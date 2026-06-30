@@ -1,0 +1,547 @@
+openapi: 3.0.3
+info:
+  title: JAAS Module 0 Identity API
+  description: API specifications for Module 0 — Tenant, Identity, and RBAC authorization core.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Dev Server
+paths:
+  /auth/login:
+    post:
+      summary: User Login
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - tenant_slug
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                tenant_slug:
+                  type: string
+      responses:
+        '200':
+          description: Successful Login
+        '401':
+          description: Invalid Credentials
+        '403':
+          description: Tenant Suspended or User Account Inactive
+
+  /auth/logout:
+    post:
+      summary: User Logout
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      responses:
+        '200':
+          description: Successfully Logged Out
+        '401':
+          description: Unauthorized
+
+  /auth/refresh:
+    post:
+      summary: Token Refresh Rotation
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token rotated successfully
+        '401':
+          description: Refresh token expired or reuse breach detected
+
+  /auth/forgot-password:
+    post:
+      summary: Request Password Reset Token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - tenant_slug
+              properties:
+                email:
+                  type: string
+                  format: email
+                tenant_slug:
+                  type: string
+      responses:
+        '200':
+          description: Silently reports success to avoid email leakage
+
+  /auth/reset-password:
+    post:
+      summary: Reset Password
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - new_password
+                - confirm_password
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+                confirm_password:
+                  type: string
+      responses:
+        '200':
+          description: Password updated
+
+  /tenants:
+    post:
+      summary: Create Tenant (Superadmin only)
+      tags:
+        - Tenants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - slug
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                domain:
+                  type: string
+                plan:
+                  type: string
+      responses:
+        '201':
+          description: Tenant created
+    get:
+      summary: List Tenants
+      tags:
+        - Tenants
+      responses:
+        '200':
+          description: Paginated tenant list
+
+  /tenants/{id}:
+    get:
+      summary: Get Tenant
+      tags:
+        - Tenants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant details
+    patch:
+      summary: Update Tenant
+      tags:
+        - Tenants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                domain:
+                  type: string
+                plan:
+                  type: string
+      responses:
+        '200':
+          description: Tenant updated
+
+  /tenants/{id}/activate:
+    post:
+      summary: Activate Tenant
+      tags:
+        - Tenants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant status set to active
+
+  /tenants/{id}/suspend:
+    post:
+      summary: Suspend Tenant
+      tags:
+        - Tenants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant status set to suspended
+
+  /users:
+    post:
+      summary: Create User
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - first_name
+                - last_name
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                phone:
+                  type: string
+                role_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '201':
+          description: User created
+    get:
+      summary: List Tenant Users
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      responses:
+        '200':
+          description: List of users in tenant
+
+  /users/{id}:
+    get:
+      summary: Get User Profile
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User details
+    patch:
+      summary: Update User
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                phone:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+
+  /users/{id}/deactivate:
+    post:
+      summary: Deactivate User Account
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User set to inactive
+
+  /users/{id}/roles:
+    post:
+      summary: Assign Roles to User
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role_ids
+              properties:
+                role_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: User roles assigned successfully
+
+  /roles:
+    post:
+      summary: Create Custom Role
+      tags:
+        - Roles
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                permission_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '201':
+          description: Role created
+    get:
+      summary: List Tenant Roles
+      tags:
+        - Roles
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      responses:
+        '200':
+          description: List of roles
+
+  /roles/{id}:
+    get:
+      summary: Get Role
+      tags:
+        - Roles
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role details
+    patch:
+      summary: Update Role
+      tags:
+        - Roles
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Role updated
+    delete:
+      summary: Delete Custom Role
+      tags:
+        - Roles
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role soft deleted
+
+  /roles/{id}/permissions:
+    post:
+      summary: Assign Permissions to Role
+      tags:
+        - Roles
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - permission_ids
+              properties:
+                permission_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Permissions assigned to role
+
+  /permissions:
+    get:
+      summary: List Global Permissions
+      tags:
+        - Permissions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of global privileges
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter your user access token.
+    TenantSubdomain:
+      type: apiKey
+      in: header
+      name: Host
+      description: The request host header containing the tenant subdomain slug (e.g. acme.jaas.com).
