@@ -1,0 +1,306 @@
+// Module 0 — Database Schema (DBML Notation)
+// https://dbml.dbdiagram.io/docs/
+//
+// Conventions:
+//   - All table names: lowercase, plural, snake_case
+//   - All column names: lowercase, snake_case
+//   - Primary keys: UUID type, named "id"
+//   - Foreign keys: {referenced_table_singular}_id
+//   - Timestamps: created_at, updated_at (where mutable), deleted_at (soft delete)
+//   - Indexes: idx_{table}_{column(s)}
+//   - Unique constraints: uq_{table}_{column(s)}
+
+Project JAAS_Module0 {
+  database_type: 'PostgreSQL'
+  Note: 'Module 0: Tenant + Identity + RBAC'
+}
+
+// ============================================================
+// TENANTS
+// ============================================================
+
+Table tenants {
+  id uuid [pk, note: 'UUIDv4 primary key']
+  name varchar(255) [not null, note: 'Display name of the tenant organization']
+  slug varchar(64) [unique, not null, note: 'URL-safe identifier for subdomain routing. Immutable after creation.']
+  domain varchar(255) [unique, note: 'Custom domain if configured. Nullable.']
+  status varchar(20) [not null, default: 'active', note: 'Enum: active, suspended, inactive']
+  plan varchar(50) [not null, default: 'free', note: 'Subscription plan identifier']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [note: 'Soft delete timestamp. NULL = active record.']
+
+  indexes {
+    slug [name: 'idx_tenants_slug']
+    domain [name: 'idx_tenants_domain']
+    status [name: 'idx_tenants_status']
+    deleted_at [name: 'idx_tenants_deleted_at']
+  }
+
+  Note: 'Root entity. Each tenant represents an isolated customer organization.'
+}
+
+// ============================================================
+// TENANT SETTINGS
+// ============================================================
+
+Table tenant_settings {
+  id uuid [pk]
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Owning tenant']
+  key varchar(255) [not null, note: 'Setting key (e.g., timezone, locale, mfa_required)']
+  value text [not null, note: 'Setting value as string']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (tenant_id, key) [unique, name: 'uq_tenant_settings_tenant_key']
+    tenant_id [name: 'idx_tenant_settings_tenant_id']
+  }
+
+  Note: 'Key-value configuration scoped to a tenant.'
+}
+
+// ============================================================
+// USERS
+// ============================================================
+
+Table users {
+  id uuid [pk]
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Owning tenant']
+  email varchar(255) [not null, note: 'User email address']
+  password_hash varchar(255) [not null, note: 'bcrypt hashed password (cost 12)']
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+  phone varchar(20) [note: 'Nullable. E.164 format recommended.']
+  avatar_url varchar(500) [note: 'Nullable. URL to profile image.']
+  status varchar(20) [not null, default: 'active', note: 'Enum: active, inactive, invited, suspended']
+  email_verified_at timestamptz [note: 'Nullable. Set when email is verified.']
+  last_login_at timestamptz [note: 'Nullable. Updated on each successful login.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [note: 'Soft delete timestamp']
+
+  indexes {
+    (tenant_id, email) [unique, name: 'uq_users_tenant_email']
+    tenant_id [name: 'idx_users_tenant_id']
+    email [name: 'idx_users_email']
+    status [name: 'idx_users_status']
+    deleted_at [name: 'idx_users_deleted_at']
+  }
+
+  Note: 'User identity within a tenant. Email is unique per tenant.'
+}
+
+// ============================================================
+// ROLES
+// ============================================================
+
+Table roles {
+  id uuid [pk]
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Owning tenant']
+  name varchar(100) [not null, note: 'Role name, unique within tenant']
+  description varchar(500) [note: 'Nullable. Human-readable description.']
+  is_system boolean [not null, default: false, note: 'System roles cannot be deleted or renamed']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [note: 'Soft delete timestamp']
+
+  indexes {
+    (tenant_id, name) [unique, name: 'uq_roles_tenant_name']
+    tenant_id [name: 'idx_roles_tenant_id']
+    deleted_at [name: 'idx_roles_deleted_at']
+  }
+
+  Note: 'RBAC role scoped to a tenant. Binds permissions to users.'
+}
+
+// ============================================================
+// PERMISSIONS
+// ============================================================
+
+Table permissions {
+  id uuid [pk]
+  resource varchar(100) [not null, note: 'Resource name (e.g., users, roles, tenants)']
+  action varchar(50) [not null, note: 'Action name (e.g., create, read, update, delete)']
+  description varchar(500) [note: 'Nullable. Human-readable description.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (resource, action) [unique, name: 'uq_permissions_resource_action']
+    resource [name: 'idx_permissions_resource']
+  }
+
+  Note: 'Global permission definitions. NOT tenant-scoped. Defines what can be done.'
+}
+
+// ============================================================
+// USER ROLES (Join Table)
+// ============================================================
+
+Table user_roles {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id, note: 'Assigned user']
+  role_id uuid [not null, ref: > roles.id, note: 'Assigned role']
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Tenant scope']
+  assigned_at timestamptz [not null, default: `now()`, note: 'When the role was assigned']
+  assigned_by uuid [ref: > users.id, note: 'Nullable. User who made the assignment.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, role_id, tenant_id) [unique, name: 'uq_user_roles_user_role_tenant']
+    user_id [name: 'idx_user_roles_user_id']
+    role_id [name: 'idx_user_roles_role_id']
+    tenant_id [name: 'idx_user_roles_tenant_id']
+  }
+
+  Note: 'Many-to-many relationship between users and roles within a tenant.'
+}
+
+// ============================================================
+// ROLE PERMISSIONS (Join Table)
+// ============================================================
+
+Table role_permissions {
+  id uuid [pk]
+  role_id uuid [not null, ref: > roles.id, note: 'Role receiving the permission']
+  permission_id uuid [not null, ref: > permissions.id, note: 'Permission being granted']
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Tenant scope']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (role_id, permission_id, tenant_id) [unique, name: 'uq_role_permissions_role_perm_tenant']
+    role_id [name: 'idx_role_permissions_role_id']
+    permission_id [name: 'idx_role_permissions_permission_id']
+    tenant_id [name: 'idx_role_permissions_tenant_id']
+  }
+
+  Note: 'Many-to-many relationship between roles and permissions within a tenant.'
+}
+
+// ============================================================
+// SESSIONS
+// ============================================================
+
+Table sessions {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id, note: 'Session owner']
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Tenant scope']
+  ip_address varchar(45) [not null, note: 'IPv4 or IPv6 address']
+  user_agent varchar(500) [not null, note: 'Browser/client user agent string']
+  expires_at timestamptz [not null, note: 'Session expiry timestamp']
+  revoked_at timestamptz [note: 'Nullable. Set when session is revoked.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_sessions_user_id']
+    tenant_id [name: 'idx_sessions_tenant_id']
+    (user_id, tenant_id) [name: 'idx_sessions_user_tenant']
+    expires_at [name: 'idx_sessions_expires_at']
+  }
+
+  Note: 'Active login session. Created on login, revoked on logout or deactivation.'
+}
+
+// ============================================================
+// REFRESH TOKENS
+// ============================================================
+
+Table refresh_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id, note: 'Token owner']
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Tenant scope']
+  token_hash varchar(64) [unique, not null, note: 'SHA-256 hash of the opaque refresh token']
+  expires_at timestamptz [not null, note: 'Token expiry timestamp (7 days from creation)']
+  revoked_at timestamptz [note: 'Nullable. Set when token is revoked or rotated.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    token_hash [unique, name: 'uq_refresh_tokens_token_hash']
+    user_id [name: 'idx_refresh_tokens_user_id']
+    tenant_id [name: 'idx_refresh_tokens_tenant_id']
+    (user_id, tenant_id) [name: 'idx_refresh_tokens_user_tenant']
+  }
+
+  Note: 'Opaque refresh token for JWT renewal. Supports rotation and reuse detection.'
+}
+
+// ============================================================
+// PASSWORD RESET TOKENS
+// ============================================================
+
+Table password_reset_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id, note: 'User requesting the reset']
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Tenant scope']
+  token_hash varchar(64) [unique, not null, note: 'SHA-256 hash of the reset token']
+  expires_at timestamptz [not null, note: 'Token expiry (1 hour from creation)']
+  used_at timestamptz [note: 'Nullable. Set when the token is consumed.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    token_hash [unique, name: 'uq_password_reset_tokens_token_hash']
+    user_id [name: 'idx_password_reset_tokens_user_id']
+    tenant_id [name: 'idx_password_reset_tokens_tenant_id']
+  }
+
+  Note: 'Time-limited, single-use token for password reset.'
+}
+
+// ============================================================
+// MFA CONFIGS
+// ============================================================
+
+Table mfa_configs {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id, note: 'User owning this MFA config']
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Tenant scope']
+  type varchar(20) [not null, note: 'Enum: totp, sms, email']
+  secret varchar(500) [not null, note: 'Encrypted MFA secret']
+  is_enabled boolean [not null, default: false, note: 'Whether MFA is actively enforced']
+  verified_at timestamptz [note: 'Nullable. Must be set before is_enabled can be true.']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, type) [unique, name: 'uq_mfa_configs_user_type']
+    user_id [name: 'idx_mfa_configs_user_id']
+    tenant_id [name: 'idx_mfa_configs_tenant_id']
+  }
+
+  Note: 'Per-user MFA configuration. One entry per MFA type per user.'
+}
+
+// ============================================================
+// AUDIT LOGS
+// ============================================================
+
+Table audit_logs {
+  id uuid [pk]
+  tenant_id uuid [not null, ref: > tenants.id, note: 'Tenant scope']
+  user_id uuid [ref: > users.id, note: 'Nullable. NULL for system-initiated actions.']
+  action varchar(100) [not null, note: 'Action identifier (e.g., tenant.created, user.login.success)']
+  resource varchar(100) [not null, note: 'Resource type (e.g., tenant, user, role)']
+  resource_id varchar(36) [note: 'Nullable. UUID of the affected resource.']
+  metadata jsonb [note: 'Nullable. Action-specific context as JSON.']
+  ip_address varchar(45) [note: 'Nullable. Client IP address.']
+  user_agent varchar(500) [note: 'Nullable. Client user agent.']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    tenant_id [name: 'idx_audit_logs_tenant_id']
+    user_id [name: 'idx_audit_logs_user_id']
+    action [name: 'idx_audit_logs_action']
+    resource [name: 'idx_audit_logs_resource']
+    created_at [name: 'idx_audit_logs_created_at']
+    (tenant_id, created_at) [name: 'idx_audit_logs_tenant_created']
+    (tenant_id, action) [name: 'idx_audit_logs_tenant_action']
+  }
+
+  Note: 'Immutable audit trail. No updated_at, no deleted_at. Append-only.'
+}

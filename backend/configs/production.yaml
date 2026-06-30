@@ -1,0 +1,29 @@
+# JAAS Production Configuration
+server:
+  port: 8080
+  env: production
+
+database:
+  host: db
+  port: 5432
+  user: postgres
+  password: ""
+  dbname: jaas_prod
+  sslmode: require
+
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+
+rabbitmq:
+  host: rabbitmq
+  port: 5672
+  user: guest
+  password: guest
+
+jwt:
+  secret: "" # Must be injected via JWT_SECRET env variable in production
+  access_token_ttl: 15
+  refresh_token_ttl: 7

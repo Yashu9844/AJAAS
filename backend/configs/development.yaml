@@ -1,0 +1,29 @@
+# JAAS Development Configuration
+server:
+  port: 8080
+  env: development
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: ""
+  dbname: jaas_dev
+  sslmode: disable
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+
+rabbitmq:
+  host: localhost
+  port: 5672
+  user: guest
+  password: guest
+
+jwt:
+  secret: dev_secret_key_minimum_256_bits_for_security_purposes_only
+  access_token_ttl: 15 # in minutes
+  refresh_token_ttl: 7 # in days

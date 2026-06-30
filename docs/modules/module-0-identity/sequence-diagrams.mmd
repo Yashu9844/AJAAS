@@ -1,0 +1,675 @@
+# Module 0 — Sequence Diagrams
+
+All sequence diagrams use Mermaid syntax and document the full request lifecycle for each core operation.
+
+---
+
+## 1. Login
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant CT as AuthController
+    participant V as Validator
+    participant AS as AuthService
+    participant TR as TenantRepo
+    participant UR as UserRepo
+    participant SS as SessionService
+    participant TS as TokenService
+    participant AL as AuditService
+    participant MQ as RabbitMQ
+
+    C->>CT: POST /api/v1/auth/login
+    Note right of C: {email, password, tenant_slug}
+
+    CT->>V: Validate LoginRequest
+    alt Validation fails
+        V-->>CT: ValidationError
+        CT-->>C: 400 Bad Request
+    end
+
+    CT->>AS: Login(request)
+
+    AS->>TR: FindBySlug(tenant_slug)
+    alt Tenant not found
+        AS->>AL: LogAudit(action: user.login.failed, metadata: {reason: invalid_tenant})
+        AS-->>CT: ErrInvalidCredentials
+        CT-->>C: 401 Unauthorized
+    end
+
+    AS->>AS: Check tenant.Status == "active"
+    alt Tenant suspended/inactive
+        AS->>AL: LogAudit(action: user.login.failed, metadata: {reason: tenant_suspended})
+        AS-->>CT: ErrTenantSuspended
+        CT-->>C: 403 Forbidden
+    end
+
+    AS->>UR: FindByEmail(tenant_id, email)
+    alt User not found
+        AS->>AL: LogAudit(action: user.login.failed, metadata: {reason: invalid_email})
+        AS-->>CT: ErrInvalidCredentials
+        CT-->>C: 401 Unauthorized
+    end
+
+    AS->>AS: bcrypt.CompareHashAndPassword(user.PasswordHash, password)
+    alt Password mismatch
+        AS->>AL: LogAudit(action: user.login.failed, metadata: {reason: invalid_password, user_id})
+        AS-->>CT: ErrInvalidCredentials
+        CT-->>C: 401 Unauthorized
+    end
+
+    AS->>AS: Check user.Status == "active"
+    alt User not active
+        AS->>AL: LogAudit(action: user.login.failed, metadata: {reason: user_not_active})
+        AS-->>CT: ErrAccountNotActive
+        CT-->>C: 403 Forbidden
+    end
+
+    rect rgb(200, 230, 200)
+        Note over AS,TS: Begin Transaction
+        AS->>SS: CreateSession(user_id, tenant_id, ip, user_agent)
+        AS->>TS: GenerateRefreshToken(user_id, tenant_id)
+        AS->>UR: UpdateLastLoginAt(user_id)
+        Note over AS,TS: Commit Transaction
+    end
+
+    AS->>AS: GenerateJWT(user_id, tenant_id, email, roles)
+    AS->>AL: LogAudit(action: user.login.success, user_id, tenant_id)
+    AS->>MQ: Publish(identity.user.logged_in, {user_id, tenant_id, timestamp})
+
+    AS-->>CT: LoginResponse
+    CT-->>C: 200 OK {access_token, refresh_token, expires_at, user}
+```
+
+---
+
+## 2. Logout
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as AuthMiddleware
+    participant CT as AuthController
+    participant AS as AuthService
+    participant SS as SessionService
+    participant TS as TokenService
+    participant RD as Redis
+    participant AL as AuditService
+
+    C->>MW: POST /api/v1/auth/logout
+    Note right of C: Authorization: Bearer <jwt>
+    MW->>MW: Validate JWT, extract user_id, tenant_id
+    MW->>CT: Authenticated request
+
+    CT->>AS: Logout(user_id, session_id)
+
+    rect rgb(200, 230, 200)
+        Note over AS,TS: Begin Transaction
+        AS->>SS: RevokeSession(session_id)
+        SS->>RD: Delete session:{session_id}
+        AS->>TS: RevokeRefreshTokenBySession(session_id)
+        Note over AS,TS: Commit Transaction
+    end
+
+    AS->>RD: Set blacklist:{jti} with TTL = remaining JWT lifetime
+    AS->>AL: LogAudit(action: user.logout, user_id, tenant_id)
+
+    AS-->>CT: Success
+    CT-->>C: 200 OK {message: "logged out successfully"}
+```
+
+---
+
+## 3. Refresh Token
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant CT as AuthController
+    participant V as Validator
+    participant AS as AuthService
+    participant TS as TokenService
+    participant TR as TenantRepo
+    participant UR as UserRepo
+    participant SS as SessionService
+    participant AL as AuditService
+
+    C->>CT: POST /api/v1/auth/refresh
+    Note right of C: {refresh_token}
+
+    CT->>V: Validate RefreshTokenRequest
+    alt Validation fails
+        V-->>CT: ValidationError
+        CT-->>C: 400 Bad Request
+    end
+
+    CT->>AS: RefreshToken(refresh_token)
+
+    AS->>AS: Hash token with SHA-256
+    AS->>TS: FindByTokenHash(token_hash)
+
+    alt Token not found
+        AS-->>CT: ErrInvalidRefreshToken
+        CT-->>C: 401 Unauthorized
+    end
+
+    AS->>AS: Check token.RevokedAt is NULL
+    alt Token already revoked (REUSE DETECTION)
+        rect rgb(255, 200, 200)
+            Note over AS,TS: Security: Refresh token reuse detected
+            AS->>TS: RevokeAllTokensForUser(user_id, tenant_id)
+            AS->>SS: RevokeAllSessionsForUser(user_id, tenant_id)
+            AS->>AL: LogAudit(action: security.token_reuse, user_id, tenant_id)
+        end
+        AS-->>CT: ErrRefreshTokenReused
+        CT-->>C: 401 Unauthorized
+    end
+
+    AS->>AS: Check token.ExpiresAt > now()
+    alt Token expired
+        AS-->>CT: ErrRefreshTokenExpired
+        CT-->>C: 401 Unauthorized
+    end
+
+    AS->>UR: FindByID(token.UserID)
+    AS->>AS: Check user.Status == "active"
+    alt User not active
+        AS->>TS: RevokeAllTokensForUser(user_id, tenant_id)
+        AS-->>CT: ErrAccountNotActive
+        CT-->>C: 403 Forbidden
+    end
+
+    AS->>TR: FindByID(token.TenantID)
+    AS->>AS: Check tenant.Status == "active"
+    alt Tenant suspended
+        AS-->>CT: ErrTenantSuspended
+        CT-->>C: 403 Forbidden
+    end
+
+    rect rgb(200, 230, 200)
+        Note over AS,TS: Begin Transaction (Token Rotation)
+        AS->>TS: RevokeToken(old_token_id)
+        AS->>TS: GenerateRefreshToken(user_id, tenant_id)
+        Note over AS,TS: Commit Transaction
+    end
+
+    AS->>AS: GenerateJWT(user_id, tenant_id, email, roles)
+
+    AS-->>CT: RefreshTokenResponse
+    CT-->>C: 200 OK {access_token, refresh_token, expires_at}
+```
+
+---
+
+## 4. Forgot Password
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant CT as AuthController
+    participant V as Validator
+    participant AS as AuthService
+    participant TR as TenantRepo
+    participant UR as UserRepo
+    participant TS as TokenService
+    participant AL as AuditService
+    participant MQ as RabbitMQ
+
+    C->>CT: POST /api/v1/auth/forgot-password
+    Note right of C: {email, tenant_slug}
+
+    CT->>V: Validate ForgotPasswordRequest
+    alt Validation fails
+        V-->>CT: ValidationError
+        CT-->>C: 400 Bad Request
+    end
+
+    CT->>AS: ForgotPassword(email, tenant_slug)
+
+    AS->>TR: FindBySlug(tenant_slug)
+    alt Tenant not found
+        Note over AS: Return success anyway (no information leakage)
+        AS-->>CT: Success
+        CT-->>C: 200 OK {message: "if the email exists, a reset link has been sent"}
+    end
+
+    AS->>UR: FindByEmail(tenant_id, email)
+    alt User not found
+        Note over AS: Return success anyway (no information leakage)
+        AS-->>CT: Success
+        CT-->>C: 200 OK {message: "if the email exists, a reset link has been sent"}
+    end
+
+    AS->>TS: GeneratePasswordResetToken(user_id, tenant_id)
+    Note over TS: Generate 32-byte random token, SHA-256 hash stored, raw token returned
+    AS->>AL: LogAudit(action: password.reset_requested, user_id, tenant_id)
+    AS->>MQ: Publish(identity.password.reset_requested, {user_id, email, raw_token, tenant_slug})
+
+    AS-->>CT: Success
+    CT-->>C: 200 OK {message: "if the email exists, a reset link has been sent"}
+```
+
+---
+
+## 5. Reset Password
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant CT as AuthController
+    participant V as Validator
+    participant AS as AuthService
+    participant TS as TokenService
+    participant UR as UserRepo
+    participant SS as SessionService
+    participant AL as AuditService
+    participant MQ as RabbitMQ
+
+    C->>CT: POST /api/v1/auth/reset-password
+    Note right of C: {token, new_password, confirm_password}
+
+    CT->>V: Validate ResetPasswordRequest
+    alt Validation fails (passwords don't match, too short)
+        V-->>CT: ValidationError
+        CT-->>C: 400 Bad Request
+    end
+
+    CT->>AS: ResetPassword(token, new_password)
+
+    AS->>AS: Hash token with SHA-256
+    AS->>TS: FindPasswordResetTokenByHash(token_hash)
+
+    alt Token not found
+        AS-->>CT: ErrInvalidToken
+        CT-->>C: 400 Bad Request
+    end
+
+    AS->>AS: Check token.UsedAt is NULL
+    alt Token already used
+        AS-->>CT: ErrTokenAlreadyUsed
+        CT-->>C: 400 Bad Request
+    end
+
+    AS->>AS: Check token.ExpiresAt > now()
+    alt Token expired
+        AS-->>CT: ErrTokenExpired
+        CT-->>C: 400 Bad Request
+    end
+
+    AS->>AS: bcrypt.GenerateFromPassword(new_password, cost=12)
+
+    rect rgb(200, 230, 200)
+        Note over AS,SS: Begin Transaction
+        AS->>UR: UpdatePasswordHash(user_id, new_hash)
+        AS->>TS: MarkTokenAsUsed(token_id)
+        AS->>SS: RevokeAllSessionsForUser(user_id, tenant_id)
+        AS->>TS: RevokeAllRefreshTokensForUser(user_id, tenant_id)
+        Note over AS,SS: Commit Transaction
+    end
+
+    AS->>AL: LogAudit(action: password.reset_completed, user_id, tenant_id)
+    AS->>MQ: Publish(identity.password.reset, {user_id, tenant_id, timestamp})
+
+    AS-->>CT: Success
+    CT-->>C: 200 OK {message: "password has been reset successfully"}
+```
+
+---
+
+## 6. Invite User
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware
+    participant CT as UserController
+    participant V as Validator
+    participant US as UserService
+    participant UR as UserRepo
+    participant RR as RoleRepo
+    participant AL as AuditService
+    participant MQ as RabbitMQ
+
+    C->>MW: POST /api/v1/users (invite)
+    Note right of C: Authorization: Bearer <jwt>
+    MW->>MW: Auth + RBAC check (users:create)
+    MW->>CT: Authenticated request
+
+    CT->>V: Validate InviteUserRequest
+    Note right of V: {email, first_name, last_name, role_ids}
+    alt Validation fails
+        V-->>CT: ValidationError
+        CT-->>C: 400 Bad Request
+    end
+
+    CT->>US: InviteUser(request, tenant_id, invited_by)
+
+    US->>UR: FindByEmail(tenant_id, email)
+    alt Email already exists
+        US-->>CT: ErrEmailAlreadyExists
+        CT-->>C: 409 Conflict
+    end
+
+    US->>RR: ValidateRoleIDs(tenant_id, role_ids)
+    alt Invalid role IDs
+        US-->>CT: ErrInvalidRoleIDs
+        CT-->>C: 400 Bad Request
+    end
+
+    rect rgb(200, 230, 200)
+        Note over US,RR: Begin Transaction
+        US->>US: Generate temporary password hash
+        US->>UR: Create user with status "invited"
+        US->>US: Assign roles (create user_roles entries)
+        Note over US,RR: Commit Transaction
+    end
+
+    US->>AL: LogAudit(action: user.invited, user_id, tenant_id, metadata: {invited_by, email})
+    US->>MQ: Publish(identity.user.invited, {user_id, tenant_id, email, invited_by})
+
+    US-->>CT: UserResponse
+    CT-->>C: 201 Created
+```
+
+---
+
+## 7. Assign Role
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware
+    participant CT as RoleController
+    participant V as Validator
+    participant RS as RoleService
+    participant UR as UserRepo
+    participant RR as RoleRepo
+    participant AL as AuditService
+    participant RD as Redis
+    participant MQ as RabbitMQ
+
+    C->>MW: POST /api/v1/users/{id}/roles
+    Note right of C: {role_ids}
+    MW->>MW: Auth + RBAC check (users:update)
+    MW->>CT: Authenticated request
+
+    CT->>V: Validate AssignRoleRequest
+    alt Validation fails
+        V-->>CT: ValidationError
+        CT-->>C: 400 Bad Request
+    end
+
+    CT->>RS: AssignRoles(user_id, tenant_id, role_ids, assigned_by)
+
+    RS->>UR: FindByID(user_id)
+    alt User not found or different tenant
+        RS-->>CT: ErrUserNotFound
+        CT-->>C: 404 Not Found
+    end
+
+    RS->>RR: ValidateRoleIDs(tenant_id, role_ids)
+    alt Invalid role IDs
+        RS-->>CT: ErrInvalidRoleIDs
+        CT-->>C: 400 Bad Request
+    end
+
+    loop For each role_id
+        RS->>RS: Check if user_role already exists (idempotent)
+        alt Not assigned yet
+            RS->>RS: Create user_role entry
+        end
+    end
+
+    RS->>RD: Invalidate perms:{user_id}:{tenant_id}
+    RS->>AL: LogAudit(action: role.assigned, user_id, tenant_id, metadata: {role_ids, assigned_by})
+    RS->>MQ: Publish(identity.role.assigned, {user_id, role_ids, tenant_id, assigned_by})
+
+    RS-->>CT: Success
+    CT-->>C: 200 OK {message: "roles assigned successfully"}
+```
+
+---
+
+## 8. Assign Permission
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware
+    participant CT as RoleController
+    participant V as Validator
+    participant RS as RoleService
+    participant RR as RoleRepo
+    participant PR as PermissionRepo
+    participant AL as AuditService
+    participant RD as Redis
+    participant MQ as RabbitMQ
+
+    C->>MW: POST /api/v1/roles/{id}/permissions
+    Note right of C: {permission_ids}
+    MW->>MW: Auth + RBAC check (roles:update)
+    MW->>CT: Authenticated request
+
+    CT->>V: Validate AssignPermissionsRequest
+    alt Validation fails
+        V-->>CT: ValidationError
+        CT-->>C: 400 Bad Request
+    end
+
+    CT->>RS: AssignPermissions(role_id, tenant_id, permission_ids)
+
+    RS->>RR: FindByID(role_id)
+    alt Role not found or different tenant
+        RS-->>CT: ErrRoleNotFound
+        CT-->>C: 404 Not Found
+    end
+
+    RS->>PR: ValidatePermissionIDs(permission_ids)
+    alt Invalid permission IDs
+        RS-->>CT: ErrInvalidPermissionIDs
+        CT-->>C: 400 Bad Request
+    end
+
+    loop For each permission_id
+        RS->>RS: Check if role_permission already exists (idempotent)
+        alt Not assigned yet
+            RS->>RS: Create role_permission entry
+        end
+    end
+
+    RS->>RD: Invalidate perms for all users with this role
+    RS->>AL: LogAudit(action: permission.assigned, tenant_id, metadata: {role_id, permission_ids})
+    RS->>MQ: Publish(identity.permission.assigned, {role_id, permission_ids, tenant_id})
+
+    RS-->>CT: Success
+    CT-->>C: 200 OK {message: "permissions assigned successfully"}
+```
+
+---
+
+## 9. Deactivate User
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware
+    participant CT as UserController
+    participant US as UserService
+    participant UR as UserRepo
+    participant SS as SessionService
+    participant TS as TokenService
+    participant RD as Redis
+    participant AL as AuditService
+    participant MQ as RabbitMQ
+
+    C->>MW: POST /api/v1/users/{id}/deactivate
+    MW->>MW: Auth + RBAC check (users:update)
+    MW->>CT: Authenticated request
+
+    CT->>US: DeactivateUser(user_id, tenant_id)
+
+    US->>UR: FindByID(user_id)
+    alt User not found or different tenant
+        US-->>CT: ErrUserNotFound
+        CT-->>C: 404 Not Found
+    end
+
+    US->>US: Check user.Status != "inactive"
+    alt Already inactive
+        US-->>CT: ErrUserAlreadyInactive
+        CT-->>C: 409 Conflict
+    end
+
+    rect rgb(200, 230, 200)
+        Note over US,TS: Begin Transaction
+        US->>UR: UpdateStatus(user_id, "inactive")
+        US->>SS: RevokeAllSessionsForUser(user_id, tenant_id)
+        US->>TS: RevokeAllRefreshTokensForUser(user_id, tenant_id)
+        Note over US,TS: Commit Transaction
+    end
+
+    US->>RD: Delete session:* for user, Delete perms:{user_id}:*
+    US->>AL: LogAudit(action: user.deactivated, user_id, tenant_id)
+    US->>MQ: Publish(identity.user.deactivated, {user_id, tenant_id, timestamp})
+
+    US-->>CT: Success
+    CT-->>C: 200 OK {message: "user deactivated successfully"}
+```
+
+---
+
+## 10. Suspend Tenant
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware
+    participant CT as TenantController
+    participant TS as TenantService
+    participant TR as TenantRepo
+    participant AL as AuditService
+    participant MQ as RabbitMQ
+
+    C->>MW: POST /api/v1/tenants/{id}/suspend
+    MW->>MW: Auth (Super Admin only)
+    MW->>CT: Authenticated request
+
+    CT->>TS: SuspendTenant(tenant_id)
+
+    TS->>TR: FindByID(tenant_id)
+    alt Tenant not found
+        TS-->>CT: ErrTenantNotFound
+        CT-->>C: 404 Not Found
+    end
+
+    TS->>TS: Check tenant.Status == "active"
+    alt Not active
+        TS-->>CT: ErrTenantAlreadySuspended
+        CT-->>C: 409 Conflict
+    end
+
+    TS->>TR: UpdateStatus(tenant_id, "suspended")
+    TS->>AL: LogAudit(action: tenant.suspended, tenant_id)
+    TS->>MQ: Publish(identity.tenant.suspended, {tenant_id, timestamp})
+
+    Note over TS: Existing sessions will fail at tenant middleware on next request
+
+    TS-->>CT: TenantResponse
+    CT-->>C: 200 OK
+```
+
+---
+
+## 11. Activate Tenant
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware
+    participant CT as TenantController
+    participant TS as TenantService
+    participant TR as TenantRepo
+    participant AL as AuditService
+    participant MQ as RabbitMQ
+
+    C->>MW: POST /api/v1/tenants/{id}/activate
+    MW->>MW: Auth (Super Admin only)
+    MW->>CT: Authenticated request
+
+    CT->>TS: ActivateTenant(tenant_id)
+
+    TS->>TR: FindByID(tenant_id)
+    alt Tenant not found
+        TS-->>CT: ErrTenantNotFound
+        CT-->>C: 404 Not Found
+    end
+
+    TS->>TS: Check tenant.Status == "suspended"
+    alt Not suspended
+        TS-->>CT: ErrTenantAlreadyActive
+        CT-->>C: 409 Conflict
+    end
+
+    TS->>TR: UpdateStatus(tenant_id, "active")
+    TS->>AL: LogAudit(action: tenant.activated, tenant_id)
+    TS->>MQ: Publish(identity.tenant.activated, {tenant_id, timestamp})
+
+    TS-->>CT: TenantResponse
+    CT-->>C: 200 OK
+```
+
+---
+
+## 12. Session Validation (Middleware)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as AuthMiddleware
+    participant RD as Redis
+    participant DB as PostgreSQL
+
+    C->>MW: Any authenticated request
+    Note right of C: Authorization: Bearer <jwt>
+
+    MW->>MW: Extract JWT from header
+    MW->>MW: Verify JWT signature
+    alt Invalid signature
+        MW-->>C: 401 Unauthorized
+    end
+
+    MW->>MW: Check JWT expiration
+    alt Expired
+        MW-->>C: 401 Unauthorized
+    end
+
+    MW->>MW: Extract claims (user_id, tenant_id, session_id, jti)
+
+    MW->>RD: Check blacklist:{jti}
+    alt Token is blacklisted
+        MW-->>C: 401 Unauthorized
+    end
+
+    MW->>RD: Check session:{session_id}
+    alt Session found in cache
+        MW->>MW: Verify session not revoked and not expired
+        alt Session invalid
+            MW-->>C: 401 Unauthorized
+        end
+    else Cache miss
+        MW->>DB: SELECT * FROM sessions WHERE id = session_id
+        alt Session not found or revoked or expired
+            MW-->>C: 401 Unauthorized
+        end
+        MW->>RD: Cache session data
+    end
+
+    MW->>MW: Extract tenant_id from subdomain
+    MW->>MW: Verify JWT tenant_id matches subdomain tenant_id
+    alt Mismatch
+        MW-->>C: 403 Forbidden
+    end
+
+    MW->>MW: Set user_id, tenant_id, roles in request context
+    MW->>MW: Continue to next middleware / controller
+```
