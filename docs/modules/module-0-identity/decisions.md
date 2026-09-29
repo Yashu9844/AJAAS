@@ -1,0 +1,4 @@
+# Module 0 — Decisions (operational ADR additions)
+
+2026-09-30 — Scaffold: 17-file operational bundle layered onto the 16-file spec base on branch loop_engineering (docs-only, zero production impact). Reason: MASTER_PROMPT Step 4 — loop needs module context to start. Alternative: write all operational files during G0-1. Tradeoff: bundle exists before code; content filled with real repo facts, no placeholders.
+2026-09-30 — plan.md owns phase truth; current-goal.md mirrors CURRENT row; implementation-checklist.md remains canonical task list; todo.md is the operational mirror with Goal IDs. Reason: three artifacts serve different readers (loop tick, human scan, phase tracker) without triple-maintenance — goal text written once in plan.md, mirrored by reference.
