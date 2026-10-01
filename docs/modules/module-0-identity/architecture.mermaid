@@ -1,0 +1,53 @@
+flowchart TB
+    %% Class Definitions for Premium Styling
+    classDef client fill:#E1F5FE,stroke:#039BE5,stroke-width:2px,color:#01579B;
+    classDef middleware fill:#FFF3E0,stroke:#FB8C00,stroke-width:2px,color:#E65100;
+    classDef controller fill:#FFEBEE,stroke:#E53935,stroke-width:2px,color:#B71C1C;
+    classDef service fill:#E8F5E9,stroke:#43A047,stroke-width:2px,color:#1B5E20;
+    classDef repo fill:#F3E5F5,stroke:#8E24AA,stroke-width:2px,color:#4A148C;
+    classDef storage fill:#ECEFF1,stroke:#546E7A,stroke-width:2px,color:#263238;
+
+    %% Subgraphs for Structured Layers
+    subgraph ClientLayer ["🌐 Request Ingress"]
+        Client["Client (Web / Mobile App)"]:::client
+    end
+
+    subgraph MiddlewareLayer ["🛡️ Security & Context Middleware Stack"]
+        CORS["CORS Middleware"]:::middleware
+        RateLimit["Rate Limiter (Redis-Backed)"]:::middleware
+        TenantResolver["Tenant Resolver (Subdomain Parse)"]:::middleware
+        AuthMiddleware["JWT Authenticator"]:::middleware
+        RBAC["RBAC Permission Guard"]:::middleware
+
+        CORS --> RateLimit
+        RateLimit --> TenantResolver
+        TenantResolver --> AuthMiddleware
+        AuthMiddleware --> RBAC
+    end
+
+    subgraph DeliveryLayer ["⚡ Delivery / API Handlers"]
+        Controllers["Gin REST Controllers"]:::controller
+    end
+
+    subgraph DomainLayer ["🧠 Services Business Logic"]
+        Services["Core Services Layer"]:::service
+    end
+
+    subgraph InfraLayer ["💾 Infrastructure Access"]
+        Repos["GORM Repositories Layer"]:::repo
+    end
+
+    subgraph StorageLayer ["🔋 Storage & Message Brokers"]
+        Postgres[("🐘 PostgreSQL DB\n(Persistent Models)")]:::storage
+        Redis[("⚡ Redis Cache\n(Blacklists & Rate Limits)")]:::storage
+        RabbitMQ[("🐇 RabbitMQ Broker\n(Async Event Queue)")]:::storage
+    end
+
+    %% Cross-Layer Flow Mappings
+    Client -->|HTTP Request| CORS
+    RBAC -->|Validated Context| Controllers
+    Controllers -->|Invoke Action| Services
+    Services -->|Database Calls| Repos
+    Repos -->|Write/Read| Postgres
+    Services -->|Session / Rate State| Redis
+    Services -->|Publish Events| RabbitMQ

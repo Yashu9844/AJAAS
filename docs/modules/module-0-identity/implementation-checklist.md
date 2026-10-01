@@ -200,28 +200,29 @@ This checklist converts every implementation task into a trackable item. Each it
 
 ### Unit Tests — Services
 
-- [ ] Create `internal/identity/services/tenant_service_test.go` — All tenant service test cases
-- [ ] Create `internal/identity/services/auth_service_test.go` — All auth service test cases
-- [ ] Create `internal/identity/services/user_service_test.go` — All user service test cases
-- [ ] Create `internal/identity/services/role_service_test.go` — All role service test cases
-- [ ] Create `internal/identity/services/permission_service_test.go` — Permission service test cases
-- [ ] Create `internal/identity/services/session_service_test.go` — Session service test cases
-- [ ] Create `internal/identity/services/token_service_test.go` — Token service test cases
-- [ ] Create `internal/identity/services/audit_service_test.go` — Audit service test cases
+- [x] Create `internal/identity/services/tenant_service_test.go` — All tenant service test cases
+- [x] Create `internal/identity/services/auth_service_test.go` — All auth service test cases
+- [x] Create `internal/identity/services/user_service_test.go` — All user service test cases
+- [x] Create `internal/identity/services/role_service_test.go` — All role service test cases
+- [x] Create `internal/identity/services/permission_service_test.go` — Permission service test cases
+- [x] Create `internal/identity/services/session_service_test.go` — Session service test cases
+- [x] Create `internal/identity/services/token_service_test.go` — Token service test cases
+- [x] Create `internal/identity/services/audit_service_test.go` — Audit service test cases
 
 ### Unit Tests — Controllers
 
-- [ ] Create `internal/identity/controllers/tenant_controller_test.go`
-- [ ] Create `internal/identity/controllers/auth_controller_test.go`
-- [ ] Create `internal/identity/controllers/user_controller_test.go`
-- [ ] Create `internal/identity/controllers/role_controller_test.go`
-- [ ] Create `internal/identity/controllers/permission_controller_test.go`
+- [x] Create `internal/identity/controllers/tenant_controller_test.go`
+- [x] Create `internal/identity/controllers/auth_controller_test.go`
+- [x] Create `internal/identity/controllers/user_controller_test.go`
+- [x] Create `internal/identity/controllers/role_controller_test.go`
+- [x] Create `internal/identity/controllers/permission_controller_test.go`
 
 ### Unit Tests — Middleware
 
-- [ ] Create `internal/identity/middleware/tenant_test.go`
-- [ ] Create `internal/identity/middleware/auth_test.go`
-- [ ] Create `internal/identity/middleware/rbac_test.go`
+- [x] Create `internal/identity/middleware/tenant_test.go`
+- [x] Create `internal/identity/middleware/auth_test.go`
+- [x] Create `internal/identity/middleware/rbac_test.go`
+- [x] Create `internal/identity/middleware/audit_test.go`
 
 ### Integration Tests — Repositories
 
