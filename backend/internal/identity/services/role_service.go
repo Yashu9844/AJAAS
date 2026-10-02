@@ -27,13 +27,13 @@ type RoleService interface {
 }
 
 type roleService struct {
-	roleRepo       repositories.RoleRepository
-	permRepo       repositories.PermissionRepository
-	userRoleRepo   repositories.UserRoleRepository
-	rolePermRepo   repositories.RolePermissionRepository
-	userRepo       repositories.UserRepository
-	publisher      queue.EventPublisher
-	auditSvc       AuditService
+	roleRepo     repositories.RoleRepository
+	permRepo     repositories.PermissionRepository
+	userRoleRepo repositories.UserRoleRepository
+	rolePermRepo repositories.RolePermissionRepository
+	userRepo     repositories.UserRepository
+	publisher    queue.EventPublisher
+	auditSvc     AuditService
 }
 
 // NewRoleService creates a new RoleService.

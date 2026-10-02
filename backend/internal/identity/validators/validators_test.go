@@ -11,12 +11,12 @@ func TestValidateSlug(t *testing.T) {
 		{"acme-corp", true},
 		{"my-company-123", true},
 		{"my--company", true}, // double hyphens matched by regex
-		{"-starting", false},   // starts with hyphen
-		{"ending-", false},     // ends with hyphen
-		{"ACME", false},        // uppercase not allowed
-		{"a", false},           // too short
-		{"ab", false},          // too short (min 3 chars required by ^[a-z][a-z0-9-]{1,62}[a-z0-9]$)
-		{"abc", true},          // length 3, valid
+		{"-starting", false},  // starts with hyphen
+		{"ending-", false},    // ends with hyphen
+		{"ACME", false},       // uppercase not allowed
+		{"a", false},          // too short
+		{"ab", false},         // too short (min 3 chars required by ^[a-z][a-z0-9-]{1,62}[a-z0-9]$)
+		{"abc", true},         // length 3, valid
 		{"very-long-slug-exceeding-sixty-four-characters-for-testing-purposes-only", false}, // > 64 chars
 	}
 

@@ -14,12 +14,12 @@ const (
 	TypeUserCreated        = "UserCreated"
 	TypeUserInvited        = "UserInvited"
 	TypeUserDeactivated    = "UserDeactivated"
-	TypeRoleAssigned        = "RoleAssigned"
-	TypeRoleRevoked         = "RoleRevoked"
-	TypePermissionAssigned  = "PermissionAssigned"
-	TypePermissionRevoked   = "PermissionRevoked"
+	TypeRoleAssigned       = "RoleAssigned"
+	TypeRoleRevoked        = "RoleRevoked"
+	TypePermissionAssigned = "PermissionAssigned"
+	TypePermissionRevoked  = "PermissionRevoked"
 	TypePasswordReset      = "PasswordReset"
-	TypeSessionRevoked      = "SessionRevoked"
+	TypeSessionRevoked     = "SessionRevoked"
 )
 
 // Routing key constants.
@@ -30,12 +30,12 @@ const (
 	RoutingKeyUserCreated        = "identity.user.created"
 	RoutingKeyUserInvited        = "identity.user.invited"
 	RoutingKeyUserDeactivated    = "identity.user.deactivated"
-	RoutingKeyRoleAssigned        = "identity.role.assigned"
-	RoutingKeyRoleRevoked         = "identity.role.revoked"
-	RoutingKeyPermissionAssigned  = "identity.permission.assigned"
-	RoutingKeyPermissionRevoked   = "identity.permission.revoked"
+	RoutingKeyRoleAssigned       = "identity.role.assigned"
+	RoutingKeyRoleRevoked        = "identity.role.revoked"
+	RoutingKeyPermissionAssigned = "identity.permission.assigned"
+	RoutingKeyPermissionRevoked  = "identity.permission.revoked"
 	RoutingKeyPasswordReset      = "identity.password.reset"
-	RoutingKeySessionRevoked      = "identity.session.revoked"
+	RoutingKeySessionRevoked     = "identity.session.revoked"
 )
 
 // Event is the generic envelope for publishing domain events.
@@ -103,13 +103,13 @@ type UserCreatedPayload struct {
 }
 
 type UserInvitedPayload struct {
-	UserID    uuid.UUID   `json:"user_id"`
-	TenantID  uuid.UUID   `json:"tenant_id"`
-	Email     string      `json:"email"`
-	FirstName string      `json:"first_name"`
-	LastName  string      `json:"last_name"`
-	InvitedBy uuid.UUID   `json:"invited_by"`
-	InvitedAt time.Time   `json:"invited_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	Email     string    `json:"email"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	InvitedBy uuid.UUID `json:"invited_by"`
+	InvitedAt time.Time `json:"invited_at"`
 }
 
 type UserDeactivatedPayload struct {

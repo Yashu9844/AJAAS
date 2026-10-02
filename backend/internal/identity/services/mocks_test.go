@@ -511,9 +511,9 @@ func (m *MockTokenService) HashOpaqueToken(token string) string {
 
 // MockSessionService stubs SessionService
 type MockSessionService struct {
-	CreateSessionFunc   func(ctx context.Context, tx *gorm.DB, userID, tenantID uuid.UUID, ipAddress, userAgent string) (*models.Session, error)
-	ValidateSessionFunc func(ctx context.Context, db *gorm.DB, sessionID uuid.UUID) (bool, error)
-	RevokeSessionFunc   func(ctx context.Context, tx *gorm.DB, sessionID uuid.UUID) error
+	CreateSessionFunc    func(ctx context.Context, tx *gorm.DB, userID, tenantID uuid.UUID, ipAddress, userAgent string) (*models.Session, error)
+	ValidateSessionFunc  func(ctx context.Context, db *gorm.DB, sessionID uuid.UUID) (bool, error)
+	RevokeSessionFunc    func(ctx context.Context, tx *gorm.DB, sessionID uuid.UUID) error
 	RevokeAllForUserFunc func(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error
 }
 
@@ -544,5 +544,3 @@ func (m *MockSessionService) RevokeAllForUser(ctx context.Context, tx *gorm.DB, 
 	}
 	return nil
 }
-
-

@@ -12,11 +12,11 @@ import (
 
 // RabbitMQPublisher implements EventPublisher using amqp091 connection.
 type RabbitMQPublisher struct {
-	url      string
-	conn     *amqp.Connection
-	ch       *amqp.Channel
-	mu       sync.RWMutex
-	closed   bool
+	url         string
+	conn        *amqp.Connection
+	ch          *amqp.Channel
+	mu          sync.RWMutex
+	closed      bool
 	notifyClose chan *amqp.Error
 }
 
