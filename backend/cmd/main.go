@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/identity"
+	"github.com/jaas/jaas/internal/organization"
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
 	"github.com/jaas/jaas/internal/shared/database"
@@ -93,6 +94,19 @@ func main() {
 	if err := db.AutoMigrate(identityModule.RegisterModels()...); err != nil {
 		log.Fatal().Err(err).Msg("Database auto-migration failed")
 	}
+
+	// 6b. Bootstrap Organization Module (depends on Module 0 services/middleware)
+	orgModule := organization.NewModule(
+		db,
+		redisClient,
+		publisher,
+		&log.Logger,
+		identityModule.UserService(),
+		identityModule.AuditService(),
+	)
+	if err := db.AutoMigrate(orgModule.RegisterModels()...); err != nil {
+		log.Fatal().Err(err).Msg("Organization auto-migration failed")
+	}
 	log.Info().Msg("Database auto-migrations executed successfully")
 
 	// 7. Initialize HTTP server engine
@@ -110,6 +124,14 @@ func main() {
 	// Group routing definitions under v1 API
 	v1Group := router.Group("/api/v1")
 	identityModule.RegisterRoutes(v1Group)
+	orgModule.RegisterRoutes(
+		v1Group,
+		identityModule.UserRoleRepository(),
+		identityModule.RolePermissionRepository(),
+		identityModule.TenantResolver(),
+		identityModule.AuthMiddleware(),
+		identityModule.AuditService(),
+	)
 
 	// Health check route
 	router.GET("/health", func(c *gin.Context) {
