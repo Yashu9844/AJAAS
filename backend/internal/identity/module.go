@@ -3,6 +3,7 @@ package identity
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/identity/controllers"
+	"github.com/jaas/jaas/internal/identity/middleware"
 	"github.com/jaas/jaas/internal/identity/models"
 	"github.com/jaas/jaas/internal/identity/repositories"
 	"github.com/jaas/jaas/internal/identity/routes"
@@ -16,10 +17,10 @@ import (
 
 // Module encapsulates the Module 0 Identity and Access Management domain.
 type Module struct {
-	db           *gorm.DB
-	redisClient  *sharedCache.RedisClient
-	publisher    sharedQueue.EventPublisher
-	logger       *zerolog.Logger
+	db          *gorm.DB
+	redisClient *sharedCache.RedisClient
+	publisher   sharedQueue.EventPublisher
+	logger      *zerolog.Logger
 
 	// Repositories
 	tenantRepo   repositories.TenantRepository
@@ -36,21 +37,21 @@ type Module struct {
 	auditRepo    repositories.AuditLogRepository
 
 	// Services
-	auditSvc     services.AuditService
-	tokenSvc     services.TokenService
-	sessionSvc   services.SessionService
-	tenantSvc    services.TenantService
-	roleSvc      services.RoleService
-	permSvc      services.PermissionService
-	userSvc      services.UserService
-	authSvc      services.AuthService
+	auditSvc   services.AuditService
+	tokenSvc   services.TokenService
+	sessionSvc services.SessionService
+	tenantSvc  services.TenantService
+	roleSvc    services.RoleService
+	permSvc    services.PermissionService
+	userSvc    services.UserService
+	authSvc    services.AuthService
 
 	// Controllers
-	tenantCtrl   *controllers.TenantController
-	authCtrl     *controllers.AuthController
-	userCtrl     *controllers.UserController
-	roleCtrl     *controllers.RoleController
-	permCtrl     *controllers.PermissionController
+	tenantCtrl *controllers.TenantController
+	authCtrl   *controllers.AuthController
+	userCtrl   *controllers.UserController
+	roleCtrl   *controllers.RoleController
+	permCtrl   *controllers.PermissionController
 }
 
 // NewModule constructs a Module container injecting database and message queue handles.
@@ -158,4 +159,28 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 		m.roleCtrl,
 		m.permCtrl,
 	)
+}
+
+// UserService exposes the user domain service to dependent modules (Module 1+).
+func (m *Module) UserService() services.UserService { return m.userSvc }
+
+// AuditService exposes the audit transport to dependent modules.
+func (m *Module) AuditService() services.AuditService { return m.auditSvc }
+
+// UserRoleRepository exposes user-role reads for RBAC middleware in dependent modules.
+func (m *Module) UserRoleRepository() repositories.UserRoleRepository { return m.userRoleRepo }
+
+// RolePermissionRepository exposes role-permission reads for RBAC middleware in dependent modules.
+func (m *Module) RolePermissionRepository() repositories.RolePermissionRepository {
+	return m.rolePermRepo
+}
+
+// TenantResolver builds the subdomain tenant-resolution middleware for dependent modules.
+func (m *Module) TenantResolver() gin.HandlerFunc {
+	return middleware.TenantResolver(m.db, m.tenantRepo)
+}
+
+// AuthMiddleware builds the JWT authentication middleware for dependent modules.
+func (m *Module) AuthMiddleware() gin.HandlerFunc {
+	return middleware.Authenticate(m.db, m.tokenSvc, m.sessionSvc)
 }
