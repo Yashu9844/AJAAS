@@ -1,14 +1,11 @@
-# Module 2 — Employee Service
+# Module 2 — Employee Management & Profiles
 
-Purpose: Own employee profiles linked to identity users, employment details, status sync.
-Responsibilities: Employee profiles, employment details, reporting links, status sync on UserDeactivated. Full spec lands at design phase — see specification.md.
-Inputs / Outputs: see specification.md.
-Dependencies: Modules 0 (Identity), 1 (Organization). See connections.md.
-Consumed By: Modules 3, 4, 5, 6.
-Contracts exposed: TBD — frozen at design phase. See plan.md P1.
-Important files: see files.md.
-How to run: see testing.md.
-How to test: see testing.md.
-Current state: NOT DESIGNED. See current-status.md.
-Current goal: no active goal. See current-goal.md.
-Known limitations: module awaits design after Modules 0 + 1 contracts. See todo.md.
+Module 2 provides comprehensive employee lifecycle tracking, profiles, contact details, statutory/bank information with field-level privacy, document attachments, and milestone event timelines.
+
+## Core Capabilities
+- Employee onboarding & code auto-generation.
+- Status transitions (`active`, `probation`, `notice`, `terminated`, `resigned`).
+- Contact and emergency details with self-service updates.
+- Statutory & banking records protected by sensitive RBAC.
+- Document metadata storage and verification workflow.
+- Milestone career timeline and reactive sync on identity user deactivation.

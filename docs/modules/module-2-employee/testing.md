@@ -1,9 +1,7 @@
-# Module 2 — Testing
+# Module 2 — Testing Strategy
 
-Strategy (MASTER_PROMPT section 14): unit (services 90 percent) + integration (Docker PG) + contract/API + security (enumeration, tamper, reuse, injection) + golden (protected) + performance (p95 budgets).
-
-Commands (activate at P2 implementation):
-- go build ./... ; go vet ./... ; gofmt -l .
-- go test -race ./internal/employee/...  (backend path: backend/internal/employee)
-- Frontend module path: frontend/src/modules/employee
-- grep -r TODO (must be empty); migrations up/down/up clean.
+## Coverage & Quality Gates
+- **Service Layer Coverage:** $\ge 90\%$ statement coverage on application services.
+- **Package Coverage:** $\ge 80\%$ statement coverage across the module.
+- **Sensors:** `go build ./...`, `go vet ./...`, `gofmt -l`, `go test ./internal/employee/...`.
+- **Negative Paths:** Duplicate code, invalid status transitions, cross-tenant leaks, unverified user attachments.

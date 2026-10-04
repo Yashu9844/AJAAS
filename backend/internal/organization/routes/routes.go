@@ -40,6 +40,7 @@ func RegisterRoutes(
 		depts.GET("", read, deptCtrl.List)
 		depts.GET("/:id", read, deptCtrl.GetByID)
 		depts.PATCH("/:id", write, auditMW("department.updated", "department"), deptCtrl.Update)
+		depts.POST("/:id/deactivate", write, auditMW("department.deactivated", "department"), deptCtrl.Deactivate)
 	}
 
 	teams := router.Group("/teams")
@@ -49,6 +50,7 @@ func RegisterRoutes(
 		teams.GET("", read, teamCtrl.List)
 		teams.GET("/:id", read, teamCtrl.GetByID)
 		teams.PATCH("/:id", write, auditMW("team.updated", "team"), teamCtrl.Update)
+		teams.POST("/:id/deactivate", write, auditMW("team.deactivated", "team"), teamCtrl.Deactivate)
 	}
 
 	desigs := router.Group("/designations")
@@ -58,6 +60,7 @@ func RegisterRoutes(
 		desigs.GET("", read, desigCtrl.List)
 		desigs.GET("/:id", read, desigCtrl.GetByID)
 		desigs.PATCH("/:id", write, auditMW("designation.updated", "designation"), desigCtrl.Update)
+		desigs.POST("/:id/deactivate", write, auditMW("designation.deactivated", "designation"), desigCtrl.Deactivate)
 	}
 
 	mappings := router.Group("/mappings")

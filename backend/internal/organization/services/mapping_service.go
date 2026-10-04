@@ -183,7 +183,7 @@ func (s *mappingService) CreateMapping(ctx context.Context, tx *gorm.DB, tenantI
 		return nil, err
 	}
 
-	publishOrOutbox(ctx, s.publisher, events.Exchange, events.RoutingKeyMappingCreated,
+	publishOrOutbox(ctx, tx, s.publisher, events.Exchange,
 		events.NewEvent(events.TypeMappingCreated, events.RoutingKeyMappingCreated, tenantID, correlationID,
 			events.MappingPayload{MappingID: m.ID, UserID: userID}))
 	_ = s.audit.Log(ctx, tx, tenantID.String(), "", "mapping.created", "mapping", m.ID.String(), map[string]string{"user_id": userID.String()}, "", "")

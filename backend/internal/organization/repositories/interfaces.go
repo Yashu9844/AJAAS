@@ -24,6 +24,7 @@ type DepartmentRepository interface {
 type TeamRepository interface {
 	Create(ctx context.Context, tx *gorm.DB, team *models.Team) error
 	FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Team, error)
+	FindByName(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID, name string) (*models.Team, error)
 	FindAll(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, departmentID *uuid.UUID, page, perPage int) ([]models.Team, int64, error)
 	CountByDepartment(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID) (int64, error)
 	Update(ctx context.Context, tx *gorm.DB, team *models.Team) error
@@ -50,5 +51,6 @@ type MappingRepository interface {
 	FindByTeam(ctx context.Context, db *gorm.DB, tenantID, teamID uuid.UUID) ([]models.Mapping, error)
 	CountActiveByDepartment(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID) (int64, error)
 	CountActiveByTeam(ctx context.Context, db *gorm.DB, tenantID, teamID uuid.UUID) (int64, error)
+	CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error)
 	Update(ctx context.Context, tx *gorm.DB, m *models.Mapping) error
 }

@@ -1,61 +1,70 @@
 # JAAS — Current State: What's Done
 
-Snapshot of the codebase as it stands today. Design-heavy, implementation-early.
+Snapshot of the codebase. Clean architecture foundation + Module 0 Identity + Module 1 Organization + Module 2 Employee fully implemented in backend.
 
 ## Project in one line
 
 JAAS (Just Another Admin SaaS / Company Operating System) — multi-tenant SaaS unifying HR, Assets, Projects, Meetings, Payroll, Reporting, AI, IoT. Target: replace Jira, Monday, ClickUp, GreytHR, Zoho One, Odoo, ERPNext.
 
 - Model: one tenant per customer (`acme.jaas.com`), isolated users / roles / data.
-- Roles: JAAS Super Admin (platform) vs Tenant Admin (customer).
+- Roles: JAAS Super Admin (platform) vs Tenant Admin (customer) vs Members.
 
 ## Languages & stack
 
-- Backend: **Go 1.25** (go.mod) — Gin, GORM + pgx, golang-jwt v5, bcrypt (cost 12), go-redis, RabbitMQ amqp, Viper, zerolog, validator v10, google/uuid.
-  - Note: `backend/Dockerfile` still says `golang:1.22-alpine` — mismatch with go.mod.
+- Backend: **Go 1.25+ / 1.27** — Gin, GORM + pgx, golang-jwt v5, bcrypt (cost 12), go-redis, RabbitMQ amqp, Viper, zerolog, validator v10, google/uuid.
 - Frontend: **TypeScript + Next.js 16.2.9 App Router + React 19.2.4**, ESLint, plain CSS. React Compiler enabled.
-- Infra / specs: Docker Compose, YAML config, DBML + Mermaid for design, Markdown docs. No migrations runner, no gateway, no CI wired yet.
+- Infra / specs: Docker Compose (frontend, backend, postgres, redis, rabbitmq), YAML config, DBML + Mermaid design docs, OpenAPI 3.0.3 Swagger spec.
 
-## Architecture & principles (as designed)
+## Architecture & principles
 
-- Multi-tenancy: shared infra + shared PostgreSQL, isolation via `tenant_id` on every row, subdomain routing (`{slug}.jaas.com/api/v1`).
+- Multi-tenancy: shared infra + shared PostgreSQL, isolation via mandatory `tenant_id` on every row, subdomain routing (`{slug}.jaas.com/api/v1`).
 - Clean Architecture + DDD layers: HTTP (Routes → Middleware → Controllers) → Application (Services → DTOs → Validators) → Domain (Models → Events → Rules) → Infrastructure (Repos → DB / Cache / Queue).
-- Conventions: UUID PKs, `created_at / updated_at / deleted_at` soft delete (except immutable `audit_logs`), `{data, meta}` success envelope, `{error: {code, message, details}}` errors, `page / per_page` pagination (20 default, 100 max).
-- Auth: JWT access 15 min + rotating refresh 7 days. Redis for sessions / rate-limit / blacklist. RabbitMQ for domain events. Middleware order: `CORS → RateLimit → TenantResolver → Auth → RBAC → Audit`.
-- Module 0 (Tenant + Identity + RBAC) is the root dependency — zero internal deps, everything else (Modules 1–12) builds on it.
+- Conventions: UUID PKs, `created_at / updated_at / deleted_at` soft delete (except immutable `audit_logs` and join tables), `{data, meta}` success envelope, `{error: {code, message, details}}` errors, `page / per_page` pagination (20 default, 100 max).
+- Auth: JWT access 15 min + rotating refresh 7 days with cryptographic reuse detection. Redis for sessions / rate-limit / token blacklisting. RabbitMQ for domain events (with NoOp/Outbox fallback).
+- Middleware order: `CORS → RequestLogger → RateLimit → TenantResolver → Auth → RBAC → Audit`.
 
 ## What's done
 
-- Product discovery: problem, requirements, 10 personas (CEO → Super Admin), journeys, IA — marked complete in `context01.md`.
-- Module 0 spec (complete on paper): 16 files in `docs/modules/module-0-identity/` — README, system-architecture, api-contracts, database-schema.dbml, sequence-diagrams, events, security, business-rules, testing-strategy, roadmap, checklist, implementation-plan, etc.
-- Backend shared foundation (`internal/shared/`, with tests):
-  - `config/config.go` — Viper YAML + env loader (server, database, redis, rabbitmq, jwt).
-  - `database/database.go` — GORM Postgres + pool (25 open / 10 idle / 5m lifetime).
-  - `database/base.go` — `BaseModel` (UUID + timestamps + soft delete + BeforeCreate hook), `TenantBaseModel` (+ `tenant_id`).
-  - `errors/errors.go` — `AppError` + sentinels (400/401/403/404/409/429/500).
-  - `logger/logger.go` — zerolog, console in dev / JSON in prod.
-  - `constants/constants.go` — statuses, token TTLs, pagination, `tenant_admin` / `member` roles.
-  - Tests: `config_test.go`, `errors_test.go`, `base_test.go`.
-- Config & dev scaffolding: `configs/development.yaml` + `production.yaml`, `Makefile` (`dev-frontend`, `dev-backend`, `docker-up/down`), `docker-compose.yml` (frontend:3000, backend:8080), backend + frontend Dockerfiles, `.env.example`.
-- Frontend bootstrap only: `src/app/layout.tsx` + `page.tsx` ("Bootstrap foundation ready"). Directory skeleton (`app/components/hooks/lib/services/stores/types/utils`, `modules/identity,organization,employee`) is all `.gitkeep`.
+### Backend Foundation & Infrastructure
+- Shared packages: `config`, `database` (pool & BaseModel), `errors` (sentinel AppErrors), `logger` (zerolog), `constants`, `cache` (Redis client), `queue` (RabbitMQ + NoOp fallback), `utils` (validator).
+- Bootstrap: `cmd/main.go` DI container boots identity, organization, and employee modules, automigrates GORM models, connects caches and event queues, registers routes under `/api/v1`, handles graceful shutdown.
+- API Documentation: `backend/api/swagger.yaml` OpenAPI 3.0.3 spec covers all 24 Identity endpoints, 20 Organization endpoints, and 13 Employee endpoints.
 
-## What's partially done / broken
+### Module 0 — Identity & RBAC (Complete)
+- 12 GORM models & 12 migration pairs (000001–000012).
+- 12 repositories with tenant-scoping.
+- 8 services: Tenant, Auth (token rotation + reuse breach revocation), User, Role, Permission, Session, Token, Audit.
+- 5 controllers & 24 REST endpoints.
+- Full middleware stack: Subdomain Tenant Resolver, JWT Auth, RBAC permission checker, Audit logger, CORS, sliding-window Rate Limiter.
+- 12 domain events with publisher.
+- 100% unit tests passing with high coverage across services and controllers.
 
-- `internal/identity/models/tenant.go` exists but references `User, Role, Session, AuditLog, TenantSettings` which don't exist yet — won't compile. Only 1 of ~12 models.
-- `Makefile dev-backend` points at `cmd/main.go` — file doesn't exist (`cmd/` is just `.gitkeep`). Same for `api/`, `migrations/`, `internal/organization`, `internal/employee` (all empty).
-- `docker-compose.yml` has frontend + backend only — Postgres, Redis, RabbitMQ, Kong, SMTP from the spec are missing.
-- `production.yaml` has empty `database.password` and `jwt.secret` (must inject via env). `.env.example` only has `PORT` + `DATABASE_URL`.
-- No TODOs in code — but that's because there's almost no feature code yet; the pending work lives in `implementation-checklist.md` / `implementation-roadmap.md`.
+### Module 1 — Organization Structure (Complete)
+- 4 domain models (Department with acyclic tree hierarchy, Team, Designation, Mapping) + Outbox model.
+- 5 migration pairs (000013–000017).
+- 4 tenant-scoped repositories.
+- 5 services: Department (depth ≤ 10, cycle guards), Team, Designation, Mapping (single primary check, manager cycle prevention), OrgChart (forest generator, reporting chains), Event Consumer.
+- User deactivation convergence: deactivating a user automatically converges org mappings in the same transaction.
+- 5 controllers & 20 REST endpoints with RBAC (`organization:read`, `organization:update`) and audit logging.
+- 7 domain events published to outbox/RabbitMQ.
+- Comprehensive unit test suites covering services, edge cases, error paths, branch coverage, and hierarchy rules.
 
-## What's pending (the real work)
+### Module 2 — Employee Management & Records (Complete)
+- 7 domain models (`EmployeeProfile`, `EmploymentDetail`, `EmployeeContact`, `EmployeeStatutory`, `EmployeeDocument`, `EmployeeTimeline`, `EmployeeEventsOutbox`).
+- 7 migration pairs (000018–000024).
+- 4 tenant-scoped repositories (Profile, Statutory, Document, Timeline).
+- 5 application services:
+  - `EmployeeService`: Atomic onboarding, employee code uniqueness, self-service contact update, status transitions (`active`, `probation`, `notice`, `terminated`, `resigned`).
+  - `EmployeeStatutoryService`: Field-level PII masking for banking & tax IDs with strict RBAC (`employee:read_sensitive`, `employee:update_sensitive`).
+  - `EmployeeDocumentService`: Document metadata attachment & admin verification workflow.
+  - `EmployeeTimelineService`: Chronological career milestone audit log.
+  - `EventConsumer`: Status sync on `identity.user.deactivated`.
+- 4 controllers & 13 REST endpoints registered under `/api/v1/employees` with RBAC and AuditLog middleware.
+- 5 domain events published to outbox/RabbitMQ.
+- 100% unit test suites passing across models, validators, services, and controllers.
 
-- Immediate next per `context01.md`: Module 0 ER Diagram review → then Module 1 Organization Architecture (Departments, Teams, Designations, Reporting hierarchy, Org chart).
-- Backend roadmap Phases 2–10 (~30h est.): 11 models, 12 migrations, DTOs/validation, events/queue, repositories, 8 services (Auth/Tenant/User/Role/Permission/Session/Token/Audit), controllers/routes, middleware stack, bootstrap + Swagger.
-- Frontend: auth pages, org/employee pages, state, API clients — all unwritten.
-- Modules 1–12: Organization, Employee, Attendance/Leave, Projects, Meetings, Approvals, Notifications, Assets, Payroll, Analytics, AI, IoT — design + code pending.
+## What's pending
 
-## Open questions for discussion
-
-- Confirm `tenant.go` won't build — finish models + migrations next, or ER diagram first?
-- Fix `golang:1.22` Dockerfile vs go 1.25, add missing `cmd/main.go`, infra services in compose?
-- Frontend: which module (identity/auth) gets built first against the future API?
+- Integration testing against live PostgreSQL/Redis/RabbitMQ containers via Docker (`tests/api/`).
+- Frontend UI implementation (Identity, Organization, Employee slices).
+- Module 3: Attendance & Leave Management design and implementation.

@@ -39,6 +39,7 @@ type Module struct {
 	desigSvc   services.DesignationService
 	mappingSvc services.MappingService
 	chartSvc   services.OrgChartService
+	consumer   services.EventConsumer
 
 	// Controllers
 	deptCtrl    *controllers.DepartmentController
@@ -90,9 +91,10 @@ func NewModule(
 
 	m.deptSvc = services.NewDepartmentService(m.deptRepo, m.teamRepo, m.mappingRepo, publisher, audit)
 	m.teamSvc = services.NewTeamService(m.teamRepo, m.deptRepo, m.mappingRepo, users, publisher, audit)
-	m.desigSvc = services.NewDesignationService(m.desigRepo, publisher, audit)
+	m.desigSvc = services.NewDesignationService(m.desigRepo, m.mappingRepo, publisher, audit)
 	m.mappingSvc = services.NewMappingService(m.mappingRepo, m.deptRepo, m.teamRepo, m.desigRepo, users, publisher, audit)
 	m.chartSvc = services.NewOrgChartService(m.deptRepo, m.teamRepo, m.mappingRepo, m.desigRepo, redisClient)
+	m.consumer = services.NewEventConsumer(m.mappingSvc)
 
 	m.deptCtrl = controllers.NewDepartmentController(db, m.deptSvc)
 	m.teamCtrl = controllers.NewTeamController(db, m.teamSvc)
@@ -110,8 +112,16 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.Team{},
 		&models.Designation{},
 		&models.Mapping{},
+		&models.OrgEventOutbox{},
 	}
 }
+
+// Consumer exposes the identity-event consumer for broker subscription wiring.
+func (m *Module) Consumer() services.EventConsumer { return m.consumer }
+
+// MappingService exposes the mapping domain service for cross-module
+// convergence (FR-M005 hook registered in cmd/main.go).
+func (m *Module) MappingService() services.MappingService { return m.mappingSvc }
 
 // RegisterRoutes hooks org endpoint groups onto the API router. The identity
 // module owns tenantResolver/authMiddleware construction; org reuses them.

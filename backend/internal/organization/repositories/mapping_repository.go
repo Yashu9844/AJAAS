@@ -84,6 +84,12 @@ func (r *mappingRepository) CountActiveByTeam(ctx context.Context, db *gorm.DB, 
 	return total, err
 }
 
+func (r *mappingRepository) CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error) {
+	var total int64
+	err := db.WithContext(ctx).Model(&models.Mapping{}).Where("tenant_id = ? AND designation_id = ? AND status = 'active'", tenantID, designationID).Count(&total).Error
+	return total, err
+}
+
 func (r *mappingRepository) Update(ctx context.Context, tx *gorm.DB, m *models.Mapping) error {
 	return tx.WithContext(ctx).Save(m).Error
 }

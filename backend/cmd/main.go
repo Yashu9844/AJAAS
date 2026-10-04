@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jaas/jaas/internal/employee"
 	"github.com/jaas/jaas/internal/identity"
+	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/organization"
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
@@ -104,8 +106,23 @@ func main() {
 		identityModule.UserService(),
 		identityModule.AuditService(),
 	)
+	// FR-M005: deactivating a user converges org mappings in the same transaction.
+	identityServices.SetUserDeactivationConverger(orgModule.MappingService())
 	if err := db.AutoMigrate(orgModule.RegisterModels()...); err != nil {
 		log.Fatal().Err(err).Msg("Organization auto-migration failed")
+	}
+
+	// 6c. Bootstrap Employee Module (depends on Identity & Org)
+	employeeModule := employee.NewModule(
+		db,
+		redisClient,
+		publisher,
+		&log.Logger,
+		identityModule.UserService(),
+		identityModule.AuditService(),
+	)
+	if err := db.AutoMigrate(employeeModule.RegisterModels()...); err != nil {
+		log.Fatal().Err(err).Msg("Employee auto-migration failed")
 	}
 	log.Info().Msg("Database auto-migrations executed successfully")
 
@@ -125,6 +142,14 @@ func main() {
 	v1Group := router.Group("/api/v1")
 	identityModule.RegisterRoutes(v1Group)
 	orgModule.RegisterRoutes(
+		v1Group,
+		identityModule.UserRoleRepository(),
+		identityModule.RolePermissionRepository(),
+		identityModule.TenantResolver(),
+		identityModule.AuthMiddleware(),
+		identityModule.AuditService(),
+	)
+	employeeModule.RegisterRoutes(
 		v1Group,
 		identityModule.UserRoleRepository(),
 		identityModule.RolePermissionRepository(),

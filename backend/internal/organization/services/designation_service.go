@@ -23,14 +23,15 @@ type DesignationService interface {
 }
 
 type designationService struct {
-	repo      repositories.DesignationRepository
-	publisher queue.EventPublisher
-	audit     auditLogger
+	repo        repositories.DesignationRepository
+	mappingRepo repositories.MappingRepository
+	publisher   queue.EventPublisher
+	audit       auditLogger
 }
 
 // NewDesignationService creates a DesignationService.
-func NewDesignationService(repo repositories.DesignationRepository, publisher queue.EventPublisher, audit auditLogger) DesignationService {
-	return &designationService{repo: repo, publisher: publisher, audit: audit}
+func NewDesignationService(repo repositories.DesignationRepository, mappingRepo repositories.MappingRepository, publisher queue.EventPublisher, audit auditLogger) DesignationService {
+	return &designationService{repo: repo, mappingRepo: mappingRepo, publisher: publisher, audit: audit}
 }
 
 func mapDesignation(d *models.Designation) *dto.DesignationResponse {
@@ -125,6 +126,14 @@ func (s *designationService) DeactivateDesignation(ctx context.Context, tx *gorm
 	}
 	if d.Status == "inactive" {
 		return nil, &sharedErrors.AppError{Code: "CONFLICT", Message: "designation is already inactive", StatusCode: 409}
+	}
+	// FR-DG004: deactivation blocked while active mappings reference the designation.
+	refCount, err := s.mappingRepo.CountActiveByDesignation(ctx, tx, tenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	if refCount > 0 {
+		return nil, &sharedErrors.AppError{Code: "CONFLICT", Message: "designation has active mappings; migrate them first", StatusCode: 409}
 	}
 	d.Status = "inactive"
 	if err := s.repo.Update(ctx, tx, d); err != nil {

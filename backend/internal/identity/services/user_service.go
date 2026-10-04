@@ -36,6 +36,20 @@ type userService struct {
 	auditSvc     AuditService
 }
 
+// UserDeactivationConverger converges dependent state when a user is
+// deactivated (Module 1 org mappings). Set by cmd wiring; nil disables.
+type UserDeactivationConverger interface {
+	DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, correlationID uuid.UUID) error
+}
+
+var orgConverger UserDeactivationConverger
+
+// SetUserDeactivationConverger registers the cross-module convergence hook.
+// Called once at boot by cmd/main.go after both modules are wired.
+func SetUserDeactivationConverger(c UserDeactivationConverger) {
+	orgConverger = c
+}
+
 // NewUserService creates a new UserService.
 func NewUserService(
 	userRepo repositories.UserRepository,
@@ -319,6 +333,16 @@ func (s *userService) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID,
 	}
 	if err := s.tokenRepo.RevokeAllByUserID(ctx, tx, tenantID, id); err != nil {
 		return err
+	}
+
+	// FR-M005 (Module 1): converge org mappings locally (same transaction).
+	// The async identity.user.deactivated event also converges this, but the
+	// in-process call makes the API response truthful: by the time deactivate
+	// returns 200, mappings are already inactive.
+	if orgConverger != nil {
+		if err := orgConverger.DeactivateUserMappings(ctx, tx, tenantID, id, correlationID); err != nil {
+			return err
+		}
 	}
 
 	eventPayload := events.UserDeactivatedPayload{

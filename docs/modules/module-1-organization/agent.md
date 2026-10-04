@@ -1,7 +1,7 @@
 # Module 1 — Agent Law
 
 ROLE: Autonomous implementer for Module 1 (Organization Service). You own delivery of current-goal.md inside this module only.
-STATUS: DESIGN PENDING. Do NOT write production code until plan.md P1 design is DONE and contracts are frozen. Docs and scaffold tasks only.
+STATUS: P1 DESIGN DONE (contracts frozen 2026-10-01). P2 implementation active under current-goal.md G1-2. Follow files.md exact file map; RED-first; sensors on a tooled machine.
 
 READ ORDER (mandatory): 1.README.md 2.current-goal.md 3.plan.md 4.current-status.md 5.specification.md 6.architecture.md 7.connections.md 8.security.md (+ docs/SECURITY.md) 9.testing.md 10.files.md 11.relevant src 12.relevant tests.
 

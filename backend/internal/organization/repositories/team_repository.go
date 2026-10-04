@@ -32,6 +32,19 @@ func (r *teamRepository) FindByID(ctx context.Context, db *gorm.DB, tenantID, id
 	return &team, nil
 }
 
+// FindByName looks up a team by case-insensitive name within one department (FR-T002).
+func (r *teamRepository) FindByName(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID, name string) (*models.Team, error) {
+	var team models.Team
+	err := db.WithContext(ctx).First(&team, "tenant_id = ? AND department_id = ? AND lower(name) = lower(?)", tenantID, departmentID, name).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &team, nil
+}
+
 func (r *teamRepository) FindAll(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, departmentID *uuid.UUID, page, perPage int) ([]models.Team, int64, error) {
 	var teams []models.Team
 	var total int64

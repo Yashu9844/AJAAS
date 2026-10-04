@@ -121,3 +121,31 @@ func (ctrl *DepartmentController) Update(c *gin.Context) {
 	}
 	respondSuccess(c, http.StatusOK, res, nil)
 }
+
+// Deactivate handles POST /departments/:id/deactivate?force=. FR-D007.
+func (ctrl *DepartmentController) Deactivate(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department ID"})
+		return
+	}
+	force, _ := strconv.ParseBool(c.DefaultQuery("force", "false"))
+	var req dto.DeactivateRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	tenantID, ok := tenantIDOf(c)
+	if !ok {
+		respondError(c, errMissingTenant)
+		return
+	}
+	res, err := ctrl.svc.DeactivateDepartment(c.Request.Context(), ctrl.db, tenantID, id, force, req.Reason)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondSuccess(c, http.StatusOK, res, nil)
+}

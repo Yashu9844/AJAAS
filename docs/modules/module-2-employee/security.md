@@ -1,7 +1,17 @@
-# Module 2 — Security
+# Module 2 — Security Specification
 
-Law: docs/SECURITY.md (read it before any security-sensitive change).
-Module note: Employee PII (High). Encrypt sensitive fields, strict RBAC, audit all reads.
+## 1. Multi-Tenant Data Isolation
+- Every table (`employee_profiles`, `employment_details`, `employee_contacts`, `employee_statutory`, `employee_documents`, `employee_timelines`, `employee_events_outbox`) includes `tenant_id` UUID FK.
+- Repositories inject `tenant_id` into all queries. Cross-tenant access returns `404 Not Found`.
 
-Threats, PII handling, rate limits, audit requirements and trust boundaries are specified at P1 design.
-Hard rules already in force: deny by default, generic auth errors, no secrets in code/logs/responses/git, parameterized queries only, immutable audit on state changes, tenant_id on every scoped query.
+## 2. RBAC Permissions Matrix
+- `employee:read`: View basic directory and profile info (masked statutory).
+- `employee:create`: Onboard new employees.
+- `employee:update`: Modify employee records, employment terms, and status.
+- `employee:read_sensitive`: View unmasked bank account and tax IDs.
+- `employee:update_sensitive`: Modify bank details and statutory identifiers.
+- `employee:admin`: Verify documents and force status modifications.
+
+## 3. PII & Data Privacy
+- Tax IDs and bank account numbers are stored in `employee_statutory` and sanitized on general responses.
+- Self-service endpoints (`/api/v1/employees/me`) validate `userID` directly from verified JWT claims.

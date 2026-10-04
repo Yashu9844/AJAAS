@@ -1,46 +1,29 @@
-# Module 2 — Plan (updated: 2026-09-30, owner: scaffold)
+# Module 2 — Plan (updated: 2026-10-05, P0, P1 & P2 DONE, P3 NEXT)
 
 ## Phase Map
 
 | Phase | Goal ID | Objective | Depends On | Status | Proof |
 |---|---|---|---|---|---|
-| P0 | G2-0 | Bundle scaffold + dependency metadata | — | CURRENT | this scaffold |
-| P1 | G2-1 | Design: spec, architecture, contracts, goldens | Modules 0 (Identity), 1 (Organization) stable | NEXT | — |
-| P2 | G2-2 | Implement against frozen contracts | P1 | LATER | — |
-| P3 | G2-3 | Integrate + E2E + harden | P2 | LATER | — |
-
-Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED.
-Promotion needs MASTER_PROMPT section 24 Definition of Done + handoff. No phase skipping.
+| P0 | G2-0 | Bundle scaffold + dependency metadata | — | DONE | 17-file bundle initialized |
+| P1 | G2-1 | Design: spec FRs, architecture, connections, goldens, frozen REST + event contracts | Module 0 & Module 1 | DONE | spec/arch/contracts frozen 2026-10-05 |
+| P2 | G2-2 | Implement against frozen contracts (Models, Repos, Services, Controllers, Events, Swagger) | P1 | DONE | All tests pass, sensors clean, wired in main.go |
+| P3 | G2-3 | Integrate + E2E + harden + frontend slice | P2 | NEXT | — |
 
 ## Current Phase
 
-- Goal: P0 scaffold — 17-file bundle with real dependency metadata, no placeholders for known facts.
-- Why now: loop engineering must be able to start; fresh agents need module context.
-- Scope in: docs/modules/module-2-employee/**.md only.
-- Scope out: production code, schema, API.
-- Entry criteria: MASTER_PROMPT registry row known — true.
-- Exit criteria: all 17 files present, validated by Step 5 checklist.
-- Risks: design drift before deps stable (mitigate: P1 blocked until Modules 0 + 1 contracts).
-
-## Next Phase
-
-- Goal: P1 design.
-- Why next: contracts must freeze before any implementation.
-- Pre-reqs: Modules 0 + 1 contracts.
-- Est. unblocks: consumer modules (Modules 3, 4, 5, 6).
-
-## Later Phases
-
-- P2 implementation, P3 integration — per MASTER_PROMPT section 28 ordering.
+- Goal: G2-3 Integration & Frontend — E2E database verification, frontend employee profiles & directory, handoff to Module 3.
+- Pre-reqs: P2 exit true (clean build, vet, format, and passing tests).
 
 ## Gate Log
 
 | Date | Phase | Gate | Decision | By | Reason |
 |---|---|---|---|---|---|
-| 2026-09-30 | P0 | Scaffold scope (docs only) | GO | scaffold | zero production impact |
+| 2026-10-05 | P0→P1 | Scaffold verified & spec frozen | GO | loop | design contracts established |
+| 2026-10-05 | P1→P2 | P2 implementation complete & verified | GO | loop | all tests green, sensors clean |
 
 ## Progress Journal
 
 | Date | Phase | Did | Sensors | Result | Handoff |
 |---|---|---|---|---|---|
-| 2026-09-30 | P0 | bundle scaffolded | structure check | GREEN | see handoff.md |
+| 2026-10-05 | P1 | Spec, architecture, connections, goldens frozen | structure check | GREEN | ready for P2 |
+| 2026-10-05 | P2 | 7 models, 7 migrations, 5 services, 4 controllers, 13 routes, outbox, swagger | go build/vet/fmt/test | GREEN | ready for P3 |

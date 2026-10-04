@@ -533,6 +533,957 @@ paths:
         '200':
           description: List of global privileges
 
+  /departments:
+    post:
+      summary: Create Department
+      tags:
+        - Departments
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                code:
+                  type: string
+                description:
+                  type: string
+                parent_department_id:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Department created
+        '409':
+          description: Department name/code conflict or cycle detected
+    get:
+      summary: List Departments
+      tags:
+        - Departments
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: parent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: root_only
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated department list
+
+  /departments/{id}:
+    get:
+      summary: Get Department
+      tags:
+        - Departments
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Department details
+        '404':
+          description: Department not found
+    patch:
+      summary: Update Department
+      tags:
+        - Departments
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                parent_department_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Department updated
+        '409':
+          description: Cycle detected or name conflict
+
+  /departments/{id}/deactivate:
+    post:
+      summary: Deactivate Department
+      tags:
+        - Departments
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Department deactivated
+        '409':
+          description: Department has active teams/mappings without force=true
+
+  /teams:
+    post:
+      summary: Create Team
+      tags:
+        - Teams
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - department_id
+              properties:
+                name:
+                  type: string
+                department_id:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                description:
+                  type: string
+                lead_user_id:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Team created
+        '409':
+          description: Team name conflict in department
+    get:
+      summary: List Teams
+      tags:
+        - Teams
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+        - name: department_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Paginated teams list
+
+  /teams/{id}:
+    get:
+      summary: Get Team
+      tags:
+        - Teams
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Team details
+    patch:
+      summary: Update Team
+      tags:
+        - Teams
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                department_id:
+                  type: string
+                  format: uuid
+                lead_user_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Team updated
+
+  /teams/{id}/deactivate:
+    post:
+      summary: Deactivate Team
+      tags:
+        - Teams
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Team deactivated
+        '409':
+          description: Active mappings attached to team
+
+  /designations:
+    post:
+      summary: Create Designation
+      tags:
+        - Designations
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                code:
+                  type: string
+                description:
+                  type: string
+                level:
+                  type: integer
+      responses:
+        '201':
+          description: Designation created
+    get:
+      summary: List Designations
+      tags:
+        - Designations
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated designation list
+
+  /designations/{id}:
+    get:
+      summary: Get Designation
+      tags:
+        - Designations
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Designation details
+    patch:
+      summary: Update Designation
+      tags:
+        - Designations
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                level:
+                  type: integer
+      responses:
+        '200':
+          description: Designation updated
+
+  /designations/{id}/deactivate:
+    post:
+      summary: Deactivate Designation
+      tags:
+        - Designations
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Designation deactivated
+
+  /mappings:
+    post:
+      summary: Create Org Mapping
+      tags:
+        - Mappings
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                department_id:
+                  type: string
+                  format: uuid
+                team_id:
+                  type: string
+                  format: uuid
+                designation_id:
+                  type: string
+                  format: uuid
+                manager_user_id:
+                  type: string
+                  format: uuid
+                is_primary:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Mapping created
+        '409':
+          description: Manager cycle or multiple primary mappings
+    get:
+      summary: List User Mappings
+      tags:
+        - Mappings
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of mappings
+
+  /mappings/{id}:
+    get:
+      summary: Get Mapping
+      tags:
+        - Mappings
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Mapping details
+    patch:
+      summary: Update Mapping
+      tags:
+        - Mappings
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                department_id:
+                  type: string
+                  format: uuid
+                team_id:
+                  type: string
+                  format: uuid
+                designation_id:
+                  type: string
+                  format: uuid
+                manager_user_id:
+                  type: string
+                  format: uuid
+                is_primary:
+                  type: boolean
+      responses:
+        '200':
+          description: Mapping updated
+
+  /mappings/{id}/deactivate:
+    post:
+      summary: Deactivate Mapping
+      tags:
+        - Mappings
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Mapping deactivated
+
+  /org-chart:
+    get:
+      summary: Get Organization Chart Forest
+      tags:
+        - Org Chart
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: max_depth
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: include_inactive
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Full organizational tree hierarchy
+
+  /org-chart/chain:
+    get:
+      summary: Get User Reporting Chain
+      tags:
+        - Org Chart
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Upward management hierarchy and direct reports
+
+  /employees:
+    post:
+      summary: Create Employee Profile
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - employee_code
+                - first_name
+                - last_name
+                - employment_type
+                - joining_date
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                employee_code:
+                  type: string
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                display_name:
+                  type: string
+                gender:
+                  type: string
+                date_of_birth:
+                  type: string
+                  format: date
+                employment_type:
+                  type: string
+                joining_date:
+                  type: string
+                  format: date
+                personal_email:
+                  type: string
+                work_phone:
+                  type: string
+      responses:
+        '201':
+          description: Employee created
+        '409':
+          description: Duplicate employee code or profile
+    get:
+      summary: List Employees
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated employee directory
+
+  /employees/me:
+    get:
+      summary: Get Self Employee Profile
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      responses:
+        '200':
+          description: Self profile details
+    patch:
+      summary: Update Self Contact Details
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                personal_phone:
+                  type: string
+                current_address:
+                  type: string
+                permanent_address:
+                  type: string
+                emergency_contacts:
+                  type: string
+      responses:
+        '200':
+          description: Self contact updated
+
+  /employees/{id}:
+    get:
+      summary: Get Employee Profile
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Employee profile details
+    patch:
+      summary: Update Employee Profile
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                display_name:
+                  type: string
+                gender:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: Employee updated
+
+  /employees/{id}/status:
+    post:
+      summary: Transition Employee Status
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                exit_date:
+                  type: string
+                  format: date
+                exit_reason:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Status transition recorded
+
+  /employees/{id}/statutory:
+    get:
+      summary: Get Statutory & Bank Details
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: unmasked
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Bank and tax coordinates
+    put:
+      summary: Update Statutory & Bank Details
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tax_id:
+                  type: string
+                national_id:
+                  type: string
+                bank_name:
+                  type: string
+                bank_account_number:
+                  type: string
+                bank_routing_swift:
+                  type: string
+      responses:
+        '200':
+          description: Statutory information saved
+
+  /employees/{id}/documents:
+    post:
+      summary: Upload Employee Document Metadata
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - document_type
+                - file_name
+                - file_url
+                - file_size
+                - mime_type
+              properties:
+                document_type:
+                  type: string
+                file_name:
+                  type: string
+                file_url:
+                  type: string
+                file_size:
+                  type: integer
+                mime_type:
+                  type: string
+      responses:
+        '201':
+          description: Document registered
+    get:
+      summary: List Employee Documents
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of documents
+
+  /employees/{id}/documents/{doc_id}/verify:
+    post:
+      summary: Verify Employee Document
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: doc_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Document marked as verified
+
+  /employees/{id}/timeline:
+    get:
+      summary: Get Employee Career Timeline
+      tags:
+        - Employees
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of milestone career events
+
 components:
   securitySchemes:
     BearerAuth:

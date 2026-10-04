@@ -87,6 +87,13 @@ func (s *teamService) CreateTeam(ctx context.Context, tx *gorm.DB, tenantID uuid
 	if dept == nil {
 		return nil, sharedErrors.ErrNotFound
 	}
+	existing, err := s.teamRepo.FindByName(ctx, tx, tenantID, deptID, strings.TrimSpace(req.Name))
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, sharedErrors.ErrConflict
+	}
 	leadID, err := s.checkLead(ctx, tx, tenantID, req.LeadUserID)
 	if err != nil {
 		return nil, err
@@ -101,7 +108,7 @@ func (s *teamService) CreateTeam(ctx context.Context, tx *gorm.DB, tenantID uuid
 		return nil, err
 	}
 
-	publishOrOutbox(ctx, s.publisher, events.Exchange, events.RoutingKeyTeamCreated,
+	publishOrOutbox(ctx, tx, s.publisher, events.Exchange,
 		events.NewEvent(events.TypeTeamCreated, events.RoutingKeyTeamCreated, tenantID, correlationID,
 			events.TeamPayload{TeamID: team.ID, DepartmentID: deptID, Name: team.Name}))
 	_ = s.audit.Log(ctx, tx, tenantID.String(), "", "team.created", "team", team.ID.String(), map[string]string{"name": team.Name}, "", "")
@@ -145,9 +152,6 @@ func (s *teamService) UpdateTeam(ctx context.Context, tx *gorm.DB, tenantID, id 
 	}
 
 	oldDept := team.DepartmentID
-	if req.Name != nil {
-		team.Name = strings.TrimSpace(*req.Name)
-	}
 	if req.Description != nil {
 		team.Description = req.Description
 	}
@@ -164,6 +168,20 @@ func (s *teamService) UpdateTeam(ctx context.Context, tx *gorm.DB, tenantID, id 
 			return nil, sharedErrors.ErrNotFound
 		}
 		team.DepartmentID = deptID
+	}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name != team.Name {
+			// Duplicate check runs against the final department (move + rename in one request).
+			existing, err := s.teamRepo.FindByName(ctx, tx, tenantID, team.DepartmentID, name)
+			if err != nil {
+				return nil, err
+			}
+			if existing != nil && existing.ID != team.ID {
+				return nil, sharedErrors.ErrConflict
+			}
+			team.Name = name
+		}
 	}
 	if req.LeadUserID != nil {
 		leadID, err := s.checkLead(ctx, tx, tenantID, req.LeadUserID)

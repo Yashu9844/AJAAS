@@ -80,7 +80,7 @@ func (s *departmentService) CreateDepartment(ctx context.Context, tx *gorm.DB, t
 		return nil, err
 	}
 
-	publishOrOutbox(ctx, s.publisher, events.Exchange, events.RoutingKeyDepartmentCreated,
+	publishOrOutbox(ctx, tx, s.publisher, events.Exchange,
 		events.NewEvent(events.TypeDepartmentCreated, events.RoutingKeyDepartmentCreated, tenantID, correlationID,
 			events.DepartmentPayload{DepartmentID: dept.ID, Name: dept.Name}))
 	_ = s.audit.Log(ctx, tx, tenantID.String(), "", "department.created", "department", dept.ID.String(), map[string]string{"name": dept.Name}, "", "")

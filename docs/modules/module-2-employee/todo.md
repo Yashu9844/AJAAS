@@ -1,18 +1,23 @@
-# Module 2 — Todo
+# Module 2 — Todo (P1 & P2 DONE; P3 NEXT)
 
-## P0 (scaffold — this task)
-- [ ] Verify 17-file bundle present and validated (Step 5 checklist)
-  - Acceptance: every file exists, README links resolve, plan.md has one CURRENT + one NEXT
-  - Test: structure check script passes
+## P0 & P1 (done)
+- [x] 17-file bundle scaffolded
+- [x] specification.md (FR-EP, FR-ED, FR-EC, FR-ES, FR-DOC, FR-TL, FR-EV)
+- [x] architecture.md, connections.md, golden-tests.md, security.md, testing.md, files.md, decisions.md, assumptions.md
 
-## P1 (design — after Modules 0 + 1 contracts)
-- [ ] Write specification.md (FR/NFR per MASTER_PROMPT section 9 format)
-  - Dependencies: provider contracts (Modules 0 (Identity), 1 (Organization))
-  - Acceptance: numbered requirements, edge cases, explicit out-of-scope
-  - Test: contract review + consumer sign-off
-- [ ] Write architecture.md + connections.md (all edges with owner + tests)
-- [ ] Define golden-tests.md candidates (protected regression set)
-- [ ] Freeze contracts, promote P1 DONE, activate P2 in plan.md
+## P2 (done — G2-2 Implementation)
+- [x] models/ (Profile, EmploymentDetail, Contact, Statutory, Document, Timeline, Outbox) + models_test
+- [x] migrations (000018..000024) up/down pairs
+- [x] dto/ + custom validators with unit tests
+- [x] repositories/ interfaces + GORM tenant-scoped implementations
+- [x] services/ (Profile, Employment, Statutory, Document, Timeline, EventConsumer) with unit test suites
+- [x] controllers/ + routes/ (REST endpoints with RBAC & AuditLog)
+- [x] events/ (domain events + outbox pattern)
+- [x] module.go DI + wiring in cmd/main.go
+- [x] OpenAPI / Swagger documentation in backend/api/swagger.yaml
+- [x] Sensor verification: `go build`, `go vet`, `gofmt`, `go test ./internal/employee/...` all clean
 
-## P2 (future)
-- [ ] Implement, test, integrate per autonomous loop (MASTER_PROMPT section 23)
+## P3 (next — G2-3 Integration & Frontend)
+- [ ] E2E integration against PostgreSQL container (`tests/api/`)
+- [ ] Frontend Employee profile, directory, and document views
+- [ ] Handoff to Module 3 (Attendance/Leave)

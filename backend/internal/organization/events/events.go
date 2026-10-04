@@ -37,6 +37,25 @@ const (
 	RoutingKeyHierarchyMoved        = "organization.hierarchy.moved"
 )
 
+// Consumed identity routing keys (FR-E001..FR-E004, connections C7).
+const (
+	ConsumedTenantCreated   = "identity.tenant.created"
+	ConsumedTenantSuspended = "identity.tenant.suspended"
+	ConsumedUserCreated     = "identity.user.created"
+	ConsumedUserDeactivated = "identity.user.deactivated"
+)
+
+// ConsumedUserPayload is the identity user lifecycle payload consumed by org.
+type ConsumedUserPayload struct {
+	UserID   uuid.UUID `json:"user_id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+// ConsumedTenantPayload is the identity tenant lifecycle payload consumed by org.
+type ConsumedTenantPayload struct {
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
 // Event is the standard envelope (mirrors identity events).
 type Event struct {
 	EventID       uuid.UUID   `json:"event_id"`

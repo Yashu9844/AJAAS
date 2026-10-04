@@ -14,6 +14,7 @@ func TestOrgModels_Parsing(t *testing.T) {
 		&Team{},
 		&Designation{},
 		&Mapping{},
+		&OrgEventOutbox{},
 	}
 
 	cacheStore := &sync.Map{}

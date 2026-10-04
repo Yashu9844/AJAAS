@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	identityDTO "github.com/jaas/jaas/internal/identity/dto"
 	"github.com/jaas/jaas/internal/organization/dto"
+	"github.com/jaas/jaas/internal/organization/events"
 	"github.com/jaas/jaas/internal/organization/models"
 	"github.com/jaas/jaas/internal/organization/repositories"
 	"github.com/jaas/jaas/internal/organization/validators"
@@ -110,7 +112,25 @@ func mapDeptToResponse(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, dep
 	}, nil
 }
 
-// publishOrOutbox publishes an org event; queue failure never blocks the API (FR-E005).
-func publishOrOutbox(ctx context.Context, publisher queue.EventPublisher, exchange, routingKey string, evt interface{}) {
-	_ = publisher.Publish(ctx, exchange, routingKey, evt)
+// publishOrOutbox publishes an org event; on broker failure the event lands in the
+// outbox table for later retry, so queue downtime never blocks the API (FR-E005).
+// A nil tx (unit tests without a database) skips the outbox write.
+func publishOrOutbox(ctx context.Context, tx *gorm.DB, publisher queue.EventPublisher, exchange string, evt events.Event) {
+	if err := publisher.Publish(ctx, exchange, evt.RoutingKey, evt); err == nil {
+		return
+	}
+	if tx == nil {
+		return
+	}
+	raw, err := json.Marshal(evt.Payload)
+	if err != nil {
+		return
+	}
+	_ = tx.WithContext(ctx).Create(&models.OrgEventOutbox{
+		TenantID:      evt.TenantID,
+		EventType:     evt.EventType,
+		RoutingKey:    evt.RoutingKey,
+		Payload:       string(raw),
+		CorrelationID: &evt.CorrelationID,
+	})
 }

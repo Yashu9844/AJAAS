@@ -112,3 +112,30 @@ func (ctrl *DesignationController) Update(c *gin.Context) {
 	}
 	respondSuccess(c, http.StatusOK, res, nil)
 }
+
+// Deactivate handles POST /designations/:id/deactivate. FR-DG004.
+func (ctrl *DesignationController) Deactivate(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid designation ID"})
+		return
+	}
+	var req dto.DeactivateRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	tenantID, ok := tenantIDOf(c)
+	if !ok {
+		respondError(c, errMissingTenant)
+		return
+	}
+	res, err := ctrl.svc.DeactivateDesignation(c.Request.Context(), ctrl.db, tenantID, id, req.Reason)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondSuccess(c, http.StatusOK, res, nil)
+}

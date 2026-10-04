@@ -10,7 +10,6 @@ import (
 	"github.com/jaas/jaas/internal/organization/dto"
 	"github.com/jaas/jaas/internal/organization/models"
 	"github.com/jaas/jaas/internal/organization/repositories"
-	sharedCache "github.com/jaas/jaas/internal/shared/cache"
 	"gorm.io/gorm"
 )
 
@@ -20,12 +19,18 @@ type OrgChartService interface {
 	GetUserChain(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.UserChainResponse, error)
 }
 
+// chartCache is the minimal cache surface the org chart needs (satisfied by RedisClient).
+type chartCache interface {
+	Get(ctx context.Context, key string) (string, bool, error)
+	Set(ctx context.Context, key string, value string, expiration time.Duration) error
+}
+
 type orgChartService struct {
 	deptRepo    repositories.DepartmentRepository
 	teamRepo    repositories.TeamRepository
 	mappingRepo repositories.MappingRepository
 	desigRepo   repositories.DesignationRepository
-	cache       *sharedCache.RedisClient
+	cache       chartCache
 }
 
 // NewOrgChartService creates an OrgChartService. Cache may be nil (compute direct).
@@ -34,7 +39,7 @@ func NewOrgChartService(
 	teamRepo repositories.TeamRepository,
 	mappingRepo repositories.MappingRepository,
 	desigRepo repositories.DesignationRepository,
-	cache *sharedCache.RedisClient,
+	cache chartCache,
 ) OrgChartService {
 	return &orgChartService{deptRepo: deptRepo, teamRepo: teamRepo, mappingRepo: mappingRepo, desigRepo: desigRepo, cache: cache}
 }
