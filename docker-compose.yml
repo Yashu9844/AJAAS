@@ -1,6 +1,31 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: jaas_identity
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
   frontend:
     build:
       context: ./frontend
@@ -12,6 +37,8 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    depends_on:
+      - backend
 
   backend:
     build:
@@ -21,5 +48,29 @@ services:
       - "8080:8080"
     environment:
       - APP_ENV=development
+      - PORT=8080
+      - JWT_SECRET=my-super-secret-signing-key-minimum-256-bits-for-safety
+      - JWT_ACCESS_TOKEN_TTL=15
+      - JWT_REFRESH_TOKEN_TTL=10080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=jaas_identity
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
     volumes:
       - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+volumes:
+  pgdata:

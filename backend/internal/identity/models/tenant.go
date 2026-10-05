@@ -7,11 +7,11 @@ import (
 // Tenant represents an isolated customer organization.
 type Tenant struct {
 	database.BaseModel
-	Name    string `gorm:"type:varchar(255);not null" json:"name"`
-	Slug    string `gorm:"type:varchar(64);uniqueIndex:idx_tenants_slug;not null" json:"slug"`
-	Domain  *string `gorm:"type:varchar(255);uniqueIndex:idx_tenants_domain" json:"domain,omitempty"`
-	Status  string `gorm:"type:varchar(20);not null;default:'active';index:idx_tenants_status" json:"status"`
-	Plan    string `gorm:"type:varchar(50);not null;default:'free'" json:"plan"`
+	Name   string  `gorm:"type:varchar(255);not null" json:"name"`
+	Slug   string  `gorm:"type:varchar(64);uniqueIndex:idx_tenants_slug;not null" json:"slug"`
+	Domain *string `gorm:"type:varchar(255);uniqueIndex:idx_tenants_domain" json:"domain,omitempty"`
+	Status string  `gorm:"type:varchar(20);not null;default:'active';index:idx_tenants_status" json:"status"`
+	Plan   string  `gorm:"type:varchar(50);not null;default:'free'" json:"plan"`
 
 	// Relationships
 	Settings []TenantSettings `gorm:"foreignKey:TenantID" json:"settings,omitempty"`

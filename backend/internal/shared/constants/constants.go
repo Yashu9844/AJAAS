@@ -24,9 +24,9 @@ const (
 
 // Pagination defaults.
 const (
-	DefaultPage     = 1
-	DefaultPerPage  = 20
-	MaxPerPage      = 100
+	DefaultPage    = 1
+	DefaultPerPage = 20
+	MaxPerPage     = 100
 )
 
 // System Roles defined globally.
