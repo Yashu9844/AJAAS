@@ -18,6 +18,7 @@ JAAS (Just Another Admin SaaS / Company Operating System) — multi-tenant SaaS 
 ## Architecture & principles
 
 - Multi-tenancy: shared infra + shared PostgreSQL, isolation via mandatory `tenant_id` on every row, subdomain routing (`{slug}.jaas.com/api/v1`).
+- Architecture Masterplan: Detailed end-to-end specifications for all 13 modules (Modules 0–12) and 2-person team parallelization blueprint are documented in [SYSTEM_ARCHITECTURE_MASTERPLAN.md](file:///D:/.pycache/personal/JASS/AJAAS/docs/architecture/SYSTEM_ARCHITECTURE_MASTERPLAN.md).
 - Clean Architecture + DDD layers: HTTP (Routes → Middleware → Controllers) → Application (Services → DTOs → Validators) → Domain (Models → Events → Rules) → Infrastructure (Repos → DB / Cache / Queue).
 - Conventions: UUID PKs, `created_at / updated_at / deleted_at` soft delete (except immutable `audit_logs` and join tables), `{data, meta}` success envelope, `{error: {code, message, details}}` errors, `page / per_page` pagination (20 default, 100 max).
 - Auth: JWT access 15 min + rotating refresh 7 days with cryptographic reuse detection. Redis for sessions / rate-limit / token blacklisting. RabbitMQ for domain events (with NoOp/Outbox fallback).
