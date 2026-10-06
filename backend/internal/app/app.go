@@ -106,6 +106,7 @@ func Build(o Options) (*gin.Engine, error) {
 	if err := router.SetTrustedProxies(o.TrustedProxies); err != nil {
 		return nil, fmt.Errorf("invalid trusted proxies: %w", err)
 	}
+	router.Use(sharedMiddleware.SecurityHeaders(), sharedMiddleware.BodyLimit(sharedMiddleware.DefaultMaxBodyBytes))
 	router.Use(sharedMiddleware.RequestLogger(log))
 	router.Use(sharedMiddleware.CORS(o.CORSOrigins))
 

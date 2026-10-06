@@ -46,7 +46,7 @@ func (ctrl *RoleController) Create(c *gin.Context) {
 	}
 
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
-	res, err := ctrl.roleSvc.CreateRole(c.Request.Context(), tx, tenantID, req)
+	res, err := ctrl.roleSvc.CreateRole(reqCtx(c), tx, tenantID, req)
 	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
@@ -187,7 +187,7 @@ func (ctrl *RoleController) AssignPermissions(c *gin.Context) {
 
 	correlationID := uuid.New()
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
-	err = ctrl.roleSvc.AssignPermissions(c.Request.Context(), tx, tenantID, id, req, correlationID)
+	err = ctrl.roleSvc.AssignPermissions(reqCtx(c), tx, tenantID, id, req, correlationID)
 	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
@@ -224,7 +224,7 @@ func (ctrl *RoleController) AssignRolesToUser(c *gin.Context) {
 
 	correlationID := uuid.New()
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
-	err = ctrl.roleSvc.AssignRolesToUser(c.Request.Context(), tx, tenantID, userID, req, correlationID)
+	err = ctrl.roleSvc.AssignRolesToUser(reqCtx(c), tx, tenantID, userID, req, correlationID)
 	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return

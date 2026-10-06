@@ -104,7 +104,7 @@ func NewModule(
 	m.tenantSvc = services.NewTenantService(m.tenantRepo, m.roleRepo, publisher, m.auditSvc, services.WithAdminProvisioning(m.userRepo, m.userRoleRepo))
 	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc)
 	m.permSvc = services.NewPermissionService(m.permRepo)
-	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc)
+	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc, services.WithRolePermissions(m.rolePermRepo))
 	m.authSvc = services.NewAuthService(
 		m.tenantRepo,
 		m.userRepo,

@@ -116,6 +116,9 @@ func (s *roleService) CreateRole(ctx context.Context, tx *gorm.DB, tenantID uuid
 	if err != nil {
 		return nil, err
 	}
+	if err := ensureCanGrantPermissions(ctx, tx, tenantID, permIDs, s.userRoleRepo, s.rolePermRepo); err != nil {
+		return nil, err
+	}
 
 	existing, err := s.roleRepo.FindByName(ctx, tx, tenantID, req.Name)
 	if err != nil {
@@ -283,6 +286,9 @@ func (s *roleService) AssignPermissions(ctx context.Context, tx *gorm.DB, tenant
 	if err != nil {
 		return err
 	}
+	if err := ensureCanGrantPermissions(ctx, tx, tenantID, parsedPermIDs, s.userRoleRepo, s.rolePermRepo); err != nil {
+		return err
+	}
 
 	// Fetch existing assignments to verify idempotency
 	existing, err := s.rolePermRepo.FindByRoleID(ctx, tx, tenantID, roleID)
@@ -339,6 +345,7 @@ func (s *roleService) AssignRolesToUser(ctx context.Context, tx *gorm.DB, tenant
 
 	// Verify all role IDs exist inside this tenant
 	parsedRoleIDs := make([]uuid.UUID, len(req.RoleIDs))
+	roleObjs := make([]*models.Role, 0, len(req.RoleIDs))
 	for i, rIDStr := range req.RoleIDs {
 		id, err := uuid.Parse(rIDStr)
 		if err != nil {
@@ -357,6 +364,10 @@ func (s *roleService) AssignRolesToUser(ctx context.Context, tx *gorm.DB, tenant
 			}
 		}
 		parsedRoleIDs[i] = id
+		roleObjs = append(roleObjs, role)
+	}
+	if err := ensureCanAssignRoles(ctx, tx, tenantID, roleObjs, s.userRoleRepo, s.rolePermRepo); err != nil {
+		return err
 	}
 
 	// Fetch existing assignments

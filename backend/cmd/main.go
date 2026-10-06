@@ -82,7 +82,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to build application")
 	}
-	log.Info().Msg("Database auto-migrations executed successfully")
+	log.Info().Msg("Application built and schema ready")
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Server.Port),

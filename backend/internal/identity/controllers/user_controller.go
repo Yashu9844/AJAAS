@@ -47,7 +47,7 @@ func (ctrl *UserController) Create(c *gin.Context) {
 
 	correlationID := uuid.New()
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
-	res, err := ctrl.userSvc.CreateUser(c.Request.Context(), tx, tenantID, req, correlationID)
+	res, err := ctrl.userSvc.CreateUser(reqCtx(c), tx, tenantID, req, correlationID)
 	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return

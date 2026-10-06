@@ -28,7 +28,16 @@ type UserService interface {
 	ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*dto.UserResponse, error)
 }
 
+// UserOption customises a UserService.
+type UserOption func(*userService)
+
+// WithRolePermissions enables the no-privilege-escalation check when users are created with roles.
+func WithRolePermissions(rp repositories.RolePermissionRepository) UserOption {
+	return func(s *userService) { s.rolePermRepo = rp }
+}
+
 type userService struct {
+	rolePermRepo repositories.RolePermissionRepository
 	userRepo     repositories.UserRepository
 	roleRepo     repositories.RoleRepository
 	userRoleRepo repositories.UserRoleRepository
@@ -77,8 +86,9 @@ func NewUserService(
 	tokenRepo repositories.RefreshTokenRepository,
 	publisher queue.EventPublisher,
 	auditSvc AuditService,
+	opts ...UserOption,
 ) UserService {
-	return &userService{
+	s := &userService{
 		userRepo:     userRepo,
 		roleRepo:     roleRepo,
 		userRoleRepo: userRoleRepo,
@@ -87,9 +97,53 @@ func NewUserService(
 		publisher:    publisher,
 		auditSvc:     auditSvc,
 	}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
+
+// resolveRoles validates the requested role ids (de-duplicated, must exist in the tenant) and enforces that the caller
+// may assign them, BEFORE anything is written.
+func (s *userService) resolveRoles(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, raw []string) ([]*models.Role, error) {
+	var roles []*models.Role
+	seen := map[uuid.UUID]bool{}
+	for _, rIDStr := range raw {
+		roleID, err := uuid.Parse(rIDStr)
+		if err != nil {
+			return nil, sharedErrors.ErrValidation
+		}
+		if seen[roleID] {
+			continue
+		}
+		seen[roleID] = true
+		role, err := s.roleRepo.FindByID(ctx, tx, tenantID, roleID)
+		if err != nil {
+			return nil, err
+		}
+		if role == nil {
+			return nil, &sharedErrors.AppError{Code: "NOT_FOUND", Message: fmt.Sprintf("Role ID %s not found", rIDStr), StatusCode: 404}
+		}
+		roles = append(roles, role)
+	}
+	if len(roles) > 0 {
+		if s.rolePermRepo == nil {
+			if caller, ok := CallerFrom(ctx); ok && !caller.IsTenantAdmin() {
+				return nil, forbiddenGrant("Role assignment is not permitted for this caller")
+			}
+		} else if err := ensureCanAssignRoles(ctx, tx, tenantID, roles, s.userRoleRepo, s.rolePermRepo); err != nil {
+			return nil, err
+		}
+	}
+	return roles, nil
 }
 
 func (s *userService) CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateUserRequest, correlationID uuid.UUID) (*dto.UserResponse, error) {
+	roles, err := s.resolveRoles(ctx, tx, tenantID, req.RoleIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	// Verify email uniqueness
 	existing, err := s.userRepo.FindByEmail(ctx, tx, tenantID, req.Email)
 	if err != nil {
@@ -122,43 +176,14 @@ func (s *userService) CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 		return nil, err
 	}
 
-	// Map and associate default roles
+	// Associate the (already validated) roles
 	var assignedRoleIDs []uuid.UUID
-	if len(req.RoleIDs) > 0 {
-		seenRoles := map[uuid.UUID]bool{}
-		for _, rIDStr := range req.RoleIDs {
-			roleID, err := uuid.Parse(rIDStr)
-			if err != nil {
-				return nil, sharedErrors.ErrValidation
-			}
-			if seenRoles[roleID] {
-				continue
-			}
-			seenRoles[roleID] = true
-
-			// Verify role exists in this tenant
-			role, err := s.roleRepo.FindByID(ctx, tx, tenantID, roleID)
-			if err != nil {
-				return nil, err
-			}
-			if role == nil {
-				return nil, &sharedErrors.AppError{
-					Code:       "NOT_FOUND",
-					Message:    fmt.Sprintf("Role ID %s not found", rIDStr),
-					StatusCode: 404,
-				}
-			}
-
-			ur := &models.UserRole{
-				UserID:   user.ID,
-				RoleID:   roleID,
-				TenantID: tenantID,
-			}
-			if err := s.userRoleRepo.Create(ctx, tx, ur); err != nil {
-				return nil, err
-			}
-			assignedRoleIDs = append(assignedRoleIDs, roleID)
+	for _, role := range roles {
+		ur := &models.UserRole{UserID: user.ID, RoleID: role.ID, TenantID: tenantID}
+		if err := s.userRoleRepo.Create(ctx, tx, ur); err != nil {
+			return nil, err
 		}
+		assignedRoleIDs = append(assignedRoleIDs, role.ID)
 	}
 
 	res := mapUserToResponse(user)

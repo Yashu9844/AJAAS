@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"context"
 	"errors"
+	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/identity/services"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -78,4 +81,23 @@ func respondBindError(c *gin.Context, err error) {
 	c.JSON(http.StatusBadRequest, errorEnvelope{
 		Error: errorDetail{Code: sharedErrors.ErrValidation.Code, Message: sharedErrors.ErrValidation.Message, Details: utils.BindErrorDetails(err)},
 	})
+}
+
+// reqCtx returns the request context enriched with the authenticated caller (user id + JWT roles) so services can
+// enforce no-privilege-escalation rules on grants.
+func reqCtx(c *gin.Context) context.Context {
+	ctx := c.Request.Context()
+	uid, ok := c.Get("user_id")
+	if !ok {
+		return ctx
+	}
+	id, ok := uid.(uuid.UUID)
+	if !ok {
+		return ctx
+	}
+	var roles []string
+	if r, ok := c.Get("roles"); ok {
+		roles, _ = r.([]string)
+	}
+	return services.WithCaller(ctx, services.Caller{UserID: id, Roles: roles})
 }
