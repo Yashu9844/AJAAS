@@ -194,6 +194,21 @@ func (s *teamService) UpdateTeam(ctx context.Context, tx *gorm.DB, tenantID, id 
 	if err := s.teamRepo.Update(ctx, tx, team); err != nil {
 		return nil, err
 	}
+	// Moving a team across departments: the mappings that reference it follow, so a mapping never pairs a team with
+	// a department it no longer belongs to.
+	if team.DepartmentID != oldDept {
+		mappings, err := s.mappingRepo.FindByTeam(ctx, tx, tenantID, team.ID)
+		if err != nil {
+			return nil, err
+		}
+		for i := range mappings {
+			newDept := team.DepartmentID
+			mappings[i].DepartmentID = &newDept
+			if err := s.mappingRepo.Update(ctx, tx, &mappings[i]); err != nil {
+				return nil, err
+			}
+		}
+	}
 	_ = s.audit.Log(ctx, tx, tenantID.String(), "", "team.updated", "team", team.ID.String(),
 		map[string]string{"old_department_id": oldDept.String(), "new_department_id": team.DepartmentID.String()}, "", "")
 	return s.toResponse(ctx, tx, tenantID, team)

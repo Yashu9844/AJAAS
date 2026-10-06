@@ -150,7 +150,13 @@ func (s *stubMappingRepo) FindReports(ctx context.Context, db *gorm.DB, tenantID
 	return out, nil
 }
 func (s *stubMappingRepo) FindByTeam(ctx context.Context, db *gorm.DB, tenantID, teamID uuid.UUID) ([]models.Mapping, error) {
-	return nil, nil
+	var out []models.Mapping
+	for _, m := range s.byID {
+		if m.TeamID != nil && *m.TeamID == teamID && m.Status == "active" {
+			out = append(out, *m)
+		}
+	}
+	return out, nil
 }
 func (s *stubMappingRepo) CountActiveByDepartment(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID) (int64, error) {
 	var n int64

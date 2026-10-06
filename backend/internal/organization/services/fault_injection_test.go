@@ -455,3 +455,25 @@ func TestFaults_MappingsAndChart(t *testing.T) {
 		return err
 	})
 }
+
+func TestTeamMoveMakesMappingsFollow(t *testing.T) {
+	w := newWorld(&faults{})
+	ctx := context.Background()
+	dest := w.child.String()
+	if _, err := w.teamSvc.UpdateTeam(ctx, nil, w.tenant, w.team, dto.UpdateTeamRequest{DepartmentID: &dest}); err != nil {
+		t.Fatal(err)
+	}
+	m := w.maps.byID[w.mapping]
+	if m.DepartmentID == nil || *m.DepartmentID != w.child {
+		t.Fatalf("mapping must follow its team to the new department, got %v", m.DepartmentID)
+	}
+	// moving to the same department touches nothing
+	m.DepartmentID = &w.root
+	same := w.child.String()
+	if _, err := w.teamSvc.UpdateTeam(ctx, nil, w.tenant, w.team, dto.UpdateTeamRequest{DepartmentID: &same}); err != nil {
+		t.Fatal(err)
+	}
+	if *m.DepartmentID != w.root {
+		t.Fatal("a no-op move must not rewrite mappings")
+	}
+}
