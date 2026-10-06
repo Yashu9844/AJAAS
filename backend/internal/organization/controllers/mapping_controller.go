@@ -5,7 +5,6 @@ import (
 	"github.com/jaas/jaas/internal/shared/database"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -78,8 +77,7 @@ func (ctrl *MappingController) ListByUser(c *gin.Context) {
 		respondBadRequest(c, "Invalid user_id")
 		return
 	}
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 	tenantID, ok := tenantIDOf(c)
 	if !ok {
 		respondError(c, errMissingTenant)

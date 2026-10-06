@@ -3,7 +3,6 @@ package controllers
 import (
 	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -67,8 +66,7 @@ func (ctrl *TenantController) GetByID(c *gin.Context) {
 }
 
 func (ctrl *TenantController) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 
 	res, err := ctrl.tenantSvc.ListTenants(c.Request.Context(), ctrl.db, page, perPage)
 	if err != nil {

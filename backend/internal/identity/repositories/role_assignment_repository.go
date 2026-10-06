@@ -31,6 +31,24 @@ func (r *userRoleRepository) FindByUserID(ctx context.Context, db *gorm.DB, tena
 	return userRoles, nil
 }
 
+func (r *userRoleRepository) FindByUserIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, userIDs []uuid.UUID) ([]models.UserRole, error) {
+	var userRoles []models.UserRole
+	if len(userIDs) == 0 {
+		return userRoles, nil
+	}
+	err := db.WithContext(ctx).
+		Preload("Role").
+		Where("tenant_id = ? AND user_id IN ?", tenantID, userIDs).
+		Find(&userRoles).Error
+	return userRoles, err
+}
+
+func (r *userRoleRepository) CountByRoleID(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) (int64, error) {
+	var total int64
+	err := db.WithContext(ctx).Model(&models.UserRole{}).Where("tenant_id = ? AND role_id = ?", tenantID, roleID).Count(&total).Error
+	return total, err
+}
+
 func (r *userRoleRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error {
 	return tx.WithContext(ctx).
 		Delete(&models.UserRole{}, "tenant_id = ? AND user_id = ? AND role_id = ?", tenantID, userID, roleID).
@@ -64,6 +82,18 @@ func (r *rolePermissionRepository) FindByRoleID(ctx context.Context, db *gorm.DB
 		return nil, err
 	}
 	return rolePerms, nil
+}
+
+func (r *rolePermissionRepository) FindByRoleIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roleIDs []uuid.UUID) ([]models.RolePermission, error) {
+	var rolePerms []models.RolePermission
+	if len(roleIDs) == 0 {
+		return rolePerms, nil
+	}
+	err := db.WithContext(ctx).
+		Preload("Permission").
+		Where("tenant_id = ? AND role_id IN ?", tenantID, roleIDs).
+		Find(&rolePerms).Error
+	return rolePerms, err
 }
 
 func (r *rolePermissionRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error {

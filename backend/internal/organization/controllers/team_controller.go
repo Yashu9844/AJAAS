@@ -3,7 +3,6 @@ package controllers
 import (
 	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -71,8 +70,7 @@ func (ctrl *TeamController) GetByID(c *gin.Context) {
 
 // List handles GET /teams with optional department_id filter.
 func (ctrl *TeamController) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 	var deptID *uuid.UUID
 	if raw := c.Query("department_id"); raw != "" {
 		parsed, err := uuid.Parse(raw)

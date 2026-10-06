@@ -48,3 +48,11 @@ type RoleListResponse struct {
 	Data []RoleResponse `json:"data"`
 	Meta PaginationMeta `json:"meta"`
 }
+
+// AccessResponse describes what the authenticated caller may do (roles + effective permissions).
+type AccessResponse struct {
+	UserID        string        `json:"user_id"`
+	Roles         []RoleSummary `json:"roles"`
+	Permissions   []string      `json:"permissions"` // "resource:action"
+	IsTenantAdmin bool          `json:"is_tenant_admin"`
+}

@@ -80,8 +80,7 @@ func (ctrl *DepartmentController) GetByID(c *gin.Context) {
 
 // List handles GET /departments.
 func (ctrl *DepartmentController) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 	tenantID, ok := tenantIDOf(c)
 	if !ok {
 		respondError(c, errMissingTenant)

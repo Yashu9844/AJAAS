@@ -24,6 +24,7 @@ type UserService interface {
 	ListUsers(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.UserListResponse, error)
 	UpdateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.UpdateUserRequest) (*dto.UserResponse, error)
 	DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, correlationID uuid.UUID) error
+	ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*dto.UserResponse, error)
 }
 
 type userService struct {
@@ -107,11 +108,16 @@ func (s *userService) CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 	// Map and associate default roles
 	var assignedRoleIDs []uuid.UUID
 	if len(req.RoleIDs) > 0 {
+		seenRoles := map[uuid.UUID]bool{}
 		for _, rIDStr := range req.RoleIDs {
 			roleID, err := uuid.Parse(rIDStr)
 			if err != nil {
 				return nil, sharedErrors.ErrValidation
 			}
+			if seenRoles[roleID] {
+				continue
+			}
+			seenRoles[roleID] = true
 
 			// Verify role exists in this tenant
 			role, err := s.roleRepo.FindByID(ctx, tx, tenantID, roleID)
@@ -139,6 +145,9 @@ func (s *userService) CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 	}
 
 	res := mapUserToResponse(user)
+	if err := s.attachRoles(ctx, tx, tenantID, res); err != nil {
+		return nil, err
+	}
 
 	// Publish Event & Audit Log
 	eventPayload := events.UserCreatedPayload{
@@ -189,11 +198,16 @@ func (s *userService) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 	// Map and associate default roles
 	var assignedRoleIDs []uuid.UUID
 	if len(req.RoleIDs) > 0 {
+		seenRoles := map[uuid.UUID]bool{}
 		for _, rIDStr := range req.RoleIDs {
 			roleID, err := uuid.Parse(rIDStr)
 			if err != nil {
 				return nil, sharedErrors.ErrValidation
 			}
+			if seenRoles[roleID] {
+				continue
+			}
+			seenRoles[roleID] = true
 
 			role, err := s.roleRepo.FindByID(ctx, tx, tenantID, roleID)
 			if err != nil {
@@ -246,7 +260,39 @@ func (s *userService) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uui
 	if user == nil {
 		return nil, sharedErrors.ErrNotFound
 	}
-	return mapUserToResponse(user), nil
+	res := mapUserToResponse(user)
+	if err := s.attachRoles(ctx, db, tenantID, res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// attachRoles fills Roles on the given responses with one batched query.
+func (s *userService) attachRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, users ...*dto.UserResponse) error {
+	ids := make([]uuid.UUID, 0, len(users))
+	for _, u := range users {
+		id, err := uuid.Parse(u.ID)
+		if err == nil {
+			ids = append(ids, id)
+		}
+	}
+	urs, err := s.userRoleRepo.FindByUserIDs(ctx, db, tenantID, ids)
+	if err != nil {
+		return err
+	}
+	byUser := make(map[string][]dto.RoleSummary, len(users))
+	for _, ur := range urs {
+		if ur.Role != nil {
+			byUser[ur.UserID.String()] = append(byUser[ur.UserID.String()], dto.RoleSummary{ID: ur.Role.ID.String(), Name: ur.Role.Name})
+		}
+	}
+	for _, u := range users {
+		u.Roles = byUser[u.ID]
+		if u.Roles == nil {
+			u.Roles = []dto.RoleSummary{}
+		}
+	}
+	return nil
 }
 
 func (s *userService) ListUsers(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.UserListResponse, error) {
@@ -256,8 +302,13 @@ func (s *userService) ListUsers(ctx context.Context, db *gorm.DB, tenantID uuid.
 	}
 
 	data := make([]dto.UserResponse, len(users))
+	ptrs := make([]*dto.UserResponse, len(users))
 	for i := range users {
 		data[i] = *mapUserToResponse(&users[i])
+		ptrs[i] = &data[i]
+	}
+	if err := s.attachRoles(ctx, db, tenantID, ptrs...); err != nil {
+		return nil, err
 	}
 
 	totalPages := int(total / int64(perPage))
@@ -302,7 +353,35 @@ func (s *userService) UpdateUser(ctx context.Context, tx *gorm.DB, tenantID, id 
 		return nil, err
 	}
 
-	return mapUserToResponse(user), nil
+	res := mapUserToResponse(user)
+	if err := s.attachRoles(ctx, tx, tenantID, res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// ActivateUser re-enables a deactivated user (previously revoked sessions stay revoked; the user must log in again).
+func (s *userService) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*dto.UserResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, tx, tenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, sharedErrors.ErrNotFound
+	}
+	if user.Status == "active" {
+		return nil, &sharedErrors.AppError{Code: "CONFLICT", Message: "User is already active", StatusCode: 409}
+	}
+	user.Status = "active"
+	if err := s.userRepo.Update(ctx, tx, user); err != nil {
+		return nil, err
+	}
+	_ = s.auditSvc.Log(ctx, tx, tenantID.String(), "", "user.activated", "user", id.String(), nil, "", "")
+	res := mapUserToResponse(user)
+	if err := s.attachRoles(ctx, tx, tenantID, res); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (s *userService) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, correlationID uuid.UUID) error {

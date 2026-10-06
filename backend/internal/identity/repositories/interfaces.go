@@ -50,6 +50,10 @@ type PermissionRepository interface {
 type UserRoleRepository interface {
 	Create(ctx context.Context, tx *gorm.DB, ur *models.UserRole) error
 	FindByUserID(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserRole, error)
+	// FindByUserIDs batch-loads assignments (with Role preloaded) for many users in one query.
+	FindByUserIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, userIDs []uuid.UUID) ([]models.UserRole, error)
+	// CountByRoleID returns how many users currently hold the role.
+	CountByRoleID(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) (int64, error)
 	Delete(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error
 	DeleteByUserID(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error
 }
@@ -58,6 +62,8 @@ type UserRoleRepository interface {
 type RolePermissionRepository interface {
 	Create(ctx context.Context, tx *gorm.DB, rp *models.RolePermission) error
 	FindByRoleID(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) ([]models.RolePermission, error)
+	// FindByRoleIDs batch-loads assignments (with Permission preloaded) for many roles in one query.
+	FindByRoleIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roleIDs []uuid.UUID) ([]models.RolePermission, error)
 	Delete(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error
 	DeleteByRoleID(ctx context.Context, tx *gorm.DB, tenantID, roleID uuid.UUID) error
 }

@@ -118,7 +118,7 @@ func TestUserService_InviteUser(t *testing.T) {
 
 func TestUserService_GetByID(t *testing.T) {
 	userRepo := &MockUserRepository{}
-	svc := NewUserService(userRepo, nil, nil, nil, nil, nil, nil)
+	svc := NewUserService(userRepo, nil, &MockUserRoleRepository{}, nil, nil, nil, nil)
 	ctx := context.Background()
 	tenantID := uuid.New()
 	userID := uuid.New()
@@ -146,7 +146,7 @@ func TestUserService_GetByID(t *testing.T) {
 
 func TestUserService_ListUsers(t *testing.T) {
 	userRepo := &MockUserRepository{}
-	svc := NewUserService(userRepo, nil, nil, nil, nil, nil, nil)
+	svc := NewUserService(userRepo, nil, &MockUserRoleRepository{}, nil, nil, nil, nil)
 	ctx := context.Background()
 	tenantID := uuid.New()
 
@@ -165,7 +165,7 @@ func TestUserService_ListUsers(t *testing.T) {
 
 func TestUserService_UpdateUser(t *testing.T) {
 	userRepo := &MockUserRepository{}
-	svc := NewUserService(userRepo, nil, nil, nil, nil, nil, nil)
+	svc := NewUserService(userRepo, nil, &MockUserRoleRepository{}, nil, nil, nil, nil)
 	ctx := context.Background()
 	tenantID := uuid.New()
 	userID := uuid.New()
@@ -194,7 +194,7 @@ func TestUserService_DeactivateUser(t *testing.T) {
 	publisher := &MockEventPublisher{}
 	auditSvc := &MockAuditService{}
 
-	svc := NewUserService(userRepo, nil, nil, sessionRepo, tokenRepo, publisher, auditSvc)
+	svc := NewUserService(userRepo, nil, &MockUserRoleRepository{}, sessionRepo, tokenRepo, publisher, auditSvc)
 	ctx := context.Background()
 	tenantID := uuid.New()
 	userID := uuid.New()

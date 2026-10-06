@@ -1,8 +1,8 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/utils"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/identity/services"
@@ -23,8 +23,7 @@ func NewPermissionController(db *gorm.DB, permSvc services.PermissionService) *P
 }
 
 func (ctrl *PermissionController) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 
 	res, err := ctrl.permSvc.ListPermissions(c.Request.Context(), ctrl.db, page, perPage)
 	if err != nil {

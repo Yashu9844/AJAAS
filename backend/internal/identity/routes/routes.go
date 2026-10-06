@@ -29,6 +29,8 @@ func RegisterRoutes(
 	userCtrl *controllers.UserController,
 	roleCtrl *controllers.RoleController,
 	permCtrl *controllers.PermissionController,
+	auditCtrl *controllers.AuditController,
+	platformAdminKey string,
 ) {
 	// Initialize Middleware Instances
 	tenantResolver := identityMiddleware.TenantResolver(db, tenantRepo)
@@ -47,7 +49,9 @@ func RegisterRoutes(
 	}
 
 	// Tenant Operations (Global / Admin operations)
+	// Platform-level routes: guarded by the platform operator key (fail closed when unset).
 	tenants := router.Group("/tenants")
+	tenants.Use(identityMiddleware.PlatformAdmin(platformAdminKey))
 	{
 		tenants.POST("", tenantCtrl.Create)
 		tenants.GET("", tenantCtrl.List)
@@ -62,6 +66,7 @@ func RegisterRoutes(
 	authProtected.Use(authMiddleware)
 	{
 		authProtected.POST("/logout", authCtrl.Logout)
+		authProtected.GET("/me", roleCtrl.Me)
 	}
 
 	// User Profiles Group (Requires Tenant Subdomain Context + JWT Auth)
@@ -90,6 +95,16 @@ func RegisterRoutes(
 			identityMiddleware.RequirePermission(db, "users", "delete", userRoleRepo, rolePermRepo),
 			identityMiddleware.AuditLog(db, auditSvc, "user.deactivated", "user"),
 			userCtrl.Deactivate,
+		)
+		users.POST("/:id/activate",
+			identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.AuditLog(db, auditSvc, "user.activated", "user"),
+			userCtrl.Activate,
+		)
+		users.DELETE("/:id/roles/:role_id",
+			identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.AuditLog(db, auditSvc, "role.removed", "user"),
+			roleCtrl.RemoveRoleFromUser,
 		)
 		users.POST("/:id/roles",
 			identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo),
@@ -125,11 +140,23 @@ func RegisterRoutes(
 			identityMiddleware.AuditLog(db, auditSvc, "role.deleted", "role"),
 			roleCtrl.Delete,
 		)
+		roles.DELETE("/:id/permissions/:permission_id",
+			identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.AuditLog(db, auditSvc, "permission.removed", "role"),
+			roleCtrl.RemovePermission,
+		)
 		roles.POST("/:id/permissions",
 			identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo),
 			identityMiddleware.AuditLog(db, auditSvc, "permission.assigned", "role"),
 			roleCtrl.AssignPermissions,
 		)
+	}
+
+	// Audit trail (tenant host + JWT + audit:read)
+	audit := router.Group("/audit-logs")
+	audit.Use(tenantResolver, authMiddleware)
+	{
+		audit.GET("", identityMiddleware.RequirePermission(db, "audit", "read", userRoleRepo, rolePermRepo), auditCtrl.List)
 	}
 
 	// Global Privileges Group (Requires JWT Auth)

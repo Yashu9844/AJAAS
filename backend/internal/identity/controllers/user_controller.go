@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"github.com/jaas/jaas/internal/shared/database"
+	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -88,8 +88,7 @@ func (ctrl *UserController) List(c *gin.Context) {
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 
 	res, err := ctrl.userSvc.ListUsers(c.Request.Context(), ctrl.db, tenantID, page, perPage)
 	if err != nil {
@@ -151,6 +150,13 @@ func (ctrl *UserController) Deactivate(c *gin.Context) {
 		return
 	}
 
+	if caller, ok := c.Get("user_id"); ok {
+		if callerID, ok := caller.(uuid.UUID); ok && callerID == id {
+			respondError(c, &sharedErrors.AppError{Code: "CONFLICT", Message: "You cannot deactivate your own account", StatusCode: http.StatusConflict})
+			return
+		}
+	}
+
 	correlationID := uuid.New()
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	err = ctrl.userSvc.DeactivateUser(c.Request.Context(), tx, tenantID, id, correlationID)
@@ -160,4 +166,29 @@ func (ctrl *UserController) Deactivate(c *gin.Context) {
 	}
 
 	respondSuccess(c, http.StatusOK, dto.MessageResponse{Message: "User deactivated successfully"}, nil)
+}
+
+// Activate re-enables a deactivated user (POST /users/:id/activate).
+func (ctrl *UserController) Activate(c *gin.Context) {
+	tenantIDVal, ok := c.Get("tenant_id")
+	if !ok {
+		respondBadRequest(c, "Missing tenant scope")
+		return
+	}
+	tenantID := tenantIDVal.(uuid.UUID)
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondBadRequest(c, "Invalid user ID")
+		return
+	}
+
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.userSvc.ActivateUser(c.Request.Context(), tx, tenantID, id)
+	if err = database.Finish(tx, err); err != nil {
+		respondError(c, err)
+		return
+	}
+
+	respondSuccess(c, http.StatusOK, res, nil)
 }

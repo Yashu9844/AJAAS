@@ -13,6 +13,14 @@ type Config struct {
 	Redis    RedisConfig    `mapstructure:"redis"`
 	RabbitMQ RabbitMQConfig `mapstructure:"rabbitmq"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
+	Platform PlatformConfig `mapstructure:"platform"`
+}
+
+// PlatformConfig holds platform-operator (super admin) settings.
+type PlatformConfig struct {
+	// AdminKey authorises tenant provisioning/lifecycle routes (X-Platform-Key header).
+	// Empty disables those routes entirely (fail closed). Inject via PLATFORM_ADMIN_KEY.
+	AdminKey string `mapstructure:"admin_key"`
 }
 
 // ServerConfig holds server configuration details.

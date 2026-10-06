@@ -91,10 +91,19 @@ func main() {
 		&log.Logger,
 	)
 
+	identityModule.SetPlatformAdminKey(cfg.Platform.AdminKey)
+	if cfg.Platform.AdminKey == "" {
+		log.Warn().Msg("platform.admin_key is empty: /api/v1/tenants routes are DISABLED (set PLATFORM_ADMIN_KEY)")
+	}
+
 	// Run GORM migrations to auto-ensure tables structure
 	log.Info().Msg("Running database schema AutoMigrations...")
 	if err := db.AutoMigrate(identityModule.RegisterModels()...); err != nil {
 		log.Fatal().Err(err).Msg("Database auto-migration failed")
+	}
+
+	if err := identityModule.SeedPermissions(); err != nil {
+		log.Fatal().Err(err).Msg("Seeding permission catalogue failed")
 	}
 
 	// 6b. Bootstrap Organization Module (depends on Module 0 services/middleware)

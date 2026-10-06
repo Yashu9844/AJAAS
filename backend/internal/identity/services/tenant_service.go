@@ -13,6 +13,7 @@ import (
 	"github.com/jaas/jaas/internal/identity/validators"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"github.com/jaas/jaas/internal/shared/queue"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -28,10 +29,23 @@ type TenantService interface {
 }
 
 type tenantService struct {
-	tenantRepo repositories.TenantRepository
-	roleRepo   repositories.RoleRepository
-	publisher  queue.EventPublisher
-	auditSvc   AuditService
+	tenantRepo   repositories.TenantRepository
+	roleRepo     repositories.RoleRepository
+	publisher    queue.EventPublisher
+	auditSvc     AuditService
+	userRepo     repositories.UserRepository
+	userRoleRepo repositories.UserRoleRepository
+}
+
+// TenantOption customises a TenantService.
+type TenantOption func(*tenantService)
+
+// WithAdminProvisioning enables creating the first tenant_admin user together with a tenant.
+func WithAdminProvisioning(userRepo repositories.UserRepository, userRoleRepo repositories.UserRoleRepository) TenantOption {
+	return func(s *tenantService) {
+		s.userRepo = userRepo
+		s.userRoleRepo = userRoleRepo
+	}
 }
 
 // NewTenantService creates a new TenantService.
@@ -40,13 +54,18 @@ func NewTenantService(
 	roleRepo repositories.RoleRepository,
 	publisher queue.EventPublisher,
 	auditSvc AuditService,
+	opts ...TenantOption,
 ) TenantService {
-	return &tenantService{
+	s := &tenantService{
 		tenantRepo: tenantRepo,
 		roleRepo:   roleRepo,
 		publisher:  publisher,
 		auditSvc:   auditSvc,
 	}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 func (s *tenantService) CreateTenant(ctx context.Context, tx *gorm.DB, req dto.CreateTenantRequest, correlationID uuid.UUID) (*dto.TenantResponse, error) {
@@ -117,6 +136,32 @@ func (s *tenantService) CreateTenant(ctx context.Context, tx *gorm.DB, req dto.C
 	}
 
 	res := mapTenantToResponse(tenant)
+
+	if req.Admin != nil {
+		if s.userRepo == nil || s.userRoleRepo == nil {
+			return nil, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: "Initial admin provisioning is not available", StatusCode: 400}
+		}
+		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Admin.Password), 12)
+		if err != nil {
+			return nil, err
+		}
+		admin := &models.User{
+			Email:        req.Admin.Email,
+			PasswordHash: string(hashed),
+			FirstName:    req.Admin.FirstName,
+			LastName:     req.Admin.LastName,
+			Status:       "active",
+		}
+		admin.TenantID = tenant.ID
+		if err := s.userRepo.Create(ctx, tx, admin); err != nil {
+			return nil, err
+		}
+		if err := s.userRoleRepo.Create(ctx, tx, &models.UserRole{UserID: admin.ID, RoleID: roles[0].ID, TenantID: tenant.ID}); err != nil {
+			return nil, err
+		}
+		id := admin.ID.String()
+		res.AdminUserID = &id
+	}
 
 	// Publish Event & Audit Log inside transaction wrapper
 	eventPayload := events.TenantCreatedPayload{

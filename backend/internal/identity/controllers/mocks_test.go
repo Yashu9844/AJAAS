@@ -242,3 +242,19 @@ var _ services.AuthService = (*MockAuthService)(nil)
 var _ services.UserService = (*MockUserService)(nil)
 var _ services.RoleService = (*MockRoleService)(nil)
 var _ services.PermissionService = (*MockPermissionService)(nil)
+
+func (m *MockUserService) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*dto.UserResponse, error) {
+	return &dto.UserResponse{ID: id.String(), Status: "active"}, nil
+}
+
+func (m *MockRoleService) RemovePermission(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error {
+	return nil
+}
+
+func (m *MockRoleService) RemoveRoleFromUser(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error {
+	return nil
+}
+
+func (m *MockRoleService) GetMyAccess(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.AccessResponse, error) {
+	return &dto.AccessResponse{UserID: userID.String()}, nil
+}

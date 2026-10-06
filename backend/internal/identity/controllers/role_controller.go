@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"github.com/jaas/jaas/internal/shared/database"
+	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -87,8 +87,7 @@ func (ctrl *RoleController) List(c *gin.Context) {
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 
 	res, err := ctrl.roleSvc.ListRoles(c.Request.Context(), ctrl.db, tenantID, page, perPage)
 	if err != nil {
@@ -232,4 +231,76 @@ func (ctrl *RoleController) AssignRolesToUser(c *gin.Context) {
 	}
 
 	respondSuccess(c, http.StatusOK, dto.MessageResponse{Message: "Roles assigned to user successfully"}, nil)
+}
+
+// RemovePermission detaches a permission from a role (DELETE /roles/:id/permissions/:permission_id).
+func (ctrl *RoleController) RemovePermission(c *gin.Context) {
+	tenantIDVal, ok := c.Get("tenant_id")
+	if !ok {
+		respondBadRequest(c, "Missing tenant scope")
+		return
+	}
+	tenantID := tenantIDVal.(uuid.UUID)
+	roleID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondBadRequest(c, "Invalid role ID")
+		return
+	}
+	permID, err := uuid.Parse(c.Param("permission_id"))
+	if err != nil {
+		respondBadRequest(c, "Invalid permission ID")
+		return
+	}
+
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	err = ctrl.roleSvc.RemovePermission(c.Request.Context(), tx, tenantID, roleID, permID)
+	if err = database.Finish(tx, err); err != nil {
+		respondError(c, err)
+		return
+	}
+	respondSuccess(c, http.StatusOK, dto.MessageResponse{Message: "Permission removed from role successfully"}, nil)
+}
+
+// RemoveRoleFromUser detaches a role from a user (DELETE /users/:id/roles/:role_id).
+func (ctrl *RoleController) RemoveRoleFromUser(c *gin.Context) {
+	tenantIDVal, ok := c.Get("tenant_id")
+	if !ok {
+		respondBadRequest(c, "Missing tenant scope")
+		return
+	}
+	tenantID := tenantIDVal.(uuid.UUID)
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondBadRequest(c, "Invalid user ID")
+		return
+	}
+	roleID, err := uuid.Parse(c.Param("role_id"))
+	if err != nil {
+		respondBadRequest(c, "Invalid role ID")
+		return
+	}
+
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	err = ctrl.roleSvc.RemoveRoleFromUser(c.Request.Context(), tx, tenantID, userID, roleID)
+	if err = database.Finish(tx, err); err != nil {
+		respondError(c, err)
+		return
+	}
+	respondSuccess(c, http.StatusOK, dto.MessageResponse{Message: "Role removed from user successfully"}, nil)
+}
+
+// Me returns the caller's roles and effective permissions (GET /auth/me).
+func (ctrl *RoleController) Me(c *gin.Context) {
+	tenantIDVal, ok1 := c.Get("tenant_id")
+	userIDVal, ok2 := c.Get("user_id")
+	if !ok1 || !ok2 {
+		respondError(c, sharedErrors.ErrUnauthorized)
+		return
+	}
+	res, err := ctrl.roleSvc.GetMyAccess(c.Request.Context(), ctrl.db, tenantIDVal.(uuid.UUID), userIDVal.(uuid.UUID))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondSuccess(c, http.StatusOK, res, nil)
 }

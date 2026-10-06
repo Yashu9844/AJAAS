@@ -13,6 +13,7 @@ import (
 	sharedQueue "github.com/jaas/jaas/internal/shared/queue"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Module encapsulates the Module 0 Identity and Access Management domain.
@@ -52,6 +53,9 @@ type Module struct {
 	userCtrl   *controllers.UserController
 	roleCtrl   *controllers.RoleController
 	permCtrl   *controllers.PermissionController
+	auditCtrl  *controllers.AuditController
+
+	platformAdminKey string
 }
 
 // NewModule constructs a Module container injecting database and message queue handles.
@@ -96,7 +100,7 @@ func NewModule(
 	m.tokenSvc = services.NewTokenService(jwtConfig)
 	m.sessionSvc = services.NewSessionService(m.sessionRepo, redisClient)
 
-	m.tenantSvc = services.NewTenantService(m.tenantRepo, m.roleRepo, publisher, m.auditSvc)
+	m.tenantSvc = services.NewTenantService(m.tenantRepo, m.roleRepo, publisher, m.auditSvc, services.WithAdminProvisioning(m.userRepo, m.userRoleRepo))
 	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc)
 	m.permSvc = services.NewPermissionService(m.permRepo)
 	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc)
@@ -119,8 +123,27 @@ func NewModule(
 	m.userCtrl = controllers.NewUserController(db, m.userSvc)
 	m.roleCtrl = controllers.NewRoleController(db, m.roleSvc)
 	m.permCtrl = controllers.NewPermissionController(db, m.permSvc)
+	m.auditCtrl = controllers.NewAuditController(db, m.auditSvc)
 
 	return m
+}
+
+// SetPlatformAdminKey configures the platform operator key guarding /tenants routes (empty = routes disabled).
+func (m *Module) SetPlatformAdminKey(key string) { m.platformAdminKey = key }
+
+// SeedPermissions idempotently inserts the global permission catalogue (see models.DefaultPermissions).
+func (m *Module) SeedPermissions() error {
+	for _, p := range models.DefaultPermissions {
+		desc := p.Description
+		row := &models.Permission{Resource: p.Resource, Action: p.Action, Description: &desc}
+		if err := m.db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "resource"}, {Name: "action"}},
+			DoNothing: true,
+		}).Create(row).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // RegisterModels lists all domain entity models for migrations.
@@ -158,6 +181,8 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 		m.userCtrl,
 		m.roleCtrl,
 		m.permCtrl,
+		m.auditCtrl,
+		m.platformAdminKey,
 	)
 }
 

@@ -1,8 +1,8 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/utils"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -111,8 +111,7 @@ func (ctrl *EmployeeController) List(c *gin.Context) {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage := utils.ParsePagination(c)
 	status := c.Query("status")
 	search := c.Query("search")
 
@@ -137,10 +136,15 @@ func (ctrl *EmployeeController) List(c *gin.Context) {
 		return
 	}
 
+	totalPages := int(total) / perPage
+	if int(total)%perPage != 0 {
+		totalPages++
+	}
 	meta := gin.H{
-		"page":     page,
-		"per_page": perPage,
-		"total":    total,
+		"page":        page,
+		"per_page":    perPage,
+		"total_items": total,
+		"total_pages": totalPages,
 	}
 	respondSuccess(c, http.StatusOK, items, meta)
 }

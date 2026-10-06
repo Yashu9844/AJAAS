@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/identity/dto"
 	"github.com/jaas/jaas/internal/identity/models"
 	"github.com/jaas/jaas/internal/identity/repositories"
 	"github.com/rs/zerolog"
@@ -14,6 +15,7 @@ import (
 // AuditService defines the interface to write immutable security logs.
 type AuditService interface {
 	Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error
+	List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.AuditLogListResponse, error)
 }
 
 type auditService struct {
@@ -83,4 +85,26 @@ func (s *auditService) Log(ctx context.Context, tx *gorm.DB, tenantID, userID st
 	}
 
 	return nil
+}
+
+// List returns the tenant's audit trail, newest first.
+func (s *auditService) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.AuditLogListResponse, error) {
+	logs, total, err := s.auditRepo.FindByTenantID(ctx, db, tenantID, page, perPage)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]dto.AuditLogResponse, len(logs))
+	for i, l := range logs {
+		var uid *string
+		if l.UserID != nil {
+			v := l.UserID.String()
+			uid = &v
+		}
+		data[i] = dto.AuditLogResponse{ID: l.ID.String(), UserID: uid, Action: l.Action, Resource: l.Resource, ResourceID: l.ResourceID, Metadata: l.Metadata, IPAddress: l.IPAddress, CreatedAt: l.CreatedAt}
+	}
+	pages := int(total) / perPage
+	if int(total)%perPage != 0 {
+		pages++
+	}
+	return &dto.AuditLogListResponse{Data: data, Meta: dto.PaginationMeta{Page: page, PerPage: perPage, TotalItems: total, TotalPages: pages}}, nil
 }

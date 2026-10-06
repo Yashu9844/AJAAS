@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"github.com/jaas/jaas/internal/identity/dto"
 	"time"
 
 	"github.com/google/uuid"
@@ -215,6 +216,7 @@ func (m *MockPermissionRepository) FindByIDs(ctx context.Context, db *gorm.DB, i
 
 // MockUserRoleRepository stubs repositories.UserRoleRepository
 type MockUserRoleRepository struct {
+	CountByRoleIDFunc  func(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) (int64, error)
 	CreateFunc         func(ctx context.Context, tx *gorm.DB, ur *models.UserRole) error
 	FindByUserIDFunc   func(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserRole, error)
 	DeleteFunc         func(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error
@@ -543,4 +545,39 @@ func (m *MockSessionService) RevokeAllForUser(ctx context.Context, tx *gorm.DB, 
 		return m.RevokeAllForUserFunc(ctx, tx, tenantID, userID)
 	}
 	return nil
+}
+
+func (m *MockUserRoleRepository) FindByUserIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, userIDs []uuid.UUID) ([]models.UserRole, error) {
+	var all []models.UserRole
+	for _, id := range userIDs {
+		rows, err := m.FindByUserID(ctx, db, tenantID, id)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, rows...)
+	}
+	return all, nil
+}
+
+func (m *MockUserRoleRepository) CountByRoleID(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) (int64, error) {
+	if m.CountByRoleIDFunc != nil {
+		return m.CountByRoleIDFunc(ctx, db, tenantID, roleID)
+	}
+	return 0, nil
+}
+
+func (m *MockRolePermissionRepository) FindByRoleIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roleIDs []uuid.UUID) ([]models.RolePermission, error) {
+	var all []models.RolePermission
+	for _, id := range roleIDs {
+		rows, err := m.FindByRoleID(ctx, db, tenantID, id)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, rows...)
+	}
+	return all, nil
+}
+
+func (m *MockAuditService) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.AuditLogListResponse, error) {
+	return &dto.AuditLogListResponse{}, nil
 }

@@ -27,3 +27,6 @@ jwt:
   secret: "" # Must be injected via JWT_SECRET env variable in production
   access_token_ttl: 15
   refresh_token_ttl: 7
+
+platform:
+  admin_key: "" # Must be injected via PLATFORM_ADMIN_KEY env variable in production

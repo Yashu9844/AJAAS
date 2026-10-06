@@ -27,3 +27,6 @@ jwt:
   secret: dev_secret_key_minimum_256_bits_for_security_purposes_only
   access_token_ttl: 15 # in minutes
   refresh_token_ttl: 7 # in days
+
+platform:
+  admin_key: dev-platform-admin-key-change-me # override with PLATFORM_ADMIN_KEY

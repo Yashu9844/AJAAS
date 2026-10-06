@@ -18,7 +18,14 @@ func TestRoleService_CreateRole(t *testing.T) {
 	publisher := &MockEventPublisher{}
 	auditSvc := &MockAuditService{}
 
-	svc := NewRoleService(roleRepo, nil, nil, rolePermRepo, nil, publisher, auditSvc)
+	permRepo := &MockPermissionRepository{FindByIDsFunc: func(ctx context.Context, db *gorm.DB, ids []uuid.UUID) ([]models.Permission, error) {
+		out := make([]models.Permission, len(ids))
+		for i, id := range ids {
+			out[i] = models.Permission{ID: id}
+		}
+		return out, nil
+	}}
+	svc := NewRoleService(roleRepo, permRepo, nil, rolePermRepo, nil, publisher, auditSvc)
 	ctx := context.Background()
 	tenantID := uuid.New()
 
@@ -63,7 +70,7 @@ func TestRoleService_CreateRole(t *testing.T) {
 
 func TestRoleService_GetRoleByID(t *testing.T) {
 	roleRepo := &MockRoleRepository{}
-	svc := NewRoleService(roleRepo, nil, nil, nil, nil, nil, nil)
+	svc := NewRoleService(roleRepo, nil, &MockUserRoleRepository{}, &MockRolePermissionRepository{}, nil, nil, nil)
 	ctx := context.Background()
 	tenantID := uuid.New()
 	roleID := uuid.New()
@@ -91,7 +98,7 @@ func TestRoleService_GetRoleByID(t *testing.T) {
 
 func TestRoleService_ListRoles(t *testing.T) {
 	roleRepo := &MockRoleRepository{}
-	svc := NewRoleService(roleRepo, nil, nil, nil, nil, nil, nil)
+	svc := NewRoleService(roleRepo, nil, &MockUserRoleRepository{}, &MockRolePermissionRepository{}, nil, nil, nil)
 	ctx := context.Background()
 	tenantID := uuid.New()
 
@@ -110,7 +117,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 
 func TestRoleService_UpdateRole(t *testing.T) {
 	roleRepo := &MockRoleRepository{}
-	svc := NewRoleService(roleRepo, nil, nil, nil, nil, nil, nil)
+	svc := NewRoleService(roleRepo, nil, &MockUserRoleRepository{}, &MockRolePermissionRepository{}, nil, nil, nil)
 	ctx := context.Background()
 	tenantID := uuid.New()
 	roleID := uuid.New()
@@ -147,7 +154,7 @@ func TestRoleService_UpdateRole(t *testing.T) {
 
 func TestRoleService_DeleteRole(t *testing.T) {
 	roleRepo := &MockRoleRepository{}
-	svc := NewRoleService(roleRepo, nil, nil, nil, nil, nil, nil)
+	svc := NewRoleService(roleRepo, nil, &MockUserRoleRepository{}, &MockRolePermissionRepository{}, nil, nil, nil)
 	ctx := context.Background()
 	tenantID := uuid.New()
 	roleID := uuid.New()

@@ -236,3 +236,7 @@ func (m *mockPublisher) Publish(ctx context.Context, exchange string, routingKey
 	m.events = append(m.events, routingKey)
 	return nil
 }
+
+func (m *mockUserService) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*identityDto.UserResponse, error) {
+	return &identityDto.UserResponse{ID: id.String(), Status: "active"}, nil
+}
