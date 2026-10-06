@@ -107,7 +107,7 @@ func main() {
 		identityModule.AuditService(),
 	)
 	// FR-M005: deactivating a user converges org mappings in the same transaction.
-	identityServices.SetUserDeactivationConverger(orgModule.MappingService())
+	identityServices.SetUserDeactivationConverger(orgModule.UserDeactivationConverger())
 	if err := db.AutoMigrate(orgModule.RegisterModels()...); err != nil {
 		log.Fatal().Err(err).Msg("Organization auto-migration failed")
 	}

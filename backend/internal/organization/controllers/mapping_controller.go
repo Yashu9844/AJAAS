@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -126,7 +128,8 @@ func (ctrl *MappingController) Deactivate(c *gin.Context) {
 		return
 	}
 	var req dto.DeactivateMappingRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// Body is optional (like the other deactivate endpoints): an empty body is valid.
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 		respondBindError(c, err)
 		return
 	}

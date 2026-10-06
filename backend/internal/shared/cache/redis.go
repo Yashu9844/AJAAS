@@ -68,3 +68,23 @@ func (r *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
 func (r *RedisClient) Close() error {
 	return r.client.Close()
 }
+
+// DeleteByPrefix removes every key that starts with prefix (SCAN based, safe for production).
+func (r *RedisClient) DeleteByPrefix(ctx context.Context, prefix string) error {
+	var cursor uint64
+	for {
+		keys, next, err := r.client.Scan(ctx, cursor, prefix+"*", 200).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := r.client.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+		if next == 0 {
+			return nil
+		}
+		cursor = next
+	}
+}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,6 +150,42 @@ func (f *fakeChartCache) Set(ctx context.Context, key string, value string, expi
 	f.sets++
 	f.store[key] = value
 	return nil
+}
+
+func (f *fakeChartCache) DeleteByPrefix(ctx context.Context, prefix string) error {
+	for k := range f.store {
+		if strings.HasPrefix(k, prefix) {
+			delete(f.store, k)
+		}
+	}
+	return nil
+}
+
+func TestOrgChart_InvalidateChartDropsOnlyThatTenant(t *testing.T) {
+	depts, teams, mappings, _ := newChartSvc()
+	cache := &fakeChartCache{store: map[string]string{}}
+	desigs := &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}
+	svc := NewOrgChartService(depts, teams, mappings, desigs, cache)
+	a, b := uuid.New(), uuid.New()
+	cache.store[chartCacheKey(a, 10, false)] = "{}"
+	cache.store[chartCacheKey(a, 3, true)] = "{}"
+	cache.store[chartCacheKey(b, 10, false)] = "{}"
+
+	svc.(ChartInvalidator).InvalidateChart(context.Background(), a)
+
+	if len(cache.store) != 1 {
+		t.Fatalf("expected only tenant b key to remain, got %v", cache.store)
+	}
+	if _, ok := cache.store[chartCacheKey(b, 10, false)]; !ok {
+		t.Fatal("tenant b cache must survive")
+	}
+}
+
+func TestOrgChart_InvalidateChartNilCache(t *testing.T) {
+	depts, teams, mappings, _ := newChartSvc()
+	desigs := &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}
+	svc := NewOrgChartService(depts, teams, mappings, desigs, nil)
+	svc.(ChartInvalidator).InvalidateChart(context.Background(), uuid.New()) // must not panic
 }
 
 func TestOrgChart_CacheHitAndSet(t *testing.T) {

@@ -2,10 +2,12 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
 	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/organization/controllers"
+	"github.com/jaas/jaas/internal/organization/services"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +28,9 @@ func RegisterRoutes(
 	chartCtrl *controllers.OrgChartController,
 	dbForAudit *gorm.DB,
 	auditSvc identityServices.AuditService,
+	chartInv services.ChartInvalidator,
 ) {
+	invalidate := chartInvalidation(chartInv)
 	auditMW := func(action, resource string) gin.HandlerFunc {
 		return identityMiddleware.AuditLog(dbForAudit, auditSvc, action, resource)
 	}
@@ -34,7 +38,7 @@ func RegisterRoutes(
 	write := identityMiddleware.RequirePermission(db, "organization", "update", userRoleRepo, rolePermRepo)
 
 	depts := router.Group("/departments")
-	depts.Use(tenantResolver, authMiddleware)
+	depts.Use(tenantResolver, authMiddleware, invalidate)
 	{
 		depts.POST("", write, auditMW("department.created", "department"), deptCtrl.Create)
 		depts.GET("", read, deptCtrl.List)
@@ -44,7 +48,7 @@ func RegisterRoutes(
 	}
 
 	teams := router.Group("/teams")
-	teams.Use(tenantResolver, authMiddleware)
+	teams.Use(tenantResolver, authMiddleware, invalidate)
 	{
 		teams.POST("", write, auditMW("team.created", "team"), teamCtrl.Create)
 		teams.GET("", read, teamCtrl.List)
@@ -64,7 +68,7 @@ func RegisterRoutes(
 	}
 
 	mappings := router.Group("/mappings")
-	mappings.Use(tenantResolver, authMiddleware)
+	mappings.Use(tenantResolver, authMiddleware, invalidate)
 	{
 		mappings.POST("", write, auditMW("mapping.created", "mapping"), mappingCtrl.Create)
 		mappings.GET("", read, mappingCtrl.ListByUser)
@@ -78,5 +82,21 @@ func RegisterRoutes(
 	{
 		chart.GET("", chartCtrl.Chart)
 		chart.GET("/chain", chartCtrl.UserChain)
+	}
+}
+
+// chartInvalidation drops the tenant's cached org chart after every successful org write
+// (departments, teams, mappings), so GET /org-chart is read-your-writes consistent.
+func chartInvalidation(inv services.ChartInvalidator) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		if inv == nil || c.Request.Method == "GET" || c.Writer.Status() >= 300 {
+			return
+		}
+		if tid, ok := c.Get("tenant_id"); ok {
+			if id, ok := tid.(uuid.UUID); ok {
+				inv.InvalidateChart(c.Request.Context(), id)
+			}
+		}
 	}
 }

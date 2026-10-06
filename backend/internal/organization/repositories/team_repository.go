@@ -64,9 +64,10 @@ func (r *teamRepository) FindAll(ctx context.Context, db *gorm.DB, tenantID uuid
 	return teams, total, nil
 }
 
+// CountByDepartment counts ACTIVE teams of a department (inactive teams must not block deactivation).
 func (r *teamRepository) CountByDepartment(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID) (int64, error) {
 	var total int64
-	err := db.WithContext(ctx).Model(&models.Team{}).Where("tenant_id = ? AND department_id = ?", tenantID, departmentID).Count(&total).Error
+	err := db.WithContext(ctx).Model(&models.Team{}).Where("tenant_id = ? AND department_id = ? AND status = ?", tenantID, departmentID, "active").Count(&total).Error
 	return total, err
 }
 

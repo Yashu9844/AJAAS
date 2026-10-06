@@ -119,6 +119,33 @@ func (m *Module) RegisterModels() []interface{} {
 // Consumer exposes the identity-event consumer for broker subscription wiring.
 func (m *Module) Consumer() services.EventConsumer { return m.consumer }
 
+// ChartInvalidator exposes org-chart cache invalidation.
+func (m *Module) ChartInvalidator() services.ChartInvalidator {
+	inv, _ := m.chartSvc.(services.ChartInvalidator)
+	return inv
+}
+
+// convergeAndInvalidate wraps the FR-M005 user-deactivation hook so the cached org chart is dropped too.
+type convergeAndInvalidate struct {
+	svc services.MappingService
+	inv services.ChartInvalidator
+}
+
+func (c convergeAndInvalidate) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, correlationID uuid.UUID) error {
+	if err := c.svc.DeactivateUserMappings(ctx, tx, tenantID, userID, correlationID); err != nil {
+		return err
+	}
+	if c.inv != nil {
+		c.inv.InvalidateChart(ctx, tenantID)
+	}
+	return nil
+}
+
+// UserDeactivationConverger is the FR-M005 hook (mappings converge + chart cache invalidated).
+func (m *Module) UserDeactivationConverger() identityServices.UserDeactivationConverger {
+	return convergeAndInvalidate{svc: m.mappingSvc, inv: m.ChartInvalidator()}
+}
+
 // MappingService exposes the mapping domain service for cross-module
 // convergence (FR-M005 hook registered in cmd/main.go).
 func (m *Module) MappingService() services.MappingService { return m.mappingSvc }
@@ -147,6 +174,7 @@ func (m *Module) RegisterRoutes(
 		m.chartCtrl,
 		m.db,
 		auditSvc,
+		m.ChartInvalidator(),
 	)
 }
 

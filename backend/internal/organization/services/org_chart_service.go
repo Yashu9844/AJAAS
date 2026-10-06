@@ -23,6 +23,20 @@ type OrgChartService interface {
 type chartCache interface {
 	Get(ctx context.Context, key string) (string, bool, error)
 	Set(ctx context.Context, key string, value string, expiration time.Duration) error
+	DeleteByPrefix(ctx context.Context, prefix string) error
+}
+
+// ChartInvalidator drops cached org charts of a tenant after any org mutation.
+type ChartInvalidator interface {
+	InvalidateChart(ctx context.Context, tenantID uuid.UUID)
+}
+
+// InvalidateChart removes every cached chart variant (max_depth / include_inactive) for the tenant.
+func (s *orgChartService) InvalidateChart(ctx context.Context, tenantID uuid.UUID) {
+	if s.cache == nil {
+		return
+	}
+	_ = s.cache.DeleteByPrefix(ctx, fmt.Sprintf("org:chart:%s:", tenantID.String()))
 }
 
 type orgChartService struct {
