@@ -81,6 +81,8 @@ type RefreshTokenRepository interface {
 	Create(ctx context.Context, tx *gorm.DB, rt *models.RefreshToken) error
 	FindByTokenHash(ctx context.Context, db *gorm.DB, hash string) (*models.RefreshToken, error)
 	RevokeByID(ctx context.Context, tx *gorm.DB, id uuid.UUID) error
+	// RevokeBySessionID revokes every still-active refresh token issued for the session (logout).
+	RevokeBySessionID(ctx context.Context, tx *gorm.DB, sessionID uuid.UUID) error
 	RevokeAllByUserID(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error
 }
 

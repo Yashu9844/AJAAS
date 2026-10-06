@@ -155,15 +155,54 @@ func TestAuthService_Logout(t *testing.T) {
 	sessionSvc := &MockSessionService{}
 	publisher := &MockEventPublisher{}
 	auditSvc := &MockAuditService{}
-	svc := NewAuthService(nil, nil, nil, nil, nil, nil, nil, sessionSvc, publisher, auditSvc)
+	tokenRepo := &MockRefreshTokenRepository{}
+	svc := NewAuthService(nil, nil, nil, nil, tokenRepo, nil, nil, sessionSvc, publisher, auditSvc)
 
 	sessionSvc.RevokeSessionFunc = func(ctx context.Context, tx *gorm.DB, sid uuid.UUID) error {
 		return nil
 	}
+	sessionID := uuid.New()
+	var revokedFor uuid.UUID
+	tokenRepo.RevokeBySessionIDFunc = func(ctx context.Context, tx *gorm.DB, sid uuid.UUID) error {
+		revokedFor = sid
+		return nil
+	}
 
-	err := svc.Logout(context.Background(), nil, uuid.New(), uuid.New(), uuid.New(), uuid.New())
+	err := svc.Logout(context.Background(), nil, uuid.New(), uuid.New(), sessionID, uuid.New())
 	if err != nil {
 		t.Fatalf("unexpected logout failure: %v", err)
+	}
+	if revokedFor != sessionID {
+		t.Fatalf("logout must revoke the refresh tokens of the session, got %s", revokedFor)
+	}
+
+	// a failure while revoking refresh tokens must surface (never report a half logout as success)
+	tokenRepo.RevokeBySessionIDFunc = func(ctx context.Context, tx *gorm.DB, sid uuid.UUID) error { return errors.New("db down") }
+	if err := svc.Logout(context.Background(), nil, uuid.New(), uuid.New(), sessionID, uuid.New()); err == nil {
+		t.Fatal("expected error when refresh token revocation fails")
+	}
+}
+
+func TestAuthService_RefreshAfterLogoutIsPlain401NotReuse(t *testing.T) {
+	tokenRepo := &MockRefreshTokenRepository{}
+	tokenSvc := &MockTokenService{}
+	sessionSvc := &MockSessionService{}
+	svc := NewAuthService(nil, nil, nil, nil, tokenRepo, nil, tokenSvc, sessionSvc, &MockEventPublisher{}, &MockAuditService{})
+	tokenSvc.HashOpaqueTokenFunc = func(string) string { return "h" }
+	now := time.Now()
+	tokenRepo.FindByTokenHashFunc = func(ctx context.Context, db *gorm.DB, hash string) (*models.RefreshToken, error) {
+		rt := &models.RefreshToken{UserID: uuid.New(), TenantID: uuid.New(), ExpiresAt: now.Add(time.Hour), RevokedAt: &now, RevokedReason: "logout"}
+		rt.ID = uuid.New()
+		return rt, nil
+	}
+	massRevoked := false
+	sessionSvc.RevokeAllForUserFunc = func(ctx context.Context, tx *gorm.DB, tid, uid uuid.UUID) error { massRevoked = true; return nil }
+	_, err := svc.RefreshToken(context.Background(), nil, dto.RefreshTokenRequest{RefreshToken: "x"}, uuid.New())
+	if !errors.Is(err, sharedErrors.ErrUnauthorized) {
+		t.Fatalf("want plain unauthorized, got %v", err)
+	}
+	if massRevoked {
+		t.Fatal("a logged-out token must not trigger the reuse-detection mass revocation")
 	}
 }
 

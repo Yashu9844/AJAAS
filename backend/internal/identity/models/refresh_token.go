@@ -9,14 +9,18 @@ import (
 
 // RefreshToken represents a refresh token used for JWT renewal.
 type RefreshToken struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID    uuid.UUID  `gorm:"type:uuid;not null;index:idx_refresh_tokens_user_id;index:idx_refresh_tokens_user_tenant,priority:1" json:"user_id"`
-	TenantID  uuid.UUID  `gorm:"type:uuid;not null;index:idx_refresh_tokens_tenant_id;index:idx_refresh_tokens_user_tenant,priority:2" json:"tenant_id"`
-	TokenHash string     `gorm:"type:varchar(64);uniqueIndex:uq_refresh_tokens_token_hash;not null" json:"token_hash"`
-	ExpiresAt time.Time  `gorm:"not null" json:"expires_at"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;index:idx_refresh_tokens_user_id;index:idx_refresh_tokens_user_tenant,priority:1" json:"user_id"`
+	TenantID  uuid.UUID `gorm:"type:uuid;not null;index:idx_refresh_tokens_tenant_id;index:idx_refresh_tokens_user_tenant,priority:2" json:"tenant_id"`
+	TokenHash string    `gorm:"type:varchar(64);uniqueIndex:uq_refresh_tokens_token_hash;not null" json:"token_hash"`
+	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
+	// SessionID links the token to the login session it was issued for, so logout can revoke it.
+	SessionID *uuid.UUID `gorm:"type:uuid;index:idx_refresh_tokens_session_id" json:"session_id,omitempty"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-	CreatedAt time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	// RevokedReason is "logout" when revoked by an explicit logout; empty for rotation. Only rotated tokens trigger reuse detection.
+	RevokedReason string    `gorm:"type:varchar(20)" json:"-"`
+	CreatedAt     time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt     time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 }
 
 // BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.

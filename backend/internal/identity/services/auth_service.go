@@ -124,6 +124,7 @@ func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginReque
 	rt := &models.RefreshToken{
 		UserID:    user.ID,
 		TenantID:  tenant.ID,
+		SessionID: &session.ID,
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 days expiration
 	}
@@ -199,8 +200,11 @@ func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginReque
 }
 
 func (s *authService) Logout(ctx context.Context, tx *gorm.DB, tenantID, userID, sessionID uuid.UUID, correlationID uuid.UUID) error {
-	// Revoke Session
+	// Revoke Session and every refresh token issued for it (otherwise the refresh token would outlive the logout)
 	if err := s.sessionSvc.RevokeSession(ctx, tx, sessionID); err != nil {
+		return err
+	}
+	if err := s.tokenRepo.RevokeBySessionID(ctx, tx, sessionID); err != nil {
 		return err
 	}
 
@@ -235,6 +239,11 @@ func (s *authService) RefreshToken(ctx context.Context, tx *gorm.DB, req dto.Ref
 
 	// Check if expired
 	if time.Now().After(rt.ExpiresAt) {
+		return nil, sharedErrors.ErrUnauthorized
+	}
+
+	// A token revoked by an explicit logout is simply invalid (not a theft signal).
+	if rt.RevokedAt != nil && rt.RevokedReason == "logout" {
 		return nil, sharedErrors.ErrUnauthorized
 	}
 
@@ -283,19 +292,20 @@ func (s *authService) RefreshToken(ctx context.Context, tx *gorm.DB, req dto.Ref
 		return nil, err
 	}
 
+	// Generate new Session and Access Token
+	session, err := s.sessionSvc.CreateSession(ctx, tx, rt.UserID, rt.TenantID, "", "")
+	if err != nil {
+		return nil, err
+	}
+
 	newRT := &models.RefreshToken{
 		UserID:    rt.UserID,
 		TenantID:  rt.TenantID,
+		SessionID: &session.ID,
 		TokenHash: newHash,
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 	}
 	if err := s.tokenRepo.Create(ctx, tx, newRT); err != nil {
-		return nil, err
-	}
-
-	// Generate new Session and Access Token
-	session, err := s.sessionSvc.CreateSession(ctx, tx, rt.UserID, rt.TenantID, "", "")
-	if err != nil {
 		return nil, err
 	}
 

@@ -87,3 +87,9 @@ func (r *refreshTokenRepository) RevokeAllByUserID(ctx context.Context, tx *gorm
 		Where("tenant_id = ? AND user_id = ? AND revoked_at IS NULL", tenantID, userID).
 		Update("revoked_at", &now).Error
 }
+
+func (r *refreshTokenRepository) RevokeBySessionID(ctx context.Context, tx *gorm.DB, sessionID uuid.UUID) error {
+	return tx.WithContext(ctx).Model(&models.RefreshToken{}).
+		Where("session_id = ? AND revoked_at IS NULL", sessionID).
+		Updates(map[string]interface{}{"revoked_at": time.Now(), "revoked_reason": "logout"}).Error
+}

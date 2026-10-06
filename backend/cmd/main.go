@@ -155,7 +155,11 @@ func main() {
 
 	// Attach global logger and CORS middleware
 	router.Use(sharedMiddleware.RequestLogger(log))
-	router.Use(sharedMiddleware.CORS())
+	corsOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), ",")
+	if os.Getenv("CORS_ALLOWED_ORIGINS") == "" && cfg.Server.Env != "production" {
+		corsOrigins = []string{"*"} // development convenience only
+	}
+	router.Use(sharedMiddleware.CORS(corsOrigins))
 
 	// Group routing definitions under v1 API
 	v1Group := router.Group("/api/v1")

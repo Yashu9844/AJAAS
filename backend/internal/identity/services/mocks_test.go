@@ -325,6 +325,7 @@ func (m *MockSessionRepository) RevokeAllByUserID(ctx context.Context, tx *gorm.
 
 // MockRefreshTokenRepository stubs repositories.RefreshTokenRepository
 type MockRefreshTokenRepository struct {
+	RevokeBySessionIDFunc func(ctx context.Context, tx *gorm.DB, sessionID uuid.UUID) error
 	CreateFunc            func(ctx context.Context, tx *gorm.DB, rt *models.RefreshToken) error
 	FindByTokenHashFunc   func(ctx context.Context, db *gorm.DB, hash string) (*models.RefreshToken, error)
 	RevokeByIDFunc        func(ctx context.Context, tx *gorm.DB, id uuid.UUID) error
@@ -580,4 +581,11 @@ func (m *MockRolePermissionRepository) FindByRoleIDs(ctx context.Context, db *go
 
 func (m *MockAuditService) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.AuditLogListResponse, error) {
 	return &dto.AuditLogListResponse{}, nil
+}
+
+func (m *MockRefreshTokenRepository) RevokeBySessionID(ctx context.Context, tx *gorm.DB, sessionID uuid.UUID) error {
+	if m.RevokeBySessionIDFunc != nil {
+		return m.RevokeBySessionIDFunc(ctx, tx, sessionID)
+	}
+	return nil
 }
