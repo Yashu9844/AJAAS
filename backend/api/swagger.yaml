@@ -1,8 +1,15 @@
 openapi: 3.0.3
 info:
-  title: JAAS Module 0 Identity API
+  title: JAAS Modules 0-2 API (Identity, Organization, Employee)
   description: API specifications for Module 0 — Tenant, Identity, and RBAC authorization core.
-  version: 1.0.0
+  version: 1.1.0
+  x-conventions: |
+    Errors always use {"error": {"code": "...", "message": "...", "details": [{"field","message"}]}}.
+    Lists return {"data": [...], "meta": {"page","per_page","total_items","total_pages"}}; per_page is clamped to 1..100
+    (default 20) and junk values fall back to the defaults.
+    Granting access is non-escalating: a caller who is not tenant_admin can only assign roles / attach permissions
+    made of permissions they hold themselves; assigning tenant_admin requires tenant_admin (403 otherwise).
+    PII (statutory data) is masked unless ?unmasked=true is requested AND the caller holds employee:read_sensitive (403 otherwise).
 servers:
   - url: http://localhost:8080/api/v1
     description: Local Dev Server
@@ -126,7 +133,9 @@ paths:
 
   /tenants:
     post:
-      summary: Create Tenant (Superadmin only)
+      security:
+        - PlatformKey: []
+      summary: Create Tenant (platform operator key required)
       tags:
         - Tenants
       requestBody:
@@ -147,10 +156,27 @@ paths:
                   type: string
                 plan:
                   type: string
+                admin:
+                  type: object
+                  description: Optional first tenant_admin, created atomically with the tenant.
+                  required: [email, password, first_name, last_name]
+                  properties:
+                    email: {type: string, format: email}
+                    password: {type: string, minLength: 8, maxLength: 72}
+                    first_name: {type: string}
+                    last_name: {type: string}
       responses:
         '201':
-          description: Tenant created
+          description: Tenant created (admin_user_id is returned when an admin was provisioned)
+        '401':
+          description: Missing X-Platform-Key
+        '403':
+          description: Wrong X-Platform-Key
+        '503':
+          description: Platform administration is not configured (PLATFORM_ADMIN_KEY unset)
     get:
+      security:
+        - PlatformKey: []
       summary: List Tenants
       tags:
         - Tenants
@@ -160,6 +186,8 @@ paths:
 
   /tenants/{id}:
     get:
+      security:
+        - PlatformKey: []
       summary: Get Tenant
       tags:
         - Tenants
@@ -174,6 +202,8 @@ paths:
         '200':
           description: Tenant details
     patch:
+      security:
+        - PlatformKey: []
       summary: Update Tenant
       tags:
         - Tenants
@@ -203,6 +233,8 @@ paths:
 
   /tenants/{id}/activate:
     post:
+      security:
+        - PlatformKey: []
       summary: Activate Tenant
       tags:
         - Tenants
@@ -219,6 +251,8 @@ paths:
 
   /tenants/{id}/suspend:
     post:
+      security:
+        - PlatformKey: []
       summary: Suspend Tenant
       tags:
         - Tenants
@@ -522,6 +556,85 @@ paths:
         '200':
           description: Permissions assigned to role
 
+  /auth/me:
+    get:
+      summary: Roles and effective permissions of the caller
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "{user_id, roles[], permissions[] (resource:action), is_tenant_admin}"
+        '401':
+          description: Missing / invalid / revoked token
+  /users/{id}/activate:
+    post:
+      summary: Re-activate a deactivated user (users:update)
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Activated user (with roles)
+        '404':
+          description: Unknown user
+        '409':
+          description: User is already active
+  /users/{id}/roles/{role_id}:
+    delete:
+      summary: Remove a role from a user (users:update; the last tenant_admin cannot be removed)
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: role_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Role removed
+        '404':
+          description: User/role unknown or role not assigned
+        '409':
+          description: Would remove the last tenant_admin
+  /roles/{id}/permissions/{permission_id}:
+    delete:
+      summary: Remove a permission from a role (roles:update)
+      tags:
+        - Roles
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: permission_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Permission removed
+        '403':
+          description: tenant_admin permissions are fixed
+        '404':
+          description: Unknown role or permission not assigned
+  /audit-logs:
+    get:
+      summary: Read the tenant audit trail, newest first (audit:read)
+      tags:
+        - Audit
+      security:
+        - BearerAuth: []
+        - TenantSubdomain: []
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1}}
+        - {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        '200':
+          description: Paginated audit records
   /permissions:
     get:
       summary: List Global Permissions
@@ -1491,6 +1604,11 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Enter your user access token.
+    PlatformKey:
+      type: apiKey
+      in: header
+      name: X-Platform-Key
+      description: Platform operator key (PLATFORM_ADMIN_KEY) guarding /tenants routes. Fails closed when unset.
     TenantSubdomain:
       type: apiKey
       in: header
