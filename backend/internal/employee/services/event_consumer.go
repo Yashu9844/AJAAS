@@ -34,6 +34,13 @@ func (c *eventConsumer) HandleUserDeactivated(ctx context.Context, tenantID, use
 		return nil
 	}
 
+	// Exit finalisation (resigned/terminated) itself deactivates the user; the resulting event must not try to
+	// transition an already-final (or already inactive) profile again.
+	switch profile.Status {
+	case "resigned", "terminated", "inactive":
+		return nil
+	}
+
 	exitDate := time.Now().UTC()
 	_, err = c.empSvc.TransitionStatus(ctx, tenantID, profile.ID, dto.TransitionStatusRequest{
 		Status:     "inactive",
