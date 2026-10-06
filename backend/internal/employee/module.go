@@ -1,7 +1,9 @@
 package employee
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/employee/controllers"
 	"github.com/jaas/jaas/internal/employee/models"
 	"github.com/jaas/jaas/internal/employee/repositories"
@@ -129,4 +131,16 @@ func (m *Module) EmployeeService() services.EmployeeService {
 
 func (m *Module) EventConsumer() services.EventConsumer {
 	return m.consumer
+}
+
+// userDeactivationConverger adapts the employee service to the Module 0 deactivation hook (FR-EV001, synchronous).
+type userDeactivationConverger struct{ svc services.EmployeeService }
+
+func (c userDeactivationConverger) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, _ uuid.UUID) error {
+	return c.svc.ConvergeUserDeactivation(ctx, tx, tenantID, userID)
+}
+
+// UserDeactivationConverger returns the hook that keeps employee profiles in step with Module 0 user deactivation.
+func (m *Module) UserDeactivationConverger() identityServices.UserDeactivationConverger {
+	return userDeactivationConverger{svc: m.empSvc}
 }

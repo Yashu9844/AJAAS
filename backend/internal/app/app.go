@@ -89,6 +89,8 @@ func Build(o Options) (*gin.Engine, error) {
 	}
 
 	employeeModule := employee.NewModule(o.DB, o.Redis, o.Publisher, &log.Logger, identityModule.UserService(), identityModule.AuditService())
+	// FR-EV001: employee profiles converge with user deactivation inside the same transaction (no broker needed).
+	identityServices.AddUserDeactivationConverger(employeeModule.UserDeactivationConverger())
 	if cfg.Database.AutoMigrate {
 		if err := o.DB.AutoMigrate(employeeModule.RegisterModels()...); err != nil {
 			return nil, fmt.Errorf("employee auto-migration failed: %w", err)

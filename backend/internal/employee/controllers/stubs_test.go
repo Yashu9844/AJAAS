@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -98,4 +99,8 @@ type stubTlSvc struct {
 
 func (s *stubTlSvc) List(ctx context.Context, tenantID, profileID uuid.UUID) ([]dto.TimelineResponse, error) {
 	return s.list, s.err
+}
+
+func (s *stubEmpSvc) ConvergeUserDeactivation(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error {
+	return nil
 }

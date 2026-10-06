@@ -28,6 +28,10 @@ type EmployeeService interface {
 	UpdateSelfContact(ctx context.Context, tenantID, userID uuid.UUID, req dto.UpdateSelfContactRequest) (*dto.EmployeeResponse, error)
 	TransitionStatus(ctx context.Context, tenantID, id uuid.UUID, req dto.TransitionStatusRequest) (*dto.EmployeeResponse, error)
 	Deactivate(ctx context.Context, tenantID, id uuid.UUID) error
+	// ConvergeUserDeactivation (FR-EV001) marks the employee profile of a just-deactivated Module 0 user as inactive and
+	// appends a timeline entry. It runs inside the user-deactivation transaction (tx) and is a no-op when the user has no
+	// profile or the profile is already final (resigned / terminated / inactive).
+	ConvergeUserDeactivation(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error
 }
 
 type employeeService struct {
@@ -506,4 +510,51 @@ func applyStatusEffects(d *models.EmploymentDetail, req dto.TransitionStatusRequ
 		eventType = newStatus
 	}
 	return eventType
+}
+
+func (s *employeeService) ConvergeUserDeactivation(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error {
+	repo := s.profileRepo
+	if tx != nil {
+		repo = s.profileRepo.WithTx(tx)
+	}
+	profile, err := repo.GetByUserID(ctx, tenantID, userID)
+	if err != nil {
+		return err
+	}
+	if profile == nil {
+		return nil
+	}
+	switch profile.Status {
+	case "resigned", "terminated", "inactive":
+		return nil
+	}
+	oldStatus := profile.Status
+	profile.Status = "inactive"
+	if err := repo.Update(ctx, tx, profile); err != nil {
+		return err
+	}
+	timeline := &models.EmployeeTimeline{
+		EmployeeProfileID: profile.ID,
+		EventType:         "status_changed:inactive",
+		EffectiveDate:     time.Now().UTC(),
+		Notes:             "Identity user account deactivated",
+		Metadata:          "{}",
+	}
+	timeline.TenantID = tenantID
+	if tx != nil {
+		if err := tx.Create(timeline).Error; err != nil {
+			return err
+		}
+	} else if s.timelineRepo != nil {
+		if err := s.timelineRepo.Create(ctx, nil, timeline); err != nil {
+			return err
+		}
+	}
+	if s.publisher != nil {
+		evt := events.NewEventEnvelope(events.EventTypeEmployeeStatusChanged, "employee.status.changed", tenantID, map[string]interface{}{
+			"id": profile.ID, "user_id": profile.UserID, "old_status": oldStatus, "new_status": "inactive",
+		})
+		_ = s.publisher.Publish(ctx, events.ExchangeName, "employee.status.changed", evt)
+	}
+	return nil
 }

@@ -381,3 +381,26 @@ func TestEmployeeRBACTiers(t *testing.T) {
 	u2, _ := tc.newUser(t, "newemp")
 	expect(t, as("POST", "/employees", body(empBody(u2, "N-"+uniq(), nil))), 201, "create after grant")
 }
+
+// FR-EV001: deactivating a Module 0 user converges the employee profile synchronously (no broker involved).
+func TestUserDeactivationConvergesEmployee(t *testing.T) {
+	tc := newTenant(t)
+	e, uid := tc.mkEmployeeFor(t, "conv", nil)
+	expect(t, tc.do(t, "POST", "/users/"+uid+"/deactivate"), 200, "deactivate user")
+	g := tc.do(t, "GET", "/employees/"+e)
+	if g.str("data.status") != "inactive" {
+		t.Fatalf("employee must become inactive with its user: %s", g.Raw)
+	}
+	if !timelineHas(tc.do(t, "GET", "/employees/"+e+"/timeline"), "inactive") {
+		t.Fatal("timeline must record the convergence")
+	}
+	// an already-final employee is left untouched
+	e2, uid2 := tc.mkEmployeeFor(t, "conv2", nil)
+	expect(t, tc.do(t, "POST", "/employees/"+e2+"/status", body(map[string]string{"status": "terminated"})), 200, "terminate")
+	if tc.do(t, "GET", "/employees/"+e2).str("data.status") != "terminated" || tc.do(t, "GET", "/users/"+uid2).str("data.status") != "inactive" {
+		t.Fatal("terminated stays terminated; user inactive")
+	}
+	// users without a profile deactivate normally
+	plain, _ := tc.newUser(t, "noprofile")
+	expect(t, tc.do(t, "POST", "/users/"+plain+"/deactivate"), 200, "plain user")
+}

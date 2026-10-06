@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,18 +38,34 @@ type userService struct {
 	auditSvc     AuditService
 }
 
-// UserDeactivationConverger converges dependent state when a user is
-// deactivated (Module 1 org mappings). Set by cmd wiring; nil disables.
+// UserDeactivationConverger converges dependent state when a user is deactivated (Module 1 org mappings,
+// Module 2 employee profile). Registered at boot by internal/app after the modules are wired.
 type UserDeactivationConverger interface {
 	DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, correlationID uuid.UUID) error
 }
 
-var orgConverger UserDeactivationConverger
+var (
+	convergersMu sync.RWMutex
+	convergers   []UserDeactivationConverger
+)
 
-// SetUserDeactivationConverger registers the cross-module convergence hook.
-// Called once at boot by cmd/main.go after both modules are wired.
+// AddUserDeactivationConverger registers a cross-module convergence hook that runs inside the deactivation
+// transaction (so by the time the API answers 200, dependent state has converged).
+func AddUserDeactivationConverger(c UserDeactivationConverger) {
+	if c == nil {
+		return
+	}
+	convergersMu.Lock()
+	convergers = append(convergers, c)
+	convergersMu.Unlock()
+}
+
+// SetUserDeactivationConverger replaces all registered hooks with c (nil clears them).
 func SetUserDeactivationConverger(c UserDeactivationConverger) {
-	orgConverger = c
+	convergersMu.Lock()
+	convergers = nil
+	convergersMu.Unlock()
+	AddUserDeactivationConverger(c)
 }
 
 // NewUserService creates a new UserService.
@@ -418,8 +435,11 @@ func (s *userService) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID,
 	// The async identity.user.deactivated event also converges this, but the
 	// in-process call makes the API response truthful: by the time deactivate
 	// returns 200, mappings are already inactive.
-	if orgConverger != nil {
-		if err := orgConverger.DeactivateUserMappings(ctx, tx, tenantID, id, correlationID); err != nil {
+	convergersMu.RLock()
+	hooks := append([]UserDeactivationConverger(nil), convergers...)
+	convergersMu.RUnlock()
+	for _, h := range hooks {
+		if err := h.DeactivateUserMappings(ctx, tx, tenantID, id, correlationID); err != nil {
 			return err
 		}
 	}

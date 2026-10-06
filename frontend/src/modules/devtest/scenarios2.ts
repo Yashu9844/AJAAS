@@ -109,7 +109,12 @@ export const S2: Scenario[] = [
         await r.call("GET after deactivation → inactive", tn(A, "GET", `/employees/${e2.id}`), 200, expectFields(["data.status", "inactive"]));
         await r.call("Deactivate non-existent employee → 404", tn(A, "POST", `/employees/${ZERO}/deactivate`), 404);
       }
-      r.skip("FR-EV001: deactivating a Module 0 user marks the employee inactive + timeline event", "event-driven via RabbitMQ; broker is not running in this environment (NoOp publisher), so it cannot be verified here");
+      const cv = await mkEmployee(r, A, uid, "conv");
+      if (cv.id) {
+        await r.call("FR-EV001: deactivating a Module 0 user", tn(A, "POST", `/users/${cv.user.id}/deactivate`), 200);
+        await r.call("…marks the employee inactive (synchronously, no broker needed)", tn(A, "GET", `/employees/${cv.id}`), 200, expectFields(["data.status", "inactive"]));
+        await r.call("…and appends a timeline entry", tn(A, "GET", `/employees/${cv.id}/timeline`), 200, timelineHas("inactive"));
+      }
     },
   },
   {
