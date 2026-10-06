@@ -62,6 +62,9 @@ export const S2: Scenario[] = [
       await r.call("Invalid employee_code format → 400", tn(A, "POST", "/employees", empBody(u.id, "bad code!")), 400);
       await r.call("Invalid employment_type → 400", tn(A, "POST", "/employees", empBody(u.id, `Z-${uid.toUpperCase()}`, { employment_type: "slave" })), 400);
       await r.call("Missing required fields → 400", tn(A, "POST", "/employees", {}), 400);
+      await r.call("List meta uses total_items/total_pages like every other list", tn(A, "GET", "/employees", undefined, { per_page: "5" }), 200, (x) =>
+        getPath(x.resBody, "meta.total_items") !== undefined && getPath(x.resBody, "meta.total_pages") !== undefined ? null : "meta lacks total_items/total_pages",
+      );
       await r.call("Invalid joining_date → 400", { ...tn(A, "POST", "/employees"), rawBody: JSON.stringify({ ...empBody(u.id, `W-${uid.toUpperCase()}`), joining_date: "not-a-date" }) }, 400);
       await r.call("GET non-existent employee → 404", tn(A, "GET", `/employees/${ZERO}`), 404);
       await r.call("GET /employees/not-a-uuid → 400", tn(A, "GET", "/employees/not-a-uuid"), 400);
@@ -86,10 +89,20 @@ export const S2: Scenario[] = [
       await r.call("Missing status → 400", tn(A, "POST", `/employees/${e.id}/status`, {}), 400);
       await r.call("Transition notice → resigned with exit date + reason", tn(A, "POST", `/employees/${e.id}/status`, { status: "resigned", resignation_date: "2026-09-01T00:00:00Z", exit_date: "2026-10-01T00:00:00Z", exit_reason: "better offer" }), 200);
       await r.call("GET after resign: status + employment.exit_reason persisted", tn(A, "GET", `/employees/${e.id}`), 200, expectFields(["data.status", "resigned"], ["data.employment.exit_reason", "better offer"]));
+      await r.call("FR-ED004: exit dates were derived (resignation/exit date present)", tn(A, "GET", `/employees/${e.id}`), 200, (x) => (str(x, "data.employment.exit_date") && str(x, "data.employment.resignation_date") ? null : "exit_date / resignation_date missing"));
+      await r.call("Timeline contains the 'resigned' milestone (FR-TL001)", tn(A, "GET", `/employees/${e.id}/timeline`), 200, timelineHas("resigned"));
       await r.call("FR-ED005: exit finalisation deactivates Module 0 user", tn(A, "GET", `/users/${e.user.id}`), 200, expectFields(["data.status", "inactive"]));
       await r.call("FR-ED002: illegal transition resigned → active is rejected", tn(A, "POST", `/employees/${e.id}/status`, { status: "active" }), [400, 409, 422]);
       await r.call("Transition to same status is a no-op (200)", tn(A, "POST", `/employees/${e.id}/status`, { status: "resigned" }), 200);
       await r.call("Status change on non-existent employee → 404", tn(A, "POST", `/employees/${ZERO}/status`, { status: "notice" }), 404);
+      const p = await mkEmployee(r, A, uid, "conf", [], { probation_end_date: "2099-01-01T00:00:00Z" });
+      if (p.id) {
+        await r.call("FR-ED003: probation → active confirms the employee", tn(A, "POST", `/employees/${p.id}/status`, { status: "active" }), 200, expectFields(["data.status", "active"]));
+        await r.call("confirmation_date is recorded", tn(A, "GET", `/employees/${p.id}`), 200, (x) => (str(x, "data.employment.confirmation_date") ? null : "confirmation_date missing"));
+        await r.call("Timeline contains 'confirmed'", tn(A, "GET", `/employees/${p.id}/timeline`), 200, timelineHas("confirmed"));
+        await r.call("Terminal state: terminated is final", tn(A, "POST", `/employees/${p.id}/status`, { status: "terminated", exit_reason: "dev test" }), 200);
+        await r.call("terminated → probation rejected (409)", tn(A, "POST", `/employees/${p.id}/status`, { status: "probation" }), 409);
+      }
       const e2 = await mkEmployee(r, A, uid, "stat2");
       if (e2.id) {
         await r.call("Deactivate employee", tn(A, "POST", `/employees/${e2.id}/deactivate`), [200, 204]);
@@ -112,6 +125,7 @@ export const S2: Scenario[] = [
       await r.call("PUT statutory (admin)", tn(A, "PUT", `/employees/${e.id}/statutory`, { tax_id: "ABCDE1234F", national_id: "9999888877776666", bank_name: "Test Bank", bank_account_number: "123456789012", bank_routing_swift: "TESTINBB" }), 200, expectFields(["data.bank_name", "Test Bank"]));
       await r.call("GET statutory is masked by default", tn(A, "GET", `/employees/${e.id}/statutory`), 200, expectFields(["data.tax_id", "****234F"], ["data.bank_account_number", "****9012"], ["data.bank_name", "Test Bank"]));
       await r.call("GET ?unmasked=true as tenant_admin reveals raw values", tn(A, "GET", `/employees/${e.id}/statutory`, undefined, { unmasked: "true" }), 200, expectFields(["data.tax_id", "ABCDE1234F"], ["data.bank_account_number", "123456789012"]));
+      await r.call("GET ?unmasked=false stays masked", tn(A, "GET", `/employees/${e.id}/statutory`, undefined, { unmasked: "false" }), 200, expectFields(["data.tax_id", "****234F"]));
       await r.call("PUT again (upsert) changes bank name", tn(A, "PUT", `/employees/${e.id}/statutory`, { bank_name: "Other Bank", tax_id: "ABCDE1234F", national_id: "9999888877776666", bank_account_number: "123456789012", bank_routing_swift: "TESTINBB" }), 200);
       await r.call("GET after upsert shows new bank name", tn(A, "GET", `/employees/${e.id}/statutory`), 200, expectFields(["data.bank_name", "Other Bank"]));
       await r.call("PUT with tax_id > 100 chars → 400", tn(A, "PUT", `/employees/${e.id}/statutory`, { tax_id: "x".repeat(101) }), 400);
@@ -174,8 +188,10 @@ export const S2: Scenario[] = [
       await r.call("GET /employees/me returns own profile", tn(S, "GET", "/employees/me"), 200, expectFields(["data.id", e.id], ["data.user_id", e.user.id]));
       await r.call("PATCH /employees/me updates phone + address", tn(S, "PATCH", "/employees/me", { personal_phone: "+910000000001", current_address: "Self Street 1" }), 200);
       await r.call("GET /employees/me shows updated contact", tn(S, "GET", "/employees/me"), 200, expectFields(["data.contact.personal_phone", "+910000000001"], ["data.contact.current_address", "Self Street 1"]));
-      await r.call("PATCH emergency_contacts as a plain string (DTO type is string)", tn(S, "PATCH", "/employees/me", { emergency_contacts: "Mom +910000000002" }), 200);
-      await r.call("PATCH emergency_contacts as a JSON document string", tn(S, "PATCH", "/employees/me", { emergency_contacts: JSON.stringify([{ name: "Mom", phone: "+910000000002" }]) }), 200);
+      await r.call("emergency_contacts as free text is rejected (must be a JSON array, FR-EC001) → 400", tn(S, "PATCH", "/employees/me", { emergency_contacts: "Mom +910000000002" }), 400);
+      await r.call("emergency_contacts entry without phone → 400", tn(S, "PATCH", "/employees/me", { emergency_contacts: JSON.stringify([{ name: "Mom" }]) }), 400);
+      await r.call("emergency_contacts as JSON array of {name,relation,phone}", tn(S, "PATCH", "/employees/me", { emergency_contacts: JSON.stringify([{ name: "Mom", relation: "mother", phone: "+910000000002" }]) }), 200);
+      await r.call("GET /employees/me returns the stored emergency contacts", tn(S, "GET", "/employees/me"), 200, (e) => (str(e, "data.contact.emergency_contacts").includes("Mom") ? null : "emergency contacts not persisted"));
       await r.call("Employee cannot list the directory (no employee:read) → 403", tn(S, "GET", "/employees"), 403);
       if (other.id) {
         await r.call("Employee cannot read someone else → 403", tn(S, "GET", `/employees/${other.id}`), 403);
@@ -213,8 +229,8 @@ export const S2: Scenario[] = [
       await r.call("read-only: GET timeline → 200", tn(S, "GET", `/employees/${target.id}/timeline`), 200);
       await r.call("read-only: GET documents → 200", tn(S, "GET", `/employees/${target.id}/documents`), 200);
       await r.call("read-only: statutory is MASKED", tn(S, "GET", `/employees/${target.id}/statutory`), 200, expectFields(["data.tax_id", "****234F"], ["data.bank_account_number", "****9012"]));
-      await r.call("SECURITY: employee:read user adds ?unmasked=true → must NOT reveal PII (403 or still masked)", tn(S, "GET", `/employees/${target.id}/statutory`, undefined, { unmasked: "true" }), [200, 403], (x) =>
-        x.status === 403 || str(x, "data.tax_id").startsWith("****") ? null : `PII LEAK: raw tax_id "${str(x, "data.tax_id")}" returned to a user without sensitive permission`,
+      await r.call("SECURITY: employee:read user adds ?unmasked=true → 403 (never raw PII)", tn(S, "GET", `/employees/${target.id}/statutory`, undefined, { unmasked: "true" }), 403, (x) =>
+        JSON.stringify(x.resBody).includes("ABCDE1234F") ? "PII LEAK in an error response" : null,
       );
       await r.call("read-only: POST /employees → 403", tn(S, "POST", "/employees", empBody(u.id, `Q-${uid.toUpperCase()}`)), 403);
       await r.call("read-only: PATCH /employees/:id → 403", tn(S, "PATCH", `/employees/${target.id}`, { first_name: "X" }), 403);
@@ -229,6 +245,15 @@ export const S2: Scenario[] = [
       await r.call("grant employee:update_sensitive", tn(A, "POST", `/roles/${rid}/permissions`, { permission_ids: [ids.update_sensitive] }), 200);
       await r.call("now PUT statutory → 200", tn(S, "PUT", `/employees/${target.id}/statutory`, { tax_id: "ABCDE1234F", bank_account_number: "123456789012", bank_name: "ByLimited" }), 200);
       if (did) await r.call("still: verify document (needs employee:admin) → 403", tn(S, "POST", `/employees/${target.id}/documents/${did}/verify`), 403);
+      await r.call("still: unmasked read (needs employee:read_sensitive) → 403", tn(S, "GET", `/employees/${target.id}/statutory`, undefined, { unmasked: "true" }), 403);
+      const pSens = await permId(r, A, "employee", "read_sensitive");
+      r.need(pSens, "employee:read_sensitive permission missing (seed)");
+      await r.call("grant employee:read_sensitive", tn(A, "POST", `/roles/${rid}/permissions`, { permission_ids: [pSens] }), 200);
+      await r.call("now ?unmasked=true reveals the raw values", tn(S, "GET", `/employees/${target.id}/statutory`, undefined, { unmasked: "true" }), 200, expectFields(["data.tax_id", "ABCDE1234F"], ["data.bank_account_number", "123456789012"]));
+      await r.call("default read stays masked even for read_sensitive holders", tn(S, "GET", `/employees/${target.id}/statutory`), 200, expectFields(["data.tax_id", "****234F"]));
+      await r.call("unmasked access is audited (audit trail has employee.statutory_unmasked)", tn(A, "GET", "/audit-logs", undefined, { per_page: "100" }), 200, (x) =>
+        ((getPath(x.resBody, "data") as { action: string }[]) ?? []).some((y) => y.action === "employee.statutory_unmasked") ? null : "unmasked read not audited",
+      );
       await r.call("grant employee:admin", tn(A, "POST", `/roles/${rid}/permissions`, { permission_ids: [ids.admin] }), 200);
       if (did) await r.call("now verify document → 200", tn(S, "POST", `/employees/${target.id}/documents/${did}/verify`), 200);
       await r.call("cleanup: deactivate limited user", tn(A, "POST", `/users/${u.id}/deactivate`), 200);

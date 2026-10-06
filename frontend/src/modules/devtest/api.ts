@@ -3,6 +3,7 @@ import type { CallSpec, Exchange } from "./types";
 export interface Endpoint {
   host: string;
   port: string;
+  platformKey?: string; // sent as X-Platform-Key on /tenants routes
 }
 
 let seq = 0;
@@ -38,6 +39,9 @@ export async function callApi(spec: CallSpec, ep: Endpoint): Promise<Exchange> {
     headers["Content-Type"] = "application/json";
   }
   if (spec.token) headers["Authorization"] = `Bearer ${spec.token}`;
+  if (spec.scope === "global" && spec.path.startsWith("/tenants") && ep.platformKey && !spec.noPlatformKey) headers["X-Platform-Key"] = ep.platformKey;
+
+  if (spec.headers) Object.assign(headers, spec.headers);
 
   const shown = { ...headers };
   if (spec.token) shown["Authorization"] = `Bearer ${maskToken(spec.token)}`;

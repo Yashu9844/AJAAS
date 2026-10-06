@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AuthPanel, Badge, Checklist, ExchangeView } from "./components";
-import { clearHistory, clearResults, setConfig, useDevStore } from "./store";
+import { clearHistory, clearResults, setConfig, setPlatformKey, useDevStore } from "./store";
 import { CHECKLIST } from "./specs";
 
 const NAV = [
@@ -37,6 +37,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <label>
             API port
             <input value={st.port} onChange={(e) => setConfig(st.host, e.target.value)} />
+          </label>
+          <label>
+            Platform key (X-Platform-Key for /tenants)
+            <input type="password" value={st.platformKey} onChange={(e) => setPlatformKey(e.target.value)} />
           </label>
           <small>
             Tenant calls use <code>http://&lt;slug&gt;.{st.host}:{st.port}</code>

@@ -84,12 +84,14 @@ export const S0: Scenario[] = [
       await r.call("POST /users with malformed JSON", { ...tn(A, "POST", "/users"), rawBody: "{bad json" }, 400);
       await r.call("POST /tenants with empty body", gl("POST", "/tenants", {}), 400);
       await r.call("POST /tenants duplicate slug", gl("POST", "/tenants", { name: "dup", slug: A.slug }), 409);
+      await r.call("Error responses use the standard envelope {error:{code,message}}", tn(A, "GET", "/users/not-a-uuid"), 400, (e) => (str(e, "error.code") === "VALIDATION_ERROR" ? null : `error is not the standard envelope: ${JSON.stringify((e.resBody as { error?: unknown })?.error)}`));
       await r.call("POST /tenants reserved slug 'admin'", gl("POST", "/tenants", { name: "x", slug: "admin" }), [400, 409]);
       await r.call("POST /roles with invalid permission id (not uuid)", tn(A, "POST", "/roles", { name: `bad${uid}`, permission_ids: ["abc"] }), 400);
       await r.call("POST /roles with unknown (valid uuid) permission id", tn(A, "POST", "/roles", { name: `bad2${uid}`, permission_ids: [ZERO] }), [400, 404, 422]);
       await r.call("Assign non-existent role to user", tn(A, "POST", `/users/${A.user?.id}/roles`, { role_ids: [ZERO] }), [400, 404, 422]);
-      await r.call("Spec NFR-SEC005: GET /tenants must require auth (401 without token)", gl("GET", "/tenants"), 401);
-      await r.call("Spec NFR-SEC005: POST /tenants must require auth (401 without token)", gl("POST", "/tenants", { name: "anon", slug: `anon${uid}` }), [401, 403]);
+      await r.call("NFR-SEC005: GET /tenants without platform key → 401", { ...gl("GET", "/tenants"), noPlatformKey: true }, 401);
+      await r.call("NFR-SEC005: POST /tenants without platform key → 401/403", { ...gl("POST", "/tenants", { name: "anon", slug: `anon${uid}` }), noPlatformKey: true }, [401, 403]);
+      await r.call("Tenant routes with a WRONG platform key → 403", { ...gl("GET", "/tenants"), noPlatformKey: true, headers: { "X-Platform-Key": "wrong" } }, 403);
     },
   },
   {
@@ -114,6 +116,11 @@ export const S0: Scenario[] = [
       await r.call("GET after activate", gl("GET", `/tenants/${id}`), 200, expectFields(["data.status", "active"]));
       await r.call("Tenant host resolves again (401 = reached auth, not blocked)", { method: "GET", scope: "tenant", slug, path: "/users", token: null }, 401);
       await r.call("Get non-existent tenant", gl("GET", `/tenants/${ZERO}`), 404);
+      const slug2 = `dta${uid}`;
+      const admin = { email: `root.${uid}@example.com`, password: PASSWORD, first_name: "Root", last_name: "Admin" };
+      await r.call("Create tenant with a weak admin password → 400", gl("POST", "/tenants", { name: "Atomic", slug: slug2, admin: { ...admin, password: "short" } }), 400);
+      const t2 = await r.call("Same slug now succeeds (the failed request left nothing behind) and provisions the admin", gl("POST", "/tenants", { name: "Atomic", slug: slug2, admin }), 201, (e) => (str(e, "data.admin_user_id") ? null : "admin_user_id missing"));
+      if (str(t2, "data.id")) await login(r, "Provisioned admin can log in and is tenant_admin", slug2, admin.email, PASSWORD, 200);
     },
   },
   {
@@ -206,6 +213,58 @@ export const S0: Scenario[] = [
       await r.call("limited user: GET /roles now allowed → 200", tn(S, "GET", "/roles"), 200);
       await r.call("tenant_admin bypass: GET /roles → 200", tn(A, "GET", "/roles"), 200);
       await r.call("cleanup: deactivate limited user", tn(A, "POST", `/users/${u.id}/deactivate`), 200);
+    },
+  },
+  {
+    key: "s0.access",
+    module: 0,
+    title: "Access management: /auth/me, activate, unassign role/permission, delete guards, audit trail, pagination",
+    description: "Exercises the endpoints that make RBAC administrable end-to-end, the safety guards (role in use, self-deactivation), the audit-log read API, and pagination clamping.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      await r.call("/auth/me shows tenant_admin", { method: "GET", scope: "global", path: "/auth/me", token: A.accessToken }, 200, (e) =>
+        ((getPath(e.resBody, "data.roles") as { name: string }[]) ?? []).some((x) => x.name === "tenant_admin") && getPath(e.resBody, "data.is_tenant_admin") === true ? null : "tenant_admin not reported",
+      );
+      const pRead = await permId(r, A, "users", "read");
+      r.need(pRead, "users:read permission missing (seed)");
+      const dupPerm = await r.call("Create role with the same permission id twice (de-duplicated)", tn(A, "POST", "/roles", { name: `dt-acc-${uid}`, permission_ids: [pRead, pRead] }), 201, (e) =>
+        (getPath(e.resBody, "data.permissions") as unknown[] | undefined)?.length === 1 ? null : "expected exactly 1 permission",
+      );
+      const rid = str(dupPerm, "data.id");
+      r.need(rid, "role id missing");
+      await r.call("Unknown permission → 404 and NO partial role is left behind", tn(A, "POST", "/roles", { name: `dt-ghost-${uid}`, permission_ids: [ZERO] }), [400, 404]);
+      await r.call("Ghost role was not created", tn(A, "GET", "/roles", undefined, { per_page: "100" }), 200, (e) =>
+        ((getPath(e.resBody, "data") as { name: string }[]) ?? []).some((x) => x.name === `dt-ghost-${uid}`) ? "role created despite the failed request (no rollback)" : null,
+      );
+      const u = await mkUser(r, A, uid, "acc", [rid]);
+      r.need(u.id, "user id missing");
+      await r.call("User shows the assigned role", tn(A, "GET", `/users/${u.id}`), 200, (e) =>
+        ((getPath(e.resBody, "data.roles") as { id: string }[]) ?? []).some((x) => x.id === rid) ? null : "assigned role missing in user.roles",
+      );
+      await r.call("Delete a role that is still assigned → 409", tn(A, "DELETE", `/roles/${rid}`), 409);
+      await r.call("Unassign role from user", tn(A, "DELETE", `/users/${u.id}/roles/${rid}`), 200);
+      await r.call("User no longer has the role", tn(A, "GET", `/users/${u.id}`), 200, (e) =>
+        ((getPath(e.resBody, "data.roles") as { id: string }[]) ?? []).some((x) => x.id === rid) ? "role still listed" : null,
+      );
+      await r.call("Unassign again → 404", tn(A, "DELETE", `/users/${u.id}/roles/${rid}`), 404);
+      await r.call("Remove permission from role", tn(A, "DELETE", `/roles/${rid}/permissions/${pRead}`), 200);
+      await r.call("Role has no permissions now", tn(A, "GET", `/roles/${rid}`), 200, (e) => (((getPath(e.resBody, "data.permissions") as unknown[]) ?? []).length === 0 ? null : "permission still attached"));
+      await r.call("Remove permission again → 404", tn(A, "DELETE", `/roles/${rid}/permissions/${pRead}`), 404);
+      await r.call("Delete unassigned role", tn(A, "DELETE", `/roles/${rid}`), [200, 204]);
+      await r.call("Self-deactivation is refused → 409", tn(A, "POST", `/users/${A.user?.id}/deactivate`), 409);
+      await r.call("Deactivate user", tn(A, "POST", `/users/${u.id}/deactivate`), 200);
+      await r.call("Activate user", tn(A, "POST", `/users/${u.id}/activate`), 200, expectFields(["data.status", "active"]));
+      await r.call("GET after activation → active", tn(A, "GET", `/users/${u.id}`), 200, expectFields(["data.status", "active"]));
+      await r.call("Activate again → 409", tn(A, "POST", `/users/${u.id}/activate`), 409);
+      await r.call("Activate non-existent user → 404", tn(A, "POST", `/users/${ZERO}/activate`), 404);
+      await r.call("Audit trail is readable and records user.created", tn(A, "GET", "/audit-logs", undefined, { per_page: "100" }), 200, (e) =>
+        ((getPath(e.resBody, "data") as { action: string }[]) ?? []).some((x) => x.action === "user.created") ? null : "no user.created entry in the audit trail",
+      );
+      await r.call("per_page=0 falls back to the default (20)", tn(A, "GET", "/users", undefined, { per_page: "0" }), 200, expectFields(["meta.per_page", 20]));
+      await r.call("per_page=1000 is clamped to 100", tn(A, "GET", "/users", undefined, { per_page: "1000" }), 200, expectFields(["meta.per_page", 100]));
+      await r.call("page=-5 falls back to 1", tn(A, "GET", "/users", undefined, { page: "-5" }), 200, expectFields(["meta.page", 1]));
+      await r.call("per_page=abc is tolerated", tn(A, "GET", "/users", undefined, { per_page: "abc" }), 200);
+      await r.call("cleanup: deactivate user", tn(A, "POST", `/users/${u.id}/deactivate`), 200);
     },
   },
   {

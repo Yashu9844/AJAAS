@@ -7,7 +7,7 @@ import { callApi } from "./api";
 import { OP_BY_KEY } from "./specs";
 import type { ChecklistItem, Exchange, OpSpec, Session, Slot, StoredResult } from "./types";
 
-export const ep = (s: { host: string; port: string }): Endpoint => ({ host: s.host, port: s.port });
+export const ep = (s: { host: string; port: string; platformKey?: string }): Endpoint => ({ host: s.host, port: s.port, platformKey: s.platformKey });
 
 // ------------------------------------------------------------------ primitives
 export function Badge({ kind, children }: { kind: "pass" | "fail" | "idle" | "warn"; children: React.ReactNode }) {

@@ -5,6 +5,7 @@ import type { Exchange, Session, Slot, StoredResult } from "./types";
 export interface State {
   host: string;
   port: string;
+  platformKey: string;
   sessions: { A: Session | null; B: Session | null };
   ids: Record<string, string>;
   results: Record<string, StoredResult>;
@@ -14,6 +15,7 @@ export interface State {
 const INITIAL: State = {
   host: "localhost",
   port: "8080",
+  platformKey: "dev-platform-admin-key-change-me",
   sessions: { A: null, B: null },
   ids: {},
   results: {},
@@ -32,7 +34,7 @@ function load() {
   try {
     const l = JSON.parse(localStorage.getItem(LS) ?? "null");
     if (l) {
-      state = { ...state, host: l.host ?? state.host, port: l.port ?? state.port, ids: l.ids ?? {}, results: l.results ?? {}, history: l.history ?? [] };
+      state = { ...state, host: l.host ?? state.host, port: l.port ?? state.port, platformKey: l.platformKey ?? state.platformKey, ids: l.ids ?? {}, results: l.results ?? {}, history: l.history ?? [] };
     }
   } catch {}
   try {
@@ -45,7 +47,7 @@ function persist() {
   try {
     localStorage.setItem(
       LS,
-      JSON.stringify({ host: state.host, port: state.port, ids: state.ids, results: state.results, history: state.history.slice(0, 40) }),
+      JSON.stringify({ host: state.host, port: state.port, platformKey: state.platformKey, ids: state.ids, results: state.results, history: state.history.slice(0, 40) }),
     );
     sessionStorage.setItem(SS, JSON.stringify(state.sessions));
   } catch {}
@@ -73,6 +75,10 @@ export function useDevStore(): State {
 
 export function setConfig(host: string, port: string) {
   state = { ...state, host, port };
+  emit();
+}
+export function setPlatformKey(platformKey: string) {
+  state = { ...state, platformKey };
   emit();
 }
 export function setSession(slot: Slot, s: Session | null) {

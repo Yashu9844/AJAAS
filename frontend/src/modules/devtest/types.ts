@@ -56,6 +56,8 @@ export interface CallSpec {
   rawBody?: string; // sent verbatim (for invalid-JSON tests)
   token?: string | null;
   opKey?: string;
+  headers?: Record<string, string>; // extra request headers (negative tests)
+  noPlatformKey?: boolean; // do NOT attach X-Platform-Key (negative tests)
 }
 
 // ---- declarative operation spec (drives the generic form cards) ----
