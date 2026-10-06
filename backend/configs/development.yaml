@@ -10,6 +10,7 @@ database:
   password: ""
   dbname: jaas_dev
   sslmode: disable
+  auto_migrate: false # apply migrations/*.sql (set true only for a legacy AutoMigrate-created database)
 
 redis:
   host: localhost

@@ -37,6 +37,9 @@ type DatabaseConfig struct {
 	Password string `mapstructure:"password"`
 	DBName   string `mapstructure:"dbname"`
 	SSLMode  string `mapstructure:"sslmode"`
+	// AutoMigrate uses GORM AutoMigrate instead of the versioned SQL migrations. Legacy/dev convenience only:
+	// AutoMigrate constraints drift from migrations/*.sql, so production must keep this false.
+	AutoMigrate bool `mapstructure:"auto_migrate"`
 }
 
 // RedisConfig holds Redis configuration details.

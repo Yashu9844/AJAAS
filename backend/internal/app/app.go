@@ -3,6 +3,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,9 +16,11 @@ import (
 	"github.com/jaas/jaas/internal/organization"
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
+	"github.com/jaas/jaas/internal/shared/database"
 	"github.com/jaas/jaas/internal/shared/logger"
 	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"github.com/jaas/jaas/internal/shared/queue"
+	"github.com/jaas/jaas/migrations"
 	"gorm.io/gorm"
 )
 
@@ -58,8 +61,19 @@ func Build(o Options) (*gin.Engine, error) {
 	if cfg.Platform.AdminKey == "" {
 		log.Warn().Msg("platform.admin_key is empty: /api/v1/tenants routes are DISABLED (set PLATFORM_ADMIN_KEY)")
 	}
-	if err := o.DB.AutoMigrate(identityModule.RegisterModels()...); err != nil {
-		return nil, fmt.Errorf("identity auto-migration failed: %w", err)
+	if cfg.Database.AutoMigrate {
+		o.Logger.Warn().Msg("database.auto_migrate is ON: schema comes from GORM models, NOT migrations/*.sql (legacy/dev only)")
+		if err := o.DB.AutoMigrate(identityModule.RegisterModels()...); err != nil {
+			return nil, fmt.Errorf("identity auto-migration failed: %w", err)
+		}
+	} else {
+		applied, err := database.RunMigrations(context.Background(), o.DB, migrations.FS)
+		if err != nil {
+			return nil, err
+		}
+		if len(applied) > 0 {
+			o.Logger.Info().Strs("versions", applied).Msg("applied SQL migrations")
+		}
 	}
 	if err := identityModule.SeedPermissions(); err != nil {
 		return nil, fmt.Errorf("seeding permission catalogue failed: %w", err)
@@ -68,13 +82,17 @@ func Build(o Options) (*gin.Engine, error) {
 	orgModule := organization.NewModule(o.DB, o.Redis, o.Publisher, &log.Logger, identityModule.UserService(), identityModule.AuditService())
 	// FR-M005: deactivating a user converges org mappings in the same transaction.
 	identityServices.SetUserDeactivationConverger(orgModule.UserDeactivationConverger())
-	if err := o.DB.AutoMigrate(orgModule.RegisterModels()...); err != nil {
-		return nil, fmt.Errorf("organization auto-migration failed: %w", err)
+	if cfg.Database.AutoMigrate {
+		if err := o.DB.AutoMigrate(orgModule.RegisterModels()...); err != nil {
+			return nil, fmt.Errorf("organization auto-migration failed: %w", err)
+		}
 	}
 
 	employeeModule := employee.NewModule(o.DB, o.Redis, o.Publisher, &log.Logger, identityModule.UserService(), identityModule.AuditService())
-	if err := o.DB.AutoMigrate(employeeModule.RegisterModels()...); err != nil {
-		return nil, fmt.Errorf("employee auto-migration failed: %w", err)
+	if cfg.Database.AutoMigrate {
+		if err := o.DB.AutoMigrate(employeeModule.RegisterModels()...); err != nil {
+			return nil, fmt.Errorf("employee auto-migration failed: %w", err)
+		}
 	}
 
 	if cfg.Server.Env == "production" {

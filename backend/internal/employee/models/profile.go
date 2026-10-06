@@ -9,9 +9,10 @@ import (
 
 // EmployeeProfile represents the core operational profile of an employee.
 type EmployeeProfile struct {
-	database.TenantBaseModel
-	UserID        uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex:idx_emp_profile_tenant_user" json:"user_id"`
-	EmployeeCode  string     `gorm:"type:varchar(32);not null;uniqueIndex:idx_emp_profile_tenant_code" json:"employee_code"`
+	database.BaseModel
+	TenantID      uuid.UUID  `gorm:"type:uuid;not null;index:idx_emp_profiles_tenant_id;uniqueIndex:idx_emp_profile_tenant_user,priority:1;uniqueIndex:idx_emp_profile_tenant_code,priority:1" json:"tenant_id"`
+	UserID        uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex:idx_emp_profile_tenant_user,priority:2" json:"user_id"`
+	EmployeeCode  string     `gorm:"type:varchar(32);not null;uniqueIndex:idx_emp_profile_tenant_code,priority:2" json:"employee_code"`
 	FirstName     string     `gorm:"type:varchar(100);not null" json:"first_name"`
 	LastName      string     `gorm:"type:varchar(100);not null" json:"last_name"`
 	DisplayName   string     `gorm:"type:varchar(200)" json:"display_name"`
