@@ -88,3 +88,28 @@ func (r *RedisClient) DeleteByPrefix(ctx context.Context, prefix string) error {
 		cursor = next
 	}
 }
+
+var incrWithExpireScript = redis.NewScript(`
+local c = redis.call('INCR', KEYS[1])
+if c == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+return c`)
+
+var decrFloorScript = redis.NewScript(`
+local v = tonumber(redis.call('GET', KEYS[1]) or '0')
+if v > 0 then return redis.call('DECR', KEYS[1]) end
+return 0`)
+
+// IncrWithExpire atomically increments key; the TTL is set only when the key is created (fixed window).
+func (r *RedisClient) IncrWithExpire(ctx context.Context, key string, window time.Duration) (int64, error) {
+	return incrWithExpireScript.Run(ctx, r.client, []string{key}, window.Milliseconds()).Int64()
+}
+
+// Decr atomically decrements key, never going below zero.
+func (r *RedisClient) Decr(ctx context.Context, key string) error {
+	return decrFloorScript.Run(ctx, r.client, []string{key}).Err()
+}
+
+// TTL returns the remaining time-to-live of key (negative when absent / no expiry).
+func (r *RedisClient) TTL(ctx context.Context, key string) (time.Duration, error) {
+	return r.client.TTL(ctx, key).Result()
+}

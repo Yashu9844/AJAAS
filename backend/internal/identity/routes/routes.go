@@ -40,7 +40,7 @@ func RegisterRoutes(
 	auth := router.Group("/auth")
 	{
 		// Rate limiter: 10 logins per 15 minutes
-		auth.POST("/login", sharedMiddleware.RateLimiter(redisClient, 10, 15*time.Minute), authCtrl.Login)
+		auth.POST("/login", sharedMiddleware.FailureRateLimiter(redisClient, 10, 15*time.Minute), authCtrl.Login)
 		auth.POST("/refresh", authCtrl.Refresh)
 
 		// Rate limiter: 5 forgot passwords per 1 hour

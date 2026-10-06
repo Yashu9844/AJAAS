@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -142,6 +143,15 @@ func main() {
 
 	router := gin.New()
 	router.Use(gin.Recovery())
+
+	// Client IPs drive rate limiting: never trust X-Forwarded-For unless proxies are explicitly listed.
+	var trusted []string
+	if v := os.Getenv("TRUSTED_PROXIES"); v != "" {
+		trusted = strings.Split(v, ",")
+	}
+	if err := router.SetTrustedProxies(trusted); err != nil {
+		log.Fatal().Err(err).Msg("Invalid TRUSTED_PROXIES")
+	}
 
 	// Attach global logger and CORS middleware
 	router.Use(sharedMiddleware.RequestLogger(log))
