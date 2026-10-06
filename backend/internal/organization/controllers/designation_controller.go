@@ -27,7 +27,7 @@ func NewDesignationController(db *gorm.DB, svc services.DesignationService) *Des
 func (ctrl *DesignationController) Create(c *gin.Context) {
 	var req dto.CreateDesignationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -51,7 +51,7 @@ func (ctrl *DesignationController) Create(c *gin.Context) {
 func (ctrl *DesignationController) GetByID(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid designation ID"})
+		respondBadRequest(c, "Invalid designation ID")
 		return
 	}
 	tenantID, ok := tenantIDOf(c)
@@ -88,12 +88,12 @@ func (ctrl *DesignationController) List(c *gin.Context) {
 func (ctrl *DesignationController) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid designation ID"})
+		respondBadRequest(c, "Invalid designation ID")
 		return
 	}
 	var req dto.UpdateDesignationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -117,13 +117,13 @@ func (ctrl *DesignationController) Update(c *gin.Context) {
 func (ctrl *DesignationController) Deactivate(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid designation ID"})
+		respondBadRequest(c, "Invalid designation ID")
 		return
 	}
 	var req dto.DeactivateRequest
 	if c.Request.ContentLength > 0 {
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			respondBindError(c, err)
 			return
 		}
 	}

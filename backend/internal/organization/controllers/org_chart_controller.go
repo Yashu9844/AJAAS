@@ -42,7 +42,7 @@ func (ctrl *OrgChartController) Chart(c *gin.Context) {
 func (ctrl *OrgChartController) UserChain(c *gin.Context) {
 	userID, err := uuid.Parse(c.Query("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id"})
+		respondBadRequest(c, "Invalid user_id")
 		return
 	}
 	tenantID, ok := tenantIDOf(c)

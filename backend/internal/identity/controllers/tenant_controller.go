@@ -28,7 +28,7 @@ func NewTenantController(db *gorm.DB, tenantSvc services.TenantService) *TenantC
 func (ctrl *TenantController) Create(c *gin.Context) {
 	var req dto.CreateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -51,7 +51,7 @@ func (ctrl *TenantController) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		respondBadRequest(c, "Invalid tenant ID")
 		return
 	}
 
@@ -81,13 +81,13 @@ func (ctrl *TenantController) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		respondBadRequest(c, "Invalid tenant ID")
 		return
 	}
 
 	var req dto.UpdateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (ctrl *TenantController) Activate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		respondBadRequest(c, "Invalid tenant ID")
 		return
 	}
 
@@ -127,7 +127,7 @@ func (ctrl *TenantController) Suspend(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		respondBadRequest(c, "Invalid tenant ID")
 		return
 	}
 

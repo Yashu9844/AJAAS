@@ -27,7 +27,7 @@ func NewMappingController(db *gorm.DB, svc services.MappingService) *MappingCont
 func (ctrl *MappingController) Create(c *gin.Context) {
 	var req dto.CreateMappingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -51,7 +51,7 @@ func (ctrl *MappingController) Create(c *gin.Context) {
 func (ctrl *MappingController) GetByID(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid mapping ID"})
+		respondBadRequest(c, "Invalid mapping ID")
 		return
 	}
 	tenantID, ok := tenantIDOf(c)
@@ -71,7 +71,7 @@ func (ctrl *MappingController) GetByID(c *gin.Context) {
 func (ctrl *MappingController) ListByUser(c *gin.Context) {
 	userID, err := uuid.Parse(c.Query("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id"})
+		respondBadRequest(c, "Invalid user_id")
 		return
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -93,12 +93,12 @@ func (ctrl *MappingController) ListByUser(c *gin.Context) {
 func (ctrl *MappingController) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid mapping ID"})
+		respondBadRequest(c, "Invalid mapping ID")
 		return
 	}
 	var req dto.UpdateMappingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -122,12 +122,12 @@ func (ctrl *MappingController) Update(c *gin.Context) {
 func (ctrl *MappingController) Deactivate(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid mapping ID"})
+		respondBadRequest(c, "Invalid mapping ID")
 		return
 	}
 	var req dto.DeactivateMappingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	tenantID, ok := tenantIDOf(c)

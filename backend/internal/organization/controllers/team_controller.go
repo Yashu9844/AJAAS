@@ -27,7 +27,7 @@ func NewTeamController(db *gorm.DB, svc services.TeamService) *TeamController {
 func (ctrl *TeamController) Create(c *gin.Context) {
 	var req dto.CreateTeamRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -51,7 +51,7 @@ func (ctrl *TeamController) Create(c *gin.Context) {
 func (ctrl *TeamController) GetByID(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
+		respondBadRequest(c, "Invalid team ID")
 		return
 	}
 	tenantID, ok := tenantIDOf(c)
@@ -75,7 +75,7 @@ func (ctrl *TeamController) List(c *gin.Context) {
 	if raw := c.Query("department_id"); raw != "" {
 		parsed, err := uuid.Parse(raw)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_id"})
+			respondBadRequest(c, "Invalid department_id")
 			return
 		}
 		deptID = &parsed
@@ -97,12 +97,12 @@ func (ctrl *TeamController) List(c *gin.Context) {
 func (ctrl *TeamController) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
+		respondBadRequest(c, "Invalid team ID")
 		return
 	}
 	var req dto.UpdateTeamRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -126,13 +126,13 @@ func (ctrl *TeamController) Update(c *gin.Context) {
 func (ctrl *TeamController) Deactivate(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
+		respondBadRequest(c, "Invalid team ID")
 		return
 	}
 	var req dto.DeactivateRequest
 	if c.Request.ContentLength > 0 {
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			respondBindError(c, err)
 			return
 		}
 	}

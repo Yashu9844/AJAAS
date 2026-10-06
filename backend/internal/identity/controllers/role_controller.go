@@ -28,14 +28,14 @@ func NewRoleController(db *gorm.DB, roleSvc services.RoleService) *RoleControlle
 func (ctrl *RoleController) Create(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
 
 	var req dto.CreateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (ctrl *RoleController) Create(c *gin.Context) {
 func (ctrl *RoleController) GetByID(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -64,7 +64,7 @@ func (ctrl *RoleController) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
+		respondBadRequest(c, "Invalid role ID")
 		return
 	}
 
@@ -80,7 +80,7 @@ func (ctrl *RoleController) GetByID(c *gin.Context) {
 func (ctrl *RoleController) List(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -100,7 +100,7 @@ func (ctrl *RoleController) List(c *gin.Context) {
 func (ctrl *RoleController) Update(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -108,13 +108,13 @@ func (ctrl *RoleController) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
+		respondBadRequest(c, "Invalid role ID")
 		return
 	}
 
 	var req dto.UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -135,7 +135,7 @@ func (ctrl *RoleController) Update(c *gin.Context) {
 func (ctrl *RoleController) Delete(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -143,7 +143,7 @@ func (ctrl *RoleController) Delete(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
+		respondBadRequest(c, "Invalid role ID")
 		return
 	}
 
@@ -159,7 +159,7 @@ func (ctrl *RoleController) Delete(c *gin.Context) {
 func (ctrl *RoleController) AssignPermissions(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -167,13 +167,13 @@ func (ctrl *RoleController) AssignPermissions(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
+		respondBadRequest(c, "Invalid role ID")
 		return
 	}
 
 	var req dto.AssignPermissionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -195,7 +195,7 @@ func (ctrl *RoleController) AssignPermissions(c *gin.Context) {
 func (ctrl *RoleController) AssignRolesToUser(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -203,13 +203,13 @@ func (ctrl *RoleController) AssignRolesToUser(c *gin.Context) {
 	userIDStr := c.Param("id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		respondBadRequest(c, "Invalid user ID")
 		return
 	}
 
 	var req dto.AssignRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 

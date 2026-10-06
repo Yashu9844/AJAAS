@@ -90,6 +90,13 @@ func Authenticate(db *gorm.DB, tokenSvc services.TokenService, sessionSvc servic
 
 		userID, _ := uuid.Parse(claims.Subject)
 
+		// Routes without a tenant-host resolver (e.g. /auth/logout) rely on the verified JWT tenant.
+		if !exists {
+			if claimsTenantID, perr := uuid.Parse(claims.TenantID); perr == nil {
+				c.Set("tenant_id", claimsTenantID)
+			}
+		}
+
 		// Inject verified claims into request context
 		c.Set("user_id", userID)
 		c.Set("email", claims.Email)

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -62,4 +63,23 @@ func formatValidationErrorMessage(fe validator.FieldError) string {
 	default:
 		return fmt.Sprintf("Failed validation on tag: %s", fe.Tag())
 	}
+}
+
+// BindErrorDetails converts a gin ShouldBind* error (validator failures, JSON syntax/type errors, empty body)
+// into client-safe field details without leaking Go struct names.
+func BindErrorDetails(err error) []sharedErrors.ValidationErrorDetail {
+	var valErrors validator.ValidationErrors
+	if errors.As(err, &valErrors) {
+		details := make([]sharedErrors.ValidationErrorDetail, len(valErrors))
+		for i, fe := range valErrors {
+			details[i] = sharedErrors.ValidationErrorDetail{Field: fe.Field(), Message: formatValidationErrorMessage(fe)}
+		}
+		return details
+	}
+	msg := "Request body must be valid JSON"
+	var ute *json.UnmarshalTypeError
+	if errors.As(err, &ute) {
+		return []sharedErrors.ValidationErrorDetail{{Field: ute.Field, Message: "Has an invalid type or format"}}
+	}
+	return []sharedErrors.ValidationErrorDetail{{Field: "body", Message: msg}}
 }

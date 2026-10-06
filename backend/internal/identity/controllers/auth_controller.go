@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +28,7 @@ func NewAuthController(db *gorm.DB, authSvc services.AuthService) *AuthControlle
 func (ctrl *AuthController) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -56,7 +57,7 @@ func (ctrl *AuthController) Logout(c *gin.Context) {
 	sessionIDVal, ok3 := c.Get("session_id")
 
 	if !ok1 || !ok2 || !ok3 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized context mapping"})
+		respondError(c, sharedErrors.ErrUnauthorized)
 		return
 	}
 
@@ -77,7 +78,7 @@ func (ctrl *AuthController) Logout(c *gin.Context) {
 func (ctrl *AuthController) Refresh(c *gin.Context) {
 	var req dto.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -99,7 +100,7 @@ func (ctrl *AuthController) Refresh(c *gin.Context) {
 func (ctrl *AuthController) ForgotPassword(c *gin.Context) {
 	var req dto.ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -122,7 +123,7 @@ func (ctrl *AuthController) ForgotPassword(c *gin.Context) {
 func (ctrl *AuthController) ResetPassword(c *gin.Context) {
 	var req dto.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 

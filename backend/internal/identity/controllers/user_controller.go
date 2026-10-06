@@ -28,14 +28,14 @@ func NewUserController(db *gorm.DB, userSvc services.UserService) *UserControlle
 func (ctrl *UserController) Create(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
 
 	var req dto.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -57,7 +57,7 @@ func (ctrl *UserController) Create(c *gin.Context) {
 func (ctrl *UserController) GetByID(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -65,7 +65,7 @@ func (ctrl *UserController) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		respondBadRequest(c, "Invalid user ID")
 		return
 	}
 
@@ -81,7 +81,7 @@ func (ctrl *UserController) GetByID(c *gin.Context) {
 func (ctrl *UserController) List(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -101,7 +101,7 @@ func (ctrl *UserController) List(c *gin.Context) {
 func (ctrl *UserController) Update(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -109,13 +109,13 @@ func (ctrl *UserController) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		respondBadRequest(c, "Invalid user ID")
 		return
 	}
 
 	var req dto.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 
@@ -136,7 +136,7 @@ func (ctrl *UserController) Update(c *gin.Context) {
 func (ctrl *UserController) Deactivate(c *gin.Context) {
 	tenantIDVal, ok := c.Get("tenant_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing tenant scope"})
+		respondBadRequest(c, "Missing tenant scope")
 		return
 	}
 	tenantID := tenantIDVal.(uuid.UUID)
@@ -144,7 +144,7 @@ func (ctrl *UserController) Deactivate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		respondBadRequest(c, "Invalid user ID")
 		return
 	}
 

@@ -16,7 +16,7 @@ func NewDatabase(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode,
 	)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}

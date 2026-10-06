@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	"github.com/jaas/jaas/internal/shared/utils"
 )
 
 type successEnvelope struct {
@@ -33,6 +34,7 @@ func respondSuccess(c *gin.Context, status int, data interface{}, meta interface
 
 // respondError wraps error types (e.g. AppError, Validation errors) into client envelopes.
 func respondError(c *gin.Context, err error) {
+	err = sharedErrors.Normalize(err)
 	var appErr *sharedErrors.AppError
 	if errors.As(err, &appErr) {
 		c.JSON(appErr.StatusCode, errorEnvelope{
@@ -61,5 +63,19 @@ func respondValidationError(c *gin.Context, details []sharedErrors.ValidationErr
 			Message: sharedErrors.ErrValidation.Message,
 			Details: details,
 		},
+	})
+}
+
+// respondBadRequest returns a 400 in the standard error envelope.
+func respondBadRequest(c *gin.Context, msg string) {
+	c.JSON(http.StatusBadRequest, errorEnvelope{
+		Error: errorDetail{Code: sharedErrors.ErrValidation.Code, Message: msg},
+	})
+}
+
+// respondBindError converts a request-binding failure into field-level validation details.
+func respondBindError(c *gin.Context, err error) {
+	c.JSON(http.StatusBadRequest, errorEnvelope{
+		Error: errorDetail{Code: sharedErrors.ErrValidation.Code, Message: sharedErrors.ErrValidation.Message, Details: utils.BindErrorDetails(err)},
 	})
 }

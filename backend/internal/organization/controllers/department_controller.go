@@ -36,7 +36,7 @@ func tenantIDOf(c *gin.Context) (uuid.UUID, bool) {
 func (ctrl *DepartmentController) Create(c *gin.Context) {
 	var req dto.CreateDepartmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -60,7 +60,7 @@ func (ctrl *DepartmentController) Create(c *gin.Context) {
 func (ctrl *DepartmentController) GetByID(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department ID"})
+		respondBadRequest(c, "Invalid department ID")
 		return
 	}
 	tenantID, ok := tenantIDOf(c)
@@ -97,12 +97,12 @@ func (ctrl *DepartmentController) List(c *gin.Context) {
 func (ctrl *DepartmentController) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department ID"})
+		respondBadRequest(c, "Invalid department ID")
 		return
 	}
 	var req dto.UpdateDepartmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindError(c, err)
 		return
 	}
 	if valErrs := utils.ValidateStruct(req); len(valErrs) > 0 {
@@ -126,14 +126,14 @@ func (ctrl *DepartmentController) Update(c *gin.Context) {
 func (ctrl *DepartmentController) Deactivate(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department ID"})
+		respondBadRequest(c, "Invalid department ID")
 		return
 	}
 	force, _ := strconv.ParseBool(c.DefaultQuery("force", "false"))
 	var req dto.DeactivateRequest
 	if c.Request.ContentLength > 0 {
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			respondBindError(c, err)
 			return
 		}
 	}
