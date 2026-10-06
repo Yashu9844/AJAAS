@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
 	"strconv"
 
@@ -45,8 +46,9 @@ func (ctrl *UserController) Create(c *gin.Context) {
 	}
 
 	correlationID := uuid.New()
-	res, err := ctrl.userSvc.CreateUser(c.Request.Context(), ctrl.db, tenantID, req, correlationID)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.userSvc.CreateUser(c.Request.Context(), tx, tenantID, req, correlationID)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -124,8 +126,9 @@ func (ctrl *UserController) Update(c *gin.Context) {
 		return
 	}
 
-	res, err := ctrl.userSvc.UpdateUser(c.Request.Context(), ctrl.db, tenantID, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.userSvc.UpdateUser(c.Request.Context(), tx, tenantID, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -149,8 +152,9 @@ func (ctrl *UserController) Deactivate(c *gin.Context) {
 	}
 
 	correlationID := uuid.New()
-	err = ctrl.userSvc.DeactivateUser(c.Request.Context(), ctrl.db, tenantID, id, correlationID)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	err = ctrl.userSvc.DeactivateUser(c.Request.Context(), tx, tenantID, id, correlationID)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}

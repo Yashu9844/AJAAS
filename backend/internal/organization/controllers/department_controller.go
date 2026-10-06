@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
 	"strconv"
 
@@ -48,8 +49,9 @@ func (ctrl *DepartmentController) Create(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.CreateDepartment(c.Request.Context(), ctrl.db, tenantID, req, uuid.New())
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.CreateDepartment(c.Request.Context(), tx, tenantID, req, uuid.New())
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -114,8 +116,9 @@ func (ctrl *DepartmentController) Update(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.UpdateDepartment(c.Request.Context(), ctrl.db, tenantID, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.UpdateDepartment(c.Request.Context(), tx, tenantID, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -142,8 +145,9 @@ func (ctrl *DepartmentController) Deactivate(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.DeactivateDepartment(c.Request.Context(), ctrl.db, tenantID, id, force, req.Reason)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.DeactivateDepartment(c.Request.Context(), tx, tenantID, id, force, req.Reason)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}

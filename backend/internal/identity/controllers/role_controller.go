@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
 	"strconv"
 
@@ -44,8 +45,9 @@ func (ctrl *RoleController) Create(c *gin.Context) {
 		return
 	}
 
-	res, err := ctrl.roleSvc.CreateRole(c.Request.Context(), ctrl.db, tenantID, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.roleSvc.CreateRole(c.Request.Context(), tx, tenantID, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -123,8 +125,9 @@ func (ctrl *RoleController) Update(c *gin.Context) {
 		return
 	}
 
-	res, err := ctrl.roleSvc.UpdateRole(c.Request.Context(), ctrl.db, tenantID, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.roleSvc.UpdateRole(c.Request.Context(), tx, tenantID, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -147,8 +150,9 @@ func (ctrl *RoleController) Delete(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.roleSvc.DeleteRole(c.Request.Context(), ctrl.db, tenantID, id)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	err = ctrl.roleSvc.DeleteRole(c.Request.Context(), tx, tenantID, id)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -183,8 +187,9 @@ func (ctrl *RoleController) AssignPermissions(c *gin.Context) {
 	}
 
 	correlationID := uuid.New()
-	err = ctrl.roleSvc.AssignPermissions(c.Request.Context(), ctrl.db, tenantID, id, req, correlationID)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	err = ctrl.roleSvc.AssignPermissions(c.Request.Context(), tx, tenantID, id, req, correlationID)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -219,8 +224,9 @@ func (ctrl *RoleController) AssignRolesToUser(c *gin.Context) {
 	}
 
 	correlationID := uuid.New()
-	err = ctrl.roleSvc.AssignRolesToUser(c.Request.Context(), ctrl.db, tenantID, userID, req, correlationID)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	err = ctrl.roleSvc.AssignRolesToUser(c.Request.Context(), tx, tenantID, userID, req, correlationID)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}

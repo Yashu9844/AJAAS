@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
 	"strconv"
 
@@ -39,8 +40,9 @@ func (ctrl *TeamController) Create(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.CreateTeam(c.Request.Context(), ctrl.db, tenantID, req, uuid.New())
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.CreateTeam(c.Request.Context(), tx, tenantID, req, uuid.New())
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -114,8 +116,9 @@ func (ctrl *TeamController) Update(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.UpdateTeam(c.Request.Context(), ctrl.db, tenantID, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.UpdateTeam(c.Request.Context(), tx, tenantID, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -141,8 +144,9 @@ func (ctrl *TeamController) Deactivate(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.DeactivateTeam(c.Request.Context(), ctrl.db, tenantID, id, req.Reason)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.DeactivateTeam(c.Request.Context(), tx, tenantID, id, req.Reason)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}

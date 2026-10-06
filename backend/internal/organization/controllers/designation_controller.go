@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
 	"strconv"
 
@@ -39,8 +40,9 @@ func (ctrl *DesignationController) Create(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.CreateDesignation(c.Request.Context(), ctrl.db, tenantID, req, uuid.New())
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.CreateDesignation(c.Request.Context(), tx, tenantID, req, uuid.New())
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -105,8 +107,9 @@ func (ctrl *DesignationController) Update(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.UpdateDesignation(c.Request.Context(), ctrl.db, tenantID, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.UpdateDesignation(c.Request.Context(), tx, tenantID, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -132,8 +135,9 @@ func (ctrl *DesignationController) Deactivate(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.DeactivateDesignation(c.Request.Context(), ctrl.db, tenantID, id, req.Reason)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.DeactivateDesignation(c.Request.Context(), tx, tenantID, id, req.Reason)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}

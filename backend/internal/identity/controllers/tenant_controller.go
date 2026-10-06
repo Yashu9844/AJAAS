@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
 	"strconv"
 
@@ -38,8 +39,9 @@ func (ctrl *TenantController) Create(c *gin.Context) {
 	}
 
 	correlationID := uuid.New() // generated context correlation tracking
-	res, err := ctrl.tenantSvc.CreateTenant(c.Request.Context(), ctrl.db, req, correlationID)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.tenantSvc.CreateTenant(c.Request.Context(), tx, req, correlationID)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -96,8 +98,9 @@ func (ctrl *TenantController) Update(c *gin.Context) {
 		return
 	}
 
-	res, err := ctrl.tenantSvc.UpdateTenant(c.Request.Context(), ctrl.db, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.tenantSvc.UpdateTenant(c.Request.Context(), tx, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -114,8 +117,9 @@ func (ctrl *TenantController) Activate(c *gin.Context) {
 	}
 
 	correlationID := uuid.New()
-	res, err := ctrl.tenantSvc.ActivateTenant(c.Request.Context(), ctrl.db, id, correlationID)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.tenantSvc.ActivateTenant(c.Request.Context(), tx, id, correlationID)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -132,8 +136,9 @@ func (ctrl *TenantController) Suspend(c *gin.Context) {
 	}
 
 	correlationID := uuid.New()
-	res, err := ctrl.tenantSvc.SuspendTenant(c.Request.Context(), ctrl.db, id, correlationID)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.tenantSvc.SuspendTenant(c.Request.Context(), tx, id, correlationID)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}

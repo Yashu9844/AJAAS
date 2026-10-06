@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"github.com/jaas/jaas/internal/shared/database"
 	"io"
 	"net/http"
 	"strconv"
@@ -41,8 +42,9 @@ func (ctrl *MappingController) Create(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.CreateMapping(c.Request.Context(), ctrl.db, tenantID, req, uuid.New())
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.CreateMapping(c.Request.Context(), tx, tenantID, req, uuid.New())
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -112,8 +114,9 @@ func (ctrl *MappingController) Update(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.UpdateMapping(c.Request.Context(), ctrl.db, tenantID, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.UpdateMapping(c.Request.Context(), tx, tenantID, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -138,8 +141,9 @@ func (ctrl *MappingController) Deactivate(c *gin.Context) {
 		respondError(c, errMissingTenant)
 		return
 	}
-	res, err := ctrl.svc.DeactivateMapping(c.Request.Context(), ctrl.db, tenantID, id, req)
-	if err != nil {
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.svc.DeactivateMapping(c.Request.Context(), tx, tenantID, id, req)
+	if err = database.Finish(tx, err); err != nil {
 		respondError(c, err)
 		return
 	}
