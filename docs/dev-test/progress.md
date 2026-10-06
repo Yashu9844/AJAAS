@@ -43,3 +43,6 @@ Task: build temporary Module 0–2 verification UI at `/dev-test` (frontend/src/
 - NEXT: run Module 2 scenarios, fix console issues, lint/tsc/next build, manual UI smoke of form cards (Create tenant→fetch created record), write VERIFICATION_REPORT.md.
 - Tenants probeco (A) and probeco2 (B) exist w/ admin@<slug>.com / Secret123!.
 - Driver: `await import('/dev-test-driver.js'); await window.runAll('Scenarios')` in browser JS (frontend/public/dev-test-driver.js).
+
+## HARDENING PASS COMPLETE (2026-10-06)
+Branch fix/module-0-2-hardening (local, not pushed). See HARDENING_REPORT.md / GOLDEN_MAP.md. All sensors green except -race (no CGO locally) — run in CI.

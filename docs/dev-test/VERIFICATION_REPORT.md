@@ -1,5 +1,7 @@
 # MODULE 0–2 VERIFICATION UI REPORT
 
+> **Status update (2026-10-06):** every defect in this report has since been fixed on branch `fix/module-0-2-hardening` and is pinned by automated tests — see [HARDENING_REPORT.md](HARDENING_REPORT.md). The numbers below are the *original* (pre-fix) results. Re-running the console now: 22/22 scenarios PASS, 0 skipped.
+
 Console: `http://localhost:3000/dev-test` (temporary QA tool, **not** product UI). Code: `frontend/src/app/dev-test/**`, `frontend/src/modules/devtest/**`.
 Run date 2026-10-06 against the real backend (Go, GORM AutoMigrate on Postgres 15 + Redis 7 in Docker, RabbitMQ **not** running → NoOp publisher).
 No backend code was changed. All results below come from real HTTP calls made by the console.
