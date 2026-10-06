@@ -169,3 +169,5 @@ func (m *MockRolePermissionRepository) FindByRoleIDs(ctx context.Context, db *go
 func (m *MockAuditService) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.AuditLogListResponse, error) {
 	return &dto.AuditLogListResponse{}, nil
 }
+
+func (m *MockTokenService) RefreshTokenTTL() time.Duration { return 7 * 24 * time.Hour }

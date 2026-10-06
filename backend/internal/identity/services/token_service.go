@@ -28,6 +28,8 @@ type TokenService interface {
 	ValidateAccessToken(tokenStr string) (*UserClaims, error)
 	GenerateOpaqueToken() (string, string, error) // Returns (rawToken, tokenHash, error)
 	HashOpaqueToken(token string) string
+	// RefreshTokenTTL is the configured lifetime of refresh tokens.
+	RefreshTokenTTL() time.Duration
 }
 
 type tokenService struct {
@@ -107,4 +109,12 @@ func (s *tokenService) GenerateOpaqueToken() (string, string, error) {
 func (s *tokenService) HashOpaqueToken(token string) string {
 	hash := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(hash[:])
+}
+
+// RefreshTokenTTL returns the configured refresh token lifetime (days -> duration; defaults to 7 days).
+func (s *tokenService) RefreshTokenTTL() time.Duration {
+	if s.cfg.RefreshTokenTTL <= 0 {
+		return 7 * 24 * time.Hour
+	}
+	return time.Duration(s.cfg.RefreshTokenTTL) * 24 * time.Hour
 }

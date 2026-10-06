@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"time"
 )
 
 // Module encapsulates the Module 0 Identity and Access Management domain.
@@ -98,7 +99,7 @@ func NewModule(
 
 	m.auditSvc = services.NewAuditService(m.auditRepo, logger)
 	m.tokenSvc = services.NewTokenService(jwtConfig)
-	m.sessionSvc = services.NewSessionService(m.sessionRepo, redisClient)
+	m.sessionSvc = services.NewSessionService(m.sessionRepo, redisClient, time.Duration(accessTokenTTL)*time.Minute)
 
 	m.tenantSvc = services.NewTenantService(m.tenantRepo, m.roleRepo, publisher, m.auditSvc, services.WithAdminProvisioning(m.userRepo, m.userRoleRepo))
 	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc)

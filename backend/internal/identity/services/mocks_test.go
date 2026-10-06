@@ -589,3 +589,5 @@ func (m *MockRefreshTokenRepository) RevokeBySessionID(ctx context.Context, tx *
 	}
 	return nil
 }
+
+func (m *MockTokenService) RefreshTokenTTL() time.Duration { return 7 * 24 * time.Hour }

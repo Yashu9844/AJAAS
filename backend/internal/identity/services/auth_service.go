@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,6 +90,8 @@ func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginReque
 		return nil, err
 	}
 	if user == nil {
+		// Burn the same bcrypt time as a real check so response time does not reveal whether the email exists.
+		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash(), []byte(req.Password))
 		return nil, sharedErrors.ErrInvalidCredentials
 	}
 
@@ -126,7 +129,7 @@ func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginReque
 		TenantID:  tenant.ID,
 		SessionID: &session.ID,
 		TokenHash: tokenHash,
-		ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 days expiration
+		ExpiresAt: time.Now().Add(s.tokenSvc.RefreshTokenTTL()),
 	}
 	if err := s.tokenRepo.Create(ctx, tx, rt); err != nil {
 		return nil, err
@@ -303,7 +306,7 @@ func (s *authService) RefreshToken(ctx context.Context, tx *gorm.DB, req dto.Ref
 		TenantID:  rt.TenantID,
 		SessionID: &session.ID,
 		TokenHash: newHash,
-		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		ExpiresAt: time.Now().Add(s.tokenSvc.RefreshTokenTTL()),
 	}
 	if err := s.tokenRepo.Create(ctx, tx, newRT); err != nil {
 		return nil, err
@@ -468,4 +471,17 @@ func (s *authService) ResetPassword(ctx context.Context, tx *gorm.DB, req dto.Re
 	_ = s.auditSvc.Log(ctx, tx, prt.TenantID.String(), user.ID.String(), "password.reset_completed", "user", user.ID.String(), nil, "", "")
 
 	return nil
+}
+
+var (
+	dummyHashOnce sync.Once
+	dummyHash     []byte
+)
+
+// dummyPasswordHash lazily builds a bcrypt (cost 12, same as real hashes) hash used to equalise login timing.
+func dummyPasswordHash() []byte {
+	dummyHashOnce.Do(func() {
+		dummyHash, _ = bcrypt.GenerateFromPassword([]byte("jaas-timing-equaliser"), 12)
+	})
+	return dummyHash
 }

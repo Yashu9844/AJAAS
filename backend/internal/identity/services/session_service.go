@@ -23,19 +23,26 @@ type SessionService interface {
 type sessionService struct {
 	sessionRepo repositories.SessionRepository
 	redisClient *cache.RedisClient
+	ttl         time.Duration
 }
 
-// NewSessionService creates a SessionService instance.
-func NewSessionService(sessionRepo repositories.SessionRepository, redisClient *cache.RedisClient) SessionService {
+// NewSessionService creates a SessionService instance. The optional ttl is the session lifetime and must match the
+// access-token lifetime (defaults to 15 minutes).
+func NewSessionService(sessionRepo repositories.SessionRepository, redisClient *cache.RedisClient, ttl ...time.Duration) SessionService {
+	lifetime := 15 * time.Minute
+	if len(ttl) > 0 && ttl[0] > 0 {
+		lifetime = ttl[0]
+	}
 	return &sessionService{
 		sessionRepo: sessionRepo,
 		redisClient: redisClient,
+		ttl:         lifetime,
 	}
 }
 
 func (s *sessionService) CreateSession(ctx context.Context, tx *gorm.DB, userID, tenantID uuid.UUID, ipAddress, userAgent string) (*models.Session, error) {
-	// Sessions expire in 15 minutes by default (aligning with JWT TTL)
-	expiresAt := time.Now().Add(15 * time.Minute)
+	// Sessions live as long as the access token they back (aligned via the configured TTL)
+	expiresAt := time.Now().Add(s.ttl)
 
 	session := &models.Session{
 		UserID:    userID,
@@ -88,7 +95,7 @@ func (s *sessionService) RevokeSession(ctx context.Context, tx *gorm.DB, session
 
 	// Push key to Redis blacklist (TTL matches max possible remaining session duration, e.g. 15 minutes)
 	blacklistKey := fmt.Sprintf("blacklist:session:%s", sessionID.String())
-	_ = s.redisClient.Set(ctx, blacklistKey, "revoked", 15*time.Minute)
+	_ = s.redisClient.Set(ctx, blacklistKey, "revoked", s.ttl)
 
 	return nil
 }
