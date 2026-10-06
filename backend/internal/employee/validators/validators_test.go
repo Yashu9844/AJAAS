@@ -47,3 +47,39 @@ func TestValidateEmploymentType(t *testing.T) {
 		t.Errorf("expected error for unsupported employment type")
 	}
 }
+
+func TestValidateTransitionMatrix(t *testing.T) {
+	ok := [][2]string{
+		{"probation", "active"}, {"active", "notice"}, {"active", "terminated"}, {"on_leave", "active"}, {"notice", "active"},
+		{"notice", "resigned"}, {"inactive", "active"}, {"active", "active"}, {"ACTIVE", "Notice"},
+	}
+	for _, c := range ok {
+		if err := validators.ValidateTransition(c[0], c[1]); err != nil {
+			t.Errorf("%s -> %s must be allowed: %v", c[0], c[1], err)
+		}
+	}
+	bad := [][2]string{
+		{"resigned", "active"}, {"terminated", "probation"}, {"resigned", "terminated"}, {"active", "probation"},
+		{"inactive", "notice"}, {"unknown", "active"},
+	}
+	for _, c := range bad {
+		if err := validators.ValidateTransition(c[0], c[1]); err == nil {
+			t.Errorf("%s -> %s must be rejected", c[0], c[1])
+		}
+	}
+}
+
+func TestValidateEmergencyContacts(t *testing.T) {
+	good := []string{"", "  ", "[]", `[{"name":"Mom","relation":"mother","phone":"+91"}]`, `[{"name":"A","phone":"1"},{"name":"B","phone":"2"}]`}
+	for _, g := range good {
+		if err := validators.ValidateEmergencyContacts(g); err != nil {
+			t.Errorf("%q must be valid: %v", g, err)
+		}
+	}
+	bad := []string{"free text", `{"name":"x"}`, `[{"name":"Mom"}]`, `[{"phone":"1"}]`, `[1,2]`, `[{"name":" ","phone":" "}]`}
+	for _, b := range bad {
+		if err := validators.ValidateEmergencyContacts(b); err == nil {
+			t.Errorf("%q must be rejected", b)
+		}
+	}
+}
