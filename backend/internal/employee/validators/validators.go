@@ -1,8 +1,10 @@
 package validators
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -43,6 +45,53 @@ func ValidateStatus(status string) error {
 func ValidateEmploymentType(empType string) error {
 	if !validEmploymentTypes[strings.ToLower(empType)] {
 		return errors.New("invalid employment type: must be full_time, part_time, contract, or intern")
+	}
+	return nil
+}
+
+// allowedTransitions is the FR-ED002 state machine. resigned/terminated are terminal.
+var allowedTransitions = map[string][]string{
+	"probation":  {"active", "notice", "resigned", "terminated", "on_leave", "inactive"},
+	"active":     {"notice", "resigned", "terminated", "on_leave", "inactive"},
+	"on_leave":   {"active", "notice", "resigned", "terminated", "inactive"},
+	"notice":     {"active", "resigned", "terminated", "inactive"},
+	"inactive":   {"active", "terminated"},
+	"resigned":   {},
+	"terminated": {},
+}
+
+// ValidateTransition enforces the employee status state machine (from != to).
+func ValidateTransition(from, to string) error {
+	from, to = strings.ToLower(from), strings.ToLower(to)
+	if from == to {
+		return nil
+	}
+	for _, ok := range allowedTransitions[from] {
+		if ok == to {
+			return nil
+		}
+	}
+	return errors.New("illegal status transition " + from + " -> " + to)
+}
+
+// ValidateEmergencyContacts checks FR-EC001: a JSON array of {name, relation, phone} objects (name and phone required).
+// An empty string is accepted and means "no contacts".
+func ValidateEmergencyContacts(raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var items []struct {
+		Name     string `json:"name"`
+		Relation string `json:"relation"`
+		Phone    string `json:"phone"`
+	}
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return errors.New("emergency_contacts must be a JSON array of {name, relation, phone} objects")
+	}
+	for i, it := range items {
+		if strings.TrimSpace(it.Name) == "" || strings.TrimSpace(it.Phone) == "" {
+			return errors.New("emergency_contacts[" + strconv.Itoa(i) + "] requires name and phone")
+		}
 	}
 	return nil
 }

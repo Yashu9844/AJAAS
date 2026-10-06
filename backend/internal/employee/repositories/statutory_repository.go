@@ -38,7 +38,7 @@ func (r *employeeStatutoryRepository) Upsert(ctx context.Context, tx *gorm.DB, s
 		db = tx
 	}
 	return db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "tenant_id"}, {Name: "employee_profile_id"}},
+		Columns: []clause.Column{{Name: "employee_profile_id"}}, // matches uq_emp_statutory_profile (profile ids are globally unique)
 		DoUpdates: clause.AssignmentColumns([]string{
 			"tax_id", "national_id", "bank_name", "bank_account_number", "bank_routing_swift", "updated_at",
 		}),

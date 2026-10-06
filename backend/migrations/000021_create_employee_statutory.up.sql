@@ -12,5 +12,5 @@ CREATE TABLE IF NOT EXISTS employee_statutory (
     deleted_at TIMESTAMPTZ
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_emp_statutory_tenant_profile ON employee_statutory(tenant_id, employee_profile_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_emp_statutory_profile ON employee_statutory(employee_profile_id);
 CREATE INDEX IF NOT EXISTS idx_emp_statutory_deleted_at ON employee_statutory(deleted_at);

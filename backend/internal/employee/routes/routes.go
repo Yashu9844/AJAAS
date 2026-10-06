@@ -33,6 +33,16 @@ func RegisterRoutes(
 	update := identityMiddleware.RequirePermission(db, "employee", "update", userRoleRepo, rolePermRepo)
 	updateSensitive := identityMiddleware.RequirePermission(db, "employee", "update_sensitive", userRoleRepo, rolePermRepo)
 	admin := identityMiddleware.RequirePermission(db, "employee", "admin", userRoleRepo, rolePermRepo)
+	// Resolves employee:read_sensitive without blocking; the statutory handler only unmasks PII when it is true.
+	sensitiveFlag := identityMiddleware.PermissionFlag(db, "employee", "read_sensitive", "has_sensitive_perm", userRoleRepo, rolePermRepo)
+	// Unmasked reads of PII are security-relevant and always audited.
+	auditUnmasked := func(c *gin.Context) {
+		if c.Query("unmasked") == "true" {
+			auditMW("employee.statutory_unmasked", "employee")(c)
+			return
+		}
+		c.Next()
+	}
 
 	employees := router.Group("/employees")
 	employees.Use(tenantResolver, authMiddleware)
@@ -50,7 +60,7 @@ func RegisterRoutes(
 		employees.POST("/:id/deactivate", update, auditMW("employee.deactivated", "employee"), empCtrl.Deactivate)
 
 		// Statutory & Bank details
-		employees.GET("/:id/statutory", read, statCtrl.Get)
+		employees.GET("/:id/statutory", read, sensitiveFlag, auditUnmasked, statCtrl.Get)
 		employees.PUT("/:id/statutory", updateSensitive, auditMW("employee.statutory_updated", "employee"), statCtrl.Upsert)
 
 		// Documents

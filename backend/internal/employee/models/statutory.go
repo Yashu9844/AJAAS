@@ -8,7 +8,7 @@ import (
 // EmployeeStatutory stores sensitive tax identifiers and banking coordinates.
 type EmployeeStatutory struct {
 	database.TenantBaseModel
-	EmployeeProfileID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_emp_statutory_tenant_profile" json:"employee_profile_id"`
+	EmployeeProfileID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uq_emp_statutory_profile" json:"employee_profile_id"`
 	TaxID             string    `gorm:"type:varchar(100)" json:"tax_id"`
 	NationalID        string    `gorm:"type:varchar(100)" json:"national_id"`
 	BankName          string    `gorm:"type:varchar(100)" json:"bank_name"`

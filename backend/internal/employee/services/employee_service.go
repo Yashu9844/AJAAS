@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -300,7 +301,14 @@ func (s *employeeService) UpdateSelfContact(ctx context.Context, tenantID, userI
 		profile.Contact.PermanentAddress = *req.PermanentAddress
 	}
 	if req.EmergencyContacts != nil {
-		profile.Contact.EmergencyContacts = *req.EmergencyContacts
+		if err := validators.ValidateEmergencyContacts(*req.EmergencyContacts); err != nil {
+			return nil, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: err.Error(), StatusCode: 400}
+		}
+		ec := strings.TrimSpace(*req.EmergencyContacts)
+		if ec == "" {
+			ec = "[]"
+		}
+		profile.Contact.EmergencyContacts = ec
 	}
 
 	if err := s.profileRepo.UpdateContact(ctx, nil, profile.Contact); err != nil {
@@ -328,6 +336,14 @@ func (s *employeeService) TransitionStatus(ctx context.Context, tenantID, id uui
 	if oldStatus == newStatus {
 		return toEmployeeResponse(profile), nil
 	}
+	// FR-ED002: validated via the state transition matrix.
+	if err := validators.ValidateTransition(oldStatus, newStatus); err != nil {
+		return nil, &sharedErrors.AppError{Code: "INVALID_STATUS_TRANSITION", Message: err.Error(), StatusCode: 409}
+	}
+	// FR-ED002: validated via the state transition matrix.
+	if err := validators.ValidateTransition(oldStatus, newStatus); err != nil {
+		return nil, &sharedErrors.AppError{Code: "INVALID_STATUS_TRANSITION", Message: err.Error(), StatusCode: 409}
+	}
 
 	profile.Status = newStatus
 
@@ -338,28 +354,67 @@ func (s *employeeService) TransitionStatus(ctx context.Context, tenantID, id uui
 				return err
 			}
 
+			now := time.Now().UTC()
+			eventType := "status_changed:" + newStatus
 			if profile.EmploymentDetail != nil {
+				d := profile.EmploymentDetail
 				if req.ConfirmationDate != nil {
-					profile.EmploymentDetail.ConfirmationDate = req.ConfirmationDate
+					d.ConfirmationDate = req.ConfirmationDate
 				}
 				if req.ResignationDate != nil {
-					profile.EmploymentDetail.ResignationDate = req.ResignationDate
+					d.ResignationDate = req.ResignationDate
 				}
 				if req.ExitDate != nil {
-					profile.EmploymentDetail.ExitDate = req.ExitDate
+					d.ExitDate = req.ExitDate
 				}
 				if req.ExitReason != "" {
-					profile.EmploymentDetail.ExitReason = req.ExitReason
+					d.ExitReason = req.ExitReason
 				}
-				if err := pRepo.UpdateEmploymentDetail(ctx, tx, profile.EmploymentDetail); err != nil {
+				// FR-ED003: probation -> active confirms the employee.
+				if oldStatus == "probation" && newStatus == "active" {
+					if d.ConfirmationDate == nil {
+						d.ConfirmationDate = &now
+					}
+					eventType = "confirmed"
+				}
+				// FR-ED004: initiating an exit records the resignation date and a tentative exit date from the notice period.
+				if newStatus == "notice" || newStatus == "resigned" {
+					if d.ResignationDate == nil {
+						d.ResignationDate = &now
+					}
+					if d.ExitDate == nil {
+						exit := d.ResignationDate.AddDate(0, 0, d.NoticePeriodDays)
+						d.ExitDate = &exit
+					}
+				}
+				// FR-ED005: finalising an exit stamps the exit date.
+				if newStatus == "resigned" || newStatus == "terminated" {
+					if req.ExitDate == nil && d.ExitDate == nil {
+						d.ExitDate = &now
+					}
+					eventType = newStatus
+				}
+				if err := pRepo.UpdateEmploymentDetail(ctx, tx, d); err != nil {
 					return err
+				}
+			} else if newStatus == "resigned" || newStatus == "terminated" {
+				eventType = newStatus
+			}
+
+			// FR-ED005: finalising an exit deactivates the Module 0 user (same transaction).
+			if (newStatus == "resigned" || newStatus == "terminated") && s.userSvc != nil {
+				if err := s.userSvc.DeactivateUser(ctx, tx, tenantID, profile.UserID, uuid.New()); err != nil {
+					var appErr *sharedErrors.AppError
+					if !(errors.As(err, &appErr) && appErr.StatusCode == 409) { // already inactive is fine
+						return err
+					}
 				}
 			}
 
 			// Append timeline milestone
 			timeline := &models.EmployeeTimeline{
 				EmployeeProfileID: profile.ID,
-				EventType:         "status_changed:" + newStatus,
+				EventType:         eventType,
 				EffectiveDate:     time.Now().UTC(),
 				Notes:             req.Notes,
 				Metadata:          "{}",

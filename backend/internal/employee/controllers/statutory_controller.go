@@ -30,8 +30,16 @@ func (ctrl *StatutoryController) Get(c *gin.Context) {
 		return
 	}
 
-	// Check if caller has sensitive read permission or query parameter
-	sensitive := c.GetBool("has_sensitive_perm") || c.Query("unmasked") == "true"
+	// NFR-SEC002: PII stays masked unless the caller explicitly asks (?unmasked=true) AND holds employee:read_sensitive
+	// (resolved server-side by the PermissionFlag middleware; the query string alone never grants access).
+	sensitive := false
+	if c.Query("unmasked") == "true" {
+		if !c.GetBool("has_sensitive_perm") {
+			respondError(c, &sharedErrors.AppError{Code: "FORBIDDEN", Message: "Permission employee:read_sensitive is required to view unmasked data", StatusCode: http.StatusForbidden})
+			return
+		}
+		sensitive = true
+	}
 
 	res, err := ctrl.svc.GetByProfileID(c.Request.Context(), tenantID, profileID, sensitive)
 	if err != nil {
