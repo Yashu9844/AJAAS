@@ -51,7 +51,11 @@ func TestEmployeeDocumentService(t *testing.T) {
 	}
 
 	// 3. Verify
-	verified, err := svc.Verify(ctx, tenantID, doc.ID, verifierID)
+	// 3a. a document cannot be verified through another employee's path
+	if _, err := svc.Verify(ctx, tenantID, uuid.New(), doc.ID, verifierID); err == nil {
+		t.Fatal("verify through a different employee must be refused")
+	}
+	verified, err := svc.Verify(ctx, tenantID, profileID, doc.ID, verifierID)
 	if err != nil {
 		t.Fatalf("unexpected error verifying doc: %v", err)
 	}

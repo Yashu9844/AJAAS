@@ -16,7 +16,7 @@ import (
 type EmployeeDocumentService interface {
 	Upload(ctx context.Context, tenantID, profileID uuid.UUID, req dto.UploadDocumentRequest) (*dto.DocumentResponse, error)
 	List(ctx context.Context, tenantID, profileID uuid.UUID) ([]dto.DocumentResponse, error)
-	Verify(ctx context.Context, tenantID, docID, verifierID uuid.UUID) (*dto.DocumentResponse, error)
+	Verify(ctx context.Context, tenantID, profileID, docID, verifierID uuid.UUID) (*dto.DocumentResponse, error)
 }
 
 type employeeDocumentService struct {
@@ -76,12 +76,13 @@ func (s *employeeDocumentService) List(ctx context.Context, tenantID, profileID 
 	return res, nil
 }
 
-func (s *employeeDocumentService) Verify(ctx context.Context, tenantID, docID, verifierID uuid.UUID) (*dto.DocumentResponse, error) {
+func (s *employeeDocumentService) Verify(ctx context.Context, tenantID, profileID, docID, verifierID uuid.UUID) (*dto.DocumentResponse, error) {
 	doc, err := s.docRepo.GetByID(ctx, tenantID, docID)
 	if err != nil {
 		return nil, err
 	}
-	if doc == nil {
+	// the document must belong to the employee addressed by the URL (no verifying through someone else's path)
+	if doc == nil || doc.EmployeeProfileID != profileID {
 		return nil, sharedErrors.ErrNotFound
 	}
 

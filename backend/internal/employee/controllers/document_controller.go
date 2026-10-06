@@ -32,7 +32,7 @@ func (ctrl *DocumentController) Upload(c *gin.Context) {
 
 	var req dto.UploadDocumentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: err.Error(), StatusCode: http.StatusBadRequest})
+		respondBindError(c, err)
 		return
 	}
 
@@ -77,13 +77,19 @@ func (ctrl *DocumentController) Verify(c *gin.Context) {
 		return
 	}
 
+	profileID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: "invalid employee ID", StatusCode: http.StatusBadRequest})
+		return
+	}
+
 	docID, err := uuid.Parse(c.Param("doc_id"))
 	if err != nil {
 		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: "invalid document ID", StatusCode: http.StatusBadRequest})
 		return
 	}
 
-	res, err := ctrl.svc.Verify(c.Request.Context(), tenantID, docID, verifierID)
+	res, err := ctrl.svc.Verify(c.Request.Context(), tenantID, profileID, docID, verifierID)
 	if err != nil {
 		respondError(c, err)
 		return

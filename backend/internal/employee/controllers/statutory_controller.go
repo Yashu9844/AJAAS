@@ -64,7 +64,7 @@ func (ctrl *StatutoryController) Upsert(c *gin.Context) {
 
 	var req dto.UpdateStatutoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: err.Error(), StatusCode: http.StatusBadRequest})
+		respondBindError(c, err)
 		return
 	}
 

@@ -234,7 +234,7 @@ func TestStatutoryAndDocumentAndTimelineEdgeCases(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected not found on doc upload")
 	}
-	_, err = docSvc.Verify(ctx, tenantID, uuid.New(), uuid.New())
+	_, err = docSvc.Verify(ctx, tenantID, uuid.New(), uuid.New(), uuid.New())
 	if err == nil {
 		t.Errorf("expected not found on doc verify")
 	}

@@ -27,7 +27,7 @@ func (ctrl *EmployeeController) Create(c *gin.Context) {
 
 	var req dto.CreateEmployeeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: err.Error(), StatusCode: http.StatusBadRequest})
+		respondBindError(c, err)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (ctrl *EmployeeController) UpdateMe(c *gin.Context) {
 
 	var req dto.UpdateSelfContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: err.Error(), StatusCode: http.StatusBadRequest})
+		respondBindError(c, err)
 		return
 	}
 
@@ -163,7 +163,7 @@ func (ctrl *EmployeeController) Update(c *gin.Context) {
 
 	var req dto.UpdateEmployeeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: err.Error(), StatusCode: http.StatusBadRequest})
+		respondBindError(c, err)
 		return
 	}
 
@@ -190,7 +190,7 @@ func (ctrl *EmployeeController) TransitionStatus(c *gin.Context) {
 
 	var req dto.TransitionStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: err.Error(), StatusCode: http.StatusBadRequest})
+		respondBindError(c, err)
 		return
 	}
 

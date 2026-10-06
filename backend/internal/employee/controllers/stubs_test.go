@@ -87,7 +87,7 @@ func (s *stubDocSvc) Upload(ctx context.Context, tenantID, profileID uuid.UUID, 
 func (s *stubDocSvc) List(ctx context.Context, tenantID, profileID uuid.UUID) ([]dto.DocumentResponse, error) {
 	return s.list, s.err
 }
-func (s *stubDocSvc) Verify(ctx context.Context, tenantID, docID, verifierID uuid.UUID) (*dto.DocumentResponse, error) {
+func (s *stubDocSvc) Verify(ctx context.Context, tenantID, profileID, docID, verifierID uuid.UUID) (*dto.DocumentResponse, error) {
 	return s.res, s.err
 }
 
