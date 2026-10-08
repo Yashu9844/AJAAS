@@ -1,4 +1,4 @@
-# Module 3 — Current Status (updated: 2026-10-09, P5 DONE, P6 CURRENT)
+# Module 3 — Current Status (updated: 2026-10-09, P6 DONE, P7 CURRENT)
 
 Implemented:
 - P1 design bundle: specification (FR-SH/SA/PU/AR/RG/EV, AT-001..AT-022, 19 endpoints, 6 tables, 5 events), architecture, connections C1–C10, security, goldens G1–G13, testing, decisions D3-01..D3-12, assumptions.
@@ -6,12 +6,13 @@ Implemented:
 - P3: `calc` pure engine (goldens G4/G5 green), `dto` (all request/response shapes, ParsePage clamp — G13 unit), `validators` (shift code, IANA tz, dates/range, thresholds). All 100% coverage.
 - P4: `repositories` — 6 interfaces + GORM impls (shift, assignment, record, punch, regularization, outbox); tenant-scoped; advisory lock; FindOrCreate; single-query status aggregate. Compile-verified; SQL behavior pending live ring (P7).
 - P5: `services` (Shift, Assignment, Punch, Query, Regularization, OutboxRelay) + `events`; real transactions via TxRunner; outbox written in-tx, published after commit, relay retries; audit after commit (best-effort). Unit goldens G2, G3, G6, G7, G8, G10, G11, G12 green; services 91.8%, events 100%.
+- P6: `controllers` (100%), `routes` (19 routes, RBAC contract test, 100%), `module.go` (Module 2 directory adapter, permission seed attendance:read|manage|approve, outbox relay, punch rate limit 30/min/IP), `cmd/main.go` wiring (AutoMigrate, seed, routes, relay start/stop), swagger (16 paths / 19 operations, 24 schemas, refs validated). Whole backend: build + vet clean, all ./internal unit tests PASS.
 
 Partially Implemented:
 - Migrations not yet executed against Postgres (scheduled T3-18, P7).
 
 Not Implemented:
-- HTTP controllers/routes, module wiring, swagger, live tests, frontend (P6–P8).
+- live tests against Postgres (P7), frontend (P8).
 
 Known Issues:
 - Module 4 bundle still describes Projects; must be re-scoped to Leave (D3-01) before G4-1.

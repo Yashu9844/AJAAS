@@ -1,4 +1,4 @@
-# Module 3 — Todo (P1–P5 DONE; P6 CURRENT)
+# Module 3 — Todo (P1–P6 DONE; P7 CURRENT)
 
 ## P1 (done — G3-1)
 - [x] specification.md frozen (FR + AT rules + API + data + errors + edges + out-of-scope)
@@ -27,9 +27,9 @@
 - [x] T3-14 coverage ≥ 90% services (91.8%)
 
 ## P6 — G3-6 HTTP + wiring
-- [ ] T3-15 controllers + error mapping + pagination clamp (G13) + tests
-- [ ] T3-16 routes + module.go + permission seed + cmd/main.go (AutoMigrate, relay)
-- [ ] T3-17 swagger.yaml 19 paths
+- [x] T3-15 controllers + error mapping + pagination clamp (G13) + tests
+- [x] T3-16 routes + module.go + permission seed + cmd/main.go (AutoMigrate, relay)
+- [x] T3-17 swagger.yaml 19 operations (16 paths) + 24 schemas, validated
 
 ## P7 — G3-7 Live ring
 - [ ] T3-18 docker infra up, backend boot, migrations up/down/up

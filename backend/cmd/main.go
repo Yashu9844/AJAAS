@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jaas/jaas/internal/attendance"
 	"github.com/jaas/jaas/internal/employee"
 	"github.com/jaas/jaas/internal/identity"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
@@ -124,6 +125,15 @@ func main() {
 	if err := db.AutoMigrate(employeeModule.RegisterModels()...); err != nil {
 		log.Fatal().Err(err).Msg("Employee auto-migration failed")
 	}
+
+	// 6d. Bootstrap Attendance Module (Module 3; depends on Identity audit + Employee directory)
+	attendanceModule := attendance.NewModule(db, publisher, employeeModule.EmployeeService(), identityModule.AuditService())
+	if err := db.AutoMigrate(attendanceModule.RegisterModels()...); err != nil {
+		log.Fatal().Err(err).Msg("Attendance auto-migration failed")
+	}
+	if err := attendanceModule.SeedPermissions(context.Background()); err != nil {
+		log.Fatal().Err(err).Msg("Attendance permission seed failed")
+	}
 	log.Info().Msg("Database auto-migrations executed successfully")
 
 	// 7. Initialize HTTP server engine
@@ -157,6 +167,18 @@ func main() {
 		identityModule.AuthMiddleware(),
 		identityModule.AuditService(),
 	)
+	attendanceModule.RegisterRoutes(
+		v1Group,
+		identityModule.TenantResolver(),
+		identityModule.AuthMiddleware(),
+		identityModule.UserRoleRepository(),
+		identityModule.RolePermissionRepository(),
+		redisClient,
+	)
+
+	// Attendance outbox relay (FR-EV002) runs until shutdown.
+	relayCtx, stopRelay := context.WithCancel(context.Background())
+	go attendanceModule.Relay().Run(relayCtx)
 
 	// Health check route
 	router.GET("/health", func(c *gin.Context) {
@@ -184,6 +206,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Info().Msg("Shutting down HTTP server...")
+	stopRelay()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -1484,6 +1484,247 @@ paths:
         '200':
           description: List of milestone career events
 
+
+  # ---------------- Module 3: Attendance, Shifts & Time Tracking ----------------
+  /attendance/punch:
+    post:
+      summary: Punch IN or OUT (self, server clock — AT-001)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PunchRequest'}
+      responses:
+        '201': {description: Punch recorded, content: {application/json: {schema: {$ref: '#/components/schemas/PunchResultEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '403': {description: EMPLOYEE_NOT_ACTIVE}
+        '404': {description: EMPLOYEE_NOT_FOUND}
+        '409': {description: ALREADY_PUNCHED_IN | NOT_PUNCHED_IN | DUPLICATE_PUNCH | SESSION_EXPIRED}
+        '429': {description: RATE_LIMITED}
+
+  /attendance/me/today:
+    get:
+      summary: Today's attendance state for the caller
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: Today view, content: {application/json: {schema: {$ref: '#/components/schemas/TodayEnvelope'}}}}
+        '404': {description: EMPLOYEE_NOT_FOUND}
+
+  /attendance/me:
+    get:
+      summary: Caller's own records (max 62 days, default last 7)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {$ref: '#/components/parameters/FromDate'}
+        - {$ref: '#/components/parameters/ToDate'}
+      responses:
+        '200': {description: Records, content: {application/json: {schema: {$ref: '#/components/schemas/RecordListEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+
+  /attendance/records:
+    get:
+      summary: List attendance records (attendance:read)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: employee_id, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/FromDate'}
+        - {$ref: '#/components/parameters/ToDate'}
+        - {name: status, in: query, schema: {type: string, enum: [present, half_day, absent, on_leave, holiday, week_off]}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated records, content: {application/json: {schema: {$ref: '#/components/schemas/RecordListEnvelope'}}}}
+        '403': {description: FORBIDDEN}
+
+  /attendance/records/{id}:
+    get:
+      summary: Record with all punches incl. superseded (attendance:read)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Record detail, content: {application/json: {schema: {$ref: '#/components/schemas/RecordDetailEnvelope'}}}}
+        '404': {description: NOT_FOUND (also for other tenants' ids)}
+
+  /attendance/summary:
+    get:
+      summary: Daily presence summary (attendance:read, AT-020)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: date, in: query, schema: {type: string, format: date}}
+      responses:
+        '200': {description: Summary, content: {application/json: {schema: {$ref: '#/components/schemas/SummaryEnvelope'}}}}
+
+  /attendance/regularizations:
+    post:
+      summary: Request a timesheet correction (self)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateRegularizationRequest'}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR | REGULARIZATION_WINDOW}
+        '409': {description: REGULARIZATION_PENDING}
+    get:
+      summary: List all regularizations (attendance:read)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {$ref: '#/components/parameters/RegStatus'}
+        - {name: employee_id, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated list, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationListEnvelope'}}}}
+
+  /attendance/regularizations/me:
+    get:
+      summary: Caller's own regularizations
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {$ref: '#/components/parameters/RegStatus'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated list, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationListEnvelope'}}}}
+
+  /attendance/regularizations/{id}/cancel:
+    post:
+      summary: Cancel own pending request (AT-018)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '404': {description: NOT_FOUND (not yours)}
+        '409': {description: REGULARIZATION_NOT_PENDING}
+
+  /attendance/regularizations/{id}/approve:
+    post:
+      summary: Approve and apply to the record (attendance:approve, AT-017)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReviewRequest'}
+      responses:
+        '200': {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
+        '409': {description: REGULARIZATION_NOT_PENDING}
+
+  /attendance/regularizations/{id}/reject:
+    post:
+      summary: Reject with a comment (attendance:approve)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReviewRequest'}
+      responses:
+        '200': {description: Rejected, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR (comment required)}
+        '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
+
+  /shifts:
+    post:
+      summary: Create a shift (attendance:manage)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateShiftRequest'}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '409': {description: CONFLICT (name/code taken)}
+    get:
+      summary: List shifts (attendance:read)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive]}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated shifts, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftListEnvelope'}}}}
+
+  /shifts/{id}:
+    get:
+      summary: Get a shift (attendance:read)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Shift, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+    patch:
+      summary: Update a shift; code immutable (attendance:manage)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateShiftRequest'}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+
+  /shifts/{id}/deactivate:
+    post:
+      summary: Deactivate a shift (attendance:manage, AT-012)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Deactivated, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+        '409': {description: SHIFT_IN_USE | CONFLICT}
+
+  /shifts/{id}/assignments:
+    post:
+      summary: Assign an employee to the shift (attendance:manage, AT-011)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignShiftRequest'}
+      responses:
+        '201': {description: Assigned, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentEnvelope'}}}}
+        '409': {description: ASSIGNMENT_OVERLAP | SHIFT_INACTIVE}
+
+  /shift-assignments:
+    get:
+      summary: List an employee's shift assignments (attendance:read)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: employee_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated assignments, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentListEnvelope'}}}}
+
 components:
   securitySchemes:
     BearerAuth:
@@ -1496,3 +1737,199 @@ components:
       in: header
       name: Host
       description: The request host header containing the tenant subdomain slug (e.g. acme.jaas.com).
+  parameters:
+    ID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    Page: {name: page, in: query, schema: {type: integer, default: 1, minimum: 1}, description: Invalid values clamp to 1}
+    PerPage: {name: per_page, in: query, schema: {type: integer, default: 20, minimum: 1, maximum: 100}, description: Invalid values clamp to 20; above 100 clamps to 100}
+    FromDate: {name: from, in: query, schema: {type: string, format: date}}
+    ToDate: {name: to, in: query, schema: {type: string, format: date}}
+    RegStatus: {name: status, in: query, schema: {type: string, enum: [pending, approved, rejected, cancelled]}}
+  responses:
+    ValidationError:
+      description: VALIDATION_ERROR with field details
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+  schemas:
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: {type: string}
+            message: {type: string}
+            details: {type: array, items: {type: object, properties: {field: {type: string}, message: {type: string}}}}
+    PageMeta:
+      type: object
+      properties: {page: {type: integer}, per_page: {type: integer}, total_items: {type: integer}, total_pages: {type: integer}}
+    PunchRequest:
+      type: object
+      required: [type]
+      properties:
+        type: {type: string, enum: [in, out]}
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+        device_id: {type: string, maxLength: 100}
+        source: {type: string, enum: [web, mobile], default: web}
+    Punch:
+      type: object
+      description: IP address is stored for audit but never returned
+      properties:
+        id: {type: string, format: uuid}
+        punch_type: {type: string, enum: [in, out]}
+        punch_time: {type: string, format: date-time}
+        source: {type: string, enum: [web, mobile, regularization]}
+        latitude: {type: number}
+        longitude: {type: number}
+        device_id: {type: string}
+        is_superseded: {type: boolean}
+    Record:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        attendance_date: {type: string, format: date}
+        shift_id: {type: string, format: uuid}
+        first_punch_in: {type: string, format: date-time}
+        last_punch_out: {type: string, format: date-time}
+        total_work_minutes: {type: integer}
+        total_break_minutes: {type: integer}
+        late_minutes: {type: integer}
+        overtime_minutes: {type: integer}
+        status: {type: string, enum: [present, half_day, absent, on_leave, holiday, week_off]}
+        source: {type: string}
+        is_regularized: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    PunchResultEnvelope:
+      type: object
+      properties: {data: {type: object, properties: {punch: {$ref: '#/components/schemas/Punch'}, record: {$ref: '#/components/schemas/Record'}}}}
+    TodayEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            attendance_date: {type: string, format: date}
+            record: {$ref: '#/components/schemas/Record'}
+            open_session: {type: boolean}
+            shift: {$ref: '#/components/schemas/Shift'}
+    RecordListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Record'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    RecordDetailEnvelope:
+      type: object
+      properties: {data: {type: object, properties: {record: {$ref: '#/components/schemas/Record'}, punches: {type: array, items: {$ref: '#/components/schemas/Punch'}}}}}
+    SummaryEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            date: {type: string, format: date}
+            total_employees: {type: integer}
+            present: {type: integer}
+            late: {type: integer}
+            half_day: {type: integer}
+            on_leave: {type: integer}
+            absent: {type: integer}
+    CreateRegularizationRequest:
+      type: object
+      required: [attendance_date, requested_punch_in, requested_punch_out, reason]
+      properties:
+        attendance_date: {type: string, format: date}
+        requested_punch_in: {type: string, format: date-time}
+        requested_punch_out: {type: string, format: date-time}
+        reason: {type: string, minLength: 1, maxLength: 500}
+    ReviewRequest:
+      type: object
+      properties: {comment: {type: string, minLength: 1, maxLength: 500, description: Required for reject}}
+    Regularization:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        attendance_date: {type: string, format: date}
+        requested_punch_in: {type: string, format: date-time}
+        requested_punch_out: {type: string, format: date-time}
+        reason: {type: string}
+        status: {type: string, enum: [pending, approved, rejected, cancelled]}
+        reviewer_user_id: {type: string, format: uuid}
+        reviewed_at: {type: string, format: date-time}
+        review_comment: {type: string}
+        created_at: {type: string, format: date-time}
+    RegularizationEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Regularization'}}
+    RegularizationListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Regularization'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    CreateShiftRequest:
+      type: object
+      required: [name, start_time, end_time]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        code: {type: string, pattern: '^[a-z0-9-]{2,32}$'}
+        start_time: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', example: '09:00'}
+        end_time: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', example: '18:00'}
+        grace_period_mins: {type: integer, minimum: 0, maximum: 240, default: 15}
+        break_duration_mins: {type: integer, minimum: 0, maximum: 480, default: 60}
+        full_day_minutes: {type: integer, minimum: 1, maximum: 1440}
+        half_day_minutes: {type: integer, minimum: 1, maximum: 1440}
+        timezone: {type: string, example: Asia/Kolkata, default: UTC}
+    UpdateShiftRequest:
+      type: object
+      description: All fields optional; code is immutable
+      properties:
+        name: {type: string}
+        start_time: {type: string}
+        end_time: {type: string}
+        grace_period_mins: {type: integer}
+        break_duration_mins: {type: integer}
+        full_day_minutes: {type: integer}
+        half_day_minutes: {type: integer}
+        timezone: {type: string}
+    Shift:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        code: {type: string}
+        start_time: {type: string}
+        end_time: {type: string}
+        grace_period_mins: {type: integer}
+        break_duration_mins: {type: integer}
+        full_day_minutes: {type: integer}
+        half_day_minutes: {type: integer}
+        timezone: {type: string}
+        is_night_shift: {type: boolean}
+        expected_minutes: {type: integer}
+        status: {type: string, enum: [active, inactive]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ShiftEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Shift'}}
+    ShiftListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Shift'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    AssignShiftRequest:
+      type: object
+      required: [employee_id, effective_from]
+      properties:
+        employee_id: {type: string, format: uuid}
+        effective_from: {type: string, format: date}
+        effective_to: {type: string, format: date}
+    Assignment:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        shift_id: {type: string, format: uuid}
+        effective_from: {type: string, format: date}
+        effective_to: {type: string, format: date}
+        created_at: {type: string, format: date-time}
+    AssignmentEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Assignment'}}
+    AssignmentListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Assignment'}}, meta: {$ref: '#/components/schemas/PageMeta'}}

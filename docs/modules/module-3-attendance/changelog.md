@@ -6,3 +6,4 @@
 2026-10-09 — P3 DONE: calc engine (goldens G4/G5), DTOs (+G13 pagination clamp), validators. Tests: go test ./internal/attendance/... (calc/dto/validators/models 100%). Impact: none external.
 2026-10-09 — P4 DONE: repositories (6 interfaces + GORM impls, advisory lock, FindOrCreate, status aggregate). Tests: build/vet (SQL verified live at P7). Impact: none external.
 2026-10-09 — P5 DONE: services (shift, assignment, punch, query, regularization, outbox relay) + events; unit goldens G2/G3/G6/G7/G8/G10/G11/G12 green; services 91.8%. Impact: none external.
+2026-10-09 — P6 DONE: controllers + routes (19, RBAC contract test), module.go (directory adapter, permission seed, relay, punch rate limit), cmd/main.go wiring, swagger 19 operations + 24 schemas. Tests: go build/vet ./..., go test ./internal/... PASS; controllers/routes 100%. Impact: new public API (gated GO 2026-10-08); 3 rows in Module 0 permissions (D3-10).
