@@ -1,4 +1,4 @@
-# Module 3 — Todo (P1+P2 DONE; P3 CURRENT)
+# Module 3 — Todo (P1–P3 DONE; P4 CURRENT)
 
 ## P1 (done — G3-1)
 - [x] specification.md frozen (FR + AT rules + API + data + errors + edges + out-of-scope)
@@ -10,9 +10,9 @@
 - [x] T3-03 migrations 000025..000030 up/down (live verification in T3-18)
 
 ## P3 — G3-3 calc + DTOs + validators
-- [ ] T3-04 calc: ParseHHMM/FormatHHMM, ExpectedMinutes, AttendanceDate (AT-005), ComputeTotals (AT-006..AT-010)
-- [ ] T3-05 goldens G4 (totals table) + G5 (night shift, tz)
-- [ ] T3-06 DTOs (requests/responses/pagination clamp) + validators (code, HH:MM, tz, dates)
+- [x] T3-04 calc: ParseHHMM/FormatHHMM, ExpectedMinutes, AttendanceDate (AT-005), ComputeTotals (AT-006..AT-010)
+- [x] T3-05 goldens G4 (totals table) + G5 (night shift, tz)
+- [x] T3-06 DTOs (requests/responses/pagination clamp, G13 unit) + validators (code, tz, dates, thresholds)
 
 ## P4 — G3-4 Repositories
 - [ ] T3-07 interfaces + 6 GORM impls (tenant_id on every query, tx param, LockEmployee advisory lock, FindOrCreate record)

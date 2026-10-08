@@ -1,11 +1,11 @@
 # Module 3 — Current Goal
 
-Goal: G3-3 calc engine + DTOs + validators — pure time functions (ParseHHMM/FormatHHMM, ExpectedMinutes, AttendanceDate per AT-005, ComputeTotals per AT-006..AT-010), request/response DTOs with pagination clamp, field validators (org-style code, HH:MM, IANA timezone, date ranges).
-Why: services and controllers are thin wrappers over this logic; time-zone/night-shift math is the highest-risk code in the module.
-Scope: backend/internal/attendance/{calc,dto,validators}/**.
-Non-goals: repositories, services, HTTP.
+Goal: G3-4 repositories — interfaces + GORM implementations for shifts, assignments, records, punches, regularizations and outbox; `tenant_id` on every query; `tx *gorm.DB` parameter on every method; `LockEmployee` (pg_advisory_xact_lock); record `FindOrCreate`; summary aggregate query.
+Why: P5 services are written against these interfaces (fakes in unit tests, real impls live).
+Scope: backend/internal/attendance/repositories/**.
+Non-goals: business rules (services), HTTP.
 Success Criteria:
-- [ ] golden G4 (totals table) and G5 (night shift + time zones) green
-- [ ] calc 100% statement coverage; dto/validators tested
-- [ ] build/vet/gofmt clean
+- [ ] build/vet/gofmt clean; `var _ Interface = (*impl)(nil)` assertions compile
+- [ ] every query filters tenant_id (review against security.md AS-T3)
+- [ ] live behavior covered by P7 goldens (no Postgres in unit ring)
 - [ ] plan/status/todo/handoff/changelog updated
