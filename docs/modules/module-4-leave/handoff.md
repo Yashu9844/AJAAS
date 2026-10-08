@@ -1,6 +1,6 @@
-# Module 4 — Handoff (2026-10-09, G4-3 DONE → G4-4 CURRENT)
+# Module 4 — Handoff (2026-10-09, G4-4 DONE → G4-5 CURRENT)
 
-Completed: P1 design; P2 models + migrations; P3 calc/dto/validators.
-Tests executed: go test ./internal/leave/... — calc, dto, models, validators 100%.
-Next: G4-4 repositories.
-## Phase: G4-3 → DONE, G4-4 → CURRENT.
+Completed: P1–P4 (design, models+migrations, calc/dto/validators, repositories).
+Tests executed: go build ./..., go vet ./internal/leave/...; unit packages 100%.
+Next: G4-5 services + LeaveSync.
+## Phase: G4-4 → DONE, G4-5 → CURRENT.

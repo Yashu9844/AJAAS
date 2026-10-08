@@ -1,7 +1,7 @@
 # Module 4 — Current Goal
 
-Goal: G4-4 — six tenant-scoped repositories (type, holiday, balance, request, ledger, outbox) + per-employee advisory lock.
+Goal: G4-5 — services, events, outbox relay and the Module 3 LeaveSync port; unit goldens G5–G8, G10, G11, G13.
 Success Criteria:
-- [ ] interfaces + GORM implementations compile, vet clean
-- [ ] every method tenant-scoped (outbox relay excepted)
+- [ ] goldens green on fakes; services ≥ 90%
+- [ ] Module 3 LeaveSync tested; Module 3 suite still green
 - [ ] docs updated
