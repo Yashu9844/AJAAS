@@ -3,8 +3,8 @@
 | Path | Purpose | Status |
 |---|---|---|
 | docs/modules/module-4-leave/*.md | 17-file bundle | DONE (P1) |
-| backend/internal/leave/models/*.go + test | GORM models (6) | P2 |
-| backend/migrations/000031…000036 (.up/.down) | SQL schema | P2 |
+| backend/internal/leave/models/{models,models_test}.go | GORM models (6) | DONE (P2) |
+| backend/migrations/000031…000036 (.up/.down) | SQL schema | DONE (P2) |
 | backend/internal/leave/calc/*.go + goldens | days, counting, accrual, carry-forward | P3 |
 | backend/internal/leave/{dto,validators}/*.go + tests | DTOs, field rules | P3 |
 | backend/internal/leave/repositories/*.go | tenant-scoped data access | P4 |

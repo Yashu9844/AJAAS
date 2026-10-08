@@ -1,7 +1,7 @@
 # Module 4 — Current Goal
 
-Goal: G4-2 — 6 GORM models + migrations 000031–000036 with model tests (table names, index contracts incl. partial/expression uniques, append-only ledger/outbox, column types matching SQL).
+Goal: G4-3 — pure calc engine (CountDays, Accrued, CarryForward) with goldens G2–G4, plus DTOs and validators (G15 pagination clamp).
 Success Criteria:
-- [ ] models_test RED→GREEN, 100% coverage
-- [ ] 6 up/down SQL pairs
-- [ ] build/vet/gofmt clean; docs updated
+- [ ] calc 100%, goldens G2–G4 green
+- [ ] dto/validators tested
+- [ ] docs updated

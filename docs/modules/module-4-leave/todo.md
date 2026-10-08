@@ -1,8 +1,8 @@
-# Module 4 — Todo (P1 DONE; P2 CURRENT)
+# Module 4 — Todo (P2 DONE; P3 CURRENT)
 
 - [x] T4-01 [G4-1] re-scope bundle + frozen design
-- [ ] T4-02 [G4-2] models + model tests (RED→GREEN)
-- [ ] T4-03 [G4-2] migrations 000031–000036 up/down
+- [x] T4-02 [G4-2] models + model tests (RED→GREEN)
+- [x] T4-03 [G4-2] migrations 000031–000036 up/down (cycle verified live early)
 - [ ] T4-04 [G4-3] calc Days/CountDays/Accrued/CarryForward + goldens G2–G4
 - [ ] T4-05 [G4-3] dto + validators + tests
 - [ ] T4-06 [G4-4] repositories + advisory lock

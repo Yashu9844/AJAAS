@@ -1,4 +1,4 @@
-# Module 4 — Plan (updated: 2026-10-09, owner: loop — P1 DONE, P2 CURRENT)
+# Module 4 — Plan (updated: 2026-10-09, owner: loop — P2 DONE, P3 CURRENT)
 
 ## Phase Map
 
@@ -6,9 +6,9 @@
 |---|---|---|---|---|---|
 | P0 | G4-0 | Bundle scaffold | — | DONE | 2026-09-30 (as Projects) |
 | P1 | G4-1 | Re-scope to Leave; spec, architecture, connections, goldens frozen | Module 3 closed | DONE | specification.md et al. 2026-10-09 |
-| P2 | G4-2 | Models (6) + migrations 000031–000036 + model tests (incl. parity contracts) | P1 | CURRENT | — |
-| P3 | G4-3 | calc (Days, CountDays, Accrued, CarryForward) goldens G2–G4; DTOs; validators | P2 | NEXT | — |
-| P4 | G4-4 | Repositories (6) + advisory lock | P2 | LATER | — |
+| P2 | G4-2 | Models (6) + migrations 000031–000036 + model tests (incl. parity contracts) | P1 | DONE | models 100% (index/where/expression + column-type contracts), calc.Days codec 100%; migrations 36 up / 6 down / 6 up clean on scratch DB |
+| P3 | G4-3 | calc (Days, CountDays, Accrued, CarryForward) goldens G2–G4; DTOs; validators | P2 | CURRENT | — |
+| P4 | G4-4 | Repositories (6) + advisory lock | P2 | NEXT | — |
 | P5 | G4-5 | Services + events + relay + Module 3 LeaveSync; goldens G5–G8, G10, G11, G13; services ≥ 90% | P3+P4 | LATER | — |
 | P6 | G4-6 | Controllers, routes, module.go, main.go, seed, swagger | P5 | LATER | — |
 | P7 | G4-7 | Live ring: goldens, migration cycle, parity diff | P6 | LATER | — |
@@ -18,11 +18,11 @@
 Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED.
 
 ## Current Phase
-- Goal: G4-2 models + migrations 000031–000036; model tests guard table names, index contracts (incl. partial/expression uniques), append-only ledger/outbox, column types matching SQL.
-- Exit criteria: models 100% cov; build/vet/gofmt clean; SQL pairs written.
+- Goal: G4-3 calc engine — CountDays (weekends, holidays, optional holidays, sandwich, half day), Accrued (annual prorated by joining month; monthly with December remainder), CarryForward; goldens G2–G4; DTOs + validators; ParsePage clamp (G15).
+- Exit criteria: calc 100%, goldens green, dto/validators ≥ 90%.
 
 ## Next Phase
-- Goal: G4-3 pure calc engine + DTOs + validators with goldens G2–G4.
+- Goal: G4-4 repositories (6) + advisory lock.
 
 ## Gate Log
 | Date | Phase | Gate | Decision | By | Reason |
@@ -34,3 +34,4 @@ Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED.
 | Date | Phase | Did | Sensors | Result | Handoff |
 |---|---|---|---|---|---|
 | 2026-10-09 | P1 | bundle renamed + full design (spec, architecture, connections, security, goldens, decisions) | doc review vs Modules 0/2/3 code | GREEN | handoff.md |
+| 2026-10-09 | P2 | calc.Days (hundredths, SQL Value/Scan, JSON) RED→GREEN; 6 models (types, holidays, balances, requests, ledger, outbox) with parity contracts RED→GREEN; migrations 000031–000036 | vet/gofmt clean; models + calc 100%; live migration cycle 36 up / 6 down / 6 up | GREEN | handoff.md |
