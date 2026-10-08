@@ -52,6 +52,8 @@ type RecordRepository interface {
 	// FindOrCreate returns the record for (employee, date), inserting `seed` if absent.
 	FindOrCreate(ctx context.Context, tx *gorm.DB, seed *models.AttendanceRecord) (*models.AttendanceRecord, error)
 	Update(ctx context.Context, tx *gorm.DB, r *models.AttendanceRecord) error
+	// Delete removes a leave-only record (D3-17); records with punches are never deleted.
+	Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error
 	FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.AttendanceRecord, error)
 	FindByDate(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (*models.AttendanceRecord, error)
 	ListForEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, from, to time.Time) ([]models.AttendanceRecord, error)

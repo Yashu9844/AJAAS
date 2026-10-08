@@ -134,3 +134,13 @@ func (f fakeOutbox) FetchUnpublished(_ context.Context, _ *gorm.DB, limit, maxAt
 	}
 	return out, f.st.err("outbox.fetch")
 }
+
+func (f fakeRecords) Delete(_ context.Context, _ *gorm.DB, t, id uuid.UUID) error {
+	if err := f.st.err("record.delete"); err != nil {
+		return err
+	}
+	if r, ok := f.st.records[id]; ok && r.TenantID == t {
+		delete(f.st.records, id)
+	}
+	return nil
+}

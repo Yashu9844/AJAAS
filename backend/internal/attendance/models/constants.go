@@ -18,6 +18,7 @@ const (
 	SourceWeb            = "web"
 	SourceMobile         = "mobile"
 	SourceRegularization = "regularization"
+	SourceLeave          = "leave"
 )
 
 // Attendance record statuses (AT-010). on_leave/holiday/week_off are reserved for Module 4 writers.

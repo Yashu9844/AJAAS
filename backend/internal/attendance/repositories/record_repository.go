@@ -44,6 +44,10 @@ func (r *recordRepository) Update(ctx context.Context, tx *gorm.DB, rec *models.
 	return tx.WithContext(ctx).Where("tenant_id = ?", rec.TenantID).Save(rec).Error
 }
 
+func (r *recordRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error {
+	return tx.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&models.AttendanceRecord{}).Error
+}
+
 func (r *recordRepository) first(ctx context.Context, db *gorm.DB, query string, args ...interface{}) (*models.AttendanceRecord, error) {
 	var rec models.AttendanceRecord
 	if err := db.WithContext(ctx).Where(query, args...).First(&rec).Error; err != nil {
