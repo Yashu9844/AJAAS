@@ -7,7 +7,7 @@ Build bottom-up. Independent same-level modules may run in parallel. Details per
 | 0 Identity | PG/Redis/RabbitMQ/SMTP/Kong (infra) | 1–12 (all) | Infra + Auth/API root | Spec complete; shared/ done; models 1/12 broken; G0-1 CURRENT |
 | 1 Organization | 0 (Tenant, User, RBAC) | 2, 3, 4, 5 | API/Data/Auth | Design pending (ER review next) |
 | 2 Employee | 0, 1 | 3, 4, 5, 6 | API/Data | Pending |
-| 3 Attendance | 2, 1 | 7, 10, 11 | API/Data | Pending |
+| 3 Attendance, Shifts & Time Tracking (masterplan scope, D3-01) | 0, 2 | 4 (Leave), 5, 10, 11, 12 | API/Data/Event | P1 design DONE 2026-10-08; P2 CURRENT |
 | 4 Projects | 2, 1 | 6, 7, 10, 11 | API/Data | Pending |
 | 5 Meetings | 2, 1 | 6, 7, 10, 11 | API/Data | Pending |
 | 6 Approvals | 0, 2 | 7, 10, 11 | API/Data | Pending |

@@ -1,10 +1,11 @@
 # Module 3 — Current Goal
 
-Goal: NONE ACTIVE — module design pending after Modules 0 + 1 + 2 contracts.
-Why: dependencies are not stable yet. See connections.md.
-Scope: docs-only until plan.md P1 design is DONE.
-Non-goals: no production code, no schema, no API until contracts freeze.
+Goal: G3-2 Models + migrations — six GORM models (shifts, shift_assignments, attendance_records, attendance_punches, attendance_regularizations, attendance_events_outbox) matching specification.md §8, six up/down SQL pairs 000025–000030, model tests.
+Why: frozen schema unblocks calc/DTO (P3) and repositories (P4).
+Scope: backend/internal/attendance/models/**, backend/migrations/000025–000030.
+Non-goals: services, controllers, API, frontend.
 Success Criteria:
-- [ ] plan.md P1 design DONE with frozen contracts
-- [ ] This file updated to G3-1 with verifiable objective
-- [ ] handoff.md records the activation
+- [ ] `go build ./...`, `go vet ./...`, `gofmt -l` clean
+- [ ] `go test ./internal/attendance/models/...` green (schema parse, table names, unique/index names)
+- [ ] SQL pairs present; down files drop in reverse order
+- [ ] plan.md / current-status.md / todo.md / handoff.md / changelog.md updated
