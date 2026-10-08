@@ -167,14 +167,13 @@ func main() {
 		identityModule.AuthMiddleware(),
 		identityModule.AuditService(),
 	)
-	attendanceModule.RegisterRoutes(
-		v1Group,
-		identityModule.TenantResolver(),
-		identityModule.AuthMiddleware(),
-		identityModule.UserRoleRepository(),
-		identityModule.RolePermissionRepository(),
-		redisClient,
-	)
+	attendanceModule.RegisterRoutes(v1Group, attendance.RouteDeps{
+		TenantResolver: identityModule.TenantResolver(),
+		Authenticate:   identityModule.AuthMiddleware(),
+		UserRoles:      identityModule.UserRoleRepository(),
+		RolePerms:      identityModule.RolePermissionRepository(),
+		Redis:          redisClient,
+	})
 
 	// Attendance outbox relay (FR-EV002) runs until shutdown.
 	relayCtx, stopRelay := context.WithCancel(context.Background())

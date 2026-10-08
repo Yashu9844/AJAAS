@@ -82,8 +82,8 @@ func (s *regularizationService) Create(ctx context.Context, a Actor, req dto.Cre
 	if err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "attendance.regularization_requested", "attendance_regularization", g.ID.String(),
-		map[string]string{"attendance_date": req.AttendanceDate}, row)
+	s.afterCommit(ctx, a, auditEntry{"attendance.regularization_requested", "attendance_regularization", g.ID.String(),
+		map[string]string{"attendance_date": req.AttendanceDate}}, row)
 	res := mapRegularization(g)
 	return &res, nil
 }
@@ -180,7 +180,7 @@ func (s *regularizationService) Cancel(ctx context.Context, a Actor, id uuid.UUI
 	if err := s.Tx.InTx(ctx, func(tx *gorm.DB) error { return s.Repos.Regularizations.Update(ctx, tx, g) }); err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "attendance.regularization_cancelled", "attendance_regularization", g.ID.String(), nil, nil)
+	s.afterCommit(ctx, a, auditEntry{"attendance.regularization_cancelled", "attendance_regularization", g.ID.String(), nil}, nil)
 	res := mapRegularization(g)
 	return &res, nil
 }

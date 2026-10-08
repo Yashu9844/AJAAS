@@ -28,10 +28,13 @@ func NewPunchService(d Deps) PunchService { return &punchService{base{d}} }
 
 // punchTx carries one punch's state through the transaction.
 type punchTx struct {
-	record *models.AttendanceRecord
-	shift  *models.Shift
-	punch  *models.AttendancePunch
-	outbox *models.OutboxEvent
+	employeeID uuid.UUID
+	req        dto.PunchRequest
+	now        time.Time
+	record     *models.AttendanceRecord
+	shift      *models.Shift
+	punch      *models.AttendancePunch
+	outbox     *models.OutboxEvent
 }
 
 func (s *punchService) Punch(ctx context.Context, a Actor, req dto.PunchRequest) (*dto.PunchResult, error) {
@@ -40,15 +43,15 @@ func (s *punchService) Punch(ctx context.Context, a Actor, req dto.PunchRequest)
 		return nil, err
 	}
 	now := s.Now().UTC() // AT-001: server clock only
-	var st punchTx
+	st := punchTx{employeeID: emp.ID, req: req, now: now}
 	err = s.Tx.InTx(ctx, func(tx *gorm.DB) error {
 		if err := s.Repos.Records.LockEmployee(ctx, tx, a.TenantID, emp.ID); err != nil {
 			return err
 		}
-		if err := s.targetRecord(ctx, tx, a, emp.ID, req, now, &st); err != nil {
+		if err := s.targetRecord(ctx, tx, a, &st); err != nil {
 			return err
 		}
-		st.punch = newPunch(a, emp.ID, st.record.ID, req, now)
+		st.punch = newPunch(a, &st)
 		if err := s.Repos.Punches.Create(ctx, tx, st.punch); err != nil {
 			return err
 		}
@@ -61,13 +64,14 @@ func (s *punchService) Punch(ctx context.Context, a Actor, req dto.PunchRequest)
 	if err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "attendance.punch_"+req.Type, "attendance_record", st.record.ID.String(),
-		map[string]string{"punch_id": st.punch.ID.String(), "attendance_date": st.record.AttendanceDate.Format(validators.DateLayout)}, st.outbox)
+	s.afterCommit(ctx, a, auditEntry{"attendance.punch_" + req.Type, "attendance_record", st.record.ID.String(),
+		map[string]string{"punch_id": st.punch.ID.String(), "attendance_date": st.record.AttendanceDate.Format(validators.DateLayout)}}, st.outbox)
 	return &dto.PunchResult{Punch: mapPunch(st.punch), Record: mapRecord(st.record)}, nil
 }
 
 // targetRecord applies AT-003..AT-006 and loads (or creates) the record the punch belongs to.
-func (s *punchService) targetRecord(ctx context.Context, tx *gorm.DB, a Actor, employeeID uuid.UUID, req dto.PunchRequest, now time.Time, st *punchTx) error {
+func (s *punchService) targetRecord(ctx context.Context, tx *gorm.DB, a Actor, st *punchTx) error {
+	employeeID, req, now := st.employeeID, st.req, st.now
 	last, err := s.Repos.Punches.LastForEmployee(ctx, tx, a.TenantID, employeeID)
 	if err != nil {
 		return err
@@ -119,9 +123,10 @@ func sourceOf(req dto.PunchRequest) string {
 	return models.SourceWeb
 }
 
-func newPunch(a Actor, employeeID, recordID uuid.UUID, req dto.PunchRequest, now time.Time) *models.AttendancePunch {
-	p := &models.AttendancePunch{TenantID: a.TenantID, AttendanceRecordID: recordID, EmployeeProfileID: employeeID,
-		PunchTime: now, PunchType: req.Type, Source: sourceOf(req), Latitude: req.Latitude, Longitude: req.Longitude,
+func newPunch(a Actor, st *punchTx) *models.AttendancePunch {
+	req := st.req
+	p := &models.AttendancePunch{TenantID: a.TenantID, AttendanceRecordID: st.record.ID, EmployeeProfileID: st.employeeID,
+		PunchTime: st.now, PunchType: req.Type, Source: sourceOf(req), Latitude: req.Latitude, Longitude: req.Longitude,
 		DeviceID: req.DeviceID}
 	if a.IP != "" {
 		ip := a.IP

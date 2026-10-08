@@ -85,16 +85,23 @@ func (m *Module) SeedPermissions(ctx context.Context) error {
 	return nil
 }
 
+// RouteDeps is the Module 0 + shared infrastructure the routes need (connections C4).
+type RouteDeps struct {
+	TenantResolver, Authenticate gin.HandlerFunc
+	UserRoles                    identityRepos.UserRoleRepository
+	RolePerms                    identityRepos.RolePermissionRepository
+	Redis                        *cache.RedisClient
+}
+
 // RegisterRoutes mounts Module 3 under rg using Module 0 tenant/auth/RBAC middleware.
-func (m *Module) RegisterRoutes(rg *gin.RouterGroup, tenantResolver, authenticate gin.HandlerFunc,
-	userRoles identityRepos.UserRoleRepository, rolePerms identityRepos.RolePermissionRepository, redis *cache.RedisClient) {
+func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 	mw := routes.Middleware{
-		TenantResolver: tenantResolver,
-		Authenticate:   authenticate,
+		TenantResolver: d.TenantResolver,
+		Authenticate:   d.Authenticate,
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(m.db, "attendance", action, userRoles, rolePerms)
+			return identityMiddleware.RequirePermission(m.db, "attendance", action, d.UserRoles, d.RolePerms)
 		},
-		PunchLimit: sharedMiddleware.RateLimiter(redis, punchRateLimit, time.Minute),
+		PunchLimit: sharedMiddleware.RateLimiter(d.Redis, punchRateLimit, time.Minute),
 	}
 	routes.RegisterRoutes(rg, mw, m.controllers)
 }

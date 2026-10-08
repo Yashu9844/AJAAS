@@ -36,8 +36,8 @@ func (s *regularizationService) Approve(ctx context.Context, a Actor, id uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "attendance.regularization_approved", "attendance_regularization", g.ID.String(),
-		map[string]string{"attendance_date": g.AttendanceDate.Format(validators.DateLayout)}, row)
+	s.afterCommit(ctx, a, auditEntry{"attendance.regularization_approved", "attendance_regularization", g.ID.String(),
+		map[string]string{"attendance_date": g.AttendanceDate.Format(validators.DateLayout)}}, row)
 	res := mapRegularization(g)
 	return &res, nil
 }
@@ -105,7 +105,7 @@ func (s *regularizationService) Reject(ctx context.Context, a Actor, id uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "attendance.regularization_rejected", "attendance_regularization", g.ID.String(), nil, row)
+	s.afterCommit(ctx, a, auditEntry{"attendance.regularization_rejected", "attendance_regularization", g.ID.String(), nil}, row)
 	res := mapRegularization(g)
 	return &res, nil
 }

@@ -34,11 +34,17 @@ type Envelope struct {
 	Payload       interface{} `json:"payload"`
 }
 
-// New wraps a payload in the envelope; occurredAt comes from the service clock.
-func New(routingKey string, tenantID, correlationID uuid.UUID, occurredAt time.Time, payload interface{}) Envelope {
+// Source identifies who and when an event came from; OccurredAt comes from the service clock.
+type Source struct {
+	TenantID, CorrelationID uuid.UUID
+	OccurredAt              time.Time
+}
+
+// New wraps a payload in the envelope.
+func New(routingKey string, src Source, payload interface{}) Envelope {
 	return Envelope{
 		EventID: uuid.New(), EventType: routingKey, RoutingKey: routingKey, Version: envelopeVersion,
-		OccurredAt: occurredAt.UTC(), Producer: producer, TenantID: tenantID, CorrelationID: correlationID,
+		OccurredAt: src.OccurredAt.UTC(), Producer: producer, TenantID: src.TenantID, CorrelationID: src.CorrelationID,
 		Payload: payload,
 	}
 }

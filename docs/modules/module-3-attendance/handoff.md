@@ -1,11 +1,14 @@
-# Module 3 — Handoff (2026-10-09, G3-7 DONE → G3-9 CURRENT)
+# Module 3 — Handoff (2026-10-09, G3-9 DONE → Module 4 G4-1)
 
-Completed: P2 models+migrations; P3 calc/DTO/validators; P4 repositories; P5 services/events/relay; P6 HTTP edge + wiring + swagger; P7 live ring (goldens G1, G2, G6–G9, G11–G13 on real Postgres, migration cycle, schema parity).
-Not completed: P8 frontend (blocked: no identity login shell), P9 DoD close.
-Known issues: Module 4 re-scope pending (D3-01); Module 0 RequirePermission soft-deleted-role bug inherited; dev DBs booted before D3-14 need a one-time index drop.
-Files changed (P7): backend/tests/api/attendance_{helpers,flow,rules}_test.go (new), tests/api/{db,helpers}_test.go (login limiter reset, D3-15), backend/internal/attendance/models/{shift,attendance,models_test}.go (parity tags + tests); docs: spec AT-004 note, decisions D3-13..15, golden-tests locations, plan/todo/status.
-Tests executed: `go vet ./...` clean; `go test ./internal/...` PASS; `go test -tags integration ./tests/api/` PASS (5 attendance + 5 org); migrations 000001–000030 up, 000030–000025 down, 000025–000030 up on scratch DB `jaas_migcheck` (dropped after); column+index diff AutoMigrate vs SQL: identical.
-How to rerun live: `docker start ajaas-postgres-1 ajaas-redis-1 ajaas-rabbitmq-1`; boot backend (`APP_ENV=development DATABASE_PASSWORD=postgres DATABASE_DBNAME=jaas_dev go run ./cmd`); `go test -tags integration -count=1 ./tests/api/`.
-Remaining risks: relay publish to a live RabbitMQ not asserted (outbox rows asserted; publish covered by unit golden G12).
-Required follow-up (G3-9): §24 checklist, DEPENDENCY-GRAPH, Module 4 handoff.
-## Phase: P7 → DONE, P9 → CURRENT, Module 4 G4-1 → NEXT.
+Completed: P1 design; P2 models+migrations; P3 calc/DTO/validators; P4 repositories; P5 services/events/relay; P6 HTTP edge + wiring + swagger; P7 live ring; P9 DoD close (checklist in current-status.md).
+Not completed: P8 frontend — BLOCKED (frontend is a Next.js bootstrap with no identity login shell).
+Known issues: Module 0 RequirePermission ignores soft-deleted roles (inherited); dev DBs created before D3-14 need a one-time index drop; `-race` not run on this host.
+Files changed (P9): services/{helpers,punch_service}.go, events/events.go(+test), module.go, cmd/main.go (RouteDeps), services/harness_test.go (spy rename), tests/api/attendance_race_test.go; docs.
+Tests executed: `go vet ./...` clean; `go test ./internal/...` PASS; `go test -tags integration -count=1 ./tests/api/` PASS (11).
+Remaining risks: relay publish to a live RabbitMQ is not asserted end-to-end (outbox rows asserted; publish path unit-tested, G12).
+
+## Module 4 entry point (Leave)
+- D3-01 split: Module 3 = Attendance, Module 4 = Leave (masterplan). The existing docs/modules/module-4-* bundle is scoped to Projects and must be re-scoped before G4-1.
+- Leave consumes from Module 3: `attendance_records.status = on_leave` (AT-020 summary counts it), events `attendance.*` on exchange `jaas.attendance.events`; Leave approval should write/override day records through a Module 3 service port, not by touching tables directly.
+- Reuse the patterns: TxRunner + outbox in-tx, advisory lock per employee, `?::date` strings, ParsePage clamp, permission seed via ON CONFLICT DO NOTHING, live goldens behind `integration` tag with `newAttTenant`-style bootstrap.
+## Phase: G3-9 → DONE; Module 3 backend CLOSED; next: Module 4 G4-1 (design).

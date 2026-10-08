@@ -1,4 +1,4 @@
-# Module 3 — Todo (P1–P7 DONE; P9 CURRENT)
+# Module 3 — Todo (backend CLOSED 2026-10-09; P8 BLOCKED)
 
 ## P1 (done — G3-1)
 - [x] specification.md frozen (FR + AT rules + API + data + errors + edges + out-of-scope)
@@ -36,5 +36,5 @@
 - [x] T3-19 live goldens G1, G2, G6, G7, G8, G9, G11, G12, G13 PASS (tests/api/attendance_*_test.go, `-tags integration`)
 
 ## P8/P9
-- [ ] T3-20 frontend slice (blocked on identity shell)
-- [ ] T3-21 DoD close + handoff to Module 4
+- [ ] T3-20 frontend slice — BLOCKED: no identity login shell
+- [x] T3-21 DoD close + handoff to Module 4 (2026-10-09)

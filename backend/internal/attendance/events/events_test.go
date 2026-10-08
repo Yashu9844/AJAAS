@@ -12,7 +12,7 @@ import (
 func TestNewEnvelope(t *testing.T) {
 	tenant, corr := uuid.New(), uuid.New()
 	at := time.Date(2026, 10, 9, 9, 0, 0, 0, time.FixedZone("IST", 19800))
-	env := New(PunchIn, tenant, corr, at, PunchPayload{PunchType: "in"})
+	env := New(PunchIn, Source{TenantID: tenant, CorrelationID: corr, OccurredAt: at}, PunchPayload{PunchType: "in"})
 	if env.EventID == uuid.Nil || env.EventType != PunchIn || env.RoutingKey != PunchIn {
 		t.Fatalf("bad envelope: %+v", env)
 	}

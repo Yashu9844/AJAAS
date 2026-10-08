@@ -54,7 +54,7 @@ func (s *shiftService) Create(ctx context.Context, a Actor, req dto.CreateShiftR
 	if err := s.Tx.InTx(ctx, func(tx *gorm.DB) error { return s.Repos.Shifts.Create(ctx, tx, shift) }); err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "shift.created", "shift", shift.ID.String(), map[string]string{"name": shift.Name}, nil)
+	s.afterCommit(ctx, a, auditEntry{"shift.created", "shift", shift.ID.String(), map[string]string{"name": shift.Name}}, nil)
 	return mapShift(shift), nil
 }
 
@@ -182,7 +182,7 @@ func (s *shiftService) Update(ctx context.Context, a Actor, id uuid.UUID, req dt
 	if err := s.Tx.InTx(ctx, func(tx *gorm.DB) error { return s.Repos.Shifts.Update(ctx, tx, shift) }); err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "shift.updated", "shift", shift.ID.String(), map[string]string{"name": shift.Name}, nil)
+	s.afterCommit(ctx, a, auditEntry{"shift.updated", "shift", shift.ID.String(), map[string]string{"name": shift.Name}}, nil)
 	return mapShift(shift), nil
 }
 
@@ -211,6 +211,6 @@ func (s *shiftService) Deactivate(ctx context.Context, a Actor, id uuid.UUID) (*
 	if err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "shift.deactivated", "shift", shift.ID.String(), nil, nil)
+	s.afterCommit(ctx, a, auditEntry{"shift.deactivated", "shift", shift.ID.String(), nil}, nil)
 	return mapShift(shift), nil
 }

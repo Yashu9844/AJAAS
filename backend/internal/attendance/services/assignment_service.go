@@ -82,8 +82,8 @@ func (s *assignmentService) Assign(ctx context.Context, a Actor, shiftID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	s.afterCommit(ctx, a, "shift.assigned", "shift_assignment", created.ID.String(),
-		map[string]string{"employee_id": employeeID.String(), "shift_id": shiftID.String(), "effective_from": req.EffectiveFrom}, nil)
+	s.afterCommit(ctx, a, auditEntry{"shift.assigned", "shift_assignment", created.ID.String(),
+		map[string]string{"employee_id": employeeID.String(), "shift_id": shiftID.String(), "effective_from": req.EffectiveFrom}}, nil)
 	res := mapAssignment(created)
 	return &res, nil
 }

@@ -1,4 +1,4 @@
-# Module 3 — Plan (updated: 2026-10-09, owner: loop — P7 DONE, P9 CURRENT)
+# Module 3 — Plan (updated: 2026-10-09, owner: loop — backend CLOSED; P8 BLOCKED)
 
 ## Phase Map
 
@@ -12,20 +12,16 @@
 | P5 | G3-5 | Services (shift, assignment, punch, query, regularization, outbox relay) + events; goldens G2/G3/G6/G7/G8/G10/G11/G12; services ≥ 90% | P3+P4 | DONE | 7 services + events + relay; goldens G2,G3,G6,G7,G8,G10,G11,G12 green; services 91.8%, events 100% |
 | P6 | G3-6 | Controllers + routes + module.go + main.go wiring + permission seed + swagger (19 paths); G13 | P5 | DONE | controllers 100%, routes 100% (19-route + RBAC contract test), module.go + seed + relay, main.go wired, swagger 16 paths/24 schemas validated |
 | P7 | G3-7 | Live ring: Docker PG boot, migrations up/down/up, live goldens G1/G6/G7/G9/G11/G12/G13 | P6 | DONE | live G1,G2,G6–G9,G11–G13 PASS; full tests/api suite PASS; migrations up/down/up clean; AutoMigrate↔SQL columns+indexes identical |
-| P8 | G3-8 | Frontend attendance slice vs live API | P7 + identity frontend shell | LATER | — |
-| P9 | G3-9 | Hardening + DoD close (§24), handoff to Module 4 | P7 | CURRENT | — |
+| P8 | G3-8 | Frontend attendance slice vs live API | P7 + identity frontend shell | BLOCKED | no identity login shell in frontend (bootstrap only) |
+| P9 | G3-9 | Hardening + DoD close (§24), handoff to Module 4 | P7 | DONE | §24 DoD all boxes with evidence (current-status.md); AST quality check clean (D3-16); contract 19/19; AS-T1..T9 mapped to tests; live AS-T6 race test PASS |
 
 Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED. Promotion = MASTER_PROMPT §24 + handoff.
 
 ## Current Phase
-- Goal: G3-9 DoD close (MASTER_PROMPT §24) — walk the checklist against evidence (spec FR/AT coverage map, security.md threats → tests, swagger ↔ routes, 300-line cap, no TODOs, docs coherent), update DEPENDENCY-GRAPH, write the Module 4 handoff (re-scope bundle from Projects to Leave per D3-01).
-- Why now: P7 proved the module end-to-end on real Postgres; P8 (frontend) is blocked on the identity login shell and stays LATER.
-- Scope in: docs only, plus small fixes the checklist exposes.
-- Exit criteria: §24 checklist all ticked with evidence links; handoff.md names Module 4 entry point.
-- Risks: none material.
+- None in Module 3: backend closed at P9 (2026-10-09). Loop moves to Module 4 (Leave) G4-1 — see docs/modules/module-4-*/ and handoff.md.
 
 ## Next Phase
-- Goal: Module 4 (Leave) G4-1 design — re-scope docs/modules/module-4-* from Projects to Leave, full spec/architecture/goldens, then implement in phases like Module 3.
+- Goal: G3-8 frontend attendance slice, unblocked when the identity login shell exists (frontend is still a Next.js bootstrap).
 
 ## Gate Log
 | Date | Phase | Gate | Decision | By | Reason |
@@ -45,3 +41,4 @@ Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED. Promotio
 | 2026-10-09 | P5 | ports (EmployeeDirectory, AuditLogger, TxRunner, Clock) + in-memory fakes with tx rollback; ShiftService, AssignmentService, PunchService, QueryService, RegularizationService, OutboxRelay; events envelope; resolveDay cross-midnight tests; split fakes to honor 300-line cap | vet/gofmt clean; services 91.8%; no TODO | GREEN | handoff.md |
 | 2026-10-09 | P6 | controllers (bind→VALIDATION_ERROR details, opaque 500, actor from context only), routes (19, RBAC per spec), module.go (Module 2 directory adapter, permission seed, relay, punch rate limit), cmd/main.go wiring + relay shutdown, swagger paths+schemas | go build ./... + vet ./... clean; go test ./internal/... all PASS; controllers/routes 100% | GREEN | handoff.md |
 | 2026-10-09 | P7 | infra up; backend boot (19 routes, seed rows); live goldens G1,G2,G6–G9,G11–G13 RED→GREEN (fixes: test precedence D3-13, login limiter reset D3-15); migrations 30 up / 6 down / 6 up; schema parity diff → model tags (integer, partial + expression indexes) RED→GREEN (D3-14) | go test -tags integration ./tests/api PASS (10 tests); go test ./internal/... PASS; vet/gofmt clean | GREEN | handoff.md |
+| 2026-10-09 | P9 | DoD walk: AST quality check (func/file/depth/params/panic/TODO) → refactor 5 functions (events.Source, auditEntry, punchTx, RouteDeps), D3-16; contract diff routes↔swagger 19/19; threat→evidence map; live AS-T6 concurrency test; DEPENDENCY-GRAPH | go vet ./... clean; go test ./internal/... PASS; go test -tags integration ./tests/api PASS (11) | GREEN | handoff.md |

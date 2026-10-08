@@ -117,7 +117,7 @@ func (b base) recompute(ctx context.Context, tx *gorm.DB, rec *models.Attendance
 
 // writeOutbox stores the event inside the business transaction (FR-EV002, D3-06).
 func (b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, routingKey string, payload interface{}) (*models.OutboxEvent, error) {
-	env := events.New(routingKey, a.TenantID, a.CorrelationID, b.Now(), payload)
+	env := events.New(routingKey, events.Source{TenantID: a.TenantID, CorrelationID: a.CorrelationID, OccurredAt: b.Now()}, payload)
 	raw, err := json.Marshal(env)
 	if err != nil {
 		return nil, err
@@ -127,9 +127,15 @@ func (b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, routingKey 
 	return row, b.Repos.Outbox.Create(ctx, tx, row)
 }
 
+// auditEntry is one audit row: action, resource type, resource id, metadata (positional order).
+type auditEntry struct {
+	Action, Resource, ResourceID string
+	Meta                         interface{}
+}
+
 // afterCommit audits and publishes best-effort; failures never surface (D3-06, D3-07).
-func (b base) afterCommit(ctx context.Context, a Actor, action, resource, resourceID string, meta interface{}, row *models.OutboxEvent) {
-	_ = b.Audit.Log(ctx, b.Tx.DB(), a.TenantID.String(), a.UserID.String(), action, resource, resourceID, meta, a.IP, a.UserAgent)
+func (b base) afterCommit(ctx context.Context, a Actor, e auditEntry, row *models.OutboxEvent) {
+	_ = b.Audit.Log(ctx, b.Tx.DB(), a.TenantID.String(), a.UserID.String(), e.Action, e.Resource, e.ResourceID, e.Meta, a.IP, a.UserAgent)
 	if row == nil {
 		return
 	}

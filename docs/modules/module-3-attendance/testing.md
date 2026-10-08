@@ -23,4 +23,4 @@ go test -count=1 -tags integration ./tests/api/ -run Attendance -v
 - `services`: fakes for repos, employee directory, audit spy, publisher spy, fake txRunner; goldens G2/G3/G6/G7/G8/G10/G11/G12.
 - `controllers`: httptest with stub services — binding → VALIDATION_ERROR, status mapping, pagination clamp (G13), self endpoints never read employee_id.
 - `models`: GORM schema parse, table names, unique index names.
-- live (build tag `integration`): `attendance_flow_test.go` (punch flow G2/G11/G12, G13), `attendance_rules_test.go` (G6/G7/G8 regularization, G9 RBAC, G1 isolation), `attendance_helpers_test.go` (tenant+admin+member+employees bootstrap, punch backdating). Last run 2026-10-09: PASS.
+- live (build tag `integration`): `attendance_flow_test.go` (punch flow G2/G11/G12, G13), `attendance_rules_test.go` (G6/G7/G8 regularization, G9 RBAC, G1 isolation), `attendance_race_test.go` (AS-T6: 10 concurrent INs → exactly one session), `attendance_helpers_test.go` (tenant+admin+member+employees bootstrap, punch backdating). Last run 2026-10-09: PASS. Not run: `go test -race` (no cgo toolchain on this Windows host).

@@ -12,5 +12,5 @@
 | backend/internal/attendance/events/events.go (+test) | event types + envelope | DONE (P5) |
 | backend/internal/attendance/controllers/*.go (+tests), routes/routes.go (+test), module.go | HTTP edge + DI | DONE (P6) |
 | backend/cmd/main.go (wire module, seed, relay) · backend/api/swagger.yaml (19 operations) | bootstrap/contract | DONE (P6) |
-| backend/tests/api/attendance_{helpers,flow,rules}_test.go (`integration` tag) | live goldens | DONE (P7) |
-| frontend/src/modules/attendance/** | UI slice | P8 (LATER) |
+| backend/tests/api/attendance_{helpers,flow,rules,race}_test.go (`integration` tag) | live goldens + AS-T6 race | DONE (P7, race P9) |
+| frontend/src/modules/attendance/** | UI slice | P8 BLOCKED |

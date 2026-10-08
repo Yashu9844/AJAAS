@@ -1,4 +1,4 @@
-# Module 3 — Current Status (updated: 2026-10-09, P7 DONE, P9 CURRENT)
+# Module 3 — Current Status (updated: 2026-10-09, backend CLOSED — P1–P7, P9 DONE; P8 BLOCKED)
 
 Implemented:
 - P1 design bundle: specification (FR-SH/SA/PU/AR/RG/EV, AT-001..AT-022, 19 endpoints, 6 tables, 5 events), architecture, connections C1–C10, security, goldens G1–G13, testing, decisions D3-01..D3-12, assumptions.
@@ -13,7 +13,7 @@ Partially Implemented:
 - Migrations verified live: 30 up → 6 down → 6 up on scratch DB; AutoMigrate and SQL schemas identical (columns + index definitions).
 
 Not Implemented:
-- frontend (P8, blocked on identity login shell); DoD close (P9).
+- frontend (P8) — BLOCKED: frontend has no identity login shell yet.
 
 Known Issues:
 - Module 4 bundle still describes Projects; must be re-scoped to Leave (D3-01) before G4-1.
@@ -24,3 +24,19 @@ Blocked:
 
 Technical Debt:
 - None yet.
+
+## Definition of Done (MASTER_PROMPT §24) — backend, 2026-10-09
+- [x] Requirements understood — FR-SH/SA/PU/AR/RG/EV + AT-001..AT-022 cited in code comments and tests
+- [x] Dependencies checked — connections.md C1–C10; Module 0 (auth, RBAC, audit, rate limit), Module 2 (employee directory)
+- [x] Implementation complete (goal scope) — 19 endpoints, 6 tables, 5 events, outbox relay
+- [x] Code quality — AST check: func ≤50, file ≤300, depth ≤4, params ≤4 (D3-16), no panic/TODO/nolint
+- [x] Unit pass — `go test ./internal/...` (attendance: 100% all pkgs except services 91.8%)
+- [x] Integration pass — `go test -tags integration ./tests/api/` 11/11 (6 attendance + 5 org)
+- [x] Contract pass — live Gin routes ↔ swagger operations 19/19 identical; router contract test
+- [x] Golden pass — G1–G13 (unit and/or live, see golden-tests.md)
+- [x] Security verified — security.md threat → evidence table AS-T1..T9
+- [x] Dependent tests pass — Module 1 org live suite green in the same run
+- [x] No unrelated modules modified — outside touches are integration points only: cmd/main.go, api/swagger.yaml, tests/api shared helpers (D3-15), module-0 decisions.md (D3-10), DEPENDENCY-GRAPH.md
+- [x] Docs updated — spec (AT-004 note), status, todo, plan, handoff, changelog, files, decisions D3-13..16, security, testing
+- [x] Diff reviewed · [x] No secrets/config leaks (scan clean)
+- Not run: `go test -race` (no cgo on this host) — compensated by the live AS-T6 concurrency test.

@@ -33,4 +33,17 @@
 ## Error hygiene
 Bind/validation errors return `VALIDATION_ERROR` with field details (no raw Go error text). Unexpected errors → `INTERNAL_ERROR` only.
 
-Pre-production checklist: docs/SECURITY.md §12 applies at P8 exit.
+## Threat → evidence (verified 2026-10-09, P9)
+| Threat | Evidence |
+|---|---|
+| AS-T1 | unit G3 (services/punch_golden_test.go); live attendance_race_test.go (client punch_time ignored); controllers SelfEndpointsIgnoreClientIDs |
+| AS-T2 | controllers SelfEndpointsIgnoreClientIDs; routes self endpoints carry no id params; live G9 member /me sees only own rows |
+| AS-T3 | live G1 (attendance_rules_test.go): 5 foreign ids → 404, foreign JWT → 403, list → 0 rows |
+| AS-T4 | unit + live G7 |
+| AS-T5 | live AT-004 debounce (attendance_flow_test.go); IP limiter wired in module.go (30/min, shared RateLimiter) |
+| AS-T6 | live attendance_race_test.go: 10 concurrent INs → 1×201, 9×409, 1 punch row, 1 record |
+| AS-T7 | unit G12 + live (outbox payload has no latitude/device/ip) |
+| AS-T8 | unit G6 (supersede) + live G6 (regularization punches, superseded kept) + G11 audit rows |
+| AS-T9 | DTO whitelist (dto.go); controllers ignore unknown fields; status/totals/is_night_shift server-computed |
+
+Pre-production checklist: docs/SECURITY.md §12 — Module 3 items (tenant-scoped queries, DTO validation, parameterized queries, no panic, structured logs) verified at P9; JWT/bcrypt/MFA/CORS/TLS items are Module 0 / deploy scope.

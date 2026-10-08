@@ -58,16 +58,16 @@ func (f *fakeEmployees) CountWorking(_ context.Context, t uuid.UUID) (int64, err
 	return n, f.err
 }
 
-type auditEntry struct {
+type loggedAudit struct {
 	action, resource, resourceID string
 	metadata                     interface{}
 	ip                           string
 }
 
-type spyAudit struct{ entries []auditEntry }
+type spyAudit struct{ entries []loggedAudit }
 
 func (s *spyAudit) Log(_ context.Context, _ *gorm.DB, _, _ string, action, resource, resourceID string, metadata interface{}, ip, _ string) error {
-	s.entries = append(s.entries, auditEntry{action, resource, resourceID, metadata, ip})
+	s.entries = append(s.entries, loggedAudit{action, resource, resourceID, metadata, ip})
 	return errors.New("audit sink down") // AT/D3-07: audit failure must never fail the request
 }
 
