@@ -1,7 +1,7 @@
 # Module 4 — Current Goal
 
-Goal: G4-3 — pure calc engine (CountDays, Accrued, CarryForward) with goldens G2–G4, plus DTOs and validators (G15 pagination clamp).
+Goal: G4-4 — six tenant-scoped repositories (type, holiday, balance, request, ledger, outbox) + per-employee advisory lock.
 Success Criteria:
-- [ ] calc 100%, goldens G2–G4 green
-- [ ] dto/validators tested
+- [ ] interfaces + GORM implementations compile, vet clean
+- [ ] every method tenant-scoped (outbox relay excepted)
 - [ ] docs updated
