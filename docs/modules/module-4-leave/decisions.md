@@ -1,0 +1,11 @@
+# Module 4 — Decisions
+
+- D4-01 Module 4 = Leave & Absence (masterplan), following D3-01. The Projects scaffold bundle was renamed to module-4-leave; Projects has no module number until the human assigns one (DEPENDENCY-GRAPH updated).
+- D4-02 Ledger is the source of truth; `leave_balances` is a projection updated in the same tx (LV-013). No generated column (masterplan) because AutoMigrate cannot express it and dev/prod parity is enforced (D3-14 style).
+- D4-03 Days are integer hundredths in Go (`calc.Days`), NUMERIC(7,2) in SQL. Reason: no float drift in balances (NFR-D002).
+- D4-04 Leave year = calendar year of the UTC date; requests must lie in the current year. Reason: simple, matches masterplan `year INT`; cross-year requests are split by the employee. Fiscal-year config deferred.
+- D4-05 Weekly off fixed Sat/Sun; one tenant holiday calendar; optional holidays count as working days. Reason: no weekly-off config exists yet (Module 3 has none); v1.1.
+- D4-06 Lazy accrual/carry-forward on first touch instead of a scheduler. Reason: no job runner in the stack; deterministic and testable.
+- D4-07 Single-tier approval by any `leave:approve` holder except the requester. Reason: Module 6 (Approvals) owns chains and manager routing; Module 1 manager data is not exposed as a service.
+- D4-08 Module 3 gains exported `services.LeaveSync` (MarkLeave/ClearLeave on the caller's tx) and record source `leave` — contract C10 reserved by Module 3 at P1. Recorded in module-3 decisions.md.
+- D4-09 Half-day leave does not change attendance status (attendance computes half_day from work minutes); full-day leave sets `on_leave`. Punches on a leave day win (recompute → present).

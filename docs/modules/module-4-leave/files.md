@@ -1,0 +1,15 @@
+# Module 4 — Files (target map frozen at P1; status updated per phase)
+
+| Path | Purpose | Status |
+|---|---|---|
+| docs/modules/module-4-leave/*.md | 17-file bundle | DONE (P1) |
+| backend/internal/leave/models/*.go + test | GORM models (6) | P2 |
+| backend/migrations/000031…000036 (.up/.down) | SQL schema | P2 |
+| backend/internal/leave/calc/*.go + goldens | days, counting, accrual, carry-forward | P3 |
+| backend/internal/leave/{dto,validators}/*.go + tests | DTOs, field rules | P3 |
+| backend/internal/leave/repositories/*.go | tenant-scoped data access | P4 |
+| backend/internal/leave/{services,events}/*.go + tests/goldens | business logic, events, relay | P5 |
+| backend/internal/attendance/services/leave_sync.go (+test), record source `leave` | Module 3 port (D4-08) | P5 |
+| backend/internal/leave/{controllers,routes}/*.go + tests, module.go | HTTP edge + DI | P6 |
+| backend/cmd/main.go · backend/api/swagger.yaml | wiring, contract | P6 |
+| backend/tests/api/leave_*_test.go (`integration`) | live goldens | P7 |
