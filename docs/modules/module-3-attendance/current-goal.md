@@ -1,11 +1,11 @@
 # Module 3 — Current Goal
 
-Goal: G3-5 services + events — ports (employeeDirectory over Module 2, auditLogger over Module 0, txRunner, clock), event envelope (FR-EV001), ShiftService, AssignmentService, PunchService, QueryService, RegularizationService, OutboxRelay.
-Why: every AT rule lives here; HTTP (P6) only adapts.
-Scope: backend/internal/attendance/{services,events}/**.
-Non-goals: HTTP, wiring, live DB.
+Goal: G3-6 HTTP edge + wiring — controllers (punch, attendance, regularization, shift) with field-level VALIDATION_ERROR and pagination clamp; routes behind Module 0 TenantResolver + Authenticate + RequirePermission(attendance:read|manage|approve) and a punch rate limit; module.go DI (Module 2 directory adapter, Module 0 audit adapter, permission seed, outbox relay); cmd/main.go wiring; swagger 19 paths.
+Why: exposes the frozen spec §5 contract over the finished services.
+Scope: backend/internal/attendance/{controllers,routes}/**, backend/internal/attendance/module.go, attendance block in backend/cmd/main.go, attendance paths in backend/api/swagger.yaml.
+Non-goals: business-rule changes, live DB runs (P7), frontend.
 Success Criteria:
-- [ ] unit goldens G2, G3, G6, G7, G8, G10, G11, G12 green (in-memory fakes honoring repo semantics)
-- [ ] services coverage ≥ 90%
-- [ ] build/vet/gofmt clean; no TODO
-- [ ] plan/status/todo/handoff/changelog updated
+- [ ] controller tests: status/envelope mapping, binding → VALIDATION_ERROR details, G13 pagination clamp, self endpoints ignore client ids
+- [ ] router test proves 19 routes resolve without conflicts
+- [ ] `go build ./...` (incl. cmd) + vet + gofmt clean; controllers ≥ 80%
+- [ ] plan/status/todo/handoff/changelog/files updated

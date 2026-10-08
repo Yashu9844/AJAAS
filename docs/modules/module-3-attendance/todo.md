@@ -1,4 +1,4 @@
-# Module 3 — Todo (P1–P4 DONE; P5 CURRENT)
+# Module 3 — Todo (P1–P5 DONE; P6 CURRENT)
 
 ## P1 (done — G3-1)
 - [x] specification.md frozen (FR + AT rules + API + data + errors + edges + out-of-scope)
@@ -18,13 +18,13 @@
 - [x] T3-07 interfaces + 6 GORM impls (tenant_id on every query, tx param, LockEmployee advisory lock, FindOrCreate record)
 
 ## P5 — G3-5 Services + events
-- [ ] T3-08 ports (employeeDirectory, auditLogger, txRunner, clock) + events envelope
-- [ ] T3-09 ShiftService + AssignmentService (G10)
-- [ ] T3-10 PunchService (G2, G3, G11, G12)
-- [ ] T3-11 AttendanceQueryService (today, me, list, detail, summary)
-- [ ] T3-12 RegularizationService (G6, G7, G8)
-- [ ] T3-13 OutboxRelay
-- [ ] T3-14 coverage ≥ 90% services
+- [x] T3-08 ports (employeeDirectory, auditLogger, txRunner, clock) + events envelope
+- [x] T3-09 ShiftService + AssignmentService (G10)
+- [x] T3-10 PunchService (G2, G3, G11, G12)
+- [x] T3-11 AttendanceQueryService (today, me, list, detail, summary)
+- [x] T3-12 RegularizationService (G6, G7, G8)
+- [x] T3-13 OutboxRelay
+- [x] T3-14 coverage ≥ 90% services (91.8%)
 
 ## P6 — G3-6 HTTP + wiring
 - [ ] T3-15 controllers + error mapping + pagination clamp (G13) + tests
