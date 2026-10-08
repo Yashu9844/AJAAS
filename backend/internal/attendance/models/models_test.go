@@ -49,6 +49,7 @@ func TestAttendanceModels_Indexes(t *testing.T) {
 		{&AttendancePunch{}, "idx_attendance_punches_employee_time", false, []string{"tenant_id", "employee_profile_id", "punch_time"}},
 		{&Regularization{}, "idx_attendance_regularizations_employee_date", false, []string{"tenant_id", "employee_profile_id", "attendance_date"}},
 		{&OutboxEvent{}, "uq_attendance_outbox_event_id", true, []string{"event_id"}},
+		{&Regularization{}, "uq_attendance_regularizations_pending", true, []string{"tenant_id", "employee_profile_id", "attendance_date"}},
 	}
 	for _, tc := range cases {
 		s := parse(t, tc.model)
@@ -66,6 +67,47 @@ func TestAttendanceModels_Indexes(t *testing.T) {
 		for i, f := range idx.Fields {
 			if f.DBName != tc.fields[i] {
 				t.Errorf("%s field[%d] = %s, want %s", tc.index, i, f.DBName, tc.fields[i])
+			}
+		}
+	}
+}
+
+// AT-015 backstop must be partial on the dev (AutoMigrate) path too, matching migration 000029.
+func TestAttendanceModels_PendingIndexIsPartial(t *testing.T) {
+	idx := findIndex(parse(t, &Regularization{}), "uq_attendance_regularizations_pending")
+	if idx == nil || idx.Where != "status = 'pending'" {
+		t.Fatalf("pending index must be WHERE status = 'pending', got %+v", idx)
+	}
+}
+
+// Partial/expression indexes must match migrations 000025 and 000030 on the AutoMigrate path (P7 parity).
+func TestAttendanceModels_IndexParityWithSQL(t *testing.T) {
+	name := findIndex(parse(t, &Shift{}), "uq_shifts_tenant_name")
+	if name == nil || name.Where != "deleted_at IS NULL" || name.Fields[1].Expression != "lower(name)" {
+		t.Errorf("uq_shifts_tenant_name must be (tenant_id, lower(name)) WHERE deleted_at IS NULL: %+v", name)
+	}
+	code := findIndex(parse(t, &Shift{}), "uq_shifts_tenant_code")
+	if code == nil || code.Where != "deleted_at IS NULL AND code IS NOT NULL" {
+		t.Errorf("uq_shifts_tenant_code partial filter missing: %+v", code)
+	}
+	pub := findIndex(parse(t, &OutboxEvent{}), "idx_attendance_outbox_published")
+	if pub == nil || pub.Where != "published = false" {
+		t.Errorf("idx_attendance_outbox_published must be partial: %+v", pub)
+	}
+}
+
+// Minute counters are INTEGER in SQL migrations; AutoMigrate must agree (P7 parity check).
+func TestAttendanceModels_IntegerColumns(t *testing.T) {
+	cols := map[interface{}][]string{
+		&Shift{}:            {"start_minute", "end_minute", "grace_period_mins", "break_duration_mins", "full_day_minutes", "half_day_minutes"},
+		&AttendanceRecord{}: {"total_work_minutes", "total_break_minutes", "late_minutes", "overtime_minutes"},
+		&OutboxEvent{}:      {"attempts"},
+	}
+	for model, names := range cols {
+		s := parse(t, model)
+		for _, n := range names {
+			if f := s.LookUpField(n); f == nil || string(f.DataType) != "integer" {
+				t.Errorf("%T.%s must be type:integer", model, n)
 			}
 		}
 	}

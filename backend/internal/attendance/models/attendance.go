@@ -16,10 +16,10 @@ type AttendanceRecord struct {
 	ShiftID           *uuid.UUID `gorm:"type:uuid"`
 	FirstPunchIn      *time.Time
 	LastPunchOut      *time.Time
-	TotalWorkMinutes  int       `gorm:"not null"`
-	TotalBreakMinutes int       `gorm:"not null"`
-	LateMinutes       int       `gorm:"not null"`
-	OvertimeMinutes   int       `gorm:"not null"`
+	TotalWorkMinutes  int       `gorm:"type:integer;not null"`
+	TotalBreakMinutes int       `gorm:"type:integer;not null"`
+	LateMinutes       int       `gorm:"type:integer;not null"`
+	OvertimeMinutes   int       `gorm:"type:integer;not null"`
 	Status            string    `gorm:"type:varchar(20);not null;index:idx_attendance_records_tenant_date_status,priority:3"`
 	Source            string    `gorm:"type:varchar(20);not null"`
 	IsRegularized     bool      `gorm:"not null"`
@@ -63,9 +63,9 @@ func (p *AttendancePunch) BeforeCreate(tx *gorm.DB) error {
 // Regularization is an employee's timesheet correction request (FR-RG001..FR-RG003).
 type Regularization struct {
 	ID                 uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	TenantID           uuid.UUID  `gorm:"type:uuid;not null;index:idx_attendance_regularizations_employee_date,priority:1;index:idx_attendance_regularizations_tenant_status,priority:1"`
-	EmployeeProfileID  uuid.UUID  `gorm:"type:uuid;not null;index:idx_attendance_regularizations_employee_date,priority:2"`
-	AttendanceDate     time.Time  `gorm:"type:date;not null;index:idx_attendance_regularizations_employee_date,priority:3"`
+	TenantID           uuid.UUID  `gorm:"type:uuid;not null;index:idx_attendance_regularizations_employee_date,priority:1;uniqueIndex:uq_attendance_regularizations_pending,priority:1,where:status = 'pending';index:idx_attendance_regularizations_tenant_status,priority:1"`
+	EmployeeProfileID  uuid.UUID  `gorm:"type:uuid;not null;index:idx_attendance_regularizations_employee_date,priority:2;uniqueIndex:uq_attendance_regularizations_pending,priority:2"`
+	AttendanceDate     time.Time  `gorm:"type:date;not null;index:idx_attendance_regularizations_employee_date,priority:3;uniqueIndex:uq_attendance_regularizations_pending,priority:3"`
 	AttendanceRecordID *uuid.UUID `gorm:"type:uuid"`
 	RequestedPunchIn   time.Time  `gorm:"not null"`
 	RequestedPunchOut  time.Time  `gorm:"not null"`
@@ -98,9 +98,9 @@ type OutboxEvent struct {
 	EventType   string    `gorm:"type:varchar(100);not null"`
 	RoutingKey  string    `gorm:"type:varchar(100);not null"`
 	Payload     string    `gorm:"type:jsonb;not null"`
-	Published   bool      `gorm:"not null;index:idx_attendance_outbox_published"`
+	Published   bool      `gorm:"not null;index:idx_attendance_outbox_published,where:published = false"`
 	PublishedAt *time.Time
-	Attempts    int       `gorm:"not null"`
+	Attempts    int       `gorm:"type:integer;not null"`
 	LastError   *string   `gorm:"type:text"`
 	CreatedAt   time.Time `gorm:"not null"`
 }

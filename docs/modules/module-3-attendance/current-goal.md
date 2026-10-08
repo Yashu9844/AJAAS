@@ -1,11 +1,10 @@
 # Module 3 — Current Goal
 
-Goal: G3-7 live ring — Docker Postgres/Redis/RabbitMQ up; backend booted on :8080 (AutoMigrate + attendance permission seed); SQL migrations 000025–000030 up/down/up against a scratch database; live goldens (build tag `integration`) G1 isolation, G6/G7 regularization lifecycle + self-approval, G9 RBAC, G11 audit rows, G12 outbox rows, G13 pagination clamp, plus a full punch flow — exercising every repository method on real Postgres.
-Why: repositories have only met fakes; this is the first real-SQL proof of the module.
-Scope: backend/tests/api/attendance_*_test.go; fixes in backend/internal/attendance/** only for bugs the live run exposes.
-Non-goals: new features, frontend.
+Goal: G3-9 DoD close — walk MASTER_PROMPT §24 against evidence (FR/AT → test map, security.md threats → tests, swagger ↔ routes, 300-line cap, no TODOs, docs coherent), update DEPENDENCY-GRAPH, hand off to Module 4 (Leave).
+Why: Module 3 is proven end-to-end on real Postgres (P7); P8 frontend stays LATER (no identity login shell).
+Scope: docs; small fixes the checklist exposes.
+Non-goals: frontend, new features.
 Success Criteria:
-- [ ] backend boots with Module 3 wired; seed rows present in `permissions`
-- [ ] migrations 000025–000030 up → down → up clean on a scratch DB
-- [ ] live goldens G1, G6, G7, G9, G11, G12, G13 + punch flow PASS
-- [ ] unit ring still green; docs updated
+- [ ] §24 checklist ticked with evidence
+- [ ] DEPENDENCY-GRAPH row shows Module 3 backend DONE
+- [ ] handoff.md names Module 4 entry point (G4-1 re-scope)

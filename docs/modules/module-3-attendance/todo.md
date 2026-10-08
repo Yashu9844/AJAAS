@@ -1,4 +1,4 @@
-# Module 3 — Todo (P1–P6 DONE; P7 CURRENT)
+# Module 3 — Todo (P1–P7 DONE; P9 CURRENT)
 
 ## P1 (done — G3-1)
 - [x] specification.md frozen (FR + AT rules + API + data + errors + edges + out-of-scope)
@@ -32,8 +32,8 @@
 - [x] T3-17 swagger.yaml 19 operations (16 paths) + 24 schemas, validated
 
 ## P7 — G3-7 Live ring
-- [ ] T3-18 docker infra up, backend boot, migrations up/down/up
-- [ ] T3-19 live goldens G1, G6, G7, G9, G11, G12, G13
+- [x] T3-18 docker infra up, backend boot (seed verified), migrations 30 up → 6 down → 6 up on scratch DB, AutoMigrate↔SQL parity identical (D3-14)
+- [x] T3-19 live goldens G1, G2, G6, G7, G8, G9, G11, G12, G13 PASS (tests/api/attendance_*_test.go, `-tags integration`)
 
 ## P8/P9
 - [ ] T3-20 frontend slice (blocked on identity shell)

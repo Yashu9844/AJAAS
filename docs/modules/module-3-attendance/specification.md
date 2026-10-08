@@ -66,7 +66,7 @@ Record when employees work: shift definitions, shift assignments, punch IN/OUT, 
 | AT-001 | Punch time = server UTC clock. No client time field exists in the contract. |
 | AT-002 | Caller must have an employee profile in the tenant (Module 2 `GetByUserID`) → else 404 `EMPLOYEE_NOT_FOUND`. Profile status must be `active`, `probation` or `notice` → else 403 `EMPLOYEE_NOT_ACTIVE`. |
 | AT-003 | Sessions alternate: `in` while a session is open → 409 `ALREADY_PUNCHED_IN`; `out` with no open session → 409 `NOT_PUNCHED_IN`. |
-| AT-004 | A punch within 60 s of the employee's previous punch → 409 `DUPLICATE_PUNCH`. |
+| AT-004 | A punch within 60 s of the employee's previous punch → 409 `DUPLICATE_PUNCH`. Evaluated before AT-003 (D3-13). |
 | AT-005 | Attendance date for `in` = local date (shift timezone, else UTC) of the punch; for a night shift, an `in` whose local time-of-day is before `end_time + 4h` belongs to the previous date. `out` always attaches to the record holding the open session. |
 | AT-006 | An open session older than 20 h is abandoned: `out` → 409 `SESSION_EXPIRED` (regularize instead); a new `in` is allowed and starts a new session. Totals ignore abandoned sessions. Work = Σ(out − in) of closed sessions; break = Σ gaps between an `out` and the next `in` on the same record. Superseded punches (AT-017) are ignored. |
 | AT-007 | `late_minutes` = max(0, first_in − (shift start + grace)) in the shift timezone on the attendance date; 0 when no shift is assigned. |

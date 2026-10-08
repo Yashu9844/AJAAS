@@ -37,6 +37,9 @@ type envelope struct {
 
 func doReq(t *testing.T, method, path, host, token string, body interface{}) (int, envelope) {
 	t.Helper()
+	if path == "/api/v1/auth/login" {
+		resetLoginLimit(t)
+	}
 	var rdr io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)

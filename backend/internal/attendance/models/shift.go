@@ -12,18 +12,18 @@ import (
 // Integer fields carry no GORM default so an explicit 0 (e.g. zero grace) is stored as 0.
 type Shift struct {
 	database.BaseModel
-	TenantID          uuid.UUID `gorm:"type:uuid;not null;index:idx_shifts_tenant_id;uniqueIndex:uq_shifts_tenant_name,priority:1;uniqueIndex:uq_shifts_tenant_code,priority:1"`
-	Name              string    `gorm:"type:varchar(100);not null;uniqueIndex:uq_shifts_tenant_name,priority:2"`
+	TenantID          uuid.UUID `gorm:"type:uuid;not null;index:idx_shifts_tenant_id;uniqueIndex:uq_shifts_tenant_name,priority:1,where:deleted_at IS NULL;uniqueIndex:uq_shifts_tenant_code,priority:1,where:deleted_at IS NULL AND code IS NOT NULL"`
+	Name              string    `gorm:"type:varchar(100);not null;uniqueIndex:uq_shifts_tenant_name,priority:2,expression:lower(name)"`
 	Code              *string   `gorm:"type:varchar(32);uniqueIndex:uq_shifts_tenant_code,priority:2"`
-	StartMinute       int       `gorm:"not null"`
-	EndMinute         int       `gorm:"not null"`
-	GracePeriodMins   int       `gorm:"not null"`
-	BreakDurationMins int       `gorm:"not null"`
-	FullDayMinutes    *int
-	HalfDayMinutes    *int
-	Timezone          string `gorm:"type:varchar(64);not null"`
-	IsNightShift      bool   `gorm:"not null"`
-	Status            string `gorm:"type:varchar(20);not null;index:idx_shifts_status"`
+	StartMinute       int       `gorm:"type:integer;not null"`
+	EndMinute         int       `gorm:"type:integer;not null"`
+	GracePeriodMins   int       `gorm:"type:integer;not null"`
+	BreakDurationMins int       `gorm:"type:integer;not null"`
+	FullDayMinutes    *int      `gorm:"type:integer"`
+	HalfDayMinutes    *int      `gorm:"type:integer"`
+	Timezone          string    `gorm:"type:varchar(64);not null"`
+	IsNightShift      bool      `gorm:"not null"`
+	Status            string    `gorm:"type:varchar(20);not null;index:idx_shifts_status"`
 }
 
 // ShiftAssignment binds an employee to a shift for an inclusive date range (AT-011). FR-SA001.
