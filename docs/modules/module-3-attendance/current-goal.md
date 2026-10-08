@@ -1,11 +1,11 @@
 # Module 3 — Current Goal
 
-Goal: G3-4 repositories — interfaces + GORM implementations for shifts, assignments, records, punches, regularizations and outbox; `tenant_id` on every query; `tx *gorm.DB` parameter on every method; `LockEmployee` (pg_advisory_xact_lock); record `FindOrCreate`; summary aggregate query.
-Why: P5 services are written against these interfaces (fakes in unit tests, real impls live).
-Scope: backend/internal/attendance/repositories/**.
-Non-goals: business rules (services), HTTP.
+Goal: G3-5 services + events — ports (employeeDirectory over Module 2, auditLogger over Module 0, txRunner, clock), event envelope (FR-EV001), ShiftService, AssignmentService, PunchService, QueryService, RegularizationService, OutboxRelay.
+Why: every AT rule lives here; HTTP (P6) only adapts.
+Scope: backend/internal/attendance/{services,events}/**.
+Non-goals: HTTP, wiring, live DB.
 Success Criteria:
-- [ ] build/vet/gofmt clean; `var _ Interface = (*impl)(nil)` assertions compile
-- [ ] every query filters tenant_id (review against security.md AS-T3)
-- [ ] live behavior covered by P7 goldens (no Postgres in unit ring)
+- [ ] unit goldens G2, G3, G6, G7, G8, G10, G11, G12 green (in-memory fakes honoring repo semantics)
+- [ ] services coverage ≥ 90%
+- [ ] build/vet/gofmt clean; no TODO
 - [ ] plan/status/todo/handoff/changelog updated

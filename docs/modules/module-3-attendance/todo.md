@@ -1,4 +1,4 @@
-# Module 3 — Todo (P1–P3 DONE; P4 CURRENT)
+# Module 3 — Todo (P1–P4 DONE; P5 CURRENT)
 
 ## P1 (done — G3-1)
 - [x] specification.md frozen (FR + AT rules + API + data + errors + edges + out-of-scope)
@@ -15,7 +15,7 @@
 - [x] T3-06 DTOs (requests/responses/pagination clamp, G13 unit) + validators (code, tz, dates, thresholds)
 
 ## P4 — G3-4 Repositories
-- [ ] T3-07 interfaces + 6 GORM impls (tenant_id on every query, tx param, LockEmployee advisory lock, FindOrCreate record)
+- [x] T3-07 interfaces + 6 GORM impls (tenant_id on every query, tx param, LockEmployee advisory lock, FindOrCreate record)
 
 ## P5 — G3-5 Services + events
 - [ ] T3-08 ports (employeeDirectory, auditLogger, txRunner, clock) + events envelope
