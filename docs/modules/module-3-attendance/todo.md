@@ -1,13 +1,13 @@
-# Module 3 — Todo (P1 DONE; P2 CURRENT)
+# Module 3 — Todo (P1+P2 DONE; P3 CURRENT)
 
 ## P1 (done — G3-1)
 - [x] specification.md frozen (FR + AT rules + API + data + errors + edges + out-of-scope)
 - [x] architecture.md, connections.md, security.md, golden-tests.md, testing.md, decisions.md, assumptions.md, files.md
 
 ## P2 — G3-2 Models + migrations
-- [ ] T3-01 models: shift, shift_assignment, attendance_record, attendance_punch, regularization, outbox (+ constants for statuses/types)
-- [ ] T3-02 models_test: schema parse, table names, index names
-- [ ] T3-03 migrations 000025..000030 up/down
+- [x] T3-01 models: shift, shift_assignment, attendance_record, attendance_punch, regularization, outbox (+ constants for statuses/types)
+- [x] T3-02 models_test: schema parse, table names, index names
+- [x] T3-03 migrations 000025..000030 up/down (live verification in T3-18)
 
 ## P3 — G3-3 calc + DTOs + validators
 - [ ] T3-04 calc: ParseHHMM/FormatHHMM, ExpectedMinutes, AttendanceDate (AT-005), ComputeTotals (AT-006..AT-010)

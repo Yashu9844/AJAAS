@@ -1,11 +1,11 @@
 # Module 3 — Current Goal
 
-Goal: G3-2 Models + migrations — six GORM models (shifts, shift_assignments, attendance_records, attendance_punches, attendance_regularizations, attendance_events_outbox) matching specification.md §8, six up/down SQL pairs 000025–000030, model tests.
-Why: frozen schema unblocks calc/DTO (P3) and repositories (P4).
-Scope: backend/internal/attendance/models/**, backend/migrations/000025–000030.
-Non-goals: services, controllers, API, frontend.
+Goal: G3-3 calc engine + DTOs + validators — pure time functions (ParseHHMM/FormatHHMM, ExpectedMinutes, AttendanceDate per AT-005, ComputeTotals per AT-006..AT-010), request/response DTOs with pagination clamp, field validators (org-style code, HH:MM, IANA timezone, date ranges).
+Why: services and controllers are thin wrappers over this logic; time-zone/night-shift math is the highest-risk code in the module.
+Scope: backend/internal/attendance/{calc,dto,validators}/**.
+Non-goals: repositories, services, HTTP.
 Success Criteria:
-- [ ] `go build ./...`, `go vet ./...`, `gofmt -l` clean
-- [ ] `go test ./internal/attendance/models/...` green (schema parse, table names, unique/index names)
-- [ ] SQL pairs present; down files drop in reverse order
-- [ ] plan.md / current-status.md / todo.md / handoff.md / changelog.md updated
+- [ ] golden G4 (totals table) and G5 (night shift + time zones) green
+- [ ] calc 100% statement coverage; dto/validators tested
+- [ ] build/vet/gofmt clean
+- [ ] plan/status/todo/handoff/changelog updated

@@ -1,13 +1,14 @@
-# Module 3 — Current Status (updated: 2026-10-08, P1 DONE, P2 CURRENT)
+# Module 3 — Current Status (updated: 2026-10-08, P2 DONE, P3 CURRENT)
 
 Implemented:
 - P1 design bundle: specification (FR-SH/SA/PU/AR/RG/EV, AT-001..AT-022, 19 endpoints, 6 tables, 5 events), architecture, connections C1–C10, security, goldens G1–G13, testing, decisions D3-01..D3-12, assumptions.
+- P2: `backend/internal/attendance/models` (Shift, ShiftAssignment, AttendanceRecord, AttendancePunch, Regularization, OutboxEvent + status/type constants); models_test green, 100% coverage. Migrations 000025–000030 (up/down) incl. SQL-only partial indexes (lower(name), pending-regularization uniqueness) and CHECK constraints.
 
 Partially Implemented:
-- None.
+- Migrations not yet executed against Postgres (scheduled T3-18, P7).
 
 Not Implemented:
-- All code (P2–P8).
+- calc, DTOs, validators, repositories, services, HTTP, wiring, live tests, frontend (P3–P8).
 
 Known Issues:
 - Module 4 bundle still describes Projects; must be re-scoped to Leave (D3-01) before G4-1.
