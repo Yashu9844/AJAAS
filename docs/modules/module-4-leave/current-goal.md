@@ -1,3 +1,3 @@
 # Module 4 — Current Goal
 
-Goal: G4-9 — DoD close (§24) with evidence; DEPENDENCY-GRAPH; handoff.
+None — Module 4 backend closed 2026-10-09 (P9 DONE). Remaining: G4-8 frontend slice, BLOCKED until the identity login shell exists.

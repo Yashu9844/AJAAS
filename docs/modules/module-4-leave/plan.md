@@ -1,4 +1,4 @@
-# Module 4 — Plan (updated: 2026-10-09, owner: loop — P7 DONE, P9 CURRENT)
+# Module 4 — Plan (updated: 2026-10-09, owner: loop — backend CLOSED; P8 BLOCKED)
 
 ## Phase Map
 
@@ -13,12 +13,12 @@
 | P6 | G4-6 | Controllers, routes, module.go, main.go, seed, swagger | P5 | DONE | controllers 100%, routes 100% (20-route RBAC contract test), module.go + seed + relay + Module 3 LeaveSync, main.go wired, swagger 16 paths/20 ops validated |
 | P7 | G4-7 | Live ring: goldens, migration cycle, parity diff | P6 | DONE | live G1, G5, G7, G8, G9, G10, G11, G12, G13, G14, G15 PASS; full tests/api 16/16; migrations 36/6/6 clean; AutoMigrate↔SQL columns + 20 index defs identical |
 | P8 | G4-8 | Frontend leave slice | identity shell | BLOCKED | no identity login shell |
-| P9 | G4-9 | DoD close + handoff | P7 | CURRENT | — |
+| P9 | G4-9 | DoD close + handoff | P7 | DONE | §24 DoD ticked with evidence (current-status.md); AST check clean; routes↔swagger 20/20; LS-T1..T8 mapped |
 
 Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED.
 
 ## Current Phase
-- Goal: G4-9 DoD close (MASTER_PROMPT §24): AST quality check, routes↔swagger contract diff, threat→evidence map, DEPENDENCY-GRAPH, handoff.
+- None in Module 4: backend closed at P9 (2026-10-09).
 
 ## Next Phase
 - Goal: G4-8 frontend leave slice when the identity login shell exists (BLOCKED).
@@ -39,3 +39,4 @@ Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED.
 | 2026-10-09 | P5 | Module 3 LeaveSync (MarkLeave/ClearLeave + record Delete + source leave; RED caught early-return bug); leave ports/errors/helpers; ledger move + lazy ensure (carry-forward, accrual); Type/Holiday/Balance/Request services; events; outbox relay; fakes with tx rollback; goldens + rules + fault injection | vet clean; leave services 96.3%, events 100%; attendance services 91.9% | GREEN | handoff.md |
 | 2026-10-09 | P6 | controllers (policy, balance, request) + routes (20 ops, RBAC per spec) + module.go (Ports, permission seed, relay) + Module 3 LeaveSync accessor + cmd/main.go wiring + swagger | go build/vet ./... clean; go test ./internal/... PASS; controllers/routes 100% | GREEN | handoff.md |
 | 2026-10-09 | P7 | live goldens tests/api/leave_{flow,rules}_test.go (lifecycle incl. Module 3 on_leave marks + clear, ledger invariant SQL, audit/outbox privacy, overlap, pagination, RBAC, self-approval, isolation, concurrency); migration cycle; parity diff | go test -tags integration ./tests/api PASS 16/16; parity identical | GREEN | handoff.md |
+| 2026-10-09 | P9 | DoD walk: AST quality (clean), contract diff 20/20, threat→evidence map, D4-10/D4-11, DEPENDENCY-GRAPH | go vet ./... clean; unit ring PASS; integration 16/16 PASS | GREEN | handoff.md |

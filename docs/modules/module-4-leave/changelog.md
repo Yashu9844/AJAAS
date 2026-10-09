@@ -5,3 +5,4 @@
 2026-10-09 — P5 DONE: leave services, events, relay, Module 3 LeaveSync; goldens green; services 96.3%.
 2026-10-09 — P6 DONE: HTTP edge, routes, wiring, permission seed, swagger.
 2026-10-09 — P7 DONE: live goldens PASS (11 goldens), full suite 16/16, migration cycle + parity identical.
+2026-10-09 — P9 DONE (backend CLOSED): DoD walked with evidence; perf caveat recorded (D4-11).

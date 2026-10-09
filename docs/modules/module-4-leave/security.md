@@ -22,3 +22,17 @@ Law: docs/SECURITY.md + Module 0 security.md (STRIDE T1–T10). Module specifics
 
 ## Error hygiene
 Validation → VALIDATION_ERROR with field details; unexpected → opaque INTERNAL_ERROR.
+
+## Threat → evidence (verified 2026-10-09, P9)
+| Threat | Evidence |
+|---|---|
+| LS-T1 | controllers TestEndpoints_SelfIgnoresClientIdentity (apply/balances ignore client ids); ApplyLeaveRequest has no employee field |
+| LS-T2 | live TestLeaveLive_G1_Isolation: 5 foreign ids → 404, foreign type on apply → 404, foreign employee balance → 404, foreign JWT → 403 |
+| LS-T3 | unit G10 + live G10 (admin self-approval → 403, stays pending) |
+| LS-T4 | live G14: 5 parallel applies on balance 5 → exactly 2 succeed, available 1 (advisory lock `leave:`) |
+| LS-T5 | live G12 ledger invariant (projection == ledger sums per kind); ledger repo exposes Create/List only; adjustments need leave:manage (G9) |
+| LS-T6 | unit G11 + live G11: no reason/comment/note text in audit metadata or outbox payloads |
+| LS-T7 | DTO whitelists; status/total_days/balances server-computed (unit SelfIgnoresClientIdentity sends status/total_days, ignored) |
+| LS-T8 | unit TestApply_Rules (backdate window, notice) + validators NoticeOK |
+
+Pre-production checklist (docs/SECURITY.md §12): Module 4 items — tenant-scoped queries, DTO validation, parameterized queries, no panic, structured logs — verified at P9; JWT/bcrypt/MFA/CORS/TLS are Module 0 / deploy scope.

@@ -9,3 +9,5 @@
 - D4-07 Single-tier approval by any `leave:approve` holder except the requester. Reason: Module 6 (Approvals) owns chains and manager routing; Module 1 manager data is not exposed as a service.
 - D4-08 Module 3 gains exported `services.LeaveSync` (MarkLeave/ClearLeave on the caller's tx) and record source `leave` — contract C10 reserved by Module 3 at P1. Recorded in module-3 decisions.md.
 - D4-09 Half-day leave does not change attendance status (attendance computes half_day from work minutes); full-day leave sets `on_leave`. Punches on a leave day win (recompute → present).
+- D4-10 (P5) Accrual events (`leave.accrued`) are written to the outbox inside the materializing tx but published by the relay, not inline; request events publish inline after commit. Reason: accrual can happen inside any command (even a balance read) and must never delay or fail it.
+- D4-11 (P7) Performance budgets NFR-P001/P002 were not verifiable on the dev host (Docker under memory pressure, ~70 ms/query, login 2–4 s; apply observed 881 ms). Query count per apply is bounded (lock + ≤ 10 statements + holidays). Re-measure on a normal host before production; not claimed as met.
