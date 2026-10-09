@@ -1,4 +1,4 @@
-# Module 6 — Plan (updated: 2026-10-09, owner: loop — P6 DONE, P7 CURRENT)
+# Module 6 — Plan (updated: 2026-10-09, owner: loop — P9 DONE — backend CLOSED)
 
 ## Phase Map
 
@@ -11,12 +11,12 @@
 | P4 | G6-4 | Repositories | P2 | DONE | 5 repos compile; job + candidate row locks; SQL proven at P7 |
 | P5 | G6-5 | Services + events + Module 1 accessors; G4–G11 | P3+P4 | DONE | goldens G4–G12 (unit) green; services 99.4% |
 | P6 | G6-6 | HTTP + wiring + swagger | P5 | DONE | 20 routes contract; controllers 99.5%; app wiring; swagger 14 paths / 20 ops |
-| P7 | G6-7 | Integration + cycle + parity | P6 | CURRENT | — |
+| P7 | G6-7 | Integration + cycle + parity | P6 | DONE | integration 2 tests (full suite 63/63); cycle 50/6/6; parity identical |
 | P8 | G6-8 | Frontend | shell | BLOCKED | — |
-| P9 | G6-9 | DoD close | P7 | NEXT | — |
+| P9 | G6-9 | DoD close | P7 | DONE | DoD checklist below; backend CLOSED |
 
 ## Current Phase
-- Goal: G6-2 models + migrations.
+- Goal: none — backend CLOSED (P8 frontend BLOCKED on identity shell).
 
 ## Next Phase
 - Goal: G6-3 pipeline graphs.
@@ -35,3 +35,5 @@
 | 2026-10-09 | P4 | repositories (job, candidate + stage events, interview, offer, outbox) | build/vet clean | GREEN | handoff.md |
 | 2026-10-09 | P5 | Module 1 accessors; job/candidate/interview/offer/hire services; events; relay; goldens G4–G12 unit + failure injection | 99.4% | GREEN | handoff.md |
 | 2026-10-09 | P6 | controllers + routes (20 ops) + module (Module 1 adapter, seeds, relay) + internal/app wiring + swagger | routes 100%, controllers 99.5%, build green | GREEN | handoff.md |
+| 2026-10-09 | P7 | tests/integration/recruitment_test.go (lifecycle G5/G6/G8/G9/G10/G12; RBAC + isolation G1/G13/G14) | 63/63 | GREEN | handoff.md |
+| 2026-10-09 | P9 | DoD: go vet, go test ./..., integration 63/63, quality checker clean, swagger refs resolved, frontend guide docs/FRONTEND_TEST_GUIDE_M5_M6.md | all green | GREEN | handoff.md |
