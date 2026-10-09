@@ -1,7 +1,7 @@
-# Module 6 — Todo (P1 DONE; P2 CURRENT)
+# Module 6 — Todo (P2 DONE; P3 CURRENT)
 
 - [x] T6-01 design frozen
-- [ ] T6-02 models + migrations
+- [x] T6-02 models + migrations
 - [ ] T6-03 pipeline graphs + DTOs + validators
 - [ ] T6-04 repositories
 - [ ] T6-05 Module 1 accessors (D6-03)

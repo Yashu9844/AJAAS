@@ -1,3 +1,4 @@
-# Module 6 — Current Status (updated: 2026-10-09, P1 DONE, P2 CURRENT)
+# Module 6 — Current Status (updated: 2026-10-09, P2 DONE, P3 CURRENT)
 
 - P1: design frozen — 20 ops, RC-001..RC-011, 6 tables, 4 events, goldens G1–G14, decisions D6-01..D6-06.
+- P2: 6 models (jobs, candidates, stage events, interviews, offers, outbox) 100%; pipeline graphs G2/G3 100%; migrations 000045–000050 cycle-verified; AutoMigrate↔SQL identical.
