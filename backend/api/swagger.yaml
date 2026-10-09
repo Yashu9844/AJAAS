@@ -2051,6 +2051,183 @@ paths:
         '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
         '409': {description: LEAVE_NOT_PENDING}
 
+
+  # ---------------- Module 5: Payroll & Statutory Compliance ----------------
+  /payroll/structures:
+    post:
+      summary: Create a salary structure (payroll:manage)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateStructureRequest'}}}}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/StructureEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '409': {description: CONFLICT (name taken)}
+    get:
+      summary: List structures (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, inactive]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Structures, content: {application/json: {schema: {$ref: '#/components/schemas/StructureListEnvelope'}}}}
+  /payroll/structures/{id}:
+    get:
+      summary: Get a structure (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Structure, content: {application/json: {schema: {$ref: '#/components/schemas/StructureEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+    patch:
+      summary: Update name/description/statutory flags; components immutable (payroll:manage)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateStructureRequest'}}}}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/StructureEnvelope'}}}}
+  /payroll/structures/{id}/deactivate:
+    post:
+      summary: Deactivate a structure (payroll:manage)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Deactivated, content: {application/json: {schema: {$ref: '#/components/schemas/StructureEnvelope'}}}}
+        '409': {description: CONFLICT}
+  /payroll/assignments:
+    post:
+      summary: Assign CTC + structure to an employee (payroll:manage)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssignRequest'}}}}
+      responses:
+        '201': {description: Assigned, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentEnvelopeP'}}}}
+        '400': {description: VALIDATION_ERROR | STRUCTURE_OVERFLOW}
+        '409': {description: ASSIGNMENT_BACKDATED | STRUCTURE_INACTIVE}
+    get:
+      summary: Assignment history of an employee (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, required: true, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: History, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentListEnvelopeP'}}}}
+  /payroll/assignments/me:
+    get:
+      summary: Caller's current assignment with full-month breakdown (self)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: Own salary, content: {application/json: {schema: {$ref: '#/components/schemas/MyAssignmentEnvelope'}}}}
+        '404': {description: NOT_FOUND | EMPLOYEE_NOT_FOUND}
+  /payroll/assignments/preview:
+    post:
+      summary: Price a CTC on a structure without saving (payroll:manage)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PreviewRequestP'}}}}
+      responses:
+        '200': {description: Breakdown, content: {application/json: {schema: {$ref: '#/components/schemas/BreakdownEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR | STRUCTURE_OVERFLOW}
+  /payroll/runs:
+    post:
+      summary: Create a payroll run for a month (payroll:manage)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateRunRequest'}}}}
+      responses:
+        '201': {description: Draft run, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR | INVALID_PERIOD}
+        '409': {description: RUN_EXISTS}
+    get:
+      summary: List runs (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [draft, calculated, approved, finalized]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Runs, content: {application/json: {schema: {$ref: '#/components/schemas/RunListEnvelope'}}}}
+  /payroll/runs/{id}:
+    get:
+      summary: Get a run with totals and warnings (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Run, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+  /payroll/runs/{id}/calculate:
+    post:
+      summary: Calculate or recalculate payslips (payroll:manage)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Calculated, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
+        '409': {description: RUN_STATE}
+  /payroll/runs/{id}/approve:
+    post:
+      summary: Approve a calculated run; approver must differ from the calculator (payroll:approve)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
+        '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
+        '409': {description: RUN_STATE}
+  /payroll/runs/{id}/finalize:
+    post:
+      summary: Finalize an approved run; payslips become visible (payroll:approve)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Finalized, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
+        '409': {description: RUN_STATE}
+  /payroll/runs/{id}/payslips:
+    get:
+      summary: Payslips of a run (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Payslips, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipListEnvelope'}}}}
+  /payroll/runs/{id}/payout.csv:
+    get:
+      summary: Payout export employee_code,employee_name,net_pay — finalized only (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: CSV file, content: {text/csv: {schema: {type: string}}}}
+        '409': {description: RUN_STATE}
+  /payroll/payslips/{id}:
+    get:
+      summary: Any payslip (payroll:read)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Payslip, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+  /payroll/payslips/me:
+    get:
+      summary: Caller's payslips of finalized runs (self)
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Own payslips, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipListEnvelope'}}}}
+  /payroll/payslips/me/{id}:
+    get:
+      summary: One own finalized payslip (self); anything else is 404
+      tags: [Payroll]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Payslip, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+
 components:
   securitySchemes:
     BearerAuth:
@@ -2429,3 +2606,144 @@ components:
             available: {$ref: '#/components/schemas/Days'}
             available_after: {$ref: '#/components/schemas/Days'}
             working_dates: {type: array, items: {type: string, format: date}}
+    Money:
+      type: number
+      description: Rupees with at most 2 decimals (stored exactly as paise); percentages use the same format (40.00 = 40%)
+      example: 41666.67
+    ComponentRequest:
+      type: object
+      required: [code, name, kind, calc]
+      properties:
+        code: {type: string, pattern: '^[A-Za-z0-9_]{2,20}$', description: Upper-cased; exactly one BASIC}
+        name: {type: string, maxLength: 100}
+        kind: {type: string, enum: [earning, deduction]}
+        calc: {type: string, enum: [fixed, percent_of_ctc, percent_of_basic, balance]}
+        value: {$ref: '#/components/schemas/Money'}
+        taxable: {type: boolean, default: true}
+    CreateStructureRequest:
+      type: object
+      required: [name, components]
+      properties:
+        name: {type: string, maxLength: 100}
+        description: {type: string, maxLength: 500}
+        pf_enabled: {type: boolean, default: true}
+        esi_enabled: {type: boolean, default: true}
+        pt_enabled: {type: boolean, default: true}
+        tds_enabled: {type: boolean, default: true}
+        components: {type: array, minItems: 1, maxItems: 40, items: {$ref: '#/components/schemas/ComponentRequest'}}
+    UpdateStructureRequest:
+      type: object
+      properties:
+        name: {type: string}
+        description: {type: string}
+        pf_enabled: {type: boolean}
+        esi_enabled: {type: boolean}
+        pt_enabled: {type: boolean}
+        tds_enabled: {type: boolean}
+    Structure:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: string}
+        pf_enabled: {type: boolean}
+        esi_enabled: {type: boolean}
+        pt_enabled: {type: boolean}
+        tds_enabled: {type: boolean}
+        status: {type: string, enum: [active, inactive]}
+        components: {type: array, items: {allOf: [{$ref: '#/components/schemas/ComponentRequest'}, {type: object, properties: {position: {type: integer}}}]}}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    StructureEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Structure'}}}
+    StructureListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Structure'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    AssignRequest:
+      type: object
+      required: [employee_id, structure_id, annual_ctc, effective_from]
+      properties:
+        employee_id: {type: string, format: uuid}
+        structure_id: {type: string, format: uuid}
+        annual_ctc: {$ref: '#/components/schemas/Money'}
+        effective_from: {type: string, format: date}
+    PayrollAssignment:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        structure_id: {type: string, format: uuid}
+        annual_ctc: {$ref: '#/components/schemas/Money'}
+        effective_from: {type: string, format: date}
+        effective_to: {type: string, format: date}
+        created_at: {type: string, format: date-time}
+    AssignmentEnvelopeP: {type: object, properties: {data: {$ref: '#/components/schemas/PayrollAssignment'}}}
+    AssignmentListEnvelopeP: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/PayrollAssignment'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    PreviewRequestP:
+      type: object
+      required: [structure_id, annual_ctc]
+      properties:
+        structure_id: {type: string, format: uuid}
+        annual_ctc: {$ref: '#/components/schemas/Money'}
+    PayLine:
+      type: object
+      properties:
+        code: {type: string, description: Component code or PF / ESI / PT / TDS}
+        name: {type: string}
+        kind: {type: string, enum: [earning, deduction]}
+        amount: {$ref: '#/components/schemas/Money'}
+    Breakdown:
+      type: object
+      properties:
+        monthly_ctc: {$ref: '#/components/schemas/Money'}
+        lines: {type: array, items: {$ref: '#/components/schemas/PayLine'}}
+        gross: {$ref: '#/components/schemas/Money'}
+        deductions: {$ref: '#/components/schemas/Money'}
+        net: {$ref: '#/components/schemas/Money'}
+    BreakdownEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Breakdown'}}}
+    MyAssignmentEnvelope: {type: object, properties: {data: {type: object, properties: {assignment: {$ref: '#/components/schemas/PayrollAssignment'}, breakdown: {$ref: '#/components/schemas/Breakdown'}}}}}
+    CreateRunRequest:
+      type: object
+      required: [month, year]
+      properties:
+        month: {type: integer, minimum: 1, maximum: 12}
+        year: {type: integer, minimum: 2000, maximum: 2200}
+    Run:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        month: {type: integer}
+        year: {type: integer}
+        status: {type: string, enum: [draft, calculated, approved, finalized]}
+        employee_count: {type: integer}
+        gross_total: {$ref: '#/components/schemas/Money'}
+        deduction_total: {$ref: '#/components/schemas/Money'}
+        net_total: {$ref: '#/components/schemas/Money'}
+        warnings: {type: array, items: {type: string}, description: 'e.g. STRUCTURE_OVERFLOW:<code>, NET_CAPPED:<code>, EMPLOYEE_MISSING:<id>'}
+        calculated_by_user_id: {type: string, format: uuid}
+        approved_by_user_id: {type: string, format: uuid}
+        calculated_at: {type: string, format: date-time}
+        approved_at: {type: string, format: date-time}
+        finalized_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    RunEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Run'}}}
+    RunListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Run'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    Payslip:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        run_id: {type: string, format: uuid}
+        month: {type: integer}
+        year: {type: integer}
+        employee_id: {type: string, format: uuid}
+        employee_code: {type: string}
+        employee_name: {type: string}
+        structure_id: {type: string, format: uuid}
+        annual_ctc: {$ref: '#/components/schemas/Money'}
+        days_in_month: {type: integer}
+        payable_days: {type: number}
+        lop_days: {type: number}
+        gross: {$ref: '#/components/schemas/Money'}
+        deductions: {$ref: '#/components/schemas/Money'}
+        net: {$ref: '#/components/schemas/Money'}
+        lines: {type: array, items: {$ref: '#/components/schemas/PayLine'}}
+        created_at: {type: string, format: date-time}
+    PayslipEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Payslip'}}}
+    PayslipListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Payslip'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
