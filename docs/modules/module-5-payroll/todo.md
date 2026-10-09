@@ -1,8 +1,8 @@
-# Module 5 — Todo (P1 DONE; P2 CURRENT)
+# Module 5 — Todo (P2 DONE; P3 CURRENT)
 
 - [x] T5-01 [G5-1] design frozen
-- [ ] T5-02 [G5-2] models + tests; migrations 000038–000044
-- [ ] T5-03 [G5-3] calc money/breakdown/prorate/statutory + goldens G2–G9
+- [x] T5-02 [G5-2] models + tests; migrations 000038–000044
+- [x] T5-03 [G5-3] calc money/breakdown/prorate/statutory + goldens G2–G9
 - [ ] T5-04 [G5-3] dto + validators
 - [ ] T5-05 [G5-4] repositories
 - [ ] T5-06 [G5-5] Module 4 UnpaidLeave port (D5-03)
