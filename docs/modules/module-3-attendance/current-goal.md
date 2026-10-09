@@ -1,10 +1,4 @@
 # Module 3 — Current Goal
 
-Goal: NONE ACTIVE — module design pending after Modules 0 + 1 + 2 contracts.
-Why: dependencies are not stable yet. See connections.md.
-Scope: docs-only until plan.md P1 design is DONE.
-Non-goals: no production code, no schema, no API until contracts freeze.
-Success Criteria:
-- [ ] plan.md P1 design DONE with frozen contracts
-- [ ] This file updated to G3-1 with verifiable objective
-- [ ] handoff.md records the activation
+None — Module 3 backend closed 2026-10-09 (P9 DONE). Remaining: G3-8 frontend slice, BLOCKED until the identity login shell exists in `frontend/`.
+Active loop target: Module 4 (Leave) G4-1 — see handoff.md.

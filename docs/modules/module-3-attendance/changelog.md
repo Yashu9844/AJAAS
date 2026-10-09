@@ -1,3 +1,11 @@
 # Module 3 — Changelog
 
-2026-09-30 — Created: 17-file doc bundle scaffold with real dependency metadata. Reason: MASTER_PROMPT Step 4 on branch loop_engineering. Tests: structure validation. Impact: docs only, no contract change.
+2026-09-30 — Created: 17-file doc bundle scaffold. Impact: docs only.
+2026-10-08 — P1 design DONE: scope re-defined to Attendance, Shifts & Time Tracking (D3-01); specification/architecture/connections/security/goldens/testing/decisions/assumptions/files frozen. Impact: contracts frozen for P2 (19 endpoints, 6 tables, 5 events). Tests: n/a (docs).
+2026-10-08 — P2 DONE: 6 GORM models + constants, models_test (table names, index contracts, append-only, UUID hooks), migrations 000025–000030. Tests: go test ./internal/attendance/models (100% cov). Impact: new tables only, no existing contract changed.
+2026-10-09 — P3 DONE: calc engine (goldens G4/G5), DTOs (+G13 pagination clamp), validators. Tests: go test ./internal/attendance/... (calc/dto/validators/models 100%). Impact: none external.
+2026-10-09 — P4 DONE: repositories (6 interfaces + GORM impls, advisory lock, FindOrCreate, status aggregate). Tests: build/vet (SQL verified live at P7). Impact: none external.
+2026-10-09 — P5 DONE: services (shift, assignment, punch, query, regularization, outbox relay) + events; unit goldens G2/G3/G6/G7/G8/G10/G11/G12 green; services 91.8%. Impact: none external.
+2026-10-09 — P6 DONE: controllers + routes (19, RBAC contract test), module.go (directory adapter, permission seed, relay, punch rate limit), cmd/main.go wiring, swagger 19 operations + 24 schemas. Tests: go build/vet ./..., go test ./internal/... PASS; controllers/routes 100%. Impact: new public API (gated GO 2026-10-08); 3 rows in Module 0 permissions (D3-10).
+2026-10-09 — P7 DONE: live goldens G1, G2, G6–G9, G11–G13 PASS on Docker Postgres; migrations up/down/up clean; AutoMigrate↔SQL parity fixed (D3-14: integer columns, partial/expression unique indexes, pending backstop); AT-004 precedence clarified (D3-13); suite-level login limiter reset (D3-15, also unblocks Module 1 TestOrgRBAC in full runs). Impact: dev DBs created before this need 3 indexes dropped once (see D3-14).
+2026-10-09 — P9 DONE (backend CLOSED): DoD §24 walked with evidence; 5 functions refactored to params ≤4 (D3-16); routes↔swagger 19/19; threat→evidence map; live AS-T6 concurrency test (10 parallel INs → 1 session). P8 frontend BLOCKED (no identity shell).

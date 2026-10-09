@@ -1,9 +1,26 @@
 # Module 3 — Testing
 
-Strategy (MASTER_PROMPT section 14): unit (services 90 percent) + integration (Docker PG) + contract/API + security (enumeration, tamper, reuse, injection) + golden (protected) + performance (p95 budgets).
+Strategy: RED first per item. Unit (calc 100%, services ≥ 90%, module ≥ 80%) + unit goldens (G2–G8, G10–G12) + live goldens (G1, G6, G7, G9, G11–G13) + migration up/down/up.
 
-Commands (activate at P2 implementation):
-- go build ./... ; go vet ./... ; gofmt -l .
-- go test -race ./internal/attendance/...  (backend path: backend/internal/attendance)
-- Frontend module path: frontend/src/modules/attendance
-- grep -r TODO (must be empty); migrations up/down/up clean.
+## Commands
+```bash
+export PATH="$HOME/go-sdk/go/bin:$PATH"     # local Go 1.27.1
+cd backend
+go build ./... && go vet ./... && gofmt -l .
+go test -count=1 ./internal/attendance/...
+go test -count=1 -cover ./internal/attendance/...
+grep -rn "TODO" internal/attendance/            # must be empty
+# live ring (Docker PG/Redis/RabbitMQ + backend on :8080):
+docker compose up -d postgres redis rabbitmq     # repo root
+DATABASE_PASSWORD=postgres DATABASE_DBNAME=jaas_dev go run ./cmd/main.go &
+go test -count=1 -tags integration ./tests/api/ -run Attendance -v
+# migrations up/down/up (psql inside container, files 000025..000030)
+```
+`-race` needs cgo (unavailable on this Windows box) — reported as not run, never claimed.
+
+## Suites
+- `calc`: table tests incl. goldens G4/G5 (fixed instants, multiple time zones).
+- `services`: fakes for repos, employee directory, audit spy, publisher spy, fake txRunner; goldens G2/G3/G6/G7/G8/G10/G11/G12.
+- `controllers`: httptest with stub services — binding → VALIDATION_ERROR, status mapping, pagination clamp (G13), self endpoints never read employee_id.
+- `models`: GORM schema parse, table names, unique index names.
+- live (build tag `integration`): `attendance_flow_test.go` (punch flow G2/G11/G12, G13), `attendance_rules_test.go` (G6/G7/G8 regularization, G9 RBAC, G1 isolation), `attendance_race_test.go` (AS-T6: 10 concurrent INs → exactly one session), `attendance_helpers_test.go` (tenant+admin+member+employees bootstrap, punch backdating). Last run 2026-10-09: PASS. Not run: `go test -race` (no cgo toolchain on this Windows host).

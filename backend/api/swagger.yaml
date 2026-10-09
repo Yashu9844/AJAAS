@@ -1597,6 +1597,460 @@ paths:
         '200':
           description: List of milestone career events
 
+
+  # ---------------- Module 3: Attendance, Shifts & Time Tracking ----------------
+  /attendance/punch:
+    post:
+      summary: Punch IN or OUT (self, server clock — AT-001)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PunchRequest'}
+      responses:
+        '201': {description: Punch recorded, content: {application/json: {schema: {$ref: '#/components/schemas/PunchResultEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '403': {description: EMPLOYEE_NOT_ACTIVE}
+        '404': {description: EMPLOYEE_NOT_FOUND}
+        '409': {description: ALREADY_PUNCHED_IN | NOT_PUNCHED_IN | DUPLICATE_PUNCH | SESSION_EXPIRED}
+        '429': {description: RATE_LIMITED}
+
+  /attendance/me/today:
+    get:
+      summary: Today's attendance state for the caller
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: Today view, content: {application/json: {schema: {$ref: '#/components/schemas/TodayEnvelope'}}}}
+        '404': {description: EMPLOYEE_NOT_FOUND}
+
+  /attendance/me:
+    get:
+      summary: Caller's own records (max 62 days, default last 7)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {$ref: '#/components/parameters/FromDate'}
+        - {$ref: '#/components/parameters/ToDate'}
+      responses:
+        '200': {description: Records, content: {application/json: {schema: {$ref: '#/components/schemas/RecordListEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+
+  /attendance/records:
+    get:
+      summary: List attendance records (attendance:read)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: employee_id, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/FromDate'}
+        - {$ref: '#/components/parameters/ToDate'}
+        - {name: status, in: query, schema: {type: string, enum: [present, half_day, absent, on_leave, holiday, week_off]}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated records, content: {application/json: {schema: {$ref: '#/components/schemas/RecordListEnvelope'}}}}
+        '403': {description: FORBIDDEN}
+
+  /attendance/records/{id}:
+    get:
+      summary: Record with all punches incl. superseded (attendance:read)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Record detail, content: {application/json: {schema: {$ref: '#/components/schemas/RecordDetailEnvelope'}}}}
+        '404': {description: NOT_FOUND (also for other tenants' ids)}
+
+  /attendance/summary:
+    get:
+      summary: Daily presence summary (attendance:read, AT-020)
+      tags: [Attendance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: date, in: query, schema: {type: string, format: date}}
+      responses:
+        '200': {description: Summary, content: {application/json: {schema: {$ref: '#/components/schemas/SummaryEnvelope'}}}}
+
+  /attendance/regularizations:
+    post:
+      summary: Request a timesheet correction (self)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateRegularizationRequest'}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR | REGULARIZATION_WINDOW}
+        '409': {description: REGULARIZATION_PENDING}
+    get:
+      summary: List all regularizations (attendance:read)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {$ref: '#/components/parameters/RegStatus'}
+        - {name: employee_id, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated list, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationListEnvelope'}}}}
+
+  /attendance/regularizations/me:
+    get:
+      summary: Caller's own regularizations
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {$ref: '#/components/parameters/RegStatus'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated list, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationListEnvelope'}}}}
+
+  /attendance/regularizations/{id}/cancel:
+    post:
+      summary: Cancel own pending request (AT-018)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '404': {description: NOT_FOUND (not yours)}
+        '409': {description: REGULARIZATION_NOT_PENDING}
+
+  /attendance/regularizations/{id}/approve:
+    post:
+      summary: Approve and apply to the record (attendance:approve, AT-017)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReviewRequest'}
+      responses:
+        '200': {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
+        '409': {description: REGULARIZATION_NOT_PENDING}
+
+  /attendance/regularizations/{id}/reject:
+    post:
+      summary: Reject with a comment (attendance:approve)
+      tags: [Regularizations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReviewRequest'}
+      responses:
+        '200': {description: Rejected, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR (comment required)}
+        '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
+
+  /shifts:
+    post:
+      summary: Create a shift (attendance:manage)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateShiftRequest'}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '409': {description: CONFLICT (name/code taken)}
+    get:
+      summary: List shifts (attendance:read)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive]}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated shifts, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftListEnvelope'}}}}
+
+  /shifts/{id}:
+    get:
+      summary: Get a shift (attendance:read)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Shift, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+    patch:
+      summary: Update a shift; code immutable (attendance:manage)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateShiftRequest'}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+
+  /shifts/{id}/deactivate:
+    post:
+      summary: Deactivate a shift (attendance:manage, AT-012)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Deactivated, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
+        '409': {description: SHIFT_IN_USE | CONFLICT}
+
+  /shifts/{id}/assignments:
+    post:
+      summary: Assign an employee to the shift (attendance:manage, AT-011)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignShiftRequest'}
+      responses:
+        '201': {description: Assigned, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentEnvelope'}}}}
+        '409': {description: ASSIGNMENT_OVERLAP | SHIFT_INACTIVE}
+
+  /shift-assignments:
+    get:
+      summary: List an employee's shift assignments (attendance:read)
+      tags: [Shifts]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: employee_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated assignments, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentListEnvelope'}}}}
+
+
+  # ---------------- Module 4: Leave & Absence Management ----------------
+  /leave/types:
+    post:
+      summary: Create a leave type (leave:manage)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateLeaveTypeRequest'}}}}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '409': {description: CONFLICT (name/code taken)}
+    get:
+      summary: List leave types (authenticated)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive]}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated types, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeListEnvelope'}}}}
+
+  /leave/types/{id}:
+    get:
+      summary: Get a leave type (authenticated)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Leave type, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+    patch:
+      summary: Update a leave type; code immutable (leave:manage)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateLeaveTypeRequest'}}}}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeEnvelope'}}}}
+        '409': {description: CONFLICT}
+
+  /leave/types/{id}/deactivate:
+    post:
+      summary: Deactivate a leave type (leave:manage)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Deactivated, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeEnvelope'}}}}
+        '409': {description: CONFLICT (already inactive)}
+
+  /leave/holidays:
+    post:
+      summary: Add a holiday (leave:manage)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateHolidayRequest'}}}}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/HolidayEnvelope'}}}}
+        '409': {description: CONFLICT (date taken)}
+    get:
+      summary: List holidays of a year (authenticated)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: year, in: query, schema: {type: integer, minimum: 2000, maximum: 2200}}]
+      responses:
+        '200': {description: Holidays, content: {application/json: {schema: {$ref: '#/components/schemas/HolidayListEnvelope'}}}}
+
+  /leave/holidays/{id}:
+    delete:
+      summary: Delete a holiday (leave:manage)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Deleted, content: {application/json: {schema: {$ref: '#/components/schemas/HolidayEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+
+  /leave/balances/me:
+    get:
+      summary: Caller's current-year balances (self; lazily accrues)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: Balances, content: {application/json: {schema: {$ref: '#/components/schemas/BalanceListEnvelope'}}}}
+        '404': {description: EMPLOYEE_NOT_FOUND}
+
+  /leave/balances:
+    get:
+      summary: An employee's balances (leave:read)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Balances, content: {application/json: {schema: {$ref: '#/components/schemas/BalanceListEnvelope'}}}}
+
+  /leave/balances/adjust:
+    post:
+      summary: HR balance adjustment (leave:manage, LV-017)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AdjustBalanceRequest'}}}}
+      responses:
+        '200': {description: Adjusted balance, content: {application/json: {schema: {$ref: '#/components/schemas/BalanceEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+
+  /leave/ledger:
+    get:
+      summary: Balance ledger (leave:read)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: employee_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: leave_type_id, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Ledger rows, content: {application/json: {schema: {$ref: '#/components/schemas/LedgerListEnvelope'}}}}
+
+  /leave/requests/preview:
+    post:
+      summary: Price a request without saving (self)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ApplyLeaveRequest'}}}}
+      responses:
+        '200': {description: Preview, content: {application/json: {schema: {$ref: '#/components/schemas/LeavePreviewEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR | INVALID_LEAVE_RANGE | LEAVE_NOTICE | NO_WORKING_DAYS | LEAVE_TOO_LONG}
+
+  /leave/requests:
+    post:
+      summary: Apply for leave (self; reserves balance)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ApplyLeaveRequest'}}}}
+      responses:
+        '201': {description: Pending request, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR | INVALID_LEAVE_RANGE | LEAVE_NOTICE | NO_WORKING_DAYS | LEAVE_TOO_LONG}
+        '403': {description: EMPLOYEE_NOT_ACTIVE | LEAVE_TYPE_NOT_APPLICABLE}
+        '409': {description: LEAVE_TYPE_INACTIVE | LEAVE_OVERLAP | INSUFFICIENT_BALANCE}
+    get:
+      summary: List requests (leave:read)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [pending, approved, rejected, cancelled]}}
+        - {name: employee_id, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/FromDate'}
+        - {$ref: '#/components/parameters/ToDate'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated requests, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestListEnvelope'}}}}
+
+  /leave/requests/me:
+    get:
+      summary: Caller's own requests (self)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [pending, approved, rejected, cancelled]}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+      responses:
+        '200': {description: Paginated requests, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestListEnvelope'}}}}
+
+  /leave/requests/{id}:
+    get:
+      summary: Get a request (leave:read)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Request, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+
+  /leave/requests/{id}/cancel:
+    post:
+      summary: Cancel own request (self, LV-011)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestEnvelope'}}}}
+        '404': {description: NOT_FOUND (not yours)}
+        '409': {description: LEAVE_ALREADY_STARTED | LEAVE_NOT_CANCELLABLE}
+
+  /leave/requests/{id}/approve:
+    post:
+      summary: Approve (leave:approve; marks attendance on_leave)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/ReviewRequest'}}}}
+      responses:
+        '200': {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestEnvelope'}}}}
+        '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
+        '409': {description: LEAVE_NOT_PENDING}
+
+  /leave/requests/{id}/reject:
+    post:
+      summary: Reject with a comment (leave:approve)
+      tags: [Leave]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReviewRequest'}}}}
+      responses:
+        '200': {description: Rejected, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestEnvelope'}}}}
+        '400': {description: VALIDATION_ERROR (comment required)}
+        '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
+        '409': {description: LEAVE_NOT_PENDING}
+
 components:
   securitySchemes:
     BearerAuth:
@@ -1614,3 +2068,364 @@ components:
       in: header
       name: Host
       description: The request host header containing the tenant subdomain slug (e.g. acme.jaas.com).
+  parameters:
+    ID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    Page: {name: page, in: query, schema: {type: integer, default: 1, minimum: 1}, description: Invalid values clamp to 1}
+    PerPage: {name: per_page, in: query, schema: {type: integer, default: 20, minimum: 1, maximum: 100}, description: Invalid values clamp to 20; above 100 clamps to 100}
+    FromDate: {name: from, in: query, schema: {type: string, format: date}}
+    ToDate: {name: to, in: query, schema: {type: string, format: date}}
+    RegStatus: {name: status, in: query, schema: {type: string, enum: [pending, approved, rejected, cancelled]}}
+  responses:
+    ValidationError:
+      description: VALIDATION_ERROR with field details
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+  schemas:
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: {type: string}
+            message: {type: string}
+            details: {type: array, items: {type: object, properties: {field: {type: string}, message: {type: string}}}}
+    PageMeta:
+      type: object
+      properties: {page: {type: integer}, per_page: {type: integer}, total_items: {type: integer}, total_pages: {type: integer}}
+    PunchRequest:
+      type: object
+      required: [type]
+      properties:
+        type: {type: string, enum: [in, out]}
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+        device_id: {type: string, maxLength: 100}
+        source: {type: string, enum: [web, mobile], default: web}
+    Punch:
+      type: object
+      description: IP address is stored for audit but never returned
+      properties:
+        id: {type: string, format: uuid}
+        punch_type: {type: string, enum: [in, out]}
+        punch_time: {type: string, format: date-time}
+        source: {type: string, enum: [web, mobile, regularization]}
+        latitude: {type: number}
+        longitude: {type: number}
+        device_id: {type: string}
+        is_superseded: {type: boolean}
+    Record:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        attendance_date: {type: string, format: date}
+        shift_id: {type: string, format: uuid}
+        first_punch_in: {type: string, format: date-time}
+        last_punch_out: {type: string, format: date-time}
+        total_work_minutes: {type: integer}
+        total_break_minutes: {type: integer}
+        late_minutes: {type: integer}
+        overtime_minutes: {type: integer}
+        status: {type: string, enum: [present, half_day, absent, on_leave, holiday, week_off]}
+        source: {type: string}
+        is_regularized: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    PunchResultEnvelope:
+      type: object
+      properties: {data: {type: object, properties: {punch: {$ref: '#/components/schemas/Punch'}, record: {$ref: '#/components/schemas/Record'}}}}
+    TodayEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            attendance_date: {type: string, format: date}
+            record: {$ref: '#/components/schemas/Record'}
+            open_session: {type: boolean}
+            shift: {$ref: '#/components/schemas/Shift'}
+    RecordListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Record'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    RecordDetailEnvelope:
+      type: object
+      properties: {data: {type: object, properties: {record: {$ref: '#/components/schemas/Record'}, punches: {type: array, items: {$ref: '#/components/schemas/Punch'}}}}}
+    SummaryEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            date: {type: string, format: date}
+            total_employees: {type: integer}
+            present: {type: integer}
+            late: {type: integer}
+            half_day: {type: integer}
+            on_leave: {type: integer}
+            absent: {type: integer}
+    CreateRegularizationRequest:
+      type: object
+      required: [attendance_date, requested_punch_in, requested_punch_out, reason]
+      properties:
+        attendance_date: {type: string, format: date}
+        requested_punch_in: {type: string, format: date-time}
+        requested_punch_out: {type: string, format: date-time}
+        reason: {type: string, minLength: 1, maxLength: 500}
+    ReviewRequest:
+      type: object
+      properties: {comment: {type: string, minLength: 1, maxLength: 500, description: Required for reject}}
+    Regularization:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        attendance_date: {type: string, format: date}
+        requested_punch_in: {type: string, format: date-time}
+        requested_punch_out: {type: string, format: date-time}
+        reason: {type: string}
+        status: {type: string, enum: [pending, approved, rejected, cancelled]}
+        reviewer_user_id: {type: string, format: uuid}
+        reviewed_at: {type: string, format: date-time}
+        review_comment: {type: string}
+        created_at: {type: string, format: date-time}
+    RegularizationEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Regularization'}}
+    RegularizationListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Regularization'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    CreateShiftRequest:
+      type: object
+      required: [name, start_time, end_time]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        code: {type: string, pattern: '^[a-z0-9-]{2,32}$'}
+        start_time: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', example: '09:00'}
+        end_time: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', example: '18:00'}
+        grace_period_mins: {type: integer, minimum: 0, maximum: 240, default: 15}
+        break_duration_mins: {type: integer, minimum: 0, maximum: 480, default: 60}
+        full_day_minutes: {type: integer, minimum: 1, maximum: 1440}
+        half_day_minutes: {type: integer, minimum: 1, maximum: 1440}
+        timezone: {type: string, example: Asia/Kolkata, default: UTC}
+    UpdateShiftRequest:
+      type: object
+      description: All fields optional; code is immutable
+      properties:
+        name: {type: string}
+        start_time: {type: string}
+        end_time: {type: string}
+        grace_period_mins: {type: integer}
+        break_duration_mins: {type: integer}
+        full_day_minutes: {type: integer}
+        half_day_minutes: {type: integer}
+        timezone: {type: string}
+    Shift:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        code: {type: string}
+        start_time: {type: string}
+        end_time: {type: string}
+        grace_period_mins: {type: integer}
+        break_duration_mins: {type: integer}
+        full_day_minutes: {type: integer}
+        half_day_minutes: {type: integer}
+        timezone: {type: string}
+        is_night_shift: {type: boolean}
+        expected_minutes: {type: integer}
+        status: {type: string, enum: [active, inactive]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ShiftEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Shift'}}
+    ShiftListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Shift'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    AssignShiftRequest:
+      type: object
+      required: [employee_id, effective_from]
+      properties:
+        employee_id: {type: string, format: uuid}
+        effective_from: {type: string, format: date}
+        effective_to: {type: string, format: date}
+    Assignment:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        shift_id: {type: string, format: uuid}
+        effective_from: {type: string, format: date}
+        effective_to: {type: string, format: date}
+        created_at: {type: string, format: date-time}
+    AssignmentEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Assignment'}}
+    AssignmentListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Assignment'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    Days:
+      type: number
+      description: Leave days with at most 2 decimals (stored exactly as hundredths)
+      example: 1.5
+    CreateLeaveTypeRequest:
+      type: object
+      required: [name, code]
+      properties:
+        name: {type: string, maxLength: 100}
+        code: {type: string, pattern: '^[A-Za-z0-9_]{2,10}$', description: Upper-cased; immutable}
+        is_paid: {type: boolean, default: true}
+        annual_allowance: {$ref: '#/components/schemas/Days'}
+        accrual: {type: string, enum: [annual, monthly], default: annual}
+        carry_forward_limit: {$ref: '#/components/schemas/Days'}
+        max_consecutive_days: {type: integer, minimum: 1, maximum: 365}
+        min_notice_days: {type: integer, minimum: 0, maximum: 90}
+        allow_half_day: {type: boolean, default: true}
+        sandwich_rule: {type: boolean, default: false}
+        applicable_gender: {type: string, enum: [all, male, female], default: all}
+    UpdateLeaveTypeRequest:
+      type: object
+      description: All optional; code immutable; max_consecutive_days 0 clears the limit
+      properties:
+        name: {type: string}
+        is_paid: {type: boolean}
+        annual_allowance: {$ref: '#/components/schemas/Days'}
+        accrual: {type: string, enum: [annual, monthly]}
+        carry_forward_limit: {$ref: '#/components/schemas/Days'}
+        max_consecutive_days: {type: integer, minimum: 0, maximum: 365}
+        min_notice_days: {type: integer}
+        allow_half_day: {type: boolean}
+        sandwich_rule: {type: boolean}
+        applicable_gender: {type: string, enum: [all, male, female]}
+    LeaveType:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        code: {type: string}
+        is_paid: {type: boolean}
+        annual_allowance: {$ref: '#/components/schemas/Days'}
+        accrual: {type: string}
+        carry_forward_limit: {$ref: '#/components/schemas/Days'}
+        max_consecutive_days: {type: integer}
+        min_notice_days: {type: integer}
+        allow_half_day: {type: boolean}
+        sandwich_rule: {type: boolean}
+        applicable_gender: {type: string}
+        status: {type: string, enum: [active, inactive]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    LeaveTypeEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/LeaveType'}}
+    LeaveTypeListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/LeaveType'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    CreateHolidayRequest:
+      type: object
+      required: [date, name]
+      properties:
+        date: {type: string, format: date}
+        name: {type: string, maxLength: 100}
+        is_optional: {type: boolean, default: false}
+    Holiday:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        date: {type: string, format: date}
+        name: {type: string}
+        is_optional: {type: boolean}
+        created_at: {type: string, format: date-time}
+    HolidayEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Holiday'}}
+    HolidayListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Holiday'}}}
+    AdjustBalanceRequest:
+      type: object
+      required: [employee_id, leave_type_id, days, reason]
+      properties:
+        employee_id: {type: string, format: uuid}
+        leave_type_id: {type: string, format: uuid}
+        days: {$ref: '#/components/schemas/Days'}
+        reason: {type: string, maxLength: 500}
+    Balance:
+      type: object
+      properties:
+        leave_type_id: {type: string, format: uuid}
+        leave_type_code: {type: string}
+        leave_type_name: {type: string}
+        year: {type: integer}
+        opening: {$ref: '#/components/schemas/Days'}
+        accrued: {$ref: '#/components/schemas/Days'}
+        adjusted: {$ref: '#/components/schemas/Days'}
+        used: {$ref: '#/components/schemas/Days'}
+        reserved: {$ref: '#/components/schemas/Days'}
+        available: {$ref: '#/components/schemas/Days'}
+        is_paid: {type: boolean}
+    BalanceEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/Balance'}}
+    BalanceListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/Balance'}}}
+    LedgerEntry:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        leave_type_id: {type: string, format: uuid}
+        year: {type: integer}
+        kind: {type: string, enum: [carry_forward, accrual, adjustment, reserve, release, consume, reversal]}
+        days: {$ref: '#/components/schemas/Days'}
+        leave_request_id: {type: string, format: uuid}
+        note: {type: string}
+        actor_user_id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    LedgerListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/LedgerEntry'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    ApplyLeaveRequest:
+      type: object
+      required: [leave_type_id, start_date, end_date, reason]
+      properties:
+        leave_type_id: {type: string, format: uuid}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        half_day: {type: string, enum: [first_half, second_half]}
+        reason: {type: string, maxLength: 500}
+    LeaveRequest:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        leave_type_id: {type: string, format: uuid}
+        leave_type_code: {type: string}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        half_day: {type: string}
+        total_days: {$ref: '#/components/schemas/Days'}
+        reason: {type: string}
+        status: {type: string, enum: [pending, approved, rejected, cancelled]}
+        reviewer_user_id: {type: string, format: uuid}
+        reviewed_at: {type: string, format: date-time}
+        review_comment: {type: string}
+        cancelled_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    LeaveRequestEnvelope:
+      type: object
+      properties: {data: {$ref: '#/components/schemas/LeaveRequest'}}
+    LeaveRequestListEnvelope:
+      type: object
+      properties: {data: {type: array, items: {$ref: '#/components/schemas/LeaveRequest'}}, meta: {$ref: '#/components/schemas/PageMeta'}}
+    LeavePreviewEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            total_days: {$ref: '#/components/schemas/Days'}
+            available: {$ref: '#/components/schemas/Days'}
+            available_after: {$ref: '#/components/schemas/Days'}
+            working_dates: {type: array, items: {type: string, format: date}}

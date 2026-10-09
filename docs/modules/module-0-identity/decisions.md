@@ -15,3 +15,4 @@ There is no super-admin identity in the data model. `/tenants*` are guarded by `
 
 ## D-HARDEN-4: cross-module rules are synchronous hooks
 No broker consumer exists, so user deactivation converges org mappings and employee profiles via in-process hooks inside the same DB transaction (`UserDeactivationConverger`). Events are still published for future consumers.
+2026-10-08 — Cross-module record (from Module 3 D3-10): Module 3 boot inserts `attendance:read`, `attendance:manage`, `attendance:approve` into the Module 0 `permissions` table (ON CONFLICT DO NOTHING) using identity `models.Permission`. No Module 0 code or REST contract changes. Reason: no deploy-time permission seed exists (AS-007). Tradeoff: Module 3 depends on the permissions table shape (resource, action, description).
