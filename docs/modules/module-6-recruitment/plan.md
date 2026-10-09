@@ -1,4 +1,4 @@
-# Module 6 — Plan (updated: 2026-10-09, owner: loop — P5 DONE, P6 CURRENT)
+# Module 6 — Plan (updated: 2026-10-09, owner: loop — P6 DONE, P7 CURRENT)
 
 ## Phase Map
 
@@ -10,10 +10,10 @@
 | P3 | G6-3 | Pipeline graphs (G2, G3) + DTOs + validators | P2 | DONE | G2/G3 graphs + DTOs + validators 100% |
 | P4 | G6-4 | Repositories | P2 | DONE | 5 repos compile; job + candidate row locks; SQL proven at P7 |
 | P5 | G6-5 | Services + events + Module 1 accessors; G4–G11 | P3+P4 | DONE | goldens G4–G12 (unit) green; services 99.4% |
-| P6 | G6-6 | HTTP + wiring + swagger | P5 | CURRENT | — |
-| P7 | G6-7 | Integration + cycle + parity | P6 | NEXT | — |
+| P6 | G6-6 | HTTP + wiring + swagger | P5 | DONE | 20 routes contract; controllers 99.5%; app wiring; swagger 14 paths / 20 ops |
+| P7 | G6-7 | Integration + cycle + parity | P6 | CURRENT | — |
 | P8 | G6-8 | Frontend | shell | BLOCKED | — |
-| P9 | G6-9 | DoD close | P7 | LATER | — |
+| P9 | G6-9 | DoD close | P7 | NEXT | — |
 
 ## Current Phase
 - Goal: G6-2 models + migrations.
@@ -34,3 +34,4 @@
 | 2026-10-09 | P3 | dto + validators (dates, future instants, CTC, email normalization) | 100% | GREEN | handoff.md |
 | 2026-10-09 | P4 | repositories (job, candidate + stage events, interview, offer, outbox) | build/vet clean | GREEN | handoff.md |
 | 2026-10-09 | P5 | Module 1 accessors; job/candidate/interview/offer/hire services; events; relay; goldens G4–G12 unit + failure injection | 99.4% | GREEN | handoff.md |
+| 2026-10-09 | P6 | controllers + routes (20 ops) + module (Module 1 adapter, seeds, relay) + internal/app wiring + swagger | routes 100%, controllers 99.5%, build green | GREEN | handoff.md |

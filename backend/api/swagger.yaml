@@ -2228,6 +2228,184 @@ paths:
         '200': {description: Payslip, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipEnvelope'}}}}
         '404': {description: NOT_FOUND}
 
+  /recruitment/jobs:
+    post:
+      summary: Create a job opening in draft (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateJobRequest'}}}}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/JobEnvelope'}}}}
+        '400': {$ref: '#/components/responses/ValidationError'}
+    get:
+      summary: List job openings (recruitment:read)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [draft, open, on_hold, closed, filled]}}, {name: department_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Jobs, content: {application/json: {schema: {$ref: '#/components/schemas/JobListEnvelope'}}}}
+  /recruitment/jobs/{id}:
+    get:
+      summary: Get a job opening (recruitment:read)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Job, content: {application/json: {schema: {$ref: '#/components/schemas/JobEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+    patch:
+      summary: Update a job while not closed/filled (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateJobRequest'}}}}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/JobEnvelope'}}}}
+        '409': {description: JOB_STATE}
+  /recruitment/jobs/{id}/status:
+    post:
+      summary: Change job status; draft→open, open↔on_hold, any non-final→closed; filled is automatic (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [status], properties: {status: {type: string, enum: [open, on_hold, closed]}}}}}}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/JobEnvelope'}}}}
+        '409': {description: JOB_STATE}
+  /recruitment/candidates:
+    post:
+      summary: Add a candidate to an open job; email unique per job, case-insensitive (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateCandidateRequest'}}}}
+      responses:
+        '201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateEnvelope'}}}}
+        '409': {description: JOB_NOT_OPEN or CONFLICT (duplicate email)}
+    get:
+      summary: List candidates (recruitment:read)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: job_id, in: query, schema: {type: string, format: uuid}}, {name: stage, in: query, schema: {$ref: '#/components/schemas/CandidateStage'}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Candidates, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateListEnvelope'}}}}
+  /recruitment/candidates/{id}:
+    get:
+      summary: Get a candidate with stage history (recruitment:read)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Candidate, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateEnvelope'}}}}
+        '404': {description: NOT_FOUND}
+    patch:
+      summary: Update contact fields (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateCandidateRequest'}}}}
+      responses:
+        '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateEnvelope'}}}}
+        '409': {description: CONFLICT or INVALID_STAGE (hired)}
+  /recruitment/candidates/{id}/stage:
+    post:
+      summary: Move a candidate along the pipeline (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [stage], properties: {stage: {type: string, enum: [screening, interview, rejected, withdrawn]}, note: {type: string, maxLength: 500}}}}}}
+      responses:
+        '200': {description: Moved, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateEnvelope'}}}}
+        '409': {description: INVALID_STAGE}
+  /recruitment/candidates/{id}/hire:
+    post:
+      summary: Hire a candidate with an accepted offer; invites a user and creates the employee profile (recruitment:hire)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [employee_code], properties: {employee_code: {type: string}, employment_type: {type: string, enum: [full_time, part_time, contract, intern]}}}}}}
+      responses:
+        '200': {description: Hired, content: {application/json: {schema: {$ref: '#/components/schemas/HireEnvelope'}}}}
+        '409': {description: NOT_HIREABLE, JOB_NOT_OPEN or CONFLICT (employee code / email taken)}
+  /recruitment/interviews:
+    post:
+      summary: Schedule an interview for a candidate in stage interview (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ScheduleInterviewRequest'}}}}
+      responses:
+        '201': {description: Scheduled, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewEnvelope'}}}}
+        '409': {description: INVALID_STAGE or CONFLICT (interviewer not working)}
+    get:
+      summary: List a candidate's interviews (recruitment:read)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: candidate_id, in: query, required: true, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Interviews, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewListEnvelope'}}}}
+  /recruitment/interviews/me:
+    get:
+      summary: My interviews as interviewer (authenticated employee)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [scheduled, completed, cancelled]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Interviews, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewListEnvelope'}}}}
+        '404': {description: EMPLOYEE_NOT_FOUND}
+  /recruitment/interviews/{id}/feedback:
+    post:
+      summary: Submit feedback on my scheduled interview (assigned interviewer only)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [rating, recommendation], properties: {rating: {type: integer, minimum: 1, maximum: 5}, recommendation: {type: string, enum: [strong_hire, hire, hold, reject]}, notes: {type: string}}}}}}
+      responses:
+        '200': {description: Completed, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewEnvelope'}}}}
+        '404': {description: NOT_FOUND (not your interview)}
+        '409': {description: INTERVIEW_STATE}
+  /recruitment/interviews/{id}/cancel:
+    post:
+      summary: Cancel a scheduled interview (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewEnvelope'}}}}
+        '409': {description: INTERVIEW_STATE}
+  /recruitment/offers:
+    post:
+      summary: Make an offer; candidate moves to stage offer (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateOfferRequest'}}}}
+      responses:
+        '201': {description: Offered, content: {application/json: {schema: {$ref: '#/components/schemas/OfferEnvelope'}}}}
+        '409': {description: INVALID_STAGE or OFFER_EXISTS}
+    get:
+      summary: List a candidate's offers (recruitment:read)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: candidate_id, in: query, required: true, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: Offers, content: {application/json: {schema: {$ref: '#/components/schemas/OfferListEnvelope'}}}}
+  /recruitment/offers/{id}/decision:
+    post:
+      summary: Record the candidate's decision (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [accepted, declined]}}}}}}
+      responses:
+        '200': {description: Decided, content: {application/json: {schema: {$ref: '#/components/schemas/OfferEnvelope'}}}}
+        '409': {description: OFFER_STATE (not open or expired)}
+  /recruitment/offers/{id}/withdraw:
+    post:
+      summary: Withdraw an open offer (recruitment:manage)
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Withdrawn, content: {application/json: {schema: {$ref: '#/components/schemas/OfferEnvelope'}}}}
+        '409': {description: OFFER_STATE}
 components:
   securitySchemes:
     BearerAuth:
@@ -2747,3 +2925,158 @@ components:
         created_at: {type: string, format: date-time}
     PayslipEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Payslip'}}}
     PayslipListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Payslip'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    CandidateStage: {type: string, enum: [applied, screening, interview, offer, hired, rejected, withdrawn]}
+    CreateJobRequest:
+      type: object
+      required: [title, headcount, employment_type, description]
+      properties:
+        title: {type: string, maxLength: 150}
+        department_id: {type: string, format: uuid}
+        designation_id: {type: string, format: uuid}
+        headcount: {type: integer, minimum: 1, maximum: 1000}
+        location: {type: string, maxLength: 100}
+        employment_type: {type: string, enum: [full_time, part_time, contract, intern]}
+        min_experience_years: {type: integer, minimum: 0, maximum: 50}
+        description: {type: string}
+    UpdateJobRequest:
+      type: object
+      description: Any subset of CreateJobRequest fields; headcount may not drop below hired_count
+      properties:
+        title: {type: string}
+        department_id: {type: string, format: uuid}
+        designation_id: {type: string, format: uuid}
+        headcount: {type: integer}
+        location: {type: string}
+        employment_type: {type: string, enum: [full_time, part_time, contract, intern]}
+        min_experience_years: {type: integer}
+        description: {type: string}
+    Job:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        department_id: {type: string, format: uuid}
+        designation_id: {type: string, format: uuid}
+        headcount: {type: integer}
+        hired_count: {type: integer}
+        location: {type: string}
+        employment_type: {type: string}
+        min_experience_years: {type: integer}
+        description: {type: string}
+        status: {type: string, enum: [draft, open, on_hold, closed, filled]}
+        opened_at: {type: string, format: date-time}
+        closed_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    JobEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Job'}}}
+    JobListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Job'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    CreateCandidateRequest:
+      type: object
+      required: [job_id, first_name, last_name, email, source]
+      properties:
+        job_id: {type: string, format: uuid}
+        first_name: {type: string}
+        last_name: {type: string}
+        email: {type: string, format: email}
+        phone: {type: string}
+        source: {type: string, enum: [career_site, referral, agency, linkedin, other]}
+        resume_url: {type: string, format: uri}
+        expected_ctc: {$ref: '#/components/schemas/Money'}
+        notice_period_days: {type: integer, minimum: 0, maximum: 365}
+    UpdateCandidateRequest:
+      type: object
+      properties:
+        first_name: {type: string}
+        last_name: {type: string}
+        email: {type: string, format: email}
+        phone: {type: string}
+        resume_url: {type: string, format: uri}
+        expected_ctc: {$ref: '#/components/schemas/Money'}
+        notice_period_days: {type: integer}
+    StageEvent:
+      type: object
+      properties:
+        from_stage: {$ref: '#/components/schemas/CandidateStage'}
+        to_stage: {$ref: '#/components/schemas/CandidateStage'}
+        actor_user_id: {type: string, format: uuid}
+        note: {type: string}
+        created_at: {type: string, format: date-time}
+    Candidate:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        job_id: {type: string, format: uuid}
+        first_name: {type: string}
+        last_name: {type: string}
+        email: {type: string}
+        phone: {type: string}
+        source: {type: string}
+        resume_url: {type: string}
+        expected_ctc: {$ref: '#/components/schemas/Money'}
+        notice_period_days: {type: integer}
+        stage: {$ref: '#/components/schemas/CandidateStage'}
+        hired_employee_id: {type: string, format: uuid}
+        history: {type: array, items: {$ref: '#/components/schemas/StageEvent'}, description: 'Only on GET /recruitment/candidates/{id}'}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CandidateEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Candidate'}}}
+    CandidateListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Candidate'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    HireEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            candidate_id: {type: string, format: uuid}
+            user_id: {type: string, format: uuid}
+            employee_id: {type: string, format: uuid}
+            job_status: {type: string, enum: [open, on_hold, filled]}
+    ScheduleInterviewRequest:
+      type: object
+      required: [candidate_id, round_name, interviewer_employee_id, scheduled_at, duration_mins]
+      properties:
+        candidate_id: {type: string, format: uuid}
+        round_name: {type: string, maxLength: 100}
+        interviewer_employee_id: {type: string, format: uuid}
+        scheduled_at: {type: string, format: date-time, description: Must be in the future}
+        duration_mins: {type: integer, minimum: 15, maximum: 480}
+        meeting_link: {type: string, format: uri}
+    Interview:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        candidate_id: {type: string, format: uuid}
+        round_name: {type: string}
+        interviewer_employee_id: {type: string, format: uuid}
+        scheduled_at: {type: string, format: date-time}
+        duration_mins: {type: integer}
+        meeting_link: {type: string}
+        status: {type: string, enum: [scheduled, completed, cancelled]}
+        rating: {type: integer}
+        recommendation: {type: string, enum: [strong_hire, hire, hold, reject]}
+        feedback: {type: string}
+        feedback_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    InterviewEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Interview'}}}
+    InterviewListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Interview'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    CreateOfferRequest:
+      type: object
+      required: [candidate_id, offered_ctc, joining_date]
+      properties:
+        candidate_id: {type: string, format: uuid}
+        offered_ctc: {$ref: '#/components/schemas/Money'}
+        joining_date: {type: string, format: date, description: Today or later}
+        expires_on: {type: string, format: date, description: Today or later and not after joining_date}
+    Offer:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        candidate_id: {type: string, format: uuid}
+        offered_ctc: {$ref: '#/components/schemas/Money'}
+        joining_date: {type: string, format: date}
+        expires_on: {type: string, format: date}
+        status: {type: string, enum: [offered, accepted, declined, withdrawn]}
+        decided_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    OfferEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Offer'}}}
+    OfferListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Offer'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}

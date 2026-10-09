@@ -100,7 +100,7 @@ func Build(o Options) (*gin.Engine, error) {
 		}
 	}
 
-	people, err := buildPeopleModules(o, identityModule, employeeModule)
+	people, err := buildPeopleModules(o, coreModules{identity: identityModule, org: orgModule, employee: employeeModule})
 	if err != nil {
 		return nil, err
 	}
