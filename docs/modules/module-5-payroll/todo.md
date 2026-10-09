@@ -1,0 +1,15 @@
+# Module 5 — Todo (P1 DONE; P2 CURRENT)
+
+- [x] T5-01 [G5-1] design frozen
+- [ ] T5-02 [G5-2] models + tests; migrations 000038–000044
+- [ ] T5-03 [G5-3] calc money/breakdown/prorate/statutory + goldens G2–G9
+- [ ] T5-04 [G5-3] dto + validators
+- [ ] T5-05 [G5-4] repositories
+- [ ] T5-06 [G5-5] Module 4 UnpaidLeave port (D5-03)
+- [ ] T5-07 [G5-5] structure/assignment services
+- [ ] T5-08 [G5-5] run/payslip services + goldens
+- [ ] T5-09 [G5-5] events + relay
+- [ ] T5-10 [G5-6] controllers, routes, module, app wiring, seed, swagger
+- [ ] T5-11 [G5-7] integration goldens + migration cycle
+- [ ] T5-12 [G5-8] frontend — BLOCKED
+- [ ] T5-13 [G5-9] DoD close
