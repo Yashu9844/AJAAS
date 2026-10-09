@@ -1,3 +1,3 @@
 # Module 7 — Current Goal
 
-Goal: G7-2 — models + migrations 000051–000056.
+Goal: G7-3 — DTOs + validators (score + lifecycle green).

@@ -1,7 +1,7 @@
-# Module 7 — Todo (P1 DONE; P2 CURRENT)
+# Module 7 — Todo (P2 DONE; P3 CURRENT)
 
 - [x] T7-01 design frozen
-- [ ] T7-02 models + migrations
+- [x] T7-02 models + migrations
 - [ ] T7-03 score + lifecycle + DTOs + validators
 - [ ] T7-04 repositories
 - [ ] T7-05 services + access policy + events + relay + goldens
