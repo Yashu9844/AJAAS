@@ -33,6 +33,7 @@ type Module struct {
 	db          *gorm.DB
 	controllers routes.Controllers
 	relay       *services.OutboxRelay
+	leaveSync   services.LeaveSync
 }
 
 // NewModule wires repositories, services and controllers over Module 0 audit and Module 2 employees.
@@ -56,7 +57,8 @@ func NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeSe
 			Regularization: controllers.NewRegularizationController(services.NewRegularizationService(deps)),
 			Shift:          controllers.NewShiftController(services.NewShiftService(deps), services.NewAssignmentService(deps)),
 		},
-		relay: services.NewOutboxRelay(deps),
+		relay:     services.NewOutboxRelay(deps),
+		leaveSync: services.NewLeaveSync(deps),
 	}
 }
 
@@ -105,6 +107,9 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 	}
 	routes.RegisterRoutes(rg, mw, m.controllers)
 }
+
+// LeaveSync exposes contract C10 for Module 4 (D3-17).
+func (m *Module) LeaveSync() services.LeaveSync { return m.leaveSync }
 
 // Relay exposes the outbox relay; cmd/main.go runs it until shutdown.
 func (m *Module) Relay() *services.OutboxRelay { return m.relay }

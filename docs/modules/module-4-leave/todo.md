@@ -1,4 +1,4 @@
-# Module 4 — Todo (P5 DONE; P6 CURRENT)
+# Module 4 — Todo (P6 DONE; P7 CURRENT)
 
 - [x] T4-01 [G4-1] re-scope bundle + frozen design
 - [x] T4-02 [G4-2] models + model tests (RED→GREEN)
@@ -10,8 +10,8 @@
 - [x] T4-08 [G4-5] Type/Holiday/Balance services + tests
 - [x] T4-09 [G4-5] Request service (preview/apply/approve/reject/cancel) + goldens
 - [x] T4-10 [G4-5] events + outbox relay
-- [ ] T4-11 [G4-6] controllers + routes + tests
-- [ ] T4-12 [G4-6] module.go, main.go wiring, permission seed, swagger
+- [x] T4-11 [G4-6] controllers + routes + tests
+- [x] T4-12 [G4-6] module.go, main.go wiring, permission seed, swagger
 - [ ] T4-13 [G4-7] live goldens + migration cycle + parity
 - [ ] T4-14 [G4-8] frontend slice — BLOCKED (identity shell)
 - [ ] T4-15 [G4-9] DoD close + handoff

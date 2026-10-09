@@ -3,3 +3,4 @@
 2026-10-09 — P3 DONE: calc engine (goldens G2–G4), DTOs (G15), validators — all 100%.
 2026-10-09 — P4 DONE: six repositories + advisory lock.
 2026-10-09 — P5 DONE: leave services, events, relay, Module 3 LeaveSync; goldens green; services 96.3%.
+2026-10-09 — P6 DONE: HTTP edge, routes, wiring, permission seed, swagger.

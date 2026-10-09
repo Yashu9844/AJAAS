@@ -14,6 +14,7 @@ import (
 	"github.com/jaas/jaas/internal/employee"
 	"github.com/jaas/jaas/internal/identity"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
+	"github.com/jaas/jaas/internal/leave"
 	"github.com/jaas/jaas/internal/organization"
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
@@ -134,6 +135,16 @@ func main() {
 	if err := attendanceModule.SeedPermissions(context.Background()); err != nil {
 		log.Fatal().Err(err).Msg("Attendance permission seed failed")
 	}
+
+	// 6e. Bootstrap Leave Module (Module 4; depends on Identity audit, Employee directory, Attendance LeaveSync)
+	leaveModule := leave.NewModule(db, leave.Ports{Employees: employeeModule.EmployeeService(), Audit: identityModule.AuditService(),
+		Attendance: attendanceModule.LeaveSync(), Publisher: publisher})
+	if err := db.AutoMigrate(leaveModule.RegisterModels()...); err != nil {
+		log.Fatal().Err(err).Msg("Leave auto-migration failed")
+	}
+	if err := leaveModule.SeedPermissions(context.Background()); err != nil {
+		log.Fatal().Err(err).Msg("Leave permission seed failed")
+	}
 	log.Info().Msg("Database auto-migrations executed successfully")
 
 	// 7. Initialize HTTP server engine
@@ -174,10 +185,17 @@ func main() {
 		RolePerms:      identityModule.RolePermissionRepository(),
 		Redis:          redisClient,
 	})
+	leaveModule.RegisterRoutes(v1Group, leave.RouteDeps{
+		TenantResolver: identityModule.TenantResolver(),
+		Authenticate:   identityModule.AuthMiddleware(),
+		UserRoles:      identityModule.UserRoleRepository(),
+		RolePerms:      identityModule.RolePermissionRepository(),
+	})
 
-	// Attendance outbox relay (FR-EV002) runs until shutdown.
+	// Attendance and Leave outbox relays (FR-EV002) run until shutdown.
 	relayCtx, stopRelay := context.WithCancel(context.Background())
 	go attendanceModule.Relay().Run(relayCtx)
+	go leaveModule.Relay().Run(relayCtx)
 
 	// Health check route
 	router.GET("/health", func(c *gin.Context) {
