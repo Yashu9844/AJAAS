@@ -1,4 +1,4 @@
-# Module 6 — Files
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Files
 
 Docs (this bundle): README, agent, current-goal, plan, current-status, todo, specification, architecture, connections, security, testing, golden-tests, assumptions, decisions, changelog, handoff, files (this map).
 

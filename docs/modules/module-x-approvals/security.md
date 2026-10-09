@@ -1,4 +1,4 @@
-# Module 6 — Security
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Security
 
 Law: docs/SECURITY.md (read it before any security-sensitive change).
 Module note: Workflow integrity (High). No self-approval bypass; every decision audited with actor + reason.

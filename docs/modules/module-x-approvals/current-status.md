@@ -1,4 +1,4 @@
-# Module 6 — Current Status (updated: 2026-09-30)
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Current Status (updated: 2026-09-30)
 
 Implemented:
 - Doc bundle scaffold (17 files) with real dependency metadata.

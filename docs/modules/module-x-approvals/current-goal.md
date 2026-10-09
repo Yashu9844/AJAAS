@@ -1,4 +1,4 @@
-# Module 6 — Current Goal
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Current Goal
 
 Goal: NONE ACTIVE — module design pending after Modules 0 + 2 contracts.
 Why: dependencies are not stable yet. See connections.md.

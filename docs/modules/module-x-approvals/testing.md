@@ -1,4 +1,4 @@
-# Module 6 — Testing
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Testing
 
 Strategy (MASTER_PROMPT section 14): unit (services 90 percent) + integration (Docker PG) + contract/API + security (enumeration, tamper, reuse, injection) + golden (protected) + performance (p95 budgets).
 

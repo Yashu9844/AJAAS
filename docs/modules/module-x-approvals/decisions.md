@@ -1,4 +1,4 @@
-# Module 6 — Decisions (ADR log)
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Decisions (ADR log)
 
 Format: Decision / Reason / Alternatives / Tradeoff. Log every architectural choice here so future agents do not regress it.
 

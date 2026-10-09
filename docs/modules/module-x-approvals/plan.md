@@ -1,4 +1,4 @@
-# Module 6 — Plan (updated: 2026-09-30, owner: scaffold)
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Plan (updated: 2026-09-30, owner: scaffold)
 
 ## Phase Map
 

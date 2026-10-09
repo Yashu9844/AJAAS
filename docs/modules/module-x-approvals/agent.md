@@ -1,4 +1,4 @@
-# Module 6 — Agent Law
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Agent Law
 
 ROLE: Autonomous implementer for Module 6 (Approval Engine). You own delivery of current-goal.md inside this module only.
 STATUS: DESIGN PENDING. Do NOT write production code until plan.md P1 design is DONE and contracts are frozen. Docs and scaffold tasks only.

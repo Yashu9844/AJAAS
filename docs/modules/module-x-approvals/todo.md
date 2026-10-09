@@ -1,4 +1,4 @@
-# Module 6 — Todo
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Todo
 
 ## P0 (scaffold — this task)
 - [ ] Verify 17-file bundle present and validated (Step 5 checklist)

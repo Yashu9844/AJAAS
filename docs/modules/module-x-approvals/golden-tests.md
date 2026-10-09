@@ -1,4 +1,4 @@
-# Module 6 — Golden Tests
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Golden Tests
 
 STATUS: candidates defined at P1 design. Rules already in force (MASTER_PROMPT section 15):
 

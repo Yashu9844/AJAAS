@@ -1,4 +1,4 @@
-# Module 6 — Specification
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Specification
 
 STATUS: DESIGN PENDING (plan.md P1). Nothing below is frozen.
 

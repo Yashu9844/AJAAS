@@ -1,4 +1,4 @@
-# Module 6 — Approval Engine
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Approval Engine
 
 Purpose: Generic multi-step approval workflows for leave, expenses, assets and more.
 Responsibilities: Workflow definitions, approval chains, escalations, decisions audit. Full spec lands at design phase — see specification.md.

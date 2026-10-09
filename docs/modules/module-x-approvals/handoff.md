@@ -1,4 +1,4 @@
-# Module 6 — Handoff (2026-09-30, scaffold)
+# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Handoff (2026-09-30, scaffold)
 
 Completed: 17-file bundle scaffolded; dependency metadata filled from MASTER_PROMPT registry; code skeletons referenced.
 Not completed: design (P1), all production code.
