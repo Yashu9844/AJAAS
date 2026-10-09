@@ -1,4 +1,4 @@
-# Module 5 — Todo (P6 DONE; P7 CURRENT)
+# Module 5 — Todo (backend CLOSED; P8 BLOCKED)
 
 - [x] T5-01 [G5-1] design frozen
 - [x] T5-02 [G5-2] models + tests; migrations 000038–000044
@@ -10,6 +10,6 @@
 - [x] T5-08 [G5-5] run/payslip services + goldens
 - [x] T5-09 [G5-5] events + relay
 - [x] T5-10 [G5-6] controllers, routes, module, app wiring, seed, swagger
-- [ ] T5-11 [G5-7] integration goldens + migration cycle
+- [x] T5-11 [G5-7] integration goldens + migration cycle
 - [ ] T5-12 [G5-8] frontend — BLOCKED
-- [ ] T5-13 [G5-9] DoD close
+- [x] T5-13 [G5-9] DoD close

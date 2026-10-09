@@ -4,3 +4,4 @@
 2026-10-09 — P4 DONE: repositories.
 2026-10-09 — P5 DONE: payroll services, events, relay; Module 4 UnpaidLeave port; goldens green.
 2026-10-09 — P6 DONE: HTTP edge, app wiring, swagger.
+2026-10-09 — P7+P9 DONE (backend CLOSED): integration goldens, parity, DoD.

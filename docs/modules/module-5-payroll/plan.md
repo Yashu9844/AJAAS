@@ -1,4 +1,4 @@
-# Module 5 — Plan (updated: 2026-10-09, owner: loop — P6 DONE, P7 CURRENT)
+# Module 5 — Plan (updated: 2026-10-09, owner: loop — backend CLOSED; P8 BLOCKED)
 
 ## Phase Map
 
@@ -11,15 +11,15 @@
 | P4 | G5-4 | Repositories | P2 | DONE | 5 repos compile; tenant-scoped; run FOR UPDATE; DISTINCT ON eligibility; SQL proven at P7 |
 | P5 | G5-5 | Services + events + relay + Module 4 UnpaidLeave port; goldens G10–G12, G15 | P3+P4 | DONE | lifecycle goldens (proration, window, LOP G10, statutory), G11, G12, G15, self-visibility/privacy; services 94.4%; Module 4 UnpaidLeave port tested |
 | P6 | G5-6 | Controllers, routes, module, app wiring, seed, swagger | P5 | DONE | controllers 99.4%, routes 100% (20-route RBAC contract), module + app wiring (peopleModules) + seed + relay, swagger 16 paths/20 ops validated |
-| P7 | G5-7 | Integration goldens + migration cycle | P6 | CURRENT | — |
+| P7 | G5-7 | Integration goldens + migration cycle | P6 | DONE | integration: lifecycle (real Module 4 LOP G10, maker-checker G11, G12, self visibility G13, privacy G14, CSV) + RBAC/isolation/G16; full suite 61/61; cycle 44/7/7; AutoMigrate↔SQL identical (19 indexes) |
 | P8 | G5-8 | Frontend | identity shell | BLOCKED | — |
-| P9 | G5-9 | DoD close + handoff | P7 | NEXT | — |
+| P9 | G5-9 | DoD close + handoff | P7 | DONE | DoD ticked with evidence; AST clean; 20/20 routes ↔ swagger |
 
 ## Current Phase
-- Goal: G5-7 integration goldens (G1, G10 real Module 4 LOP, G11–G14, G16) + full lifecycle on the in-process harness.
+- None: Module 5 backend closed at P9 (2026-10-09).
 
 ## Next Phase
-- Goal: G5-9 DoD close.
+- G5-8 frontend payroll slice (BLOCKED until a frontend shell for these modules exists).
 
 ## Gate Log
 | Date | Phase | Gate | Decision | By | Reason |
@@ -35,3 +35,4 @@
 | 2026-10-09 | P4 | repositories: structure (+components), assignment (advisory lock, current, DISTINCT ON eligibility), run (FOR UPDATE), payslip (+lines, finalized-only self list), outbox | build/vet clean | GREEN | handoff.md |
 | 2026-10-09 | P5 | Module 4 UnpaidLeave port (approved unpaid, clipped, half day, holidays) RED→GREEN; payroll ports\/errors\/helpers\/mappers; Structure, Assignment, Run (state machine + maker-checker), calculate (window, LOP, Compute, warnings), Payslip (self finalized-only, CSV), events, relay; fakes + goldens + fault injection | vet clean; payroll services 94.4%, leave services 96.5% | GREEN | handoff.md |
 | 2026-10-09 | P6 | controllers (setup, run) + routes (20 ops) + module.go + internal\/app peopleModules wiring (Module 4 UnpaidLeave) + swagger | go vet .\/... clean; go test .\/internal\/... PASS | GREEN | handoff.md |
+| 2026-10-09 | P7+P9 | tests\/integration\/payroll_test.go (2 tests); parity diff; DoD walk | integration 61\/61 PASS; AST clean | GREEN | handoff.md |

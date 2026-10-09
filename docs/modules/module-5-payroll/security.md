@@ -19,3 +19,15 @@ Salary is confidential: amounts appear only in API responses to `payroll:read` h
 | PS-T6 | Salary leakage via logs/events | whitelisted audit/event payloads; tests assert no per-employee amounts |
 | PS-T7 | Rounding drift / float errors | integer paise, golden-tested statutory math |
 | PS-T8 | CSV injection in payout export | cells beginning with `= + - @` are prefixed with `'` |
+
+## Threat → evidence (verified 2026-10-09)
+| Threat | Evidence |
+|---|---|
+| PS-T1 | integration: member → another's payslip id 404; services TestGolden_SelfVisibilityAndPrivacy |
+| PS-T2 | integration + unit: 0 payslips before finalize, unfinalized own payslip 404 |
+| PS-T3 | integration + unit G11: calculator approving → 403 SELF_APPROVAL_FORBIDDEN |
+| PS-T4 | unit G12: calculate after approve / finalize twice → RUN_STATE; run row locked (FOR UPDATE) |
+| PS-T5 | integration G1: tenant B 404 on A's run/structure, foreign structure on assign 404, foreign JWT 403 |
+| PS-T6 | integration G14: no ctc/net/amounts in audit metadata; events never name employees |
+| PS-T7 | calc goldens G2–G9 (integer paise, exact ESI ceiling, rupee rounding) |
+| PS-T8 | validators TestCSVSafe + services CSV test (`=HYPERLINK` neutralized) |
