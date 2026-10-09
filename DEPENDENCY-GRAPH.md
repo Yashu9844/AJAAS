@@ -11,7 +11,7 @@ Build bottom-up. Independent same-level modules may run in parallel. Details per
 | 4 Leave & Absence (masterplan, D4-01; Projects unnumbered) | 0, 2, 3 | 3 (attendance on_leave), 5, 7, 10, 11 | API/Data/Event | backend DONE 2026-10-09 (P1–P7, P9; live goldens PASS); frontend P8 BLOCKED (needs identity shell) |
 | 5 Payroll & Statutory Compliance (masterplan, D5-01; Meetings unnumbered) | 0, 2, 4 | 7, 10, 11 | API/Data/Event | backend DONE 2026-10-09 (P1–P7, P9; integration 61/61); frontend BLOCKED |
 | 6 Recruitment & ATS (masterplan, D6-01; Approvals unnumbered) | 0, 1, 2 | 7, 10, 11 | API/Data/Event | backend DONE 2026-10-09 (P1–P7, P9; integration 63/63); frontend BLOCKED |
-| 7 Notifications | 0, 4, 5, 6, 8, 9 (events) | 10, 11 | Event/Data | Pending |
+| 7 Performance & OKRs (masterplan, D7-01; Notifications unnumbered → module-x-notifications) | 0, 1, 2 | 10, 11 | API/Data/Event | P1 design DONE 2026-10-09; P2 CURRENT |
 | 8 Assets | 0 (User, RBAC) | 7, 10, 11 | API/Auth | Pending |
 | 9 (masterplan: Helpdesk — unscoped; Payroll moved to 5, D5-01) | — | — | — | Pending |
 | 10 Analytics | all (read contracts + events) | 11 | Data/Event | Pending |
