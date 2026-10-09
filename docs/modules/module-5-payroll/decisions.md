@@ -9,3 +9,4 @@
 - D5-07 TDS: new regime FY 2025-26, full-month projection × 12, standard deduction ₹75,000, 87A rebate up to ₹12,00,000 without marginal relief, 4% cess. Approximate by design; investment declarations/old regime out of scope.
 - D5-08 Maker-checker on approve (approver ≠ last calculator); finalize also needs `payroll:approve`.
 - D5-09 Payslips store an employee snapshot (code, name) so later Module 2 edits never rewrite history.
+- D5-10 Eligibility picks each employee's latest assignment overlapping the period (DISTINCT ON); a mid-month CTC change pays the newer CTC for the whole month in v1 (no split-period proration).
