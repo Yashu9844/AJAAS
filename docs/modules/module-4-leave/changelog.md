@@ -6,3 +6,4 @@
 2026-10-09 — P6 DONE: HTTP edge, routes, wiring, permission seed, swagger.
 2026-10-09 — P7 DONE: live goldens PASS (11 goldens), full suite 16/16, migration cycle + parity identical.
 2026-10-09 — P9 DONE (backend CLOSED): DoD walked with evidence; perf caveat recorded (D4-11).
+2026-10-09 — Integrated onto Module 0–2 hardening (branch integrate/m3-m4-on-hardening): migrations renumbered 000026–000037, app wiring, error normalization, integration tests ported; 59/59 PASS.

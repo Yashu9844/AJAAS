@@ -12,4 +12,4 @@
 | backend/internal/attendance/services/leave_sync.go (+test), record source `leave`, module LeaveSync() | Module 3 port (D4-08) | DONE (P5/P6) |
 | backend/internal/leave/{controllers,routes}/*.go + tests, module.go | HTTP edge + DI | DONE (P6) |
 | backend/cmd/main.go · backend/api/swagger.yaml | wiring, contract | DONE (P6) |
-| backend/tests/api/leave_{flow,rules}_test.go (`integration`) | live goldens | DONE (P7) |
+| backend/tests/integration/leave_test.go (in-process harness) | live goldens | DONE (P7) |

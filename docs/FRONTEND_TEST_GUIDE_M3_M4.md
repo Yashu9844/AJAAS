@@ -1,8 +1,8 @@
 # JAAS — Frontend Test Guide: Module 3 (Attendance) + Module 4 (Leave)
 
-**Branch:** `module_4_leave` (contains Module 3; `module_3_attendance` is Module 3 alone). **Backend status:** both modules' backends are done and verified against real Postgres. The frontend is still a bootstrap with no login screen, so the frontend work (P8) is open for you.
+**Branch:** `integrate/m3-m4-on-hardening` — Modules 3 and 4 merged onto the Module 0–2 hardening (`fix/module-0-2-hardening`), adapted to its contracts and fully re-tested. Once it is merged, `main` is the branch to test. (Older `module_3_attendance` / `module_4_leave` are superseded — don't test those.) **Backend status:** both modules' backends are done and verified against real Postgres. The frontend work for these modules (P8) is open for you.
 
-Use this guide to build frontend tests that exercise every behaviour below. The backend's own proof is linked per item: `internal/...` are unit tests, and `tests/api/...` are live HTTP tests run with `-tags integration`.
+Use this guide to build frontend tests that exercise every behaviour below. The backend's own proof is linked per item: `internal/...` are unit tests, and `tests/integration/...` are in-process HTTP tests against real Postgres + Redis (`JAAS_REQUIRE_INTEGRATION=1 go test ./tests/integration/`).
 
 ---
 
@@ -10,10 +10,10 @@ Use this guide to build frontend tests that exercise every behaviour below. The 
 
 | Module | Scope | Endpoints | Tables | Events | Proof |
 |---|---|---|---|---|---|
-| 3 Attendance | shifts, shift assignments, punch in/out, daily records with computed totals (work, break, late, overtime, status), regularization (timesheet correction) approvals, daily summary | 19 | 6 (`000026–000031`) | 5 on `jaas.attendance.events` | unit ≥ 91.9%, 6 live tests |
-| 4 Leave | leave types (policies), holiday calendar, ledger-backed balances with lazy accrual and carry-forward, preview/apply/approve/reject/cancel, approved leave marked `on_leave` in attendance | 20 | 6 (`000032–000037`) | 5 on `jaas.leave.events` | unit ≥ 96.3%, 5 live tests |
+| 3 Attendance | shifts, shift assignments, punch in/out, daily records with computed totals (work, break, late, overtime, status), regularization (timesheet correction) approvals, daily summary | 19 | 6 (`000026–000031`) | 5 on `jaas.attendance.events` | unit ≥ 91.9%, 7 integration tests |
+| 4 Leave | leave types (policies), holiday calendar, ledger-backed balances with lazy accrual and carry-forward, preview/apply/approve/reject/cancel, approved leave marked `on_leave` in attendance | 20 | 6 (`000032–000037`) | 5 on `jaas.leave.events` | unit ≥ 96.3%, 5 integration tests |
 
-Whole backend: `go build`, `go vet`, `go test ./internal/...` all pass, and the live suite passes 16/16 (attendance, leave, org). Full specs: `docs/modules/module-3-attendance/specification.md` and `docs/modules/module-4-leave/specification.md`. Swagger: `backend/api/swagger.yaml`.
+Whole backend (integrated with the Module 0–2 hardening): `go build`, `go vet`, `go test ./internal/...` all pass, and the full integration suite passes 59/59 (Modules 0–4, incl. security, golden and perf tests). Full specs: `docs/modules/module-3-attendance/specification.md` and `docs/modules/module-4-leave/specification.md`. Swagger: `backend/api/swagger.yaml`.
 
 ---
 
@@ -21,35 +21,31 @@ Whole backend: `go build`, `go vet`, `go test ./internal/...` all pass, and the 
 
 ```bash
 docker compose up -d postgres redis rabbitmq          # or: docker start ajaas-postgres-1 ajaas-redis-1 ajaas-rabbitmq-1
+docker exec ajaas-postgres-1 psql -U postgres -c "CREATE DATABASE jaas_fe"   # use a FRESH database (see note)
 cd backend
-APP_ENV=development DATABASE_PASSWORD=postgres DATABASE_DBNAME=jaas_dev go run ./cmd
+APP_ENV=development DATABASE_PASSWORD=postgres DATABASE_DBNAME=jaas_fe go run ./cmd
 curl localhost:8080/health                             # {"status":"UP"}
 ```
 
-On boot it auto-migrates the tables and seeds permissions `attendance:read|manage|approve` and `leave:read|manage|approve`.
+On boot the server applies the SQL migrations (`backend/migrations`, 000001–000037) and seeds the permission catalogue, including `attendance:read|manage|approve` and `leave:read|manage|approve`. **Use a fresh database:** a database created by the old AutoMigrate builds has no `schema_migrations` table and will not migrate cleanly.
 
 ### Tenant addressing (important for the browser)
-The tenant comes from the **Host subdomain only**, so the browser must call `http://<slug>.localhost:8080/api/v1/...`. Chrome and Firefox resolve `*.localhost` to 127.0.0.1. CORS allows `*` (verified preflight from `http://localhost:3000`). Send the JWT as `Authorization: Bearer <token>` and **don't** use `credentials: 'include'`, because `*` + credentials is rejected by browsers.
+The tenant comes from the **Host subdomain only**, so the browser must call `http://<slug>.localhost:8080/api/v1/...`. Chrome and Firefox resolve `*.localhost` to 127.0.0.1. Send the JWT as `Authorization: Bearer <token>`. CORS: in development with `CORS_ALLOWED_ORIGINS` unset, every origin is allowed; set `CORS_ALLOWED_ORIGINS=http://localhost:3000` to test the real allow-list. Don't use `credentials: 'include'`.
 
-### Create a test tenant + admin (no bootstrap API exists yet, so this uses SQL)
+### Create a test tenant + its first admin (one API call — no SQL)
 ```bash
-SLUG=fe-demo
-curl -X POST localhost:8080/api/v1/tenants -H 'Content-Type: application/json' -d "{\"name\":\"FE Demo\",\"slug\":\"$SLUG\"}"
-docker exec ajaas-postgres-1 psql -U postgres -d jaas_dev \
- -c "CREATE EXTENSION IF NOT EXISTS pgcrypto" \
- -c "INSERT INTO users (id,tenant_id,email,password_hash,first_name,last_name,status,created_at,updated_at) SELECT gen_random_uuid(), id, 'admin@$SLUG.com', crypt('Secret123!', gen_salt('bf',12)), 'Admin','User','active', now(), now() FROM tenants WHERE slug='$SLUG'" \
- -c "INSERT INTO user_roles (id,tenant_id,user_id,role_id,created_at,updated_at) SELECT gen_random_uuid(), u.tenant_id, u.id, r.id, now(), now() FROM users u JOIN tenants t ON t.id=u.tenant_id JOIN roles r ON r.tenant_id=t.id AND r.name='tenant_admin' WHERE t.slug='$SLUG' AND u.email='admin@$SLUG.com'"
+curl -X POST localhost:8080/api/v1/tenants \
+  -H "X-Platform-Key: dev-platform-admin-key-change-me" -H 'Content-Type: application/json' \
+  -d '{"name":"FE Demo","slug":"fe-demo","admin":{"email":"admin@fe-demo.com","password":"Passw0rd!123","first_name":"Admin","last_name":"User"}}'
 ```
-This recipe was verified on 2026-10-09. `tenant_admin` bypasses all permission checks.
+Returns the tenant with `admin_user_id`. `/tenants` without the platform key is `401`. The dev key lives in `configs/development.yaml` (override with `PLATFORM_ADMIN_KEY`). The admin holds `tenant_admin`, which bypasses permission checks. (Verified 2026-10-09 on a fresh database.)
 
-### Then, through the API (as admin, on `http://$SLUG.localhost:8080`)
-1. `POST /api/v1/auth/login` `{email, password:"Secret123!", tenant_slug}` returns `data.access_token` (15 min), `data.refresh_token` and `data.user.id`.
-2. Create a plain member with `POST /api/v1/users` `{email, password, first_name, last_name}`. The member has **no** attendance/leave permissions, which makes them a good RBAC test user.
-3. Create employee profiles for **both** users (attendance and leave need one): `POST /api/v1/employees` `{user_id, employee_code, first_name, last_name, employment_type:"full_time", joining_date:"2026-01-01T00:00:00Z"}`.
+### Then, through the API (on `http://fe-demo.localhost:8080`)
+1. `POST /api/v1/auth/login` `{tenant_slug, email, password}` returns `data.access_token`, `data.refresh_token` and `data.user.id`.
+2. Create a plain member with `POST /api/v1/users` `{email, password, first_name, last_name}`. The member has **no** attendance/leave permissions, which makes them a good RBAC test user. For a precise permission test, create a role holding exactly one permission (`POST /api/v1/roles` `{name, permission_ids}`, ids from `GET /api/v1/permissions`) and assign it to a user (`role_ids` on user create).
+3. Create employee profiles for **both** the admin and the member (attendance and leave need one; without it you get `EMPLOYEE_NOT_FOUND`): `POST /api/v1/employees` `{user_id, employee_code, first_name, last_name, employment_type:"full_time", joining_date:"2026-01-15T00:00:00Z"}`.
 
-**Login rate limit:** 10 logins per 15 min per IP. If tests hit `429`, clear it with:
-`docker exec ajaas-redis-1 sh -c "redis-cli --scan --pattern 'ratelimit:/api/v1/auth/login:*' | xargs -r redis-cli DEL"`
-
+**Login rate limit:** only **failed** logins count against the budget (successful logins never lock you out). If tests trip it, wait out the window or flush Redis for the dev DB.
 ### Response envelope (all endpoints)
 - Success: `{"data": ...}`. Lists return `{"data": [...], "meta": {page, per_page, total_items, total_pages}}`.
 - Error: `{"error": {"code", "message", "details"?: [{field, message}]}}`. Bad body fields return `400 VALIDATION_ERROR` with one detail per field.
@@ -114,10 +110,10 @@ This recipe was verified on 2026-10-09. `tenant_admin` bypasses all permission c
 ## 5. Frontend test checklist (each item is verified on the backend; your UI should prove the same)
 
 ### Attendance
-- [ ] **Punch widget:** IN gives 201 and today shows `open_session: true`. A second IN within 60 s gives `DUPLICATE_PUNCH`; after 60 s it gives `ALREADY_PUNCHED_IN`. OUT closes the session. OUT with no session gives `NOT_PUNCHED_IN`. *(tests/api/attendance_flow_test.go)*
-- [ ] **Concurrent taps:** 10 rapid IN clicks produce exactly one punch. *(attendance_race_test.go)*
+- [ ] **Punch widget:** IN gives 201 and today shows `open_session: true`. A second IN within 60 s gives `DUPLICATE_PUNCH`; after 60 s it gives `ALREADY_PUNCHED_IN`. OUT closes the session. OUT with no session gives `NOT_PUNCHED_IN`. *(tests/integration/attendance_test.go TestAttendancePunchFlow)*
+- [ ] **Concurrent taps:** 10 rapid IN clicks produce exactly one punch. *(attendance_test.go TestAttendanceConcurrentPunches)*
 - [ ] **Totals and status:** a day record shows work, break, late and overtime minutes and its status; a night shift is attributed to its start date. *(internal/attendance/calc goldens G4/G5)*
-- [ ] **Regularization:** the member submits, a second request for the same date gives `REGULARIZATION_PENDING`, the admin approves, and the record shows `is_regularized` with 540 work minutes for 09:00–18:00. The admin approving their own request gives 403. *(attendance_rules_test.go)*
+- [ ] **Regularization:** the member submits, a second request for the same date gives `REGULARIZATION_PENDING`, the admin approves, and the record shows `is_regularized` with 540 work minutes for 09:00–18:00. The admin approving their own request gives 403. *(attendance_test.go TestAttendanceRegularization)*
 - [ ] **Shifts:** create, assign, list assignments; an overlapping assignment auto-closes the old one; deactivating a shift in use gives `SHIFT_IN_USE`.
 - [ ] **Summary card:** the counts match the records.
 - [ ] **RBAC:** the member gets 403 on records, summary, shifts and the regularization list, but `/me`, punch and own regularizations work. *(G9)*
@@ -126,7 +122,7 @@ This recipe was verified on 2026-10-09. `tenant_admin` bypasses all permission c
 ### Leave
 - [ ] **Leave types admin:** create (code shown upper-cased), edit, deactivate; a duplicate name or code gives `CONFLICT`.
 - [ ] **Holidays admin:** add, list by year, delete; a duplicate date gives `CONFLICT`.
-- [ ] **Apply form + preview:** preview shows days and available-after; Fri–Mon counts 2, or 4 with the sandwich rule; a weekend-only range gives `NO_WORKING_DAYS`; a holiday inside the range is excluded. *(leave_flow_test.go, calc golden G2)*
+- [ ] **Apply form + preview:** preview shows days and available-after; Fri–Mon counts 2, or 4 with the sandwich rule; a weekend-only range gives `NO_WORKING_DAYS`; a holiday inside the range is excluded. *(leave_test.go TestLeaveLifecycle, calc golden G2)*
 - [ ] **Apply:** the balance card shows `reserved` up and `available` down. *(G5)*
 - [ ] **Approve:** used +, reserved −, and the employee's attendance for those dates shows `on_leave`. *(G8, verified live in the attendance tables)*
 - [ ] **Reject:** without a comment gives 400; with a comment the reservation is released.
@@ -144,11 +140,11 @@ This recipe was verified on 2026-10-09. `tenant_admin` bypasses all permission c
 - Leave has a single approver: anyone with `leave:approve` except the requester. Manager routing and multi-step chains are planned for Module 6.
 - Weekly off is fixed to Saturday and Sunday; the leave year is the calendar year (UTC); requests must fall in the current year.
 - Half-day leave doesn't change attendance status. Punching in on a leave day turns that day back to `present`.
-- No file attachments (proof) yet. No first-admin bootstrap API (use the SQL in §2).
+- No file attachments (proof) yet.
 - Performance targets (p95) weren't measurable on the dev machine (Docker under memory pressure); re-check on a normal machine.
-- Inherited from Module 0, unfixed: `/api/v1/tenants` is unauthenticated; CORS is `*`; a soft-deleted role's permissions still apply.
+- Module 0–2 hardening state (tenants behind the platform key, CORS allow-list, logout revokes refresh tokens, failure-only login budget, …): see `report.md` on this branch.
 
 ## 7. Where things live
 - Backend: `backend/internal/attendance/**`, `backend/internal/leave/**`
-- Live tests: `backend/tests/api/{attendance,leave}_*_test.go` (run: `go test -tags integration -count=1 ./tests/api/`)
+- Integration tests: `backend/tests/integration/{attendance,leave}_test.go` + `time_helpers_test.go` (run: `JAAS_REQUIRE_INTEGRATION=1 go test -count=1 ./tests/integration/`)
 - Module docs: `docs/modules/module-3-attendance/`, `docs/modules/module-4-leave/` (specification, golden tests, decisions, handoff)
