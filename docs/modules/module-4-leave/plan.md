@@ -1,4 +1,4 @@
-# Module 4 — Plan (updated: 2026-10-09, owner: loop — P6 DONE, P7 CURRENT)
+# Module 4 — Plan (updated: 2026-10-09, owner: loop — P7 DONE, P9 CURRENT)
 
 ## Phase Map
 
@@ -11,18 +11,17 @@
 | P4 | G4-4 | Repositories (6) + advisory lock | P2 | DONE | 6 repos + interfaces compile; tenant-scoped (outbox relay cross-tenant by design); lock namespaced `leave:`; SQL proven at P7 |
 | P5 | G4-5 | Services + events + relay + Module 3 LeaveSync; goldens G5–G8, G10, G11, G13; services ≥ 90% | P3+P4 | DONE | goldens G5,G6,G7,G8,G10,G11,G13 green on fakes; services 96.3%; events 100%; Module 3 LeaveSync tested (M3 services 91.9%) |
 | P6 | G4-6 | Controllers, routes, module.go, main.go, seed, swagger | P5 | DONE | controllers 100%, routes 100% (20-route RBAC contract test), module.go + seed + relay + Module 3 LeaveSync, main.go wired, swagger 16 paths/20 ops validated |
-| P7 | G4-7 | Live ring: goldens, migration cycle, parity diff | P6 | CURRENT | — |
+| P7 | G4-7 | Live ring: goldens, migration cycle, parity diff | P6 | DONE | live G1, G5, G7, G8, G9, G10, G11, G12, G13, G14, G15 PASS; full tests/api 16/16; migrations 36/6/6 clean; AutoMigrate↔SQL columns + 20 index defs identical |
 | P8 | G4-8 | Frontend leave slice | identity shell | BLOCKED | no identity login shell |
-| P9 | G4-9 | DoD close + handoff | P7 | NEXT | — |
+| P9 | G4-9 | DoD close + handoff | P7 | CURRENT | — |
 
 Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED.
 
 ## Current Phase
-- Goal: G4-7 live ring — backend booted with Module 4; live goldens G1, G5, G7, G8 (attendance on_leave in Module 3 tables), G9, G11, G12 (ledger invariant), G13, G14 (concurrency), G15; migration cycle + AutoMigrate↔SQL parity.
-- Exit criteria: live goldens PASS; full tests/api suite PASS; parity identical.
+- Goal: G4-9 DoD close (MASTER_PROMPT §24): AST quality check, routes↔swagger contract diff, threat→evidence map, DEPENDENCY-GRAPH, handoff.
 
 ## Next Phase
-- Goal: G4-9 DoD close + handoff.
+- Goal: G4-8 frontend leave slice when the identity login shell exists (BLOCKED).
 
 ## Gate Log
 | Date | Phase | Gate | Decision | By | Reason |
@@ -39,3 +38,4 @@ Status vocabulary: DONE / CURRENT (one) / NEXT (one) / LATER / BLOCKED.
 | 2026-10-09 | P4 | repositories: interfaces (6) + GORM impls; generic first/paged helpers; LockEmployee (leave: namespace); balance FindOrCreate with created flag (on conflict do nothing); overlap query (pending/approved, ?::date); outbox relay methods | build/vet/gofmt clean | GREEN | handoff.md |
 | 2026-10-09 | P5 | Module 3 LeaveSync (MarkLeave/ClearLeave + record Delete + source leave; RED caught early-return bug); leave ports/errors/helpers; ledger move + lazy ensure (carry-forward, accrual); Type/Holiday/Balance/Request services; events; outbox relay; fakes with tx rollback; goldens + rules + fault injection | vet clean; leave services 96.3%, events 100%; attendance services 91.9% | GREEN | handoff.md |
 | 2026-10-09 | P6 | controllers (policy, balance, request) + routes (20 ops, RBAC per spec) + module.go (Ports, permission seed, relay) + Module 3 LeaveSync accessor + cmd/main.go wiring + swagger | go build/vet ./... clean; go test ./internal/... PASS; controllers/routes 100% | GREEN | handoff.md |
+| 2026-10-09 | P7 | live goldens tests/api/leave_{flow,rules}_test.go (lifecycle incl. Module 3 on_leave marks + clear, ledger invariant SQL, audit/outbox privacy, overlap, pagination, RBAC, self-approval, isolation, concurrency); migration cycle; parity diff | go test -tags integration ./tests/api PASS 16/16; parity identical | GREEN | handoff.md |
