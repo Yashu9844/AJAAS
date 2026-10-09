@@ -1,4 +1,4 @@
-# Module 6 — Plan (updated: 2026-10-09, owner: loop — P2 DONE, P3 CURRENT)
+# Module 6 — Plan (updated: 2026-10-09, owner: loop — P3 DONE, P4 CURRENT)
 
 ## Phase Map
 
@@ -7,9 +7,9 @@
 | P0 | G6-0 | Scaffold | — | DONE | as module-6-approvals |
 | P1 | G6-1 | Design frozen | Modules 0–5 | DONE | specification.md 2026-10-09 |
 | P2 | G6-2 | Models + migrations 000045–000050 | P1 | DONE | 6 models 100%; migrations 50 up / 6 down / 6 up; AutoMigrate↔SQL identical |
-| P3 | G6-3 | Pipeline graphs (G2, G3) + DTOs + validators | P2 | CURRENT | — |
-| P4 | G6-4 | Repositories | P2 | NEXT | — |
-| P5 | G6-5 | Services + events + Module 1 accessors; G4–G11 | P3+P4 | LATER | — |
+| P3 | G6-3 | Pipeline graphs (G2, G3) + DTOs + validators | P2 | DONE | G2/G3 graphs + DTOs + validators 100% |
+| P4 | G6-4 | Repositories | P2 | CURRENT | — |
+| P5 | G6-5 | Services + events + Module 1 accessors; G4–G11 | P3+P4 | NEXT | — |
 | P6 | G6-6 | HTTP + wiring + swagger | P5 | LATER | — |
 | P7 | G6-7 | Integration + cycle + parity | P6 | LATER | — |
 | P8 | G6-8 | Frontend | shell | BLOCKED | — |
@@ -31,3 +31,4 @@
 |---|---|---|---|---|---|
 | 2026-10-09 | P1 | bundle renamed from approvals; full design | review vs Modules 0–2 code | GREEN | handoff.md |
 | 2026-10-09 | P2 | models (6) + pipeline graphs (G2, G3) RED→GREEN; migrations 000045–000050; parity | 100%; cycle + parity clean | GREEN | handoff.md |
+| 2026-10-09 | P3 | dto + validators (dates, future instants, CTC, email normalization) | 100% | GREEN | handoff.md |
