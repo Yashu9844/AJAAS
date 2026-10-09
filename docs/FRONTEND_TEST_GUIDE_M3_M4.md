@@ -10,8 +10,8 @@ Use this guide to build frontend tests that exercise every behaviour below. The 
 
 | Module | Scope | Endpoints | Tables | Events | Proof |
 |---|---|---|---|---|---|
-| 3 Attendance | shifts, shift assignments, punch in/out, daily records with computed totals (work, break, late, overtime, status), regularization (timesheet correction) approvals, daily summary | 19 | 6 (`000025–000030`) | 5 on `jaas.attendance.events` | unit ≥ 91.9%, 6 live tests |
-| 4 Leave | leave types (policies), holiday calendar, ledger-backed balances with lazy accrual and carry-forward, preview/apply/approve/reject/cancel, approved leave marked `on_leave` in attendance | 20 | 6 (`000031–000036`) | 5 on `jaas.leave.events` | unit ≥ 96.3%, 5 live tests |
+| 3 Attendance | shifts, shift assignments, punch in/out, daily records with computed totals (work, break, late, overtime, status), regularization (timesheet correction) approvals, daily summary | 19 | 6 (`000026–000031`) | 5 on `jaas.attendance.events` | unit ≥ 91.9%, 6 live tests |
+| 4 Leave | leave types (policies), holiday calendar, ledger-backed balances with lazy accrual and carry-forward, preview/apply/approve/reject/cancel, approved leave marked `on_leave` in attendance | 20 | 6 (`000032–000037`) | 5 on `jaas.leave.events` | unit ≥ 96.3%, 5 live tests |
 
 Whole backend: `go build`, `go vet`, `go test ./internal/...` all pass, and the live suite passes 16/16 (attendance, leave, org). Full specs: `docs/modules/module-3-attendance/specification.md` and `docs/modules/module-4-leave/specification.md`. Swagger: `backend/api/swagger.yaml`.
 

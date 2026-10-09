@@ -33,6 +33,9 @@ type Options struct {
 	Logger         *logger.Logger
 	CORSOrigins    []string // explicit allow-list; "*" only for development
 	TrustedProxies []string // nil = trust none (X-Forwarded-For ignored)
+	// Background, when set, runs the Module 3/4 outbox relays until it is cancelled (cmd/main.go cancels it on
+	// shutdown). Nil (tests) means no relays; events are still published synchronously after each commit.
+	Background context.Context
 }
 
 // ValidateConfig rejects configurations that are unsafe to run.
@@ -97,6 +100,11 @@ func Build(o Options) (*gin.Engine, error) {
 		}
 	}
 
+	attendanceModule, leaveModule, err := buildTimeModules(o, identityModule, employeeModule)
+	if err != nil {
+		return nil, err
+	}
+
 	if cfg.Server.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -114,6 +122,7 @@ func Build(o Options) (*gin.Engine, error) {
 	identityModule.RegisterRoutes(v1)
 	orgModule.RegisterRoutes(v1, identityModule.UserRoleRepository(), identityModule.RolePermissionRepository(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
 	employeeModule.RegisterRoutes(v1, identityModule.UserRoleRepository(), identityModule.RolePermissionRepository(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
+	registerTimeRoutes(v1, o, identityModule, attendanceModule, leaveModule)
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "UP", "timestamp": time.Now().Format(time.RFC3339)})

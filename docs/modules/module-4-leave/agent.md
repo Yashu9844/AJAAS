@@ -5,7 +5,7 @@ STATUS: P1 DESIGN DONE (contracts frozen 2026-10-09). Implement P2→P9 in plan.
 
 READ ORDER: README → current-goal → plan → current-status → specification → architecture → connections → security (+ docs/SECURITY.md) → golden-tests → testing → decisions → files → src → tests.
 
-ALLOWED: docs/modules/module-4-leave/**, backend/internal/leave/**, backend/migrations/000031–000036, backend/tests/api/leave_*; wiring edits in backend/cmd/main.go and backend/api/swagger.yaml (leave paths only); Module 3 `LeaveSync` port + record source `leave` (D4-08, recorded in module-3 decisions).
+ALLOWED: docs/modules/module-4-leave/**, backend/internal/leave/**, backend/migrations/000032–000037, backend/tests/api/leave_*; wiring edits in backend/cmd/main.go and backend/api/swagger.yaml (leave paths only); Module 3 `LeaveSync` port + record source `leave` (D4-08, recorded in module-3 decisions).
 FORBIDDEN: other edits to Modules 0–3 code; editing goldens to make red pass; secrets; claiming unrun tests passed.
 
 CODING: as Module 3 agent.md — self-defining names, one-line doc comments on exports, rule IDs in WHY comments, func ≤ 50, file ≤ 300, depth ≤ 4, params ≤ 4 excluding ctx/tx (D3-16), no panic/TODO/nolint, AppError flow, DTO ≠ model, snake_case, PATCH pointers.

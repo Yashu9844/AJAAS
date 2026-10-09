@@ -72,7 +72,7 @@ func TestAttendanceModels_Indexes(t *testing.T) {
 	}
 }
 
-// AT-015 backstop must be partial on the dev (AutoMigrate) path too, matching migration 000029.
+// AT-015 backstop must be partial on the dev (AutoMigrate) path too, matching migration 000030.
 func TestAttendanceModels_PendingIndexIsPartial(t *testing.T) {
 	idx := findIndex(parse(t, &Regularization{}), "uq_attendance_regularizations_pending")
 	if idx == nil || idx.Where != "status = 'pending'" {
@@ -80,7 +80,7 @@ func TestAttendanceModels_PendingIndexIsPartial(t *testing.T) {
 	}
 }
 
-// Partial/expression indexes must match migrations 000025 and 000030 on the AutoMigrate path (P7 parity).
+// Partial/expression indexes must match migrations 000026 and 000031 on the AutoMigrate path (P7 parity).
 func TestAttendanceModels_IndexParityWithSQL(t *testing.T) {
 	name := findIndex(parse(t, &Shift{}), "uq_shifts_tenant_name")
 	if name == nil || name.Where != "deleted_at IS NULL" || name.Fields[1].Expression != "lower(name)" {

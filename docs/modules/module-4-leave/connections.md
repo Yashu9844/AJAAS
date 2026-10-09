@@ -6,7 +6,7 @@
 | C2 | Module 4 → Module 2 EmployeeService | in-process | `GetByUserID`, `GetByID` (status, gender, joining date) | 404 / fail closed | fakes + live |
 | C3 | Module 4 → Module 0 AuditService | in-process | `Log(...)` after commit | best-effort | spy + live G11 |
 | C4 | Module 4 → Module 0 middleware | Gin | TenantResolver, Authenticate, RequirePermission(db, "leave", action, …) | 401/403 | live G9 |
-| C5 | Module 4 → PostgreSQL | SQL | migrations 000031–000036 | rollback | live + migration cycle |
+| C5 | Module 4 → PostgreSQL | SQL | migrations 000032–000037 | rollback | live + migration cycle |
 | C6 | Module 4 → RabbitMQ `jaas.leave.events` | AMQP | FR-EV001 envelope | outbox + relay | unit + live outbox rows |
 | C7 | Module 4 boot → Module 0 `permissions` | SQL idempotent insert | `leave:read`, `leave:manage`, `leave:approve` | boot fails loudly | boot + G9 |
 | C8 | Module 4 → Module 3 `services.LeaveSync` | in-process, caller's tx | `MarkLeave(ctx, tx, tenant, employee, dates)`, `ClearLeave(ctx, tx, tenant, employee, dates)` | rollback whole approve/cancel | Module 3 unit + live G8 |

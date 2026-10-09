@@ -3,6 +3,8 @@ package controllers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"gorm.io/gorm"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -244,5 +246,16 @@ func TestSnake(t *testing.T) {
 		if got := snake(in); got != want {
 			t.Errorf("snake(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Hardening convention: persistence errors are normalized (unique violation → 409), never a raw 500.
+func TestFail_NormalizesPersistenceErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	fail(c, fmt.Errorf("insert: %w", gorm.ErrDuplicatedKey))
+	if w.Code != 409 || !strings.Contains(w.Body.String(), `"CONFLICT"`) {
+		t.Fatalf("duplicate key must map to 409 CONFLICT, got %d %s", w.Code, w.Body.String())
 	}
 }

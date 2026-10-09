@@ -7,7 +7,7 @@
 ## P2 — G3-2 Models + migrations
 - [x] T3-01 models: shift, shift_assignment, attendance_record, attendance_punch, regularization, outbox (+ constants for statuses/types)
 - [x] T3-02 models_test: schema parse, table names, index names
-- [x] T3-03 migrations 000025..000030 up/down (live verification in T3-18)
+- [x] T3-03 migrations 000026..000031 up/down (live verification in T3-18)
 
 ## P3 — G3-3 calc + DTOs + validators
 - [x] T3-04 calc: ParseHHMM/FormatHHMM, ExpectedMinutes, AttendanceDate (AT-005), ComputeTotals (AT-006..AT-010)

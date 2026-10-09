@@ -14,7 +14,7 @@ grep -rn "TODO" internal/attendance/            # must be empty
 docker compose up -d postgres redis rabbitmq     # repo root
 DATABASE_PASSWORD=postgres DATABASE_DBNAME=jaas_dev go run ./cmd/main.go &
 go test -count=1 -tags integration ./tests/api/ -run Attendance -v
-# migrations up/down/up (psql inside container, files 000025..000030)
+# migrations up/down/up (psql inside container, files 000026..000031)
 ```
 `-race` needs cgo (unavailable on this Windows box) — reported as not run, never claimed.
 

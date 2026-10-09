@@ -85,7 +85,7 @@ func TestLeaveModels_Indexes(t *testing.T) {
 	}
 }
 
-// Column types must match migrations 000031–000036 (NUMERIC(7,2) days, INTEGER counters).
+// Column types must match migrations 000032–000037 (NUMERIC(7,2) days, INTEGER counters).
 func TestLeaveModels_ColumnTypes(t *testing.T) {
 	cols := map[interface{}]map[string]string{
 		&LeaveType{}:   {"annual_allowance": "numeric(7,2)", "carry_forward_limit": "numeric(7,2)", "max_consecutive_days": "integer", "min_notice_days": "integer"},

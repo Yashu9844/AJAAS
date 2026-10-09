@@ -57,7 +57,7 @@ func NewModule(db *gorm.DB, p Ports) *Module {
 	}
 }
 
-// RegisterModels lists Module 4 models for AutoMigrate (dev path; SQL 000031–000036 in prod).
+// RegisterModels lists Module 4 models for AutoMigrate (dev path; SQL 000032–000037 in prod).
 func (m *Module) RegisterModels() []interface{} {
 	return []interface{}{&models.LeaveType{}, &models.Holiday{}, &models.Balance{}, &models.Request{},
 		&models.LedgerEntry{}, &models.OutboxEvent{}}

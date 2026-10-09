@@ -4,7 +4,7 @@
 |---|---|---|
 | docs/modules/module-3-attendance/*.md | 17-file bundle | P1 DONE |
 | backend/internal/attendance/models/{constants,shift,attendance}.go + models_test.go | GORM models | DONE (P2) |
-| backend/migrations/000025_create_shifts … 000030_create_attendance_events_outbox (.up/.down) | SQL schema | DONE (P2), live check P7 |
+| backend/migrations/000026_create_shifts … 000031_create_attendance_events_outbox (.up/.down) | SQL schema | DONE (P2), live check P7 |
 | backend/internal/attendance/calc/{time,totals}.go + calc_test.go + calc_golden_test.go | pure time engine | DONE (P3) |
 | backend/internal/attendance/dto/dto.go, validators/validators.go (+tests) | request/response DTOs, field rules | DONE (P3) |
 | backend/internal/attendance/repositories/{interfaces,shift,record,punch}_repository.go | tenant-scoped data access (assignment in shift_, regularization+outbox in punch_ file) | DONE (P4) |

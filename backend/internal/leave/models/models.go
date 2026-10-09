@@ -1,4 +1,4 @@
-// Package models holds Module 4 (Leave) persistence models; migrations 000031–000036 are the SQL twin.
+// Package models holds Module 4 (Leave) persistence models; migrations 000032–000037 are the SQL twin.
 package models
 
 import (
@@ -57,7 +57,7 @@ type LeaveType struct {
 	Status             string    `gorm:"type:varchar(20);not null;index:idx_leave_types_status"`
 }
 
-// TableName maps to leave_types (migration 000031).
+// TableName maps to leave_types (migration 000032).
 func (LeaveType) TableName() string { return "leave_types" }
 
 // BeforeCreate assigns a UUID v4 when unset.
@@ -72,7 +72,7 @@ type Holiday struct {
 	IsOptional  bool      `gorm:"not null"`
 }
 
-// TableName maps to leave_holidays (migration 000032).
+// TableName maps to leave_holidays (migration 000033).
 func (Holiday) TableName() string { return "leave_holidays" }
 
 // BeforeCreate assigns a UUID v4 when unset.
@@ -94,7 +94,7 @@ type Balance struct {
 	UpdatedAt         time.Time `gorm:"not null"`
 }
 
-// TableName maps to leave_balances (migration 000033).
+// TableName maps to leave_balances (migration 000034).
 func (Balance) TableName() string { return "leave_balances" }
 
 // BeforeCreate assigns a UUID v4 when unset.
@@ -126,7 +126,7 @@ type Request struct {
 	UpdatedAt         time.Time `gorm:"not null"`
 }
 
-// TableName maps to leave_requests (migration 000034).
+// TableName maps to leave_requests (migration 000035).
 func (Request) TableName() string { return "leave_requests" }
 
 // BeforeCreate assigns a UUID v4 when unset.
@@ -147,7 +147,7 @@ type LedgerEntry struct {
 	CreatedAt         time.Time  `gorm:"not null"`
 }
 
-// TableName maps to leave_ledger (migration 000035).
+// TableName maps to leave_ledger (migration 000036).
 func (LedgerEntry) TableName() string { return "leave_ledger" }
 
 // BeforeCreate assigns a UUID v4 when unset.
@@ -168,7 +168,7 @@ type OutboxEvent struct {
 	CreatedAt   time.Time `gorm:"not null"`
 }
 
-// TableName maps to leave_events_outbox (migration 000036).
+// TableName maps to leave_events_outbox (migration 000037).
 func (OutboxEvent) TableName() string { return "leave_events_outbox" }
 
 // BeforeCreate assigns a UUID v4 when unset.

@@ -127,7 +127,7 @@ Let employees apply for leave against configurable leave types, keep an auditabl
 | NFR-D001 | Request + balance + ledger + attendance + outbox writes in one transaction |
 | NFR-D002 | Day arithmetic in integer hundredths; no floating-point in balances |
 
-## 8. Data (migrations 000031–000036; UUID PK; timestamptz; days NUMERIC(7,2))
+## 8. Data (migrations 000032–000037; UUID PK; timestamptz; days NUMERIC(7,2))
 
 - `leave_types` — tenant_id, name, code, is_paid, annual_allowance, accrual, carry_forward_limit, max_consecutive_days?, min_notice_days, allow_half_day, sandwich_rule, applicable_gender, status, created_at, updated_at, deleted_at. Unique (tenant_id, lower(name)) and (tenant_id, code) WHERE deleted_at IS NULL.
 - `leave_holidays` — tenant_id, holiday_date date, name, is_optional, created_at, updated_at, deleted_at. Unique (tenant_id, holiday_date) WHERE deleted_at IS NULL.

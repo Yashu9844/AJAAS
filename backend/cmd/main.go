@@ -70,6 +70,8 @@ func main() {
 		cors = []string{"*"} // development convenience only
 	}
 
+	// Module 3/4 outbox relays run until shutdown (FR-EV002).
+	relayCtx, stopRelays := context.WithCancel(context.Background())
 	router, err := app.Build(app.Options{
 		Config:         cfg,
 		DB:             db,
@@ -78,6 +80,7 @@ func main() {
 		Logger:         log,
 		CORSOrigins:    cors,
 		TrustedProxies: trusted,
+		Background:     relayCtx,
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to build application")
@@ -104,6 +107,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Info().Msg("Shutting down HTTP server...")
+	stopRelays()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

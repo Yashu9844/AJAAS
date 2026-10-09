@@ -79,7 +79,7 @@ type Regularization struct {
 	UpdatedAt          time.Time `gorm:"not null"`
 }
 
-// TableName maps to attendance_regularizations (migration 000029).
+// TableName maps to attendance_regularizations (migration 000030).
 func (Regularization) TableName() string { return "attendance_regularizations" }
 
 // BeforeCreate assigns a UUID v4 when unset.
@@ -105,7 +105,7 @@ type OutboxEvent struct {
 	CreatedAt   time.Time `gorm:"not null"`
 }
 
-// TableName maps to attendance_events_outbox (migration 000030).
+// TableName maps to attendance_events_outbox (migration 000031).
 func (OutboxEvent) TableName() string { return "attendance_events_outbox" }
 
 // BeforeCreate assigns a UUID v4 when unset.

@@ -62,7 +62,7 @@ func NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeSe
 	}
 }
 
-// RegisterModels lists Module 3 models for AutoMigrate (dev path; SQL 000025–000030 in prod — A3-06).
+// RegisterModels lists Module 3 models for AutoMigrate (dev path; SQL 000026–000031 in prod — A3-06).
 func (m *Module) RegisterModels() []interface{} {
 	return []interface{}{&models.Shift{}, &models.ShiftAssignment{}, &models.AttendanceRecord{},
 		&models.AttendancePunch{}, &models.Regularization{}, &models.OutboxEvent{}}

@@ -29,8 +29,10 @@ func okList(c *gin.Context, data interface{}, meta dto.PageMeta) {
 	c.JSON(http.StatusOK, gin.H{"data": data, "meta": meta})
 }
 
-// fail maps AppErrors to their status; anything else is an opaque 500 (no internals leaked).
+// fail maps AppErrors to their status after shared normalization (unique violation → 409, not found → 404);
+// anything else is an opaque 500 (no internals leaked).
 func fail(c *gin.Context, err error) {
+	err = sharedErrors.Normalize(err)
 	var app *sharedErrors.AppError
 	if errors.As(err, &app) {
 		c.JSON(app.StatusCode, gin.H{"error": errorBody{Code: app.Code, Message: app.Message}})

@@ -145,7 +145,7 @@ Pagination: `page` ≥ 1 (default 1), `per_page` 1–100 (default 20); invalid o
 | NFR-SEC002 | Self endpoints derive employee from JWT user only — no employee_id parameter accepted |
 | NFR-D001 | Multi-table writes in one transaction; events via outbox in the same transaction |
 
-## 8. Data (Postgres; migrations 000025–000030; all UUID PK, timestamptz)
+## 8. Data (Postgres; migrations 000026–000031; all UUID PK, timestamptz)
 
 - `shifts` — tenant_id, name, code?, start_minute (0–1439), end_minute, grace_period_mins, break_duration_mins, full_day_minutes?, half_day_minutes?, timezone, is_night_shift, status, created_at, updated_at, deleted_at. Unique (tenant_id, lower(name)) and (tenant_id, code) among non-deleted.
 - `shift_assignments` — tenant_id, employee_profile_id, shift_id → shifts, effective_from date, effective_to date?, created_by_user_id?, created_at, updated_at. Index (tenant_id, employee_profile_id, effective_from).

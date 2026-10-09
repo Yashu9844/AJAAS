@@ -2,7 +2,7 @@
 
 - [x] T4-01 [G4-1] re-scope bundle + frozen design
 - [x] T4-02 [G4-2] models + model tests (RED→GREEN)
-- [x] T4-03 [G4-2] migrations 000031–000036 up/down (cycle verified live early)
+- [x] T4-03 [G4-2] migrations 000032–000037 up/down (cycle verified live early)
 - [x] T4-04 [G4-3] calc Days/CountDays/Accrued/CarryForward + goldens G2–G4
 - [x] T4-05 [G4-3] dto + validators + tests
 - [x] T4-06 [G4-4] repositories + advisory lock
