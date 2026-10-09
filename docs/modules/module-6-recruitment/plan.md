@@ -1,4 +1,4 @@
-# Module 6 — Plan (updated: 2026-10-09, owner: loop — P4 DONE, P5 CURRENT)
+# Module 6 — Plan (updated: 2026-10-09, owner: loop — P5 DONE, P6 CURRENT)
 
 ## Phase Map
 
@@ -9,9 +9,9 @@
 | P2 | G6-2 | Models + migrations 000045–000050 | P1 | DONE | 6 models 100%; migrations 50 up / 6 down / 6 up; AutoMigrate↔SQL identical |
 | P3 | G6-3 | Pipeline graphs (G2, G3) + DTOs + validators | P2 | DONE | G2/G3 graphs + DTOs + validators 100% |
 | P4 | G6-4 | Repositories | P2 | DONE | 5 repos compile; job + candidate row locks; SQL proven at P7 |
-| P5 | G6-5 | Services + events + Module 1 accessors; G4–G11 | P3+P4 | CURRENT | — |
-| P6 | G6-6 | HTTP + wiring + swagger | P5 | NEXT | — |
-| P7 | G6-7 | Integration + cycle + parity | P6 | LATER | — |
+| P5 | G6-5 | Services + events + Module 1 accessors; G4–G11 | P3+P4 | DONE | goldens G4–G12 (unit) green; services 99.4% |
+| P6 | G6-6 | HTTP + wiring + swagger | P5 | CURRENT | — |
+| P7 | G6-7 | Integration + cycle + parity | P6 | NEXT | — |
 | P8 | G6-8 | Frontend | shell | BLOCKED | — |
 | P9 | G6-9 | DoD close | P7 | LATER | — |
 
@@ -33,3 +33,4 @@
 | 2026-10-09 | P2 | models (6) + pipeline graphs (G2, G3) RED→GREEN; migrations 000045–000050; parity | 100%; cycle + parity clean | GREEN | handoff.md |
 | 2026-10-09 | P3 | dto + validators (dates, future instants, CTC, email normalization) | 100% | GREEN | handoff.md |
 | 2026-10-09 | P4 | repositories (job, candidate + stage events, interview, offer, outbox) | build/vet clean | GREEN | handoff.md |
+| 2026-10-09 | P5 | Module 1 accessors; job/candidate/interview/offer/hire services; events; relay; goldens G4–G12 unit + failure injection | 99.4% | GREEN | handoff.md |

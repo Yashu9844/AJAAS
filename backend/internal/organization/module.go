@@ -150,6 +150,12 @@ func (m *Module) UserDeactivationConverger() identityServices.UserDeactivationCo
 // convergence (FR-M005 hook registered in cmd/main.go).
 func (m *Module) MappingService() services.MappingService { return m.mappingSvc }
 
+// DepartmentService exposes read access to departments for dependent modules (Module 6 D6-03).
+func (m *Module) DepartmentService() services.DepartmentService { return m.deptSvc }
+
+// DesignationService exposes read access to designations for dependent modules (Module 6 D6-03).
+func (m *Module) DesignationService() services.DesignationService { return m.desigSvc }
+
 // RegisterRoutes hooks org endpoint groups onto the API router. The identity
 // module owns tenantResolver/authMiddleware construction; org reuses them.
 func (m *Module) RegisterRoutes(
