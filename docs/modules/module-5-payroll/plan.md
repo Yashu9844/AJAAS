@@ -1,4 +1,4 @@
-# Module 5 — Plan (updated: 2026-10-09, owner: loop — P4 DONE, P5 CURRENT)
+# Module 5 — Plan (updated: 2026-10-09, owner: loop — P5 DONE, P6 CURRENT)
 
 ## Phase Map
 
@@ -9,17 +9,17 @@
 | P2 | G5-2 | Models (7) + migrations 000038–000044 + model tests | P1 | DONE | 7 models 100% (index/where/expression + column types); migrations 44 up / 7 down / 7 up clean |
 | P3 | G5-3 | calc (Money, Breakdown, Prorate, PF/ESI/PT/TDS, Assemble) goldens G2–G9; DTOs; validators | P2 | DONE | goldens G2–G9 + full payslip; calc/dto/validators 100% |
 | P4 | G5-4 | Repositories | P2 | DONE | 5 repos compile; tenant-scoped; run FOR UPDATE; DISTINCT ON eligibility; SQL proven at P7 |
-| P5 | G5-5 | Services + events + relay + Module 4 UnpaidLeave port; goldens G10–G12, G15 | P3+P4 | CURRENT | — |
-| P6 | G5-6 | Controllers, routes, module, app wiring, seed, swagger | P5 | NEXT | — |
-| P7 | G5-7 | Integration goldens + migration cycle | P6 | LATER | — |
+| P5 | G5-5 | Services + events + relay + Module 4 UnpaidLeave port; goldens G10–G12, G15 | P3+P4 | DONE | lifecycle goldens (proration, window, LOP G10, statutory), G11, G12, G15, self-visibility/privacy; services 94.4%; Module 4 UnpaidLeave port tested |
+| P6 | G5-6 | Controllers, routes, module, app wiring, seed, swagger | P5 | CURRENT | — |
+| P7 | G5-7 | Integration goldens + migration cycle | P6 | NEXT | — |
 | P8 | G5-8 | Frontend | identity shell | BLOCKED | — |
 | P9 | G5-9 | DoD close + handoff | P7 | LATER | — |
 
 ## Current Phase
-- Goal: G5-5 services (structure, assignment, run, payslip), events, relay, Module 4 UnpaidLeave port; goldens G10–G12, G15.
+- Goal: G5-6 controllers + routes (20 ops), module.go, internal/app wiring (Module 4 UnpaidLeave), permission seed, swagger.
 
 ## Next Phase
-- Goal: G5-6 HTTP edge + app wiring.
+- Goal: G5-7 integration goldens.
 
 ## Gate Log
 | Date | Phase | Gate | Decision | By | Reason |
@@ -33,3 +33,4 @@
 | 2026-10-09 | P2 | calc.Money (paise codec) + 7 models with parity contracts RED→GREEN; migrations 000038–000044 | models/calc 100%; cycle 44 up / 7 down / 7 up | GREEN | handoff.md |
 | 2026-10-09 | P3 | dto (requests\/responses, ParsePage) + validators (date, CTC, period, CSVSafe PS-T8) | all payroll packages 100% | GREEN | handoff.md |
 | 2026-10-09 | P4 | repositories: structure (+components), assignment (advisory lock, current, DISTINCT ON eligibility), run (FOR UPDATE), payslip (+lines, finalized-only self list), outbox | build/vet clean | GREEN | handoff.md |
+| 2026-10-09 | P5 | Module 4 UnpaidLeave port (approved unpaid, clipped, half day, holidays) RED→GREEN; payroll ports\/errors\/helpers\/mappers; Structure, Assignment, Run (state machine + maker-checker), calculate (window, LOP, Compute, warnings), Payslip (self finalized-only, CSV), events, relay; fakes + goldens + fault injection | vet clean; payroll services 94.4%, leave services 96.5% | GREEN | handoff.md |

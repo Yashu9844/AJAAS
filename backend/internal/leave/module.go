@@ -24,6 +24,7 @@ type Module struct {
 	db          *gorm.DB
 	controllers routes.Controllers
 	relay       *services.OutboxRelay
+	unpaid      services.UnpaidLeave
 }
 
 // Ports are the cross-module collaborators Module 4 consumes (connections C2, C3, C8).
@@ -53,7 +54,8 @@ func NewModule(db *gorm.DB, p Ports) *Module {
 			Balance: controllers.NewBalanceController(services.NewBalanceService(deps)),
 			Request: controllers.NewRequestController(services.NewRequestService(deps)),
 		},
-		relay: services.NewOutboxRelay(deps),
+		relay:  services.NewOutboxRelay(deps),
+		unpaid: services.NewUnpaidLeave(deps),
 	}
 }
 
@@ -98,6 +100,9 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 		},
 	}, m.controllers)
 }
+
+// UnpaidLeave exposes the read-only loss-of-pay port for Module 5 (D5-03).
+func (m *Module) UnpaidLeave() services.UnpaidLeave { return m.unpaid }
 
 // Relay exposes the outbox relay; cmd/main.go runs it until shutdown.
 func (m *Module) Relay() *services.OutboxRelay { return m.relay }
