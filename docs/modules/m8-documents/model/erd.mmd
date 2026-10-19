@@ -1,0 +1,48 @@
+erDiagram
+  Document ||--o{ DocumentVersion : versions
+  Document ||--o{ DocumentACL : protects
+  Document ||--o{ ShareGrant : shares
+  DocumentVersion ||--o{ ScanResult : scans
+  Document ||--o{ LegalHold : holds
+  Document {
+    uuid id PK
+    uuid tenant_id
+    string document_id_key
+  }
+  DocumentVersion {
+    uuid id PK
+    uuid tenant_id
+    string version_id_key
+  }
+  DocumentACL {
+    uuid id PK
+    uuid tenant_id
+    string document_id_key
+  }
+  ShareGrant {
+    uuid id PK
+    uuid tenant_id
+    string share_id_key
+  }
+  ScanResult {
+    uuid id PK
+    uuid tenant_id
+    string scan_id_key
+  }
+  RetentionPolicy {
+    uuid id PK
+    uuid tenant_id
+    string policy_id_key
+  }
+  LegalHold {
+    uuid id PK
+    uuid tenant_id
+    string hold_id_key
+  }
+  AccessAudit {
+    uuid id PK
+    uuid tenant_id
+    string audit_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

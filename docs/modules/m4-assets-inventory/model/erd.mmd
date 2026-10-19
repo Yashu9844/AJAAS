@@ -1,0 +1,59 @@
+erDiagram
+  AssetType ||--o{ Asset : categorizes
+  Location ||--o{ StockItem : stores
+  StockItem ||--o{ StockMovement : records
+  Asset ||--o{ AssetAssignment : assigned
+  AssetAssignment ||--o{ ReturnInspection : inspected
+  Asset ||--o{ MaintenanceTicket : maintained
+  AssetType {
+    uuid id PK
+    uuid tenant_id
+    string asset_type_id_key
+  }
+  Asset {
+    uuid id PK
+    uuid tenant_id
+    string asset_id_key
+  }
+  StockItem {
+    uuid id PK
+    uuid tenant_id
+    string stock_item_id_key
+  }
+  Location {
+    uuid id PK
+    uuid tenant_id
+    string location_id_key
+  }
+  StockMovement {
+    uuid id PK
+    uuid tenant_id
+    string movement_id_key
+  }
+  AssetAssignment {
+    uuid id PK
+    uuid tenant_id
+    string assignment_id_key
+  }
+  ReturnInspection {
+    uuid id PK
+    uuid tenant_id
+    string inspection_id_key
+  }
+  MaintenanceTicket {
+    uuid id PK
+    uuid tenant_id
+    string ticket_id_key
+  }
+  PurchaseRequestReference {
+    uuid id PK
+    uuid tenant_id
+    string request_ref_key
+  }
+  AssetAudit {
+    uuid id PK
+    uuid tenant_id
+    string audit_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

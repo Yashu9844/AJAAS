@@ -1,0 +1,11 @@
+flowchart LR
+  Client[Web / Mobile] --> GW[API Gateway]
+  GW --> S[M0 Identity & Access]
+  S --> DB[(Identity-owned PostgreSQL schema)]
+  S --> REDIS[(Redis: rate limits / bounded cache)]
+  S --> KMS[Secrets Manager / KMS]
+  S --> OUT[(Transactional outbox)]
+  OUT --> MQ[(RabbitMQ identity lifecycle events)]
+  S --> AUD[Security audit events]
+  S -. telemetry .-> OBS[Logs / Metrics / Traces]
+

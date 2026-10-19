@@ -1,0 +1,53 @@
+erDiagram
+  ReportDefinition ||--o{ ReportVersion : versions
+  ReportDefinition ||--o{ ReportSchedule : schedules
+  ReportDefinition ||--o{ ReportExecution : runs
+  ReportExecution ||--o{ ResultArtifactReference : produces
+  ProjectionCheckpoint ||--o{ ProjectionRecord : tracks
+  ReportDefinition {
+    uuid id PK
+    uuid tenant_id
+    string report_id_key
+  }
+  ReportVersion {
+    uuid id PK
+    uuid tenant_id
+    string report_id_key
+  }
+  ReportSchedule {
+    uuid id PK
+    uuid tenant_id
+    string schedule_id_key
+  }
+  ReportExecution {
+    uuid id PK
+    uuid tenant_id
+    string execution_id_key
+  }
+  ResultArtifactReference {
+    uuid id PK
+    uuid tenant_id
+    string execution_id_key
+  }
+  ProjectionCheckpoint {
+    uuid id PK
+    uuid tenant_id
+    string projection_name_key
+  }
+  ReadModelVersion {
+    uuid id PK
+    uuid tenant_id
+    string model_name_key
+  }
+  DataSourceGrant {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  ProjectionRecord {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

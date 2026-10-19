@@ -1,0 +1,52 @@
+erDiagram
+  NotificationTemplate ||--o{ TemplateVersion : versions
+  DispatchJob ||--o{ DispatchAttempt : attempts
+  DispatchJob ||--o{ ProviderReceipt : receipts
+  NotificationInboxItem ||--o{ UserPreference : respects
+  NotificationTemplate {
+    uuid id PK
+    uuid tenant_id
+    string template_id_key
+  }
+  TemplateVersion {
+    uuid id PK
+    uuid tenant_id
+    string template_id_key
+  }
+  UserPreference {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  NotificationInboxItem {
+    uuid id PK
+    uuid tenant_id
+    string notification_id_key
+  }
+  DispatchJob {
+    uuid id PK
+    uuid tenant_id
+    string job_id_key
+  }
+  DispatchAttempt {
+    uuid id PK
+    uuid tenant_id
+    string attempt_id_key
+  }
+  ProviderReceipt {
+    uuid id PK
+    uuid tenant_id
+    string receipt_id_key
+  }
+  SuppressionEntry {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  DeadLetterRecord {
+    uuid id PK
+    uuid tenant_id
+    string dead_letter_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

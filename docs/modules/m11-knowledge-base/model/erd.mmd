@@ -1,0 +1,53 @@
+erDiagram
+  Article ||--o{ ArticleVersion : versions
+  Article ||--o{ ReviewAssignment : reviews
+  Article ||--o{ PublicationRecord : publishes
+  Article ||--o{ SearchIndexRecord : indexes
+  Article ||--o{ ArticleTag : tagged
+  Article {
+    uuid id PK
+    uuid tenant_id
+    string article_id_key
+  }
+  ArticleVersion {
+    uuid id PK
+    uuid tenant_id
+    string article_id_key
+  }
+  Category {
+    uuid id PK
+    uuid tenant_id
+    string category_id_key
+  }
+  ArticleTag {
+    uuid id PK
+    uuid tenant_id
+    string article_id_key
+  }
+  AudienceRule {
+    uuid id PK
+    uuid tenant_id
+    string article_id_key
+  }
+  ReviewAssignment {
+    uuid id PK
+    uuid tenant_id
+    string review_id_key
+  }
+  PublicationRecord {
+    uuid id PK
+    uuid tenant_id
+    string publication_id_key
+  }
+  SearchIndexRecord {
+    uuid id PK
+    uuid tenant_id
+    string article_id_key
+  }
+  ArticleFeedback {
+    uuid id PK
+    uuid tenant_id
+    string feedback_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

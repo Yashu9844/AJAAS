@@ -1,0 +1,15 @@
+flowchart LR
+  Client[Web / Mobile] --> GW[API Gateway]
+  GW --> S[M9 - AI Assistant]
+  S --> AUTH[M0 Identity claims / authorization]
+  S --> DB[(Service-owned PostgreSQL schema)]
+  S --> IDEM[(Idempotency records)]
+  S --> OUT[(Transactional outbox)]
+  OUT --> MQ[(RabbitMQ)]
+  MQ --> INBOX[(Consumer inbox / deduplication)]
+  S -. cache only .-> R[(Redis)]
+  S -. telemetry .-> OBS[Logs / Metrics / Traces]
+  S --> TOOLS[Allowlisted domain APIs]
+  TOOLS --> AUTHZ[Per-tool authorization + audit]
+  S --> MODEL[Approved model provider]
+

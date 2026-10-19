@@ -1,0 +1,54 @@
+erDiagram
+  Conversation ||--o{ Message : contains
+  Conversation ||--o{ AssistantRun : runs
+  AssistantRun ||--o{ ToolCall : invokes
+  ToolCall ||--o{ ToolResultReference : returns
+  AssistantRun ||--o{ ModelUsage : measures
+  ToolCall ||--o{ PolicyDecision : authorizes
+  Conversation {
+    uuid id PK
+    uuid tenant_id
+    string conversation_id_key
+  }
+  Message {
+    uuid id PK
+    uuid tenant_id
+    string message_id_key
+  }
+  AssistantRun {
+    uuid id PK
+    uuid tenant_id
+    string run_id_key
+  }
+  ToolCall {
+    uuid id PK
+    uuid tenant_id
+    string tool_call_id_key
+  }
+  ToolResultReference {
+    uuid id PK
+    uuid tenant_id
+    string tool_call_id_key
+  }
+  PromptTemplateVersion {
+    uuid id PK
+    uuid tenant_id
+    string template_id_key
+  }
+  ModelUsage {
+    uuid id PK
+    uuid tenant_id
+    string usage_id_key
+  }
+  PolicyDecision {
+    uuid id PK
+    uuid tenant_id
+    string decision_id_key
+  }
+  UserFeedback {
+    uuid id PK
+    uuid tenant_id
+    string feedback_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

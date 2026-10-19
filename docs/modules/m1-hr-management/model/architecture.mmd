@@ -1,0 +1,16 @@
+flowchart LR
+  Client[Web / Mobile] --> GW[API Gateway]
+  GW --> S[M1 - HR Management]
+  S --> AUTH[M0 Identity claims / authorization]
+  S --> DB[(Service-owned PostgreSQL schema)]
+  S --> IDEM[(Idempotency records)]
+  S --> OUT[(Transactional outbox)]
+  OUT --> MQ[(RabbitMQ)]
+  MQ --> INBOX[(Consumer inbox / deduplication)]
+  S -. cache only .-> R[(Redis)]
+  S -. telemetry .-> OBS[Logs / Metrics / Traces]
+  HR[HR bounded contexts<br/>Org · Employee · Attendance · Leave<br/>Payroll · Recruitment · Performance] --- S
+  S --> DOC[Documents API]
+  S --> AP[Approvals API]
+  MQ -. approval decisions / identity events .-> S
+

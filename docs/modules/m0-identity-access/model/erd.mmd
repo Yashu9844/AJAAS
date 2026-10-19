@@ -1,0 +1,76 @@
+erDiagram
+  Tenant ||--o{ UserIdentity : has
+  Tenant ||--o{ Role : defines
+  UserIdentity ||--o{ Session : opens
+  UserIdentity ||--o{ UserRole : assigned
+  Role ||--o{ RolePermission : maps
+  Permission ||--o{ RolePermission : maps
+  Session ||--o{ RefreshToken : rotates
+  Tenant ||--o{ Invitation : issues
+  Tenant {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  UserIdentity {
+    uuid id PK
+    uuid tenant_id
+    string user_id_key
+  }
+  Credential {
+    uuid id PK
+    uuid tenant_id
+    string credential_id_key
+  }
+  Role {
+    uuid id PK
+    uuid tenant_id
+    string role_id_key
+  }
+  Permission {
+    uuid id PK
+    uuid tenant_id
+    string permission_id_key
+  }
+  RolePermission {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  UserRole {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  Session {
+    uuid id PK
+    uuid tenant_id
+    string session_id_key
+  }
+  RefreshToken {
+    uuid id PK
+    uuid tenant_id
+    string token_id_key
+  }
+  Invitation {
+    uuid id PK
+    uuid tenant_id
+    string invitation_id_key
+  }
+  SecurityAuditEvent {
+    uuid id PK
+    uuid tenant_id
+    string event_id_key
+  }
+  IdempotencyRecord {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  OutboxEvent {
+    uuid id PK
+    uuid tenant_id
+    string event_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

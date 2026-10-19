@@ -1,0 +1,15 @@
+flowchart LR
+  Client[Web / Mobile] --> GW[API Gateway]
+  GW --> S[M4 - Assets & Inventory]
+  S --> AUTH[M0 Identity claims / authorization]
+  S --> DB[(Service-owned PostgreSQL schema)]
+  S --> IDEM[(Idempotency records)]
+  S --> OUT[(Transactional outbox)]
+  OUT --> MQ[(RabbitMQ)]
+  MQ --> INBOX[(Consumer inbox / deduplication)]
+  S -. cache only .-> R[(Redis)]
+  S -. telemetry .-> OBS[Logs / Metrics / Traces]
+  S --> HR[HR employee references]
+  S --> AP[Approvals API]
+  S --> DOC[Documents API]
+

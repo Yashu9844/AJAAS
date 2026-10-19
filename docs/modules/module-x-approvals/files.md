@@ -1,7 +1,0 @@
-# Approvals (unnumbered; was Module 6, see module-6-recruitment D6-01) — Files
-
-Docs (this bundle): README, agent, current-goal, plan, current-status, todo, specification, architecture, connections, security, testing, golden-tests, assumptions, decisions, changelog, handoff, files (this map).
-
-Future backend: backend/internal/approvals/ (controllers, dto, events, middleware, models, repositories, routes, services, validators) — created at P2.
-Future frontend: frontend/src/modules/approvals/ (api, components, pages, hooks, services, types) — created at P2.
-Shared (owned centrally, do not edit casually): backend/internal/shared/ (config, database, errors, logger, constants, cache, queue, middleware, utils).

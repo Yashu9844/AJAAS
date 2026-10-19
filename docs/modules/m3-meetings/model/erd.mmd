@@ -1,0 +1,48 @@
+erDiagram
+  Meeting ||--o{ MeetingParticipant : invites
+  Meeting ||--o{ AgendaItem : contains
+  Meeting ||--o{ MinutesVersion : versions
+  Meeting ||--o{ RecurrenceRule : repeats
+  Meeting ||--o{ MeetingActionReference : links
+  Meeting {
+    uuid id PK
+    uuid tenant_id
+    string meeting_id_key
+  }
+  MeetingParticipant {
+    uuid id PK
+    uuid tenant_id
+    string meeting_id_key
+  }
+  AgendaItem {
+    uuid id PK
+    uuid tenant_id
+    string agenda_item_id_key
+  }
+  MinutesVersion {
+    uuid id PK
+    uuid tenant_id
+    string minutes_version_id_key
+  }
+  RecurrenceRule {
+    uuid id PK
+    uuid tenant_id
+    string meeting_id_key
+  }
+  MeetingActionReference {
+    uuid id PK
+    uuid tenant_id
+    string meeting_id_key
+  }
+  MeetingResource {
+    uuid id PK
+    uuid tenant_id
+    string meeting_id_key
+  }
+  MeetingAudit {
+    uuid id PK
+    uuid tenant_id
+    string audit_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

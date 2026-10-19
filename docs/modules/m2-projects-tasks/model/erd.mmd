@@ -1,0 +1,70 @@
+erDiagram
+  Project ||--o{ ProjectMember : members
+  Project ||--o{ Milestone : has
+  Project ||--o{ Task : contains
+  Project ||--o{ Sprint : plans
+  Task ||--o{ TaskComment : has
+  Task ||--o{ TaskAssignee : assigned
+  Task ||--o{ TaskDependency : depends
+  Project {
+    uuid id PK
+    uuid tenant_id
+    string project_id_key
+  }
+  ProjectMember {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  Milestone {
+    uuid id PK
+    uuid tenant_id
+    string milestone_id_key
+  }
+  Board {
+    uuid id PK
+    uuid tenant_id
+    string board_id_key
+  }
+  Task {
+    uuid id PK
+    uuid tenant_id
+    string task_id_key
+  }
+  TaskAssignee {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  TaskDependency {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  TaskComment {
+    uuid id PK
+    uuid tenant_id
+    string comment_id_key
+  }
+  TaskActivity {
+    uuid id PK
+    uuid tenant_id
+    string activity_id_key
+  }
+  Sprint {
+    uuid id PK
+    uuid tenant_id
+    string sprint_id_key
+  }
+  TaskLabel {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  AttachmentReference {
+    uuid id PK
+    uuid tenant_id
+    string task_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

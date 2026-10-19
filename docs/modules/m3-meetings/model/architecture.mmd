@@ -1,0 +1,15 @@
+flowchart LR
+  Client[Web / Mobile] --> GW[API Gateway]
+  GW --> S[M3 - Meetings]
+  S --> AUTH[M0 Identity claims / authorization]
+  S --> DB[(Service-owned PostgreSQL schema)]
+  S --> IDEM[(Idempotency records)]
+  S --> OUT[(Transactional outbox)]
+  OUT --> MQ[(RabbitMQ)]
+  MQ --> INBOX[(Consumer inbox / deduplication)]
+  S -. cache only .-> R[(Redis)]
+  S -. telemetry .-> OBS[Logs / Metrics / Traces]
+  S --> HR[HR identity references]
+  S --> PT[Projects & Tasks API for action items]
+  S --> DOC[Documents API]
+

@@ -1,0 +1,69 @@
+erDiagram
+  CostCentre ||--o{ Budget : allocates
+  BudgetPeriod ||--o{ Budget : period
+  ExpenseClaim ||--o{ ExpenseLine : contains
+  ExpenseLine ||--o{ ReceiptReference : attaches
+  ExpenseClaim ||--o{ Reimbursement : settles
+  ReconciliationBatch ||--o{ FinancialTransaction : reconciles
+  Vendor {
+    uuid id PK
+    uuid tenant_id
+    string vendor_id_key
+  }
+  CostCentre {
+    uuid id PK
+    uuid tenant_id
+    string cost_centre_id_key
+  }
+  Budget {
+    uuid id PK
+    uuid tenant_id
+    string budget_id_key
+  }
+  BudgetPeriod {
+    uuid id PK
+    uuid tenant_id
+    string period_id_key
+  }
+  ExpenseClaim {
+    uuid id PK
+    uuid tenant_id
+    string claim_id_key
+  }
+  ExpenseLine {
+    uuid id PK
+    uuid tenant_id
+    string line_id_key
+  }
+  ReceiptReference {
+    uuid id PK
+    uuid tenant_id
+    string line_id_key
+  }
+  Reimbursement {
+    uuid id PK
+    uuid tenant_id
+    string reimbursement_id_key
+  }
+  FinancialTransaction {
+    uuid id PK
+    uuid tenant_id
+    string transaction_id_key
+  }
+  ReconciliationBatch {
+    uuid id PK
+    uuid tenant_id
+    string batch_id_key
+  }
+  ApprovalReference {
+    uuid id PK
+    uuid tenant_id
+    string claim_id_key
+  }
+  ExportJob {
+    uuid id PK
+    uuid tenant_id
+    string job_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

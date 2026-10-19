@@ -1,0 +1,54 @@
+erDiagram
+  WorkflowDefinition ||--o{ WorkflowVersion : versions
+  WorkflowDefinition ||--o{ WorkflowInstance : instantiates
+  WorkflowInstance ||--o{ StepInstance : contains
+  StepInstance ||--o{ ApproverAssignment : assigns
+  StepInstance ||--o{ ApprovalDecision : decides
+  StepInstance ||--o{ EscalationTimer : times
+  WorkflowDefinition {
+    uuid id PK
+    uuid tenant_id
+    string workflow_id_key
+  }
+  WorkflowVersion {
+    uuid id PK
+    uuid tenant_id
+    string workflow_id_key
+  }
+  WorkflowInstance {
+    uuid id PK
+    uuid tenant_id
+    string instance_id_key
+  }
+  StepInstance {
+    uuid id PK
+    uuid tenant_id
+    string step_instance_id_key
+  }
+  ApproverAssignment {
+    uuid id PK
+    uuid tenant_id
+    string assignment_id_key
+  }
+  ApprovalDecision {
+    uuid id PK
+    uuid tenant_id
+    string decision_id_key
+  }
+  Delegation {
+    uuid id PK
+    uuid tenant_id
+    string delegation_id_key
+  }
+  EscalationTimer {
+    uuid id PK
+    uuid tenant_id
+    string timer_id_key
+  }
+  WorkflowAudit {
+    uuid id PK
+    uuid tenant_id
+    string audit_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

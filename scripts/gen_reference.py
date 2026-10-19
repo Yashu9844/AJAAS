@@ -10,10 +10,10 @@ INTERNAL = os.path.join(BACKEND, 'internal')
 
 MODULE_ORDER = ['shared', 'app', 'identity', 'organization', 'employee', 'attendance', 'leave', 'payroll',
                 'recruitment', 'performance']
-TITLES = {'shared': 'Shared infrastructure', 'app': 'Application wiring (internal/app)', 'identity': 'Module 0 — Identity',
-          'organization': 'Module 1 — Organization', 'employee': 'Module 2 — Employee', 'attendance': 'Module 3 — Attendance',
-          'leave': 'Module 4 — Leave', 'payroll': 'Module 5 — Payroll', 'recruitment': 'Module 6 — Recruitment',
-          'performance': 'Module 7 — Performance (in progress)'}
+TITLES = {'shared': 'Shared infrastructure', 'app': 'Application wiring (internal/app)', 'identity': 'M0 Identity & Access',
+          'organization': 'M1 HR / Organization', 'employee': 'M1 HR / Employee', 'attendance': 'M1 HR / Attendance',
+          'leave': 'M1 HR / Leave', 'payroll': 'M1 HR / Payroll', 'recruitment': 'M1 HR / Recruitment',
+          'performance': 'M1 HR / Performance (in progress)'}
 
 
 def read(path):
@@ -222,11 +222,14 @@ def main():
             w.append(f'- `{f}`: {", ".join(names) if names else "(helpers only)"}')
 
     w.append('\n## E. Business rules, errors and decisions (verbatim from each module bundle)\n')
-    bundles = sorted(d for d in os.listdir(os.path.join(ROOT, 'docs', 'modules')) if re.match(r'module-\d+-', d))
-    bundles.sort(key=lambda d: int(d.split('-')[1]))
-    for b in bundles:
-        base = os.path.join(ROOT, 'docs', 'modules', b)
-        sources = [f for f in ('specification.md', 'requirements.md', 'business-rules.md', 'edge-cases.md')
+    mods = os.path.join(ROOT, 'docs', 'modules')
+    bundles = [('m0-identity-access', os.path.join(mods, 'm0-identity-access'))]
+    ctx_root = os.path.join(mods, 'm1-hr-management', 'contexts')
+    for ctx in MODULE_ORDER:
+        if os.path.isdir(os.path.join(ctx_root, ctx)):
+            bundles.append((f'm1-hr-management/contexts/{ctx}', os.path.join(ctx_root, ctx)))
+    for b, base in bundles:
+        sources = [f for f in ('specification.md',)
                    if os.path.exists(os.path.join(base, f))]
         spec = '\n'.join(read(os.path.join(base, f)) for f in sources)
         if not spec or 'DESIGN PENDING' in spec[:400]:
@@ -240,7 +243,7 @@ def main():
         if frs:
             w.append('\n**Requirements and rules (ID-tagged bullets)**\n')
             w.extend(frs)
-        err = re.search(r'\n## \d+\. Errors\n(.*?)(?=\n## )', spec, re.S)
+        err = re.search(r'\n#{2,3} \d+\. Errors\n(.*?)(?=\n#{2,3} )', spec, re.S)
         if err:
             w.append('\n**Errors**\n')
             w.append(err.group(1).strip())

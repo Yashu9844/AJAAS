@@ -1,7 +1,7 @@
 # JAAS — Security & Code Style Guide
 
 Single enforceable standard for all JAAS code (human or AI).
-Supersedes ad-hoc rules. Module specs (`docs/modules/module-0-identity/security.md`, `coding-guidelines.md`) remain detail refs — this file is the law.
+Supersedes ad-hoc rules. Module and context security sections (each bundle's `design.md`) and the coding guidelines (`docs/ENGINEERING.md` Appendix A) are detail refs — this file is the law.
 
 Goals: secure by default, readable without essays, self-defining names, small modular services, low latency, smooth UX.
 
@@ -134,7 +134,7 @@ Keys: `JWT_SECRET` (rotate 90d), `MFA_ENCRYPTION_KEY` (re-encrypt on rotate), DB
 - Validation: Gin `ShouldBindJSON` → `validator/v10` tags → 400 with field details. Unknown fields ignored. Malformed JSON → 400.
 - Headers on all responses: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `Content-Security-Policy`, `X-Request-ID` (trace).
 - CORS: explicit origin whitelist. No `*` in prod.
-- No user-controlled URL fetch in Module 0 (no SSRF surface). All JSON responses (no HTML → XSS-safe); still sanitize stored strings on write.
+- No server-side fetch of user-controlled URLs anywhere (no SSRF surface); stored URLs (e.g. HR learning content links) are validated (https only) and never fetched by the backend. All JSON responses (no HTML → XSS-safe); still sanitize stored strings on write.
 - Kong terminates TLS. App receives plain HTTP internally. Trust `X-Forwarded-For` only behind proxy.
 
 ## 10. OWASP Top 10 (2021) mapping

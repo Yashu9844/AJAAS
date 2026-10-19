@@ -1,0 +1,138 @@
+erDiagram
+  Department ||--o{ Team : contains
+  Employee ||--o{ Employment : has
+  Employee ||--o{ AttendancePunch : records
+  Employee ||--o{ LeaveRequest : requests
+  Employee ||--o{ LeaveLedgerEntry : ledger
+  PayrollRun ||--o{ PayrollLine : contains
+  JobOpening ||--o{ Candidate : receives
+  Candidate ||--o{ Offer : may_receive
+  ReviewCycle ||--o{ Goal : contains
+  Goal ||--o{ KeyResult : contains
+  Department {
+    uuid id PK
+    uuid tenant_id
+    string department_id_key
+  }
+  Team {
+    uuid id PK
+    uuid tenant_id
+    string team_id_key
+  }
+  Designation {
+    uuid id PK
+    uuid tenant_id
+    string designation_id_key
+  }
+  Employee {
+    uuid id PK
+    uuid tenant_id
+    string employee_id_key
+  }
+  Employment {
+    uuid id PK
+    uuid tenant_id
+    string employment_id_key
+  }
+  EmployeeContact {
+    uuid id PK
+    uuid tenant_id
+    string contact_id_key
+  }
+  StatutoryProfile {
+    uuid id PK
+    uuid tenant_id
+    string employee_id_key
+  }
+  Shift {
+    uuid id PK
+    uuid tenant_id
+    string shift_id_key
+  }
+  ShiftAssignment {
+    uuid id PK
+    uuid tenant_id
+    string employee_id_key
+  }
+  AttendancePunch {
+    uuid id PK
+    uuid tenant_id
+    string punch_id_key
+  }
+  DailyAttendance {
+    uuid id PK
+    uuid tenant_id
+    string employee_id_key
+  }
+  LeaveType {
+    uuid id PK
+    uuid tenant_id
+    string leave_type_id_key
+  }
+  LeaveRequest {
+    uuid id PK
+    uuid tenant_id
+    string leave_request_id_key
+  }
+  LeaveLedgerEntry {
+    uuid id PK
+    uuid tenant_id
+    string entry_id_key
+  }
+  PayrollRun {
+    uuid id PK
+    uuid tenant_id
+    string payroll_run_id_key
+  }
+  PayrollLine {
+    uuid id PK
+    uuid tenant_id
+    string payroll_run_id_key
+  }
+  JobOpening {
+    uuid id PK
+    uuid tenant_id
+    string job_id_key
+  }
+  Candidate {
+    uuid id PK
+    uuid tenant_id
+    string candidate_id_key
+  }
+  CandidateStageHistory {
+    uuid id PK
+    uuid tenant_id
+    string candidate_id_key
+  }
+  Offer {
+    uuid id PK
+    uuid tenant_id
+    string offer_id_key
+  }
+  ReviewCycle {
+    uuid id PK
+    uuid tenant_id
+    string cycle_id_key
+  }
+  Goal {
+    uuid id PK
+    uuid tenant_id
+    string goal_id_key
+  }
+  KeyResult {
+    uuid id PK
+    uuid tenant_id
+    string key_result_id_key
+  }
+  PerformanceReview {
+    uuid id PK
+    uuid tenant_id
+    string review_id_key
+  }
+  SagaOperation {
+    uuid id PK
+    uuid tenant_id
+    string operation_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

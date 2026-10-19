@@ -1,0 +1,48 @@
+erDiagram
+  TenantSetting ||--o{ ConfigVersion : versions
+  FeatureFlag ||--o{ ConfigVersion : versions
+  IntegrationConfig ||--o{ SecretReference : references
+  WebhookSubscription ||--o{ WebhookDelivery : delivers
+  ConfigVersion ||--o{ ChangeApproval : approves
+  TenantSetting {
+    uuid id PK
+    uuid tenant_id
+    string tenant_id_key
+  }
+  FeatureFlag {
+    uuid id PK
+    uuid tenant_id
+    string flag_id_key
+  }
+  IntegrationConfig {
+    uuid id PK
+    uuid tenant_id
+    string integration_id_key
+  }
+  WebhookSubscription {
+    uuid id PK
+    uuid tenant_id
+    string webhook_id_key
+  }
+  ConfigVersion {
+    uuid id PK
+    uuid tenant_id
+    string config_version_id_key
+  }
+  ChangeApproval {
+    uuid id PK
+    uuid tenant_id
+    string change_id_key
+  }
+  SecretReference {
+    uuid id PK
+    uuid tenant_id
+    string secret_ref_id_key
+  }
+  WebhookDelivery {
+    uuid id PK
+    uuid tenant_id
+    string delivery_id_key
+  }
+
+%% Cross-service references are IDs only; do not add cross-service database foreign keys.

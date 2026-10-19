@@ -1,0 +1,57 @@
+flowchart TB
+  U[Web / Mobile Clients] --> FE[Next.js / React Shell<br/>Role-aware Dashboard]
+  FE --> GW[API Gateway<br/>TLS · routing · edge limits]
+  GW --> ID[M0 Identity & Access]
+  GW --> HR[M1 HR Management]
+  GW --> PT[M2 Projects & Tasks]
+  GW --> MT[M3 Meetings]
+  GW --> AS[M4 Assets & Inventory]
+  GW --> FI[M5 Finance]
+  GW --> RA[M6 Reports & Analytics]
+  GW --> AP[M7 Approvals]
+  GW --> DO[M8 Documents]
+  GW --> AI[M9 AI Assistant]
+  GW --> NO[M10 Notifications]
+  GW --> KB[M11 Company Knowledge Base]
+  GW --> ST[M12 Settings]
+  ID --> PG[(PostgreSQL<br/>service-owned schemas)]
+  HR --> PG
+  PT --> PG
+  MT --> PG
+  AS --> PG
+  FI --> PG
+  RA --> PG
+  AP --> PG
+  DO --> PG
+  AI --> PG
+  NO --> PG
+  KB --> PG
+  ST --> PG
+  HR -. outbox/events .-> MQ[(RabbitMQ)]
+  PT -. outbox/events .-> MQ
+  MT -. outbox/events .-> MQ
+  AS -. outbox/events .-> MQ
+  FI -. outbox/events .-> MQ
+  AP -. decisions .-> MQ
+  DO -. lifecycle .-> MQ
+  MQ -. consumers .-> NO
+  MQ -. projections .-> RA
+  MQ -. indexing .-> KB
+  MQ -. tool/audit events .-> AI
+  DO --> OBJ[(Object Storage)]
+  RA --> OBJ
+  ID -. bounded cache / rate limit .-> REDIS[(Redis)]
+  OBS[Logs · Metrics · Traces · Alerts] --- GW
+  OBS --- ID
+  OBS --- HR
+  OBS --- PT
+  OBS --- MT
+  OBS --- AS
+  OBS --- FI
+  OBS --- RA
+  OBS --- AP
+  OBS --- DO
+  OBS --- AI
+  OBS --- NO
+  OBS --- KB
+  OBS --- ST

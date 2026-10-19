@@ -1,0 +1,16 @@
+flowchart LR
+  Client[Web / Mobile] --> GW[API Gateway]
+  GW --> S[M7 - Approvals]
+  S --> AUTH[M0 Identity claims / authorization]
+  S --> DB[(Service-owned PostgreSQL schema)]
+  S --> IDEM[(Idempotency records)]
+  S --> OUT[(Transactional outbox)]
+  OUT --> MQ[(RabbitMQ)]
+  MQ --> INBOX[(Consumer inbox / deduplication)]
+  S -. cache only .-> R[(Redis)]
+  S -. telemetry .-> OBS[Logs / Metrics / Traces]
+  S --> NO[Notifications API]
+  HR[HR] -. workflow request / decision .-> MQ
+  FI[Finance] -. workflow request / decision .-> MQ
+  AS[Assets] -. workflow request / decision .-> MQ
+
