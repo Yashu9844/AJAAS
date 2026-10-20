@@ -1,8 +1,12 @@
 package services
 
 import (
+	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/jaas/jaas/internal/shared/config"
 )
@@ -84,5 +88,54 @@ func TestTokenService_OpaqueToken(t *testing.T) {
 	expectedHash := svc.HashOpaqueToken(raw)
 	if expectedHash != hash {
 		t.Errorf("expected hash %q, got %q", expectedHash, hash)
+	}
+}
+
+func TestEdDSASigningJWKSAndLegacyWindow(t *testing.T) {
+	cfg := &config.JWTConfig{Secret: strings.Repeat("s", 40), AccessTokenTTL: 15}
+	ts := NewTokenService(cfg)
+	tok, _, err := ts.GenerateAccessToken("u", "t", "e", nil, "sid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claims, err := ts.ValidateAccessToken(tok); err != nil || claims.Subject != "u" {
+		t.Fatalf("EdDSA round trip: %v", err)
+	}
+	set, ok := KeySetOf(ts)
+	if !ok || len(set.Keys) != 1 || set.Keys[0].Alg != "EdDSA" || set.Keys[0].Kty != "OKP" || set.Keys[0].Kid == "" {
+		t.Fatalf("jwks: %+v", set)
+	}
+	if _, ok := KeySetOf(&MockTokenService{}); ok {
+		t.Fatal("mocks expose no key set")
+	}
+	// another key id is rejected
+	other := NewTokenService(&config.JWTConfig{Secret: strings.Repeat("o", 40), AccessTokenTTL: 15})
+	foreign, _, _ := other.GenerateAccessToken("u", "t", "e", nil, "sid")
+	if _, err := ts.ValidateAccessToken(foreign); err == nil {
+		t.Fatal("foreign key id must fail")
+	}
+	// legacy HS256 accepted only while the window is open
+	legacy := jwt.NewWithClaims(jwt.SigningMethodHS256, &UserClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "u", ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute))}})
+	hs, _ := legacy.SignedString([]byte(cfg.Secret))
+	if _, err := ts.ValidateAccessToken(hs); err == nil {
+		t.Fatal("HS256 refused when the legacy window is closed")
+	}
+	cfg.AcceptLegacyHS256 = true
+	if _, err := ts.ValidateAccessToken(hs); err != nil {
+		t.Fatalf("HS256 accepted during the window: %v", err)
+	}
+	seed := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	if _, err := ParseSigningKey(seed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseSigningKey("c2hvcnQ="); err == nil {
+		t.Fatal("short seed rejected")
+	}
+	if _, err := ParseSigningKey("!!!"); err == nil {
+		t.Fatal("non-base64 rejected")
+	}
+	explicit := NewTokenService(&config.JWTConfig{SigningKey: seed, AccessTokenTTL: 15})
+	if tok, _, err := explicit.GenerateAccessToken("u", "t", "e", nil, "s"); err != nil || tok == "" {
+		t.Fatal("explicit key signs")
 	}
 }

@@ -28,6 +28,8 @@ jwt:
   secret: "" # Must be injected via JWT_SECRET env variable in production
   access_token_ttl: 15
   refresh_token_ttl: 7
+  signing_key: "" # base64 Ed25519 seed (32 bytes); JWT_SIGNING_KEY. Development derives one from the secret.
+  accept_legacy_hs256: false # accept HS256 tokens during the EdDSA migration window
 
 platform:
   admin_key: "" # Must be injected via PLATFORM_ADMIN_KEY env variable in production

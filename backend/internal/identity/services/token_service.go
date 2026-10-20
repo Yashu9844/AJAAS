@@ -33,12 +33,14 @@ type TokenService interface {
 }
 
 type tokenService struct {
-	cfg *config.JWTConfig
+	cfg  *config.JWTConfig
+	keys signingKeys
 }
 
-// NewTokenService creates a new TokenService.
+// NewTokenService creates a new TokenService. Access tokens are signed with Ed25519 (EdDSA) under a key id published
+// at /.well-known/jwks.json, so any service can verify them without sharing a secret (M0 plan B4).
 func NewTokenService(cfg *config.JWTConfig) TokenService {
-	return &tokenService{cfg: cfg}
+	return &tokenService{cfg: cfg, keys: loadSigningKeys(cfg)}
 }
 
 func (s *tokenService) GenerateAccessToken(userID, tenantID, email string, roles []string, sessionID string) (string, time.Time, error) {
@@ -60,8 +62,9 @@ func (s *tokenService) GenerateAccessToken(userID, tenantID, email string, roles
 		SessionID: sessionID,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString([]byte(s.cfg.Secret))
+	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	token.Header["kid"] = s.keys.kid
+	signed, err := token.SignedString(s.keys.private)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -70,13 +73,8 @@ func (s *tokenService) GenerateAccessToken(userID, tenantID, email string, roles
 }
 
 func (s *tokenService) ValidateAccessToken(tokenStr string) (*UserClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-		// Verify signature method is HMAC
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(s.cfg.Secret), nil
-	})
+	token, err := jwt.ParseWithClaims(tokenStr, &UserClaims{}, s.keys.verificationKey(s.cfg),
+		jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg(), jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
 		return nil, err

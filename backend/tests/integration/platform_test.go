@@ -85,3 +85,11 @@ func TestIdempotencyKeyReplaysAndRejectsReuse(t *testing.T) {
 		t.Fatalf("tenant replay: %s", p2.Raw)
 	}
 }
+
+func TestJWKSPublishesTheEdDSAKey(t *testing.T) {
+	r := call(t, "GET", "/.well-known/jwks.json")
+	expect(t, r, 200, "jwks")
+	if r.str("keys.0.kty") != "OKP" || r.str("keys.0.alg") != "EdDSA" || r.str("keys.0.kid") == "" {
+		t.Fatalf("jwks: %s", r.Raw)
+	}
+}

@@ -171,7 +171,7 @@ func call(t *testing.T, method, path string, opts ...opt) resp {
 		o(r)
 	}
 	url := "/api/v1" + path
-	if strings.HasPrefix(path, "/health") {
+	if strings.HasPrefix(path, "/health") || strings.HasPrefix(path, "/.well-known") {
 		url = path
 	}
 	if len(r.query) > 0 {

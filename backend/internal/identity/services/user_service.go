@@ -39,7 +39,9 @@ func WithRolePermissions(rp repositories.RolePermissionRepository) UserOption {
 }
 
 // WithInvitations issues an invitation (token delivered to the user) whenever a user is invited.
-func WithInvitations(inv InvitationService) UserOption { return func(s *userService) { s.invites = inv } }
+func WithInvitations(inv InvitationService) UserOption {
+	return func(s *userService) { s.invites = inv }
+}
 
 // WithUserEvents records user events through sink (the transactional outbox in production).
 func WithUserEvents(sink EventSink) UserOption { return func(s *userService) { s.sink = sink } }

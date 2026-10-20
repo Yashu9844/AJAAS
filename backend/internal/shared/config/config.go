@@ -63,6 +63,11 @@ type JWTConfig struct {
 	Secret          string `mapstructure:"secret"`
 	AccessTokenTTL  int    `mapstructure:"access_token_ttl"`  // in minutes
 	RefreshTokenTTL int    `mapstructure:"refresh_token_ttl"` // in days
+	// SigningKey is the base64 Ed25519 seed (32 bytes) access tokens are signed with (EdDSA, published as JWKS).
+	// Empty outside production: a key is derived from Secret so development tokens survive restarts.
+	SigningKey string `mapstructure:"signing_key"`
+	// AcceptLegacyHS256 keeps accepting HS256 tokens signed with Secret during the migration window.
+	AcceptLegacyHS256 bool `mapstructure:"accept_legacy_hs256"`
 }
 
 // LoadConfig reads configuration from file or environment variables.

@@ -44,6 +44,13 @@ func ValidateConfig(cfg *config.Config) error {
 			return errors.New("jwt.secret must be at least 32 characters in production (set JWT_SECRET)")
 		}
 	}
+	if cfg.JWT.SigningKey != "" {
+		if _, err := identityServices.ParseSigningKey(cfg.JWT.SigningKey); err != nil {
+			return fmt.Errorf("jwt.signing_key: %w", err)
+		}
+	} else if cfg.Server.Env == "production" {
+		return errors.New("jwt.signing_key (base64 Ed25519 seed) is required in production (set JWT_SIGNING_KEY)")
+	}
 	if cfg.JWT.AccessTokenTTL <= 0 || cfg.JWT.RefreshTokenTTL <= 0 {
 		return errors.New("jwt token TTLs must be positive")
 	}
@@ -132,5 +139,6 @@ func Build(o Options) (*gin.Engine, error) {
 	registerPeopleRoutes(v1, o, identityModule, people)
 
 	registerHealth(router, o.DB, o.Redis)
+	identityModule.RegisterWellKnown(router)
 	return router, nil
 }

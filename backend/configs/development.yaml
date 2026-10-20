@@ -28,6 +28,8 @@ jwt:
   secret: dev_secret_key_minimum_256_bits_for_security_purposes_only
   access_token_ttl: 15 # in minutes
   refresh_token_ttl: 7 # in days
+  signing_key: "" # base64 Ed25519 seed (32 bytes); JWT_SIGNING_KEY. Development derives one from the secret.
+  accept_legacy_hs256: true # accept HS256 tokens during the EdDSA migration window
 
 platform:
   admin_key: dev-platform-admin-key-change-me # override with PLATFORM_ADMIN_KEY

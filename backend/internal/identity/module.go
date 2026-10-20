@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -225,6 +226,19 @@ func (m *Module) CallerScope(c *gin.Context) (string, bool) {
 		return "", false
 	}
 	return claims.TenantID + ":" + claims.Subject, true
+}
+
+// RegisterWellKnown mounts the public JWKS at the server root (/.well-known/jwks.json) so any service can verify
+// access tokens without sharing a secret (M0 plan B4).
+func (m *Module) RegisterWellKnown(router gin.IRoutes) {
+	set, ok := services.KeySetOf(m.tokenSvc)
+	if !ok {
+		return
+	}
+	router.GET("/.well-known/jwks.json", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=300")
+		c.JSON(http.StatusOK, set)
+	})
 }
 
 // SetAutomaticRoleSource installs the HR-backed source of the automatic employee/manager roles.
