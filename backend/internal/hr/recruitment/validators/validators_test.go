@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jaas/jaas/internal/hr/payroll/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 )
 
 func TestValidators(t *testing.T) {
@@ -25,7 +25,7 @@ func TestValidators(t *testing.T) {
 	if FutureInstant(now.Add(time.Hour), now) != nil || FutureInstant(now, now) != ErrPastTime {
 		t.Fatal("FutureInstant")
 	}
-	if ValidateCTC(calc.Rupees(600000)) != nil || ValidateCTC(0) != ErrCTC || ValidateCTC(calc.Rupees(1_000_000_001)) != ErrCTC {
+	if ValidateCTC(kernel.Rupees(600000)) != nil || ValidateCTC(0) != ErrCTC || ValidateCTC(kernel.Rupees(1_000_000_001)) != ErrCTC {
 		t.Fatal("ValidateCTC")
 	}
 	if NormalizeEmail("  Asha@Example.COM ") != "asha@example.com" {

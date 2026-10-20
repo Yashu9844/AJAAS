@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/employee/services"
-	identityDto "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 )
 
 func TestEventConsumerHandleUserDeactivated(t *testing.T) {
@@ -19,8 +19,8 @@ func TestEventConsumerHandleUserDeactivated(t *testing.T) {
 	pRepo := newMockProfileRepo()
 	tRepo := newMockTimelineRepo()
 	uSvc := newMockUserService()
-	uSvc.users[userID] = &identityDto.UserResponse{
-		ID:    userID.String(),
+	uSvc.users[userID] = &identityport.User{
+		ID:    userID,
 		Email: "deact@example.com",
 	}
 	pub := &mockPublisher{}

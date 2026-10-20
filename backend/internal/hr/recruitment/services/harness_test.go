@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
-	"github.com/jaas/jaas/internal/hr/payroll/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/recruitment/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"gorm.io/gorm"
 )
@@ -58,20 +58,16 @@ func (f *fakeEmployees) add(t uuid.UUID, status string) *employeeDTO.EmployeeRes
 }
 
 type fakeUsers struct {
-	invites []identityDTO.InviteUserRequest
+	invites []identityport.Invite
 	err     error
-	badID   bool
 }
 
-func (f *fakeUsers) InviteUser(_ context.Context, _ *gorm.DB, _ uuid.UUID, req identityDTO.InviteUserRequest, _ uuid.UUID) (*identityDTO.UserResponse, error) {
+func (f *fakeUsers) InviteUser(_ context.Context, _ *gorm.DB, _ uuid.UUID, in identityport.Invite, _ uuid.UUID) (*identityport.User, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	f.invites = append(f.invites, req)
-	if f.badID {
-		return &identityDTO.UserResponse{ID: "not-a-uuid"}, nil
-	}
-	return &identityDTO.UserResponse{ID: uuid.NewString(), Email: req.Email}, nil
+	f.invites = append(f.invites, in)
+	return &identityport.User{ID: uuid.New(), Email: in.Email, Status: "invited"}, nil
 }
 
 type fakeOrg struct {
@@ -182,7 +178,7 @@ func (h *harness) toStage(t *testing.T, id uuid.UUID, stages ...string) {
 func (h *harness) offer(t *testing.T, candID uuid.UUID) *dto.OfferResponse {
 	t.Helper()
 	return must(h.offs.Create(context.Background(), h.actor, dto.CreateOfferRequest{CandidateID: candID.String(),
-		OfferedCTC: calc.Rupees(1200000), JoiningDate: "2026-11-02"}))
+		OfferedCTC: kernel.Rupees(1200000), JoiningDate: "2026-11-02"}))
 }
 
 // accepted drives a fresh candidate on jobID to stage offer with an accepted offer.

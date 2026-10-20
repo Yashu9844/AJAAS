@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/models"
 	"gorm.io/gorm"
@@ -241,7 +241,7 @@ type fUsers struct {
 	f *faults
 }
 
-func (u fUsers) GetByID(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*identityDTO.UserResponse, error) {
+func (u fUsers) GetByID(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*identityport.User, error) {
 	if err := u.f.hit(); err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func newWorld(f *faults) *world {
 	w.teams = &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}, byName: map[string]*models.Team{}}
 	w.maps = &stubMappingRepo{byID: map[uuid.UUID]*models.Mapping{}, primary: map[uuid.UUID]*models.Mapping{}}
 	w.desigs = &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}
-	w.users = &stubUserChecker{users: map[uuid.UUID]*identityDTO.UserResponse{w.boss: activeUser(w.boss), w.emp: activeUser(w.emp)}}
+	w.users = &stubUserChecker{users: map[uuid.UUID]*identityport.User{w.boss: activeUser(w.boss), w.emp: activeUser(w.emp)}}
 
 	r := &models.Department{TenantID: w.tenant, Name: "Root", Status: "active"}
 	r.ID = w.root

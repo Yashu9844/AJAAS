@@ -9,7 +9,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/employee/models"
 	"github.com/jaas/jaas/internal/hr/employee/repositories"
-	identityDto "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"gorm.io/gorm"
 )
 
@@ -196,33 +196,24 @@ func (m *mockTimelineRepo) ListByProfileID(ctx context.Context, tenantID, profil
 }
 
 type mockUserService struct {
-	users map[uuid.UUID]*identityDto.UserResponse
+	users map[uuid.UUID]*identityport.User
 }
 
 func newMockUserService() *mockUserService {
 	return &mockUserService{
-		users: make(map[uuid.UUID]*identityDto.UserResponse),
+		users: make(map[uuid.UUID]*identityport.User),
 	}
 }
 
-func (m *mockUserService) CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req identityDto.CreateUserRequest, correlationID uuid.UUID) (*identityDto.UserResponse, error) {
+func (m *mockUserService) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in identityport.Invite, correlationID uuid.UUID) (*identityport.User, error) {
 	return nil, nil
 }
-func (m *mockUserService) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req identityDto.InviteUserRequest, correlationID uuid.UUID) (*identityDto.UserResponse, error) {
-	return nil, nil
-}
-func (m *mockUserService) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityDto.UserResponse, error) {
+func (m *mockUserService) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityport.User, error) {
 	u, ok := m.users[id]
 	if !ok {
 		return nil, errors.New("user not found")
 	}
 	return u, nil
-}
-func (m *mockUserService) ListUsers(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*identityDto.UserListResponse, error) {
-	return nil, nil
-}
-func (m *mockUserService) UpdateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req identityDto.UpdateUserRequest) (*identityDto.UserResponse, error) {
-	return nil, nil
 }
 func (m *mockUserService) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, correlationID uuid.UUID) error {
 	return nil
@@ -235,8 +226,4 @@ type mockPublisher struct {
 func (m *mockPublisher) Publish(ctx context.Context, exchange string, routingKey string, event interface{}) error {
 	m.events = append(m.events, routingKey)
 	return nil
-}
-
-func (m *mockUserService) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*identityDto.UserResponse, error) {
-	return &identityDto.UserResponse{ID: id.String(), Status: "active"}, nil
 }

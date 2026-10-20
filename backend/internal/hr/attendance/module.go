@@ -3,6 +3,7 @@ package attendance
 
 import (
 	"context"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,9 +14,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/attendance/routes"
 	"github.com/jaas/jaas/internal/hr/attendance/services"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	employeeServices "github.com/jaas/jaas/internal/hr/employee/services"
-	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityServices "github.com/jaas/jaas/internal/identity/services"
+	employeeAPI "github.com/jaas/jaas/internal/hr/employee/api"
 	"github.com/jaas/jaas/internal/shared/cache"
 	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"github.com/jaas/jaas/internal/shared/queue"
@@ -34,7 +33,7 @@ type Module struct {
 }
 
 // NewModule wires repositories, services and controllers over Module 0 audit and Module 2 employees.
-func NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeServices.EmployeeService, audit identityServices.AuditService) *Module {
+func NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeAPI.Directory, audit identityport.Auditor) *Module {
 	deps := services.Deps{
 		Tx: services.NewTxRunner(db),
 		Repos: services.Repos{
@@ -65,21 +64,19 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.AttendancePunch{}, &models.Regularization{}, &models.OutboxEvent{}}
 }
 
-
 // RouteDeps is the Module 0 + shared infrastructure the routes need (connections C4).
 type RouteDeps struct {
-	TenantResolver, Authenticate gin.HandlerFunc
-	Authz                        identityMiddleware.Authorizer
-	Redis                        *cache.RedisClient
+	Identity identityport.HTTP
+	Redis    *cache.RedisClient
 }
 
 // RegisterRoutes mounts Module 3 under rg using Module 0 tenant/auth/RBAC middleware.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 	mw := routes.Middleware{
-		TenantResolver: d.TenantResolver,
-		Authenticate:   d.Authenticate,
+		TenantResolver: d.Identity.TenantResolver(),
+		Authenticate:   d.Identity.Authenticate(),
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(d.Authz, "attendance", action)
+			return d.Identity.Require("attendance", action)
 		},
 		PunchLimit: sharedMiddleware.RateLimiter(d.Redis, punchRateLimit, time.Minute),
 	}
@@ -92,9 +89,9 @@ func (m *Module) LeaveSync() services.LeaveSync { return m.leaveSync }
 // Relay exposes the outbox relay; cmd/main.go runs it until shutdown.
 func (m *Module) Relay() *services.OutboxRelay { return m.relay }
 
-// employeeDirectory adapts Module 2 EmployeeService to services.EmployeeDirectory (connections C2).
+// employeeDirectory adapts the HR/Employee directory to services.EmployeeDirectory (connections C2).
 type employeeDirectory struct {
-	svc employeeServices.EmployeeService
+	svc employeeAPI.Directory
 }
 
 func (d employeeDirectory) GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error) {

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	leavecalc "github.com/jaas/jaas/internal/hr/leave/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/payroll/calc"
 	"github.com/jaas/jaas/internal/hr/payroll/dto"
 	"github.com/jaas/jaas/internal/hr/payroll/models"
@@ -37,7 +37,7 @@ func setupSeptember(t *testing.T) *lifecycle {
 		h.assign(t, l.maker, e, l.structure, calc.Rupees(1200000), "2026-01-01")
 	}
 	h.assign(t, l.maker, empB.ID, l.structure, calc.Rupees(1200000), "2026-09-16")
-	h.lop.days[empD.ID] = leavecalc.Days(200)
+	h.lop.days[empD.ID] = kernel.Days(200)
 	run, err := NewRunService(h.deps).Create(context.Background(), l.maker, dto.CreateRunRequest{Month: 9, Year: 2026})
 	if err != nil {
 		t.Fatal(err)

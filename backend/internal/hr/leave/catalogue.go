@@ -1,8 +1,8 @@
 package leave
 
 import (
-	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/hr/leave/routes"
+	"github.com/jaas/jaas/internal/identity/access"
 )
 
 // Catalogue is HR/Leave's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md

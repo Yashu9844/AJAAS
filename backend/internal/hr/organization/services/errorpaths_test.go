@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/models"
 	"gorm.io/gorm"
@@ -82,7 +82,7 @@ func (f *failMappingRepo) FindPrimaryByUser(ctx context.Context, db *gorm.DB, te
 // failUsers fails user resolution.
 type failUsers struct{ stubUserChecker }
 
-func (f *failUsers) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityDTO.UserResponse, error) {
+func (f *failUsers) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityport.User, error) {
 	return nil, errBoom
 }
 
@@ -108,7 +108,7 @@ func TestServiceErrorPropagation(t *testing.T) {
 		t.Error("dept deactivate must propagate repo error")
 	}
 
-	teamSvc := NewTeamService(&failTeamRepo{}, &failDeptRepo{}, &stubMappingRepo{byID: map[uuid.UUID]*models.Mapping{}}, &stubUserChecker{users: map[uuid.UUID]*identityDTO.UserResponse{}}, &stubPublisher{}, &stubAudit{})
+	teamSvc := NewTeamService(&failTeamRepo{}, &failDeptRepo{}, &stubMappingRepo{byID: map[uuid.UUID]*models.Mapping{}}, &stubUserChecker{users: map[uuid.UUID]*identityport.User{}}, &stubPublisher{}, &stubAudit{})
 	if _, err := teamSvc.CreateTeam(ctx, nil, tenantID, dto.CreateTeamRequest{Name: "X", DepartmentID: id.String()}, uuid.New()); !isErr(err, errBoom) {
 		t.Error("team create must propagate dept repo error")
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	leavecalc "github.com/jaas/jaas/internal/hr/leave/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/payroll/calc"
 	"github.com/jaas/jaas/internal/hr/payroll/models"
 	"github.com/jaas/jaas/internal/hr/payroll/repositories"
@@ -144,14 +144,14 @@ func dateOnly(t time.Time) time.Time {
 type slipFigures struct {
 	days    int
 	payable int64
-	lop     leavecalc.Days
+	lop     kernel.Days
 	result  calc.Result
 }
 
 func buildPayslip(run *models.Run, as models.Assignment, emp *employeeDTO.EmployeeResponse, f slipFigures) *models.Payslip {
 	slip := &models.Payslip{TenantID: run.TenantID, RunID: run.ID, EmployeeProfileID: emp.ID, EmployeeCode: emp.EmployeeCode,
 		EmployeeName: strings.TrimSpace(emp.FirstName + " " + emp.LastName), StructureID: as.StructureID, AnnualCTC: as.AnnualCTC,
-		DaysInMonth: f.days, PayableDays: leavecalc.Days(f.payable), LopDays: f.lop, Gross: f.result.Gross,
+		DaysInMonth: f.days, PayableDays: kernel.Days(f.payable), LopDays: f.lop, Gross: f.result.Gross,
 		Deductions: f.result.Deductions, Net: f.result.Net}
 	for i, l := range f.result.Lines {
 		slip.Lines = append(slip.Lines, models.PayslipLine{Code: l.Code, Name: l.Name, Kind: l.Kind, Amount: l.Amount, Position: i})

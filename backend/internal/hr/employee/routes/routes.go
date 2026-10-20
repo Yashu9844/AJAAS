@@ -3,36 +3,30 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/hr/employee/controllers"
-	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityServices "github.com/jaas/jaas/internal/identity/services"
-	"gorm.io/gorm"
+	"github.com/jaas/jaas/internal/hr/identityport"
 )
 
 // RegisterRoutes wires employee endpoint groups with Module 0 middleware and RBAC.
-func RegisterRoutes(
-	router *gin.RouterGroup,
-	db *gorm.DB,
-	authz identityMiddleware.Authorizer,
-	tenantResolver gin.HandlerFunc,
-	authMiddleware gin.HandlerFunc,
-	empCtrl *controllers.EmployeeController,
-	statCtrl *controllers.StatutoryController,
-	docCtrl *controllers.DocumentController,
-	tlCtrl *controllers.TimelineController,
-	dbForAudit *gorm.DB,
-	auditSvc identityServices.AuditService,
-) {
-	auditMW := func(action, resource string) gin.HandlerFunc {
-		return identityMiddleware.AuditLog(dbForAudit, auditSvc, action, resource)
-	}
+// Controllers groups the employee HTTP handlers.
+type Controllers struct {
+	Employees *controllers.EmployeeController
+	Statutory *controllers.StatutoryController
+	Documents *controllers.DocumentController
+	Timeline  *controllers.TimelineController
+}
 
-	read := identityMiddleware.RequirePermission(authz, "employee", "read")
-	create := identityMiddleware.RequirePermission(authz, "employee", "create")
-	update := identityMiddleware.RequirePermission(authz, "employee", "update")
-	updateSensitive := identityMiddleware.RequirePermission(authz, "employee", "update_sensitive")
-	admin := identityMiddleware.RequirePermission(authz, "employee", "admin")
+func RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP, c Controllers) {
+	empCtrl, statCtrl, docCtrl, tlCtrl := c.Employees, c.Statutory, c.Documents, c.Timeline
+	tenantResolver, authMiddleware := idp.TenantResolver(), idp.Authenticate()
+	auditMW := idp.AuditTrail
+
+	read := idp.Require("employee", "read")
+	create := idp.Require("employee", "create")
+	update := idp.Require("employee", "update")
+	updateSensitive := idp.Require("employee", "update_sensitive")
+	admin := idp.Require("employee", "admin")
 	// Resolves employee:read_sensitive without blocking; the statutory handler only unmasks PII when it is true.
-	sensitiveFlag := identityMiddleware.PermissionFlag(authz, "employee", "read_sensitive", "has_sensitive_perm")
+	sensitiveFlag := idp.Flag("employee", "read_sensitive", "has_sensitive_perm")
 	// Unmasked reads of PII are security-relevant and always audited.
 	auditUnmasked := func(c *gin.Context) {
 		if c.Query("unmasked") == "true" {

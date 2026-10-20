@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/models"
 )
@@ -15,7 +15,7 @@ func newTeamSvc() (*stubDeptRepo, *stubTeamRepo, *stubMappingRepo, *stubUserChec
 	depts := &stubDeptRepo{byID: map[uuid.UUID]*models.Department{}, byName: map[string]*models.Department{}}
 	teams := &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}, byName: map[string]*models.Team{}}
 	mappings := &stubMappingRepo{byID: map[uuid.UUID]*models.Mapping{}, primary: map[uuid.UUID]*models.Mapping{}}
-	users := &stubUserChecker{users: map[uuid.UUID]*identityDTO.UserResponse{}}
+	users := &stubUserChecker{users: map[uuid.UUID]*identityport.User{}}
 	svc := NewTeamService(teams, depts, mappings, users, &stubPublisher{}, &stubAudit{})
 	return depts, teams, mappings, users, svc
 }

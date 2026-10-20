@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/events"
 	"github.com/jaas/jaas/internal/hr/organization/models"
@@ -18,7 +18,7 @@ import (
 
 // userChecker validates user existence/activity through Module 0 (injected, mocked in tests).
 type userChecker interface {
-	GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityDTO.UserResponse, error)
+	GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityport.User, error)
 }
 
 // auditLogger records org mutations through Module 0 audit transport.

@@ -4,13 +4,13 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/hr/employee/api"
 	"github.com/jaas/jaas/internal/hr/employee/controllers"
 	"github.com/jaas/jaas/internal/hr/employee/models"
 	"github.com/jaas/jaas/internal/hr/employee/repositories"
 	employeeRoutes "github.com/jaas/jaas/internal/hr/employee/routes"
 	"github.com/jaas/jaas/internal/hr/employee/services"
-	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityServices "github.com/jaas/jaas/internal/identity/services"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	sharedCache "github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"github.com/rs/zerolog"
@@ -49,15 +49,14 @@ func NewModule(
 	redisClient *sharedCache.RedisClient,
 	publisher queue.EventPublisher,
 	logger *zerolog.Logger,
-	userSvc identityServices.UserService,
-	auditSvc identityServices.AuditService,
+	idp identityport.Port,
 ) *Module {
 	pRepo := repositories.NewEmployeeProfileRepository(db)
 	sRepo := repositories.NewEmployeeStatutoryRepository(db)
 	dRepo := repositories.NewEmployeeDocumentRepository(db)
 	tRepo := repositories.NewEmployeeTimelineRepository(db)
 
-	empSvc := services.NewEmployeeService(db, pRepo, tRepo, userSvc, auditSvc, publisher)
+	empSvc := services.NewEmployeeService(db, pRepo, tRepo, idp.Users(), idp.Audit(), publisher)
 	statSvc := services.NewEmployeeStatutoryService(sRepo, pRepo)
 	docSvc := services.NewEmployeeDocumentService(dRepo, pRepo, publisher)
 	tlSvc := services.NewEmployeeTimelineService(tRepo, pRepo)
@@ -101,31 +100,18 @@ func (m *Module) RegisterModels() []interface{} {
 	}
 }
 
-func (m *Module) RegisterRoutes(
-	router *gin.RouterGroup,
-	authz identityMiddleware.Authorizer,
-	tenantResolver gin.HandlerFunc,
-	authMiddleware gin.HandlerFunc,
-	auditSvc identityServices.AuditService,
-) {
-	employeeRoutes.RegisterRoutes(
-		router,
-		m.db,
-		authz,
-		tenantResolver,
-		authMiddleware,
-		m.empCtrl,
-		m.statCtrl,
-		m.docCtrl,
-		m.tlCtrl,
-		m.db,
-		auditSvc,
-	)
+// RegisterRoutes mounts the employee endpoints behind the M0 guards provided by idp.
+func (m *Module) RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP) {
+	employeeRoutes.RegisterRoutes(router, idp, employeeRoutes.Controllers{Employees: m.empCtrl, Statutory: m.statCtrl,
+		Documents: m.docCtrl, Timeline: m.tlCtrl})
 }
 
 func (m *Module) EmployeeService() services.EmployeeService {
 	return m.empSvc
 }
+
+// Directory is the employee directory published to the other HR contexts (employee/api).
+func (m *Module) Directory() api.Directory { return m.empSvc }
 
 func (m *Module) EventConsumer() services.EventConsumer {
 	return m.consumer
@@ -139,6 +125,6 @@ func (c userDeactivationConverger) DeactivateUserMappings(ctx context.Context, t
 }
 
 // UserDeactivationConverger returns the hook that keeps employee profiles in step with Module 0 user deactivation.
-func (m *Module) UserDeactivationConverger() identityServices.UserDeactivationConverger {
+func (m *Module) UserDeactivationConverger() identityport.DeactivationHook {
 	return userDeactivationConverger{svc: m.empSvc}
 }

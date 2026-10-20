@@ -1,8 +1,8 @@
 package recruitment
 
 import (
-	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/hr/recruitment/routes"
+	"github.com/jaas/jaas/internal/identity/access"
 )
 
 // Catalogue is HR/Recruitment's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md

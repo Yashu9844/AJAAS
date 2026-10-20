@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/employee/services"
-	identityDto "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 )
 
 func TestEmployeeServiceEdgeCasesAndBranches(t *testing.T) {
@@ -63,7 +63,7 @@ func TestEmployeeServiceEdgeCasesAndBranches(t *testing.T) {
 	}
 
 	// Add user and create profile
-	uSvc.users[userID] = &identityDto.UserResponse{ID: userID.String(), Email: "user@example.com"}
+	uSvc.users[userID] = &identityport.User{ID: userID, Email: "user@example.com"}
 	probationEnd := time.Now().UTC().Add(30 * 24 * time.Hour)
 	prof, err := svc.CreateEmployee(ctx, tenantID, dto.CreateEmployeeRequest{
 		UserID:           userID,
@@ -136,7 +136,7 @@ func TestEmployeeServiceEdgeCasesAndBranches(t *testing.T) {
 
 	// 8. UpdateSelfContact with nil existing contact and all fields
 	u2ID := uuid.New()
-	uSvc.users[u2ID] = &identityDto.UserResponse{ID: u2ID.String(), Email: "u2@example.com"}
+	uSvc.users[u2ID] = &identityport.User{ID: u2ID, Email: "u2@example.com"}
 	prof2, _ := svc.CreateEmployee(ctx, tenantID, dto.CreateEmployeeRequest{
 		UserID:         u2ID,
 		EmployeeCode:   "EMP-004",

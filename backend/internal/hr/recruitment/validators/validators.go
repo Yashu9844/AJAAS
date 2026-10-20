@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jaas/jaas/internal/hr/payroll/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 )
 
 // DateLayout is the API calendar-date format.
@@ -19,7 +19,7 @@ var (
 	ErrPastTime    = errors.New("scheduled_at must be in the future")
 	ErrCTC         = errors.New("amount must be greater than 0 and at most 1000000000")
 	ErrExpiryOrder = errors.New("expires_on must not be after joining_date")
-	maxCTC         = calc.Rupees(1_000_000_000)
+	maxCTC         = kernel.Rupees(1_000_000_000)
 )
 
 // ParseDate parses a YYYY-MM-DD date as UTC midnight.
@@ -52,7 +52,7 @@ func FutureInstant(at, now time.Time) error {
 }
 
 // ValidateCTC checks an offered/expected CTC.
-func ValidateCTC(m calc.Money) error {
+func ValidateCTC(m kernel.Money) error {
 	if m <= 0 || m > maxCTC {
 		return ErrCTC
 	}

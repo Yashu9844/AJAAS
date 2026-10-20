@@ -1,4 +1,4 @@
-package calc
+package kernel
 
 import (
 	"encoding/json"

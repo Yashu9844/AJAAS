@@ -2,10 +2,10 @@
 package leave
 
 import (
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
 	"github.com/jaas/jaas/internal/hr/leave/controllers"
 	"github.com/jaas/jaas/internal/hr/leave/models"
 	"github.com/jaas/jaas/internal/hr/leave/repositories"
@@ -61,20 +61,18 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.LedgerEntry{}, &models.OutboxEvent{}}
 }
 
-
 // RouteDeps is the Module 0 infrastructure the routes need (connections C4).
 type RouteDeps struct {
-	TenantResolver, Authenticate gin.HandlerFunc
-	Authz                        identityMiddleware.Authorizer
+	Identity identityport.HTTP
 }
 
 // RegisterRoutes mounts Module 4 under rg using Module 0 tenant/auth/RBAC middleware.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 	routes.RegisterRoutes(rg, routes.Middleware{
-		TenantResolver: d.TenantResolver,
-		Authenticate:   d.Authenticate,
+		TenantResolver: d.Identity.TenantResolver(),
+		Authenticate:   d.Identity.Authenticate(),
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(d.Authz, "leave", action)
+			return d.Identity.Require("leave", action)
 		},
 	}, m.controllers)
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	leavecalc "github.com/jaas/jaas/internal/hr/leave/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/payroll/repositories"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
@@ -21,7 +21,7 @@ type EmployeeDirectory interface {
 
 // LeaveLOP is Module 5's view of Module 4 `services.UnpaidLeave` (connections C3, D5-03).
 type LeaveLOP interface {
-	UnpaidDays(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (leavecalc.Days, error)
+	UnpaidDays(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (kernel.Days, error)
 }
 
 // AuditLogger is Module 5's view of the Module 0 AuditService.

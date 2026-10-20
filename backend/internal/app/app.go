@@ -8,10 +8,10 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jaas/jaas/internal/hr/employee"
+	"github.com/jaas/jaas/internal/hr"
+	"github.com/jaas/jaas/internal/hr/identityport/inprocess"
 	"github.com/jaas/jaas/internal/identity"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
-	"github.com/jaas/jaas/internal/hr/organization"
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
 	"github.com/jaas/jaas/internal/shared/database"
@@ -88,32 +88,18 @@ func Build(o Options) (*gin.Engine, error) {
 		return nil, fmt.Errorf("seeding permission catalogue failed: %w", err)
 	}
 
-	orgModule := organization.NewModule(o.DB, o.Redis, o.Publisher, &log.Logger, identityModule.UserService(), identityModule.AuditService())
-	// FR-M005: deactivating a user converges org mappings in the same transaction.
-	identityServices.SetUserDeactivationConverger(orgModule.UserDeactivationConverger())
-	if cfg.Database.AutoMigrate {
-		if err := o.DB.AutoMigrate(orgModule.RegisterModels()...); err != nil {
-			return nil, fmt.Errorf("organization auto-migration failed: %w", err)
-		}
-	}
-
-	employeeModule := employee.NewModule(o.DB, o.Redis, o.Publisher, &log.Logger, identityModule.UserService(), identityModule.AuditService())
-	// FR-EV001: employee profiles converge with user deactivation inside the same transaction (no broker needed).
-	identityServices.AddUserDeactivationConverger(employeeModule.UserDeactivationConverger())
-	if cfg.Database.AutoMigrate {
-		if err := o.DB.AutoMigrate(employeeModule.RegisterModels()...); err != nil {
-			return nil, fmt.Errorf("employee auto-migration failed: %w", err)
-		}
-	}
-
-	people, err := buildPeopleModules(o, coreModules{identity: identityModule, org: orgModule, employee: employeeModule})
+	hrModule, err := hr.New(context.Background(), hr.Options{DB: o.DB, Redis: o.Redis, Publisher: o.Publisher, Logger: &log.Logger,
+		Identity: inprocess.New(identityModule, o.DB), AutoMigrate: cfg.Database.AutoMigrate, Background: o.Background})
 	if err != nil {
 		return nil, err
 	}
-	if err := registerCatalogues(context.Background(), identityModule); err != nil {
+	// Predefined roles need every service's catalogue, so they are synced once HR has registered its permissions.
+	if err := identityModule.SyncRoleTemplates(context.Background()); err != nil {
 		return nil, err
 	}
-	wireAutomaticRoles(o, identityModule, employeeModule, orgModule)
+	if o.Background != nil {
+		go identityModule.RunAutomaticRoleSync(o.Background, automaticRoleSweep)
+	}
 	idemStore := idempotency.NewStore(o.DB)
 	startIdentityBackground(o, identityModule, idemStore)
 
@@ -135,10 +121,7 @@ func Build(o Options) (*gin.Engine, error) {
 	registerDevMailbox(v1, o, identityModule)
 	identityModule.RegisterRoutes(v1)
 	// M1 HR Management: every HR route lives under /api/v1/hr (docs/modules/m1-hr-management/decisions.md DHR-03).
-	hr := v1.Group("/hr")
-	orgModule.RegisterRoutes(hr, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
-	employeeModule.RegisterRoutes(hr, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
-	registerPeopleRoutes(hr, o, identityModule, people)
+	hrModule.RegisterRoutes(v1.Group("/hr"))
 
 	registerHealth(router, o.DB, o.Redis)
 	identityModule.RegisterWellKnown(router)

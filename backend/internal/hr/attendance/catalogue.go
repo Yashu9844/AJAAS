@@ -1,8 +1,8 @@
 package attendance
 
 import (
-	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/hr/attendance/routes"
+	"github.com/jaas/jaas/internal/identity/access"
 )
 
 // Catalogue is HR/Attendance's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md

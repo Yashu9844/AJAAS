@@ -51,7 +51,6 @@ type Line struct {
 }
 
 // Monthly returns annual / 12 rounded to paise.
-func (m Money) Monthly() Money { return divRound(int64(m), 12) }
 
 // DaysInMonth returns the calendar days of a month.
 func DaysInMonth(year, month int) int {

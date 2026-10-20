@@ -1,8 +1,8 @@
 package payroll
 
 import (
-	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/hr/payroll/routes"
+	"github.com/jaas/jaas/internal/identity/access"
 )
 
 // Catalogue is HR/Payroll's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md

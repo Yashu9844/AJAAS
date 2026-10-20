@@ -6,17 +6,17 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/models"
 	"gorm.io/gorm"
 )
 
 type stubUserChecker struct {
-	users map[uuid.UUID]*identityDTO.UserResponse
+	users map[uuid.UUID]*identityport.User
 }
 
-func (s *stubUserChecker) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityDTO.UserResponse, error) {
+func (s *stubUserChecker) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityport.User, error) {
 	return s.users[id], nil
 }
 
@@ -24,7 +24,7 @@ func newMappingSvc() (*stubMappingRepo, *stubDeptRepo, *stubTeamRepo, MappingSer
 	mappings := &stubMappingRepo{byID: map[uuid.UUID]*models.Mapping{}, primary: map[uuid.UUID]*models.Mapping{}}
 	depts := &stubDeptRepo{byID: map[uuid.UUID]*models.Department{}}
 	teams := &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}}
-	users := &stubUserChecker{users: map[uuid.UUID]*identityDTO.UserResponse{}}
+	users := &stubUserChecker{users: map[uuid.UUID]*identityport.User{}}
 	svc := NewMappingService(mappings, depts, teams, &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}, users, &stubPublisher{}, &stubAudit{})
 	return mappings, depts, teams, svc, users
 }
@@ -65,8 +65,8 @@ func (s *stubDesigRepo) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uu
 	return nil
 }
 
-func activeUser(id uuid.UUID) *identityDTO.UserResponse {
-	return &identityDTO.UserResponse{ID: id.String(), Status: "active"}
+func activeUser(id uuid.UUID) *identityport.User {
+	return &identityport.User{ID: id, Status: "active"}
 }
 
 func TestMappingService_CreateAndPrimaryGuard(t *testing.T) {

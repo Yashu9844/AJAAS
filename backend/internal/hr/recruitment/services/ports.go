@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/recruitment/repositories"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
@@ -20,9 +20,9 @@ type EmployeeDirectory interface {
 	CreateEmployee(ctx context.Context, tenantID uuid.UUID, req employeeDTO.CreateEmployeeRequest) (*employeeDTO.EmployeeResponse, error)
 }
 
-// UserInviter is Module 6's view of Module 0 UserService.InviteUser (connections C2, D6-02).
+// UserInviter is HR/Recruitment's view of M0 user invitation (connections C2, D6-02); identityport.Users satisfies it.
 type UserInviter interface {
-	InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req identityDTO.InviteUserRequest, correlationID uuid.UUID) (*identityDTO.UserResponse, error)
+	InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in identityport.Invite, correlationID uuid.UUID) (*identityport.User, error)
 }
 
 // OrgDirectory answers whether Module 1 references exist (connections C4, D6-03).

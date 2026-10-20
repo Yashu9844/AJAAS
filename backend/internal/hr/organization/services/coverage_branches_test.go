@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/models"
 	"gorm.io/gorm"
@@ -83,7 +83,7 @@ func TestMappingService_UpdateRefsAndBadInput(t *testing.T) {
 
 	// Inactive user on create → 404 (EC-05).
 	inactiveID := uuid.New()
-	users.users[inactiveID] = &identityDTO.UserResponse{ID: inactiveID.String(), Status: "inactive"}
+	users.users[inactiveID] = &identityport.User{ID: inactiveID, Status: "inactive"}
 	if _, err := svc.CreateMapping(ctx, nil, tenantID, dto.CreateMappingRequest{UserID: inactiveID.String(), DepartmentID: strPtr(dept.ID.String())}, uuid.New()); err == nil {
 		t.Fatal("expected not-found mapping inactive user")
 	}
@@ -94,7 +94,7 @@ func TestMappingService_DeactivateUserRepoError(t *testing.T) {
 	depts := &stubDeptRepo{byID: map[uuid.UUID]*models.Department{}}
 	teams := &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}}
 	desigs := &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}
-	users := &stubUserChecker{users: map[uuid.UUID]*identityDTO.UserResponse{}}
+	users := &stubUserChecker{users: map[uuid.UUID]*identityport.User{}}
 	svc := NewMappingService(&errMappingRepo{base}, depts, teams, desigs, users, &stubPublisher{}, &stubAudit{})
 
 	if err := svc.DeactivateUserMappings(context.Background(), nil, uuid.New(), uuid.New(), uuid.New()); !errors.Is(err, errBoom) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	identityDTO "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/recruitment/dto"
 	"github.com/jaas/jaas/internal/hr/recruitment/events"
 	"github.com/jaas/jaas/internal/hr/recruitment/models"
@@ -60,13 +60,11 @@ func (s *HireService) reserveUser(ctx context.Context, a Actor, candidateID uuid
 			plan.userID = *c.HiredUserID
 			return nil
 		}
-		u, err := s.Users.InviteUser(ctx, tx, a.TenantID, identityDTO.InviteUserRequest{Email: c.Email, FirstName: c.FirstName, LastName: c.LastName}, a.CorrelationID)
+		u, err := s.Users.InviteUser(ctx, tx, a.TenantID, identityport.Invite{Email: c.Email, FirstName: c.FirstName, LastName: c.LastName}, a.CorrelationID)
 		if err != nil {
 			return err
 		}
-		if plan.userID, err = uuid.Parse(u.ID); err != nil {
-			return err
-		}
+		plan.userID = u.ID
 		c.HiredUserID = &plan.userID
 		return s.Repos.Candidates.Update(ctx, tx, c)
 	})

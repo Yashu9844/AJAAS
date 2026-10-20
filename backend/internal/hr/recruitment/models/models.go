@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/hr/payroll/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"gorm.io/gorm"
 )
 
@@ -50,22 +50,22 @@ func (j *Job) BeforeCreate(tx *gorm.DB) error { return assignID(&j.ID) }
 
 // Candidate is one applicant for one job (FR-CD001).
 type Candidate struct {
-	ID               uuid.UUID   `gorm:"type:uuid;primaryKey"`
-	TenantID         uuid.UUID   `gorm:"type:uuid;not null;index:idx_recruitment_candidates_job_stage,priority:1"`
-	JobID            uuid.UUID   `gorm:"type:uuid;not null;uniqueIndex:uq_recruitment_candidates_job_email,priority:1;index:idx_recruitment_candidates_job_stage,priority:2"`
-	FirstName        string      `gorm:"type:varchar(100);not null"`
-	LastName         string      `gorm:"type:varchar(100);not null"`
-	Email            string      `gorm:"type:varchar(255);not null;uniqueIndex:uq_recruitment_candidates_job_email,priority:2,expression:lower(email)"`
-	Phone            *string     `gorm:"type:varchar(30)"`
-	Source           string      `gorm:"type:varchar(20);not null"`
-	ResumeURL        *string     `gorm:"type:varchar(500)"`
-	ExpectedCTC      *calc.Money `gorm:"column:expected_ctc;type:numeric(14,2)"`
-	NoticePeriodDays *int        `gorm:"type:integer"`
-	Stage            string      `gorm:"type:varchar(20);not null;index:idx_recruitment_candidates_job_stage,priority:3"`
-	HiredUserID      *uuid.UUID  `gorm:"type:uuid"`
-	HiredEmployeeID  *uuid.UUID  `gorm:"type:uuid"`
-	CreatedAt        time.Time   `gorm:"not null"`
-	UpdatedAt        time.Time   `gorm:"not null"`
+	ID               uuid.UUID     `gorm:"type:uuid;primaryKey"`
+	TenantID         uuid.UUID     `gorm:"type:uuid;not null;index:idx_recruitment_candidates_job_stage,priority:1"`
+	JobID            uuid.UUID     `gorm:"type:uuid;not null;uniqueIndex:uq_recruitment_candidates_job_email,priority:1;index:idx_recruitment_candidates_job_stage,priority:2"`
+	FirstName        string        `gorm:"type:varchar(100);not null"`
+	LastName         string        `gorm:"type:varchar(100);not null"`
+	Email            string        `gorm:"type:varchar(255);not null;uniqueIndex:uq_recruitment_candidates_job_email,priority:2,expression:lower(email)"`
+	Phone            *string       `gorm:"type:varchar(30)"`
+	Source           string        `gorm:"type:varchar(20);not null"`
+	ResumeURL        *string       `gorm:"type:varchar(500)"`
+	ExpectedCTC      *kernel.Money `gorm:"column:expected_ctc;type:numeric(14,2)"`
+	NoticePeriodDays *int          `gorm:"type:integer"`
+	Stage            string        `gorm:"type:varchar(20);not null;index:idx_recruitment_candidates_job_stage,priority:3"`
+	HiredUserID      *uuid.UUID    `gorm:"type:uuid"`
+	HiredEmployeeID  *uuid.UUID    `gorm:"type:uuid"`
+	CreatedAt        time.Time     `gorm:"not null"`
+	UpdatedAt        time.Time     `gorm:"not null"`
 }
 
 // TableName maps to recruitment_candidates (migration 000046).
@@ -119,13 +119,13 @@ func (i *Interview) BeforeCreate(tx *gorm.DB) error { return assignID(&i.ID) }
 
 // Offer is an offer to a candidate (FR-OF); at most one `offered` per candidate (RC-006).
 type Offer struct {
-	ID              uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	TenantID        uuid.UUID  `gorm:"type:uuid;not null"`
-	CandidateID     uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex:uq_recruitment_offers_open,where:status = 'offered';index:idx_recruitment_offers_candidate"`
-	OfferedCTC      calc.Money `gorm:"column:offered_ctc;type:numeric(14,2);not null"`
-	JoiningDate     time.Time  `gorm:"type:date;not null"`
-	ExpiresOn       *time.Time `gorm:"type:date"`
-	Status          string     `gorm:"type:varchar(20);not null"`
+	ID              uuid.UUID    `gorm:"type:uuid;primaryKey"`
+	TenantID        uuid.UUID    `gorm:"type:uuid;not null"`
+	CandidateID     uuid.UUID    `gorm:"type:uuid;not null;uniqueIndex:uq_recruitment_offers_open,where:status = 'offered';index:idx_recruitment_offers_candidate"`
+	OfferedCTC      kernel.Money `gorm:"column:offered_ctc;type:numeric(14,2);not null"`
+	JoiningDate     time.Time    `gorm:"type:date;not null"`
+	ExpiresOn       *time.Time   `gorm:"type:date"`
+	Status          string       `gorm:"type:varchar(20);not null"`
 	DecidedAt       *time.Time
 	CreatedByUserID uuid.UUID `gorm:"type:uuid;not null"`
 	CreatedAt       time.Time `gorm:"not null"`

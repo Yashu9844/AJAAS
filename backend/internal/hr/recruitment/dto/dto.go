@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/hr/payroll/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 )
 
 // CreateJobRequest is R1.
@@ -40,26 +40,26 @@ type JobStatusRequest struct {
 
 // CreateCandidateRequest is R6.
 type CreateCandidateRequest struct {
-	JobID            string      `json:"job_id" binding:"required,uuid"`
-	FirstName        string      `json:"first_name" binding:"required,min=1,max=100"`
-	LastName         string      `json:"last_name" binding:"required,min=1,max=100"`
-	Email            string      `json:"email" binding:"required,email,max=255"`
-	Phone            *string     `json:"phone" binding:"omitempty,max=30"`
-	Source           string      `json:"source" binding:"required,oneof=career_site referral agency linkedin other"`
-	ResumeURL        *string     `json:"resume_url" binding:"omitempty,url,max=500"`
-	ExpectedCTC      *calc.Money `json:"expected_ctc"`
-	NoticePeriodDays *int        `json:"notice_period_days" binding:"omitempty,min=0,max=365"`
+	JobID            string        `json:"job_id" binding:"required,uuid"`
+	FirstName        string        `json:"first_name" binding:"required,min=1,max=100"`
+	LastName         string        `json:"last_name" binding:"required,min=1,max=100"`
+	Email            string        `json:"email" binding:"required,email,max=255"`
+	Phone            *string       `json:"phone" binding:"omitempty,max=30"`
+	Source           string        `json:"source" binding:"required,oneof=career_site referral agency linkedin other"`
+	ResumeURL        *string       `json:"resume_url" binding:"omitempty,url,max=500"`
+	ExpectedCTC      *kernel.Money `json:"expected_ctc"`
+	NoticePeriodDays *int          `json:"notice_period_days" binding:"omitempty,min=0,max=365"`
 }
 
 // UpdateCandidateRequest is R9 (contact fields only; stage changes go through R10/R11/R17).
 type UpdateCandidateRequest struct {
-	FirstName        *string     `json:"first_name" binding:"omitempty,min=1,max=100"`
-	LastName         *string     `json:"last_name" binding:"omitempty,min=1,max=100"`
-	Email            *string     `json:"email" binding:"omitempty,email,max=255"`
-	Phone            *string     `json:"phone" binding:"omitempty,max=30"`
-	ResumeURL        *string     `json:"resume_url" binding:"omitempty,url,max=500"`
-	ExpectedCTC      *calc.Money `json:"expected_ctc"`
-	NoticePeriodDays *int        `json:"notice_period_days" binding:"omitempty,min=0,max=365"`
+	FirstName        *string       `json:"first_name" binding:"omitempty,min=1,max=100"`
+	LastName         *string       `json:"last_name" binding:"omitempty,min=1,max=100"`
+	Email            *string       `json:"email" binding:"omitempty,email,max=255"`
+	Phone            *string       `json:"phone" binding:"omitempty,max=30"`
+	ResumeURL        *string       `json:"resume_url" binding:"omitempty,url,max=500"`
+	ExpectedCTC      *kernel.Money `json:"expected_ctc"`
+	NoticePeriodDays *int          `json:"notice_period_days" binding:"omitempty,min=0,max=365"`
 }
 
 // StageRequest is R10.
@@ -93,10 +93,10 @@ type FeedbackRequest struct {
 
 // CreateOfferRequest is R17.
 type CreateOfferRequest struct {
-	CandidateID string     `json:"candidate_id" binding:"required,uuid"`
-	OfferedCTC  calc.Money `json:"offered_ctc" binding:"required"`
-	JoiningDate string     `json:"joining_date" binding:"required"`
-	ExpiresOn   *string    `json:"expires_on"`
+	CandidateID string       `json:"candidate_id" binding:"required,uuid"`
+	OfferedCTC  kernel.Money `json:"offered_ctc" binding:"required"`
+	JoiningDate string       `json:"joining_date" binding:"required"`
+	ExpiresOn   *string      `json:"expires_on"`
 }
 
 // OfferDecisionRequest is R19.
@@ -142,7 +142,7 @@ type CandidateResponse struct {
 	Phone            *string              `json:"phone,omitempty"`
 	Source           string               `json:"source"`
 	ResumeURL        *string              `json:"resume_url,omitempty"`
-	ExpectedCTC      *calc.Money          `json:"expected_ctc,omitempty"`
+	ExpectedCTC      *kernel.Money        `json:"expected_ctc,omitempty"`
 	NoticePeriodDays *int                 `json:"notice_period_days,omitempty"`
 	Stage            string               `json:"stage"`
 	HiredEmployeeID  *uuid.UUID           `json:"hired_employee_id,omitempty"`
@@ -170,14 +170,14 @@ type InterviewResponse struct {
 
 // OfferResponse serializes an offer.
 type OfferResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	CandidateID uuid.UUID  `json:"candidate_id"`
-	OfferedCTC  calc.Money `json:"offered_ctc"`
-	JoiningDate string     `json:"joining_date"`
-	ExpiresOn   *string    `json:"expires_on,omitempty"`
-	Status      string     `json:"status"`
-	DecidedAt   *time.Time `json:"decided_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID          uuid.UUID    `json:"id"`
+	CandidateID uuid.UUID    `json:"candidate_id"`
+	OfferedCTC  kernel.Money `json:"offered_ctc"`
+	JoiningDate string       `json:"joining_date"`
+	ExpiresOn   *string      `json:"expires_on,omitempty"`
+	Status      string       `json:"status"`
+	DecidedAt   *time.Time   `json:"decided_at,omitempty"`
+	CreatedAt   time.Time    `json:"created_at"`
 }
 
 // HireResponse is R11.

@@ -3,37 +3,30 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityServices "github.com/jaas/jaas/internal/identity/services"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/controllers"
 	"github.com/jaas/jaas/internal/hr/organization/services"
-	"gorm.io/gorm"
 )
 
 // RegisterRoutes wires organization endpoint groups with Module 0 middleware
 // (tenantResolver + authMiddleware built from the identity module; rate limiting
 // reuses Module 0 middleware on the same Gin engine).
-func RegisterRoutes(
-	router *gin.RouterGroup,
-	db *gorm.DB,
-	authz identityMiddleware.Authorizer,
-	tenantResolver gin.HandlerFunc,
-	authMiddleware gin.HandlerFunc,
-	deptCtrl *controllers.DepartmentController,
-	teamCtrl *controllers.TeamController,
-	desigCtrl *controllers.DesignationController,
-	mappingCtrl *controllers.MappingController,
-	chartCtrl *controllers.OrgChartController,
-	dbForAudit *gorm.DB,
-	auditSvc identityServices.AuditService,
-	chartInv services.ChartInvalidator,
-) {
+// Controllers groups the organization HTTP handlers.
+type Controllers struct {
+	Departments  *controllers.DepartmentController
+	Teams        *controllers.TeamController
+	Designations *controllers.DesignationController
+	Mappings     *controllers.MappingController
+	Chart        *controllers.OrgChartController
+}
+
+func RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP, c Controllers, chartInv services.ChartInvalidator) {
+	deptCtrl, teamCtrl, desigCtrl, mappingCtrl, chartCtrl := c.Departments, c.Teams, c.Designations, c.Mappings, c.Chart
+	tenantResolver, authMiddleware := idp.TenantResolver(), idp.Authenticate()
 	invalidate := chartInvalidation(chartInv)
-	auditMW := func(action, resource string) gin.HandlerFunc {
-		return identityMiddleware.AuditLog(dbForAudit, auditSvc, action, resource)
-	}
-	read := identityMiddleware.RequirePermission(authz, "organization", "read")
-	write := identityMiddleware.RequirePermission(authz, "organization", "update")
+	auditMW := idp.AuditTrail
+	read := idp.Require("organization", "read")
+	write := idp.Require("organization", "update")
 
 	depts := router.Group("/departments")
 	depts.Use(tenantResolver, authMiddleware, invalidate)

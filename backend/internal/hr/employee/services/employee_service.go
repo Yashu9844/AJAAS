@@ -13,7 +13,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee/models"
 	"github.com/jaas/jaas/internal/hr/employee/repositories"
 	"github.com/jaas/jaas/internal/hr/employee/validators"
-	identityServices "github.com/jaas/jaas/internal/identity/services"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
@@ -38,8 +38,8 @@ type employeeService struct {
 	db           *gorm.DB
 	profileRepo  repositories.EmployeeProfileRepository
 	timelineRepo repositories.EmployeeTimelineRepository
-	userSvc      identityServices.UserService
-	auditSvc     identityServices.AuditService
+	userSvc      identityport.Users
+	auditSvc     identityport.Auditor
 	publisher    queue.EventPublisher
 }
 
@@ -47,8 +47,8 @@ func NewEmployeeService(
 	db *gorm.DB,
 	profileRepo repositories.EmployeeProfileRepository,
 	timelineRepo repositories.EmployeeTimelineRepository,
-	userSvc identityServices.UserService,
-	auditSvc identityServices.AuditService,
+	userSvc identityport.Users,
+	auditSvc identityport.Auditor,
 	publisher queue.EventPublisher,
 ) EmployeeService {
 	return &employeeService{

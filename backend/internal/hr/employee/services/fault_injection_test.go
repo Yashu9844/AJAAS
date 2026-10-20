@@ -10,7 +10,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/employee/models"
 	"github.com/jaas/jaas/internal/hr/employee/services"
-	identityDto "github.com/jaas/jaas/internal/identity/dto"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"gorm.io/gorm"
 )
@@ -161,7 +161,7 @@ type fUsers struct {
 	f *faults
 }
 
-func (u fUsers) GetByID(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*identityDto.UserResponse, error) {
+func (u fUsers) GetByID(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*identityport.User, error) {
 	if err := u.f.hit(); err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func seed(f *faults, status string) *seeded {
 
 func (s *seeded) employees() services.EmployeeService {
 	users := newMockUserService()
-	users.users[s.user] = &identityDto.UserResponse{ID: s.user.String()}
+	users.users[s.user] = &identityport.User{ID: s.user}
 	return services.NewEmployeeService(nil, fProfiles{s.pr, s.f}, newMockTimelineRepo(), fUsers{users, s.f}, nil, &mockPublisher{})
 }
 
@@ -196,7 +196,7 @@ func TestFaults_EmployeeService(t *testing.T) {
 		s := seed(f, "active")
 		newUser := uuid.New()
 		users := newMockUserService()
-		users.users[newUser] = &identityDto.UserResponse{ID: newUser.String()}
+		users.users[newUser] = &identityport.User{ID: newUser}
 		svc := services.NewEmployeeService(nil, fProfiles{s.pr, f}, newMockTimelineRepo(), fUsers{users, f}, nil, &mockPublisher{})
 		pe := time.Now().Add(time.Hour)
 		_, err := svc.CreateEmployee(ctx, s.tenant, dto.CreateEmployeeRequest{UserID: newUser, EmployeeCode: "NEW-1", FirstName: "N", LastName: "E", EmploymentType: "full_time", JoiningDate: time.Now(), ProbationEndDate: &pe})

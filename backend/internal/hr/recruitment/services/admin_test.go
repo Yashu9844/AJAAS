@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/hr/payroll/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/recruitment/dto"
 	"github.com/jaas/jaas/internal/hr/recruitment/repositories"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
@@ -71,7 +71,7 @@ func TestCandidates_ListUpdateAndOfferExit(t *testing.T) {
 	h := newHarness()
 	job := h.openJob(t, 1)
 	c := h.candidate(t, job.ID, "a@x.io")
-	neg := calc.Money(-1)
+	neg := kernel.Money(-1)
 	_, err := h.cands.Create(bg, h.actor, dto.CreateCandidateRequest{JobID: job.ID.String(), FirstName: "x", LastName: "y", Email: "n@x.io", Source: "other", ExpectedCTC: &neg})
 	wantCode(t, err, "VALIDATION_ERROR")
 	_, err = h.cands.Update(bg, h.actor, c.ID, dto.UpdateCandidateRequest{ExpectedCTC: &neg})
@@ -81,7 +81,7 @@ func TestCandidates_ListUpdateAndOfferExit(t *testing.T) {
 	_, err = h.cands.Create(bg, h.actor, dto.CreateCandidateRequest{JobID: uuid.NewString(), FirstName: "x", LastName: "y", Email: "n@x.io", Source: "other"})
 	wantErr(t, err, ErrNotFound)
 
-	fn, ln, ph, url, ctc, np := "Ana", "Roy", "+91", "https://cv.example/a", calc.Rupees(900000), 30
+	fn, ln, ph, url, ctc, np := "Ana", "Roy", "+91", "https://cv.example/a", kernel.Rupees(900000), 30
 	u := must(h.cands.Update(bg, h.actor, c.ID, dto.UpdateCandidateRequest{FirstName: &fn, LastName: &ln, Phone: &ph, ResumeURL: &url, ExpectedCTC: &ctc, NoticePeriodDays: &np}))
 	if u.FirstName != fn || *u.Phone != ph || *u.ExpectedCTC != ctc || *u.NoticePeriodDays != 30 {
 		t.Fatalf("%+v", u)
@@ -145,7 +145,7 @@ func TestOffers_ValidationWithdrawAndExpiry(t *testing.T) {
 	h := newHarness()
 	c := h.candidate(t, h.openJob(t, 1).ID, "a@x.io")
 	h.toStage(t, c.ID, "screening", "interview")
-	base := dto.CreateOfferRequest{CandidateID: c.ID.String(), OfferedCTC: calc.Rupees(100000), JoiningDate: "2026-11-01"}
+	base := dto.CreateOfferRequest{CandidateID: c.ID.String(), OfferedCTC: kernel.Rupees(100000), JoiningDate: "2026-11-01"}
 	str := func(s string) *string { return &s }
 	for name, mut := range map[string]func(*dto.CreateOfferRequest){
 		"candidate":   func(r *dto.CreateOfferRequest) { r.CandidateID = "x" },
@@ -186,11 +186,7 @@ func TestHire_PortFailures(t *testing.T) {
 	h.users.err = errors.New("email already registered")
 	_, err := h.hire.Hire(bg, h.actor, c, dto.HireRequest{EmployeeCode: "E1"})
 	wantErr(t, err, h.users.err)
-	h.users.err, h.users.badID = nil, true
-	if _, err = h.hire.Hire(bg, h.actor, c, dto.HireRequest{EmployeeCode: "E1"}); err == nil {
-		t.Fatal("bad user id must fail")
-	}
-	h.users.badID = false
+	h.users.err = nil
 	h.emps.err = errors.New("m2 down")
 	_, err = h.hire.Hire(bg, h.actor, c, dto.HireRequest{EmployeeCode: "E1"})
 	wantErr(t, err, h.emps.err)

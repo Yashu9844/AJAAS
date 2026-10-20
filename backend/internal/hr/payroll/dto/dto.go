@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	leavecalc "github.com/jaas/jaas/internal/hr/leave/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/payroll/calc"
 )
 
@@ -159,8 +159,8 @@ type PayslipResponse struct {
 	StructureID  uuid.UUID      `json:"structure_id"`
 	AnnualCTC    calc.Money     `json:"annual_ctc"`
 	DaysInMonth  int            `json:"days_in_month"`
-	PayableDays  leavecalc.Days `json:"payable_days"`
-	LopDays      leavecalc.Days `json:"lop_days"`
+	PayableDays  kernel.Days    `json:"payable_days"`
+	LopDays      kernel.Days    `json:"lop_days"`
 	Gross        calc.Money     `json:"gross"`
 	Deductions   calc.Money     `json:"deductions"`
 	Net          calc.Money     `json:"net"`

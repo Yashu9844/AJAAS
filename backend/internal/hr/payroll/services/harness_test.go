@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	leavecalc "github.com/jaas/jaas/internal/hr/leave/calc"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/payroll/calc"
 	"github.com/jaas/jaas/internal/hr/payroll/dto"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
@@ -43,11 +43,11 @@ func (f *fakeEmployees) GetByID(_ context.Context, t, id uuid.UUID) (*employeeDT
 
 // fakeLOP returns configured unpaid days per employee (Module 4 port).
 type fakeLOP struct {
-	days map[uuid.UUID]leavecalc.Days
+	days map[uuid.UUID]kernel.Days
 	err  error
 }
 
-func (f *fakeLOP) UnpaidDays(_ context.Context, _, emp uuid.UUID, _, _ time.Time) (leavecalc.Days, error) {
+func (f *fakeLOP) UnpaidDays(_ context.Context, _, emp uuid.UUID, _, _ time.Time) (kernel.Days, error) {
 	return f.days[emp], f.err
 }
 
@@ -84,7 +84,7 @@ type harness struct {
 
 // newHarness pins now to 2026-10-09; payroll period tests use September 2026 (30 days).
 func newHarness() *harness {
-	h := &harness{st: newStore(), lop: &fakeLOP{days: map[uuid.UUID]leavecalc.Days{}}, audit: &spyAudit{}, pub: &spyPublisher{},
+	h := &harness{st: newStore(), lop: &fakeLOP{days: map[uuid.UUID]kernel.Days{}}, audit: &spyAudit{}, pub: &spyPublisher{},
 		emps: &fakeEmployees{byUser: map[uuid.UUID]*employeeDTO.EmployeeResponse{}, byID: map[uuid.UUID]*employeeDTO.EmployeeResponse{}},
 		now:  time.Date(2026, 10, 9, 9, 0, 0, 0, time.UTC), tenant: uuid.New()}
 	h.deps = Deps{Tx: fakeRunner{h.st}, Repos: Repos{Structures: fakeStructures{h.st}, Assignments: fakeAssignments{h.st},

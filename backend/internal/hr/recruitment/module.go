@@ -4,11 +4,11 @@ package recruitment
 import (
 	"context"
 	"errors"
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
 	orgDTO "github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/recruitment/controllers"
 	"github.com/jaas/jaas/internal/hr/recruitment/models"
@@ -96,18 +96,16 @@ func (m *Module) RegisterModels() []interface{} {
 	return []interface{}{&models.Job{}, &models.Candidate{}, &models.StageEvent{}, &models.Interview{}, &models.Offer{}, &models.OutboxEvent{}}
 }
 
-
 // RouteDeps is the Module 0 infrastructure the routes need.
 type RouteDeps struct {
-	TenantResolver, Authenticate gin.HandlerFunc
-	Authz                        identityMiddleware.Authorizer
+	Identity identityport.HTTP
 }
 
 // RegisterRoutes mounts Module 6 under rg.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
-	routes.RegisterRoutes(rg, routes.Middleware{TenantResolver: d.TenantResolver, Authenticate: d.Authenticate,
+	routes.RegisterRoutes(rg, routes.Middleware{TenantResolver: d.Identity.TenantResolver(), Authenticate: d.Identity.Authenticate(),
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(d.Authz, "recruitment", action)
+			return d.Identity.Require("recruitment", action)
 		}}, m.controller)
 }
 

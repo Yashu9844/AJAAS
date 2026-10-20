@@ -2,10 +2,10 @@
 package payroll
 
 import (
+	"github.com/jaas/jaas/internal/hr/identityport"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
 	"github.com/jaas/jaas/internal/hr/payroll/controllers"
 	"github.com/jaas/jaas/internal/hr/payroll/models"
 	"github.com/jaas/jaas/internal/hr/payroll/repositories"
@@ -54,18 +54,16 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.Payslip{}, &models.PayslipLine{}, &models.OutboxEvent{}}
 }
 
-
 // RouteDeps is the Module 0 infrastructure the routes need.
 type RouteDeps struct {
-	TenantResolver, Authenticate gin.HandlerFunc
-	Authz                        identityMiddleware.Authorizer
+	Identity identityport.HTTP
 }
 
 // RegisterRoutes mounts Module 5 under rg.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
-	routes.RegisterRoutes(rg, routes.Middleware{TenantResolver: d.TenantResolver, Authenticate: d.Authenticate,
+	routes.RegisterRoutes(rg, routes.Middleware{TenantResolver: d.Identity.TenantResolver(), Authenticate: d.Identity.Authenticate(),
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(d.Authz, "payroll", action)
+			return d.Identity.Require("payroll", action)
 		}}, m.controllers)
 }
 

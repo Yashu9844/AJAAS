@@ -11,6 +11,9 @@ import (
 	"github.com/jaas/jaas/internal/shared/idempotency"
 )
 
+// automaticRoleSweep is how often every tenant's automatic roles are reconciled; logins sync the user immediately.
+const automaticRoleSweep = 5 * time.Minute
+
 // idempotencyPurge is how often expired Idempotency-Key records are deleted.
 const idempotencyPurge = time.Hour
 
