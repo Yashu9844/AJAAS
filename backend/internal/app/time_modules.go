@@ -8,6 +8,7 @@ import (
 	"github.com/jaas/jaas/internal/attendance"
 	"github.com/jaas/jaas/internal/employee"
 	"github.com/jaas/jaas/internal/identity"
+	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/leave"
 	"github.com/jaas/jaas/internal/organization"
 	"github.com/jaas/jaas/internal/payroll"
@@ -30,11 +31,6 @@ type coreModules struct {
 	employee *employee.Module
 }
 
-// seeder is a module that seeds its own permissions (D3-10).
-type seeder interface {
-	SeedPermissions(ctx context.Context) error
-}
-
 // buildPeopleModules wires Modules 3–6: schema (AutoMigrate only in legacy mode; SQL migrations 000026–000050
 // otherwise), module-owned permission seeds and the optional outbox relays.
 func buildPeopleModules(o Options, core coreModules) (*peopleModules, error) {
@@ -53,7 +49,7 @@ func buildPeopleModules(o Options, core coreModules) (*peopleModules, error) {
 	return m, nil
 }
 
-// prepare migrates (legacy mode only), seeds permissions and starts the relays.
+// prepare migrates (legacy mode only) and starts the relays. Permissions are registered by registerCatalogues.
 func (m *peopleModules) prepare(o Options) error {
 	if o.Config.Database.AutoMigrate {
 		var all []interface{}
@@ -62,11 +58,6 @@ func (m *peopleModules) prepare(o Options) error {
 		}
 		if err := o.DB.AutoMigrate(all...); err != nil {
 			return fmt.Errorf("people modules auto-migration failed: %w", err)
-		}
-	}
-	for name, s := range map[string]seeder{"attendance": m.attendance, "leave": m.leave, "payroll": m.payroll, "recruitment": m.recruitment} {
-		if err := s.SeedPermissions(context.Background()); err != nil {
-			return fmt.Errorf("%s permission seed failed: %w", name, err)
 		}
 	}
 	if o.Background != nil {
@@ -81,11 +72,25 @@ func (m *peopleModules) prepare(o Options) error {
 // registerPeopleRoutes mounts Modules 3–6 behind Module 0 tenant/auth/RBAC middleware.
 func registerPeopleRoutes(v1 *gin.RouterGroup, o Options, id *identity.Module, m *peopleModules) {
 	m.attendance.RegisterRoutes(v1, attendance.RouteDeps{TenantResolver: id.TenantResolver(), Authenticate: id.AuthMiddleware(),
-		UserRoles: id.UserRoleRepository(), RolePerms: id.RolePermissionRepository(), Redis: o.Redis})
+		Authz: id.Authorizer(), Redis: o.Redis})
 	m.leave.RegisterRoutes(v1, leave.RouteDeps{TenantResolver: id.TenantResolver(), Authenticate: id.AuthMiddleware(),
-		UserRoles: id.UserRoleRepository(), RolePerms: id.RolePermissionRepository()})
+		Authz: id.Authorizer()})
 	m.payroll.RegisterRoutes(v1, payroll.RouteDeps{TenantResolver: id.TenantResolver(), Authenticate: id.AuthMiddleware(),
-		UserRoles: id.UserRoleRepository(), RolePerms: id.RolePermissionRepository()})
+		Authz: id.Authorizer()})
 	m.recruitment.RegisterRoutes(v1, recruitment.RouteDeps{TenantResolver: id.TenantResolver(), Authenticate: id.AuthMiddleware(),
-		UserRoles: id.UserRoleRepository(), RolePerms: id.RolePermissionRepository()})
+		Authz: id.Authorizer()})
+}
+
+// registerCatalogues registers every HR context's permissions with M0 and provisions predefined roles in every
+// tenant (docs/ARCHITECTURE.md §17). It runs after all modules are built.
+func registerCatalogues(ctx context.Context, id *identity.Module) error {
+	for name, defs := range map[string][]access.PermissionDef{
+		"organization": organization.Catalogue(), "employee": employee.Catalogue(), "attendance": attendance.Catalogue(),
+		"leave": leave.Catalogue(), "payroll": payroll.Catalogue(), "recruitment": recruitment.Catalogue(),
+	} {
+		if err := id.RegisterCatalogue(ctx, defs); err != nil {
+			return fmt.Errorf("%s permission catalogue: %w", name, err)
+		}
+	}
+	return id.SyncRoleTemplates(ctx)
 }

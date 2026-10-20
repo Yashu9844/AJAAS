@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS user_permission_blocks;
+DROP TABLE IF EXISTS user_permission_grants;
+ALTER TABLE tenants DROP COLUMN IF EXISTS access_version;
+ALTER TABLE user_roles DROP COLUMN IF EXISTS source;
+ALTER TABLE role_permissions DROP COLUMN IF EXISTS scope;
+DROP INDEX IF EXISTS uq_roles_tenant_template_key;
+DROP INDEX IF EXISTS idx_roles_parent_role_id;
+ALTER TABLE roles DROP COLUMN IF EXISTS template_managed;
+ALTER TABLE roles DROP COLUMN IF EXISTS is_automatic;
+ALTER TABLE roles DROP COLUMN IF EXISTS template_key;
+ALTER TABLE roles DROP COLUMN IF EXISTS parent_role_id;
+ALTER TABLE permissions DROP COLUMN IF EXISTS is_sensitive;
+ALTER TABLE permissions DROP COLUMN IF EXISTS module;

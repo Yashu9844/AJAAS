@@ -21,8 +21,9 @@ type UserLoginSummary struct {
 
 // RoleSummary maps roles in user details response.
 type RoleSummary struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Source string `json:"source,omitempty"` // manual | automatic
 }
 
 // LoginResponse contains response payload after successful login.
@@ -30,6 +31,7 @@ type LoginResponse struct {
 	AccessToken  string           `json:"access_token"`
 	RefreshToken string           `json:"refresh_token"`
 	ExpiresAt    time.Time        `json:"expires_at"`
+	TenantID     string           `json:"tenant_id"`
 	User         UserLoginSummary `json:"user"`
 }
 

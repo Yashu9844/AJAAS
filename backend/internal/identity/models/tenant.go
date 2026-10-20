@@ -12,6 +12,8 @@ type Tenant struct {
 	Domain *string `gorm:"type:varchar(255);uniqueIndex:idx_tenants_domain" json:"domain,omitempty"`
 	Status string  `gorm:"type:varchar(20);not null;default:'active';index:idx_tenants_status" json:"status"`
 	Plan   string  `gorm:"type:varchar(50);not null;default:'free'" json:"plan"`
+	// AccessVersion changes with every access write in the tenant; it keys the effective-access cache.
+	AccessVersion int64 `gorm:"not null;default:0" json:"-"`
 
 	// Relationships
 	Settings []TenantSettings `gorm:"foreignKey:TenantID" json:"settings,omitempty"`

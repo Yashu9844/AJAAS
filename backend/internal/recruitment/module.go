@@ -9,8 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityModels "github.com/jaas/jaas/internal/identity/models"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
 	orgDTO "github.com/jaas/jaas/internal/organization/dto"
 	"github.com/jaas/jaas/internal/recruitment/controllers"
 	"github.com/jaas/jaas/internal/recruitment/models"
@@ -20,7 +18,6 @@ import (
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // Module is the Module 6 DI container.
@@ -99,35 +96,18 @@ func (m *Module) RegisterModels() []interface{} {
 	return []interface{}{&models.Job{}, &models.Candidate{}, &models.StageEvent{}, &models.Interview{}, &models.Offer{}, &models.OutboxEvent{}}
 }
 
-// SeedPermissions idempotently inserts recruitment:read|manage|hire (connections C7).
-func (m *Module) SeedPermissions(ctx context.Context) error {
-	for action, desc := range map[string]string{
-		routes.ActionRead:   "View job openings, candidates, interviews and offers",
-		routes.ActionManage: "Manage job openings, candidates, interviews and offers",
-		routes.ActionHire:   "Hire candidates (creates a user invite and an employee profile)",
-	} {
-		d := desc
-		err := m.db.WithContext(ctx).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "resource"}, {Name: "action"}}, DoNothing: true}).
-			Create(&identityModels.Permission{Resource: "recruitment", Action: action, Description: &d}).Error
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // RouteDeps is the Module 0 infrastructure the routes need.
 type RouteDeps struct {
 	TenantResolver, Authenticate gin.HandlerFunc
-	UserRoles                    identityRepos.UserRoleRepository
-	RolePerms                    identityRepos.RolePermissionRepository
+	Authz                        identityMiddleware.Authorizer
 }
 
 // RegisterRoutes mounts Module 6 under rg.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 	routes.RegisterRoutes(rg, routes.Middleware{TenantResolver: d.TenantResolver, Authenticate: d.Authenticate,
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(m.db, "recruitment", action, d.UserRoles, d.RolePerms)
+			return identityMiddleware.RequirePermission(d.Authz, "recruitment", action)
 		}}, m.controller)
 }
 

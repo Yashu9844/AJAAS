@@ -304,3 +304,25 @@ func (ctrl *RoleController) Me(c *gin.Context) {
 	}
 	respondSuccess(c, http.StatusOK, res, nil)
 }
+
+// Clone copies a role's grants and parent into a new custom role (POST /roles/:id/clone).
+func (ctrl *RoleController) Clone(c *gin.Context) {
+	tid, ok := c.Get("tenant_id")
+	tenantID, ok2 := tid.(uuid.UUID)
+	if !ok || !ok2 {
+		respondBadRequest(c, "Missing tenant scope")
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondBadRequest(c, "Invalid role ID")
+		return
+	}
+	var req dto.CloneRoleRequest
+	if !bindValid(c, &req) {
+		return
+	}
+	tx := database.BeginTx(c.Request.Context(), ctrl.db)
+	res, err := ctrl.roleSvc.CloneRole(reqCtx(c), tx, tenantID, id, req)
+	respond(c, http.StatusCreated, res, database.Finish(tx, err))
+}

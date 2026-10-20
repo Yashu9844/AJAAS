@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	identityDTO "github.com/jaas/jaas/internal/identity/dto"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
+	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/organization/controllers"
 	"github.com/jaas/jaas/internal/organization/events"
@@ -160,8 +160,7 @@ func (m *Module) DesignationService() services.DesignationService { return m.des
 // module owns tenantResolver/authMiddleware construction; org reuses them.
 func (m *Module) RegisterRoutes(
 	router *gin.RouterGroup,
-	userRoleRepo identityRepos.UserRoleRepository,
-	rolePermRepo identityRepos.RolePermissionRepository,
+	authz identityMiddleware.Authorizer,
 	tenantResolver gin.HandlerFunc,
 	authMiddleware gin.HandlerFunc,
 	auditSvc identityServices.AuditService,
@@ -169,8 +168,7 @@ func (m *Module) RegisterRoutes(
 	orgRoutes.RegisterRoutes(
 		router,
 		m.db,
-		userRoleRepo,
-		rolePermRepo,
+		authz,
 		tenantResolver,
 		authMiddleware,
 		m.deptCtrl,

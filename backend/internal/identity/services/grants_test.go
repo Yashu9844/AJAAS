@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/identity/dto"
 	"github.com/jaas/jaas/internal/identity/models"
 	"gorm.io/gorm"
@@ -28,71 +29,86 @@ func TestCallerContext(t *testing.T) {
 	}
 }
 
-func TestEnsureCanGrantPermissions(t *testing.T) {
+func resolverFor(e *env) AccessResolver {
+	return NewAccessResolver(AccessResolverDeps{UserRoles: e.urRepo, RolePerms: e.rpRepo})
+}
+
+func TestEnsureCanGrant(t *testing.T) {
 	e := newEnv(&faults{})
-	held, other := e.permID, uuid.New()
+	r := resolverFor(e)
+	held := access.Grant{Permission: "users:read", Scope: access.ScopeTenant}
+	narrower := access.Grant{Permission: "users:read", Scope: access.ScopeOwn}
+	other := access.Grant{Permission: "payroll:read", Scope: access.ScopeOwn}
 
 	// system context and tenant_admin are unrestricted
-	if err := ensureCanGrantPermissions(context.Background(), nil, e.tenantID, []uuid.UUID{other}, e.urRepo, e.rpRepo); err != nil {
+	if err := ensureCanGrant(context.Background(), nil, r, e.tenantID, []access.Grant{other}); err != nil {
 		t.Fatalf("system context: %v", err)
 	}
-	if err := ensureCanGrantPermissions(callerCtx(e, "tenant_admin"), nil, e.tenantID, []uuid.UUID{other}, e.urRepo, e.rpRepo); err != nil {
+	if err := ensureCanGrant(callerCtx(e, "tenant_admin"), nil, r, e.tenantID, []access.Grant{other}); err != nil {
 		t.Fatalf("tenant_admin: %v", err)
 	}
-	// nothing to grant
-	if err := ensureCanGrantPermissions(callerCtx(e, "custom"), nil, e.tenantID, nil, e.urRepo, e.rpRepo); err != nil {
+	if err := ensureCanGrant(callerCtx(e, "custom"), nil, r, e.tenantID, nil); err != nil {
 		t.Fatalf("empty grant: %v", err)
 	}
-	// subset of own permissions is fine, anything else is refused
-	if err := ensureCanGrantPermissions(callerCtx(e, "custom"), nil, e.tenantID, []uuid.UUID{held}, e.urRepo, e.rpRepo); err != nil {
+	// own permission at the same or a narrower scope is fine, anything else is refused
+	if err := ensureCanGrant(callerCtx(e, "custom"), nil, r, e.tenantID, []access.Grant{held, narrower}); err != nil {
 		t.Fatalf("own permission: %v", err)
 	}
-	if err := ensureCanGrantPermissions(callerCtx(e, "custom"), nil, e.tenantID, []uuid.UUID{held, other}, e.urRepo, e.rpRepo); !isStatus(err, 403) {
+	if err := ensureCanGrant(callerCtx(e, "custom"), nil, r, e.tenantID, []access.Grant{held, other}); !isStatus(err, 403) {
 		t.Fatalf("foreign permission must be refused: %v", err)
+	}
+	// a held permission at a narrower scope cannot be handed out wider
+	e.rpRepo.FindByRoleIDFunc = func(_ context.Context, _ *gorm.DB, _, _ uuid.UUID) ([]models.RolePermission, error) {
+		return []models.RolePermission{{RoleID: e.roleID, PermissionID: e.permID, Scope: "direct_reports",
+			Permission: &models.Permission{ID: e.permID, Resource: "users", Action: "read"}}}, nil
+	}
+	if err := ensureCanGrant(callerCtx(e, "custom"), nil, r, e.tenantID, []access.Grant{held}); !isStatus(err, 403) {
+		t.Fatalf("wider scope than held must be refused: %v", err)
 	}
 	// lookup failures surface (fail closed)
 	e.urRepo.FindByUserIDFunc = func(context.Context, *gorm.DB, uuid.UUID, uuid.UUID) ([]models.UserRole, error) { return nil, errBoom }
-	if err := ensureCanGrantPermissions(callerCtx(e, "custom"), nil, e.tenantID, []uuid.UUID{held}, e.urRepo, e.rpRepo); err == nil {
+	if err := ensureCanGrant(callerCtx(e, "custom"), nil, r, e.tenantID, []access.Grant{narrower}); err == nil {
 		t.Fatal("repo failure must not allow the grant")
 	}
 }
 
 func TestEnsureCanAssignRoles(t *testing.T) {
 	e := newEnv(&faults{})
+	r := resolverFor(e)
 	plain := &models.Role{Name: "plain"}
 	plain.ID = uuid.New()
 	admin := &models.Role{Name: "tenant_admin", IsSystem: true}
 	admin.ID = uuid.New()
 	strong := &models.Role{Name: "strong"}
 	strong.ID = uuid.New()
-	// the caller's own role (e.roleID) carries permission e.permID; "strong" carries a different one
+	// the caller's own role (e.roleID) carries users:read; "strong" carries payroll:approve
 	e.rpRepo.FindByRoleIDFunc = func(_ context.Context, _ *gorm.DB, _, roleID uuid.UUID) ([]models.RolePermission, error) {
 		switch roleID {
 		case strong.ID:
-			return []models.RolePermission{{RoleID: roleID, PermissionID: uuid.New()}}, nil
+			return []models.RolePermission{{RoleID: roleID, Scope: "tenant", Permission: &models.Permission{Resource: "payroll", Action: "approve"}}}, nil
 		case plain.ID:
 			return nil, nil
 		}
-		return []models.RolePermission{{RoleID: roleID, PermissionID: e.permID}}, nil
+		return []models.RolePermission{{RoleID: roleID, PermissionID: e.permID, Scope: "tenant", Permission: &models.Permission{Resource: "users", Action: "read"}}}, nil
 	}
 
 	member := callerCtx(e, "custom")
-	if err := ensureCanAssignRoles(member, nil, e.tenantID, []*models.Role{plain}, e.urRepo, e.rpRepo); err != nil {
+	if err := ensureCanAssignRoles(member, nil, r, e.tenantID, []*models.Role{plain}); err != nil {
 		t.Fatalf("permission-less role: %v", err)
 	}
-	if err := ensureCanAssignRoles(member, nil, e.tenantID, []*models.Role{admin}, e.urRepo, e.rpRepo); !isStatus(err, 403) {
+	if err := ensureCanAssignRoles(member, nil, r, e.tenantID, []*models.Role{admin}); !isStatus(err, 403) {
 		t.Fatalf("tenant_admin must be refused: %v", err)
 	}
-	if err := ensureCanAssignRoles(member, nil, e.tenantID, []*models.Role{strong}, e.urRepo, e.rpRepo); !isStatus(err, 403) {
+	if err := ensureCanAssignRoles(member, nil, r, e.tenantID, []*models.Role{strong}); !isStatus(err, 403) {
 		t.Fatalf("role with foreign permission must be refused: %v", err)
 	}
-	if err := ensureCanAssignRoles(callerCtx(e, "tenant_admin"), nil, e.tenantID, []*models.Role{admin, strong}, e.urRepo, e.rpRepo); err != nil {
+	if err := ensureCanAssignRoles(callerCtx(e, "tenant_admin"), nil, r, e.tenantID, []*models.Role{admin, strong}); err != nil {
 		t.Fatalf("tenant_admin may assign anything: %v", err)
 	}
-	if err := ensureCanAssignRoles(context.Background(), nil, e.tenantID, []*models.Role{admin}, e.urRepo, e.rpRepo); err != nil {
+	if err := ensureCanAssignRoles(context.Background(), nil, r, e.tenantID, []*models.Role{admin}); err != nil {
 		t.Fatalf("system context: %v", err)
 	}
-	if err := ensureCanAssignRoles(member, nil, e.tenantID, nil, e.urRepo, e.rpRepo); err != nil {
+	if err := ensureCanAssignRoles(member, nil, r, e.tenantID, nil); err != nil {
 		t.Fatalf("no roles: %v", err)
 	}
 }

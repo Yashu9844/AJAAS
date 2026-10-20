@@ -166,6 +166,9 @@ func newEnv(f *faults) *env {
 		out := make([]models.Permission, len(ids))
 		for i, id := range ids {
 			out[i] = models.Permission{ID: id, Resource: "users", Action: "read"}
+			if id != e.permID { // any other permission is one the caller does not hold
+				out[i] = models.Permission{ID: id, Resource: "foreign", Action: id.String()}
+			}
 		}
 		return out, f.hit()
 	}
@@ -180,7 +183,7 @@ func newEnv(f *faults) *env {
 
 	e.rpRepo.CreateFunc = func(_ context.Context, _ *gorm.DB, _ *models.RolePermission) error { return f.hit() }
 	e.rpRepo.FindByRoleIDFunc = func(_ context.Context, _ *gorm.DB, _, _ uuid.UUID) ([]models.RolePermission, error) {
-		return []models.RolePermission{{RoleID: e.roleID, PermissionID: e.permID, Permission: &models.Permission{ID: e.permID, Resource: "users", Action: "read"}}}, f.hit()
+		return []models.RolePermission{{RoleID: e.roleID, PermissionID: e.permID, Scope: "tenant", Permission: &models.Permission{ID: e.permID, Resource: "users", Action: "read"}}}, f.hit()
 	}
 	e.rpRepo.DeleteFunc = func(_ context.Context, _ *gorm.DB, _, _, _ uuid.UUID) error { return f.hit() }
 	e.rpRepo.DeleteByRoleIDFunc = func(_ context.Context, _ *gorm.DB, _, _ uuid.UUID) error { return f.hit() }

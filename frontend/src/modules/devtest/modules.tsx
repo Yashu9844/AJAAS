@@ -2,12 +2,14 @@
 import { AuthSection } from "./auth";
 import { Checklist, OpGroup, ScenarioCard, SessionBox } from "./components";
 import { S0 } from "./scenarios0";
+import { S0_ACCESS } from "./scenariosAccess";
 import { S1 } from "./scenarios1";
 import { S2 } from "./scenarios2";
 import { Tabs } from "./shell";
 import { useDevStore } from "./store";
 import {
   CHECKLIST,
+  M0_ACCESS,
   M0_AUTH,
   M0_ROLES,
   M0_TENANTS,
@@ -80,7 +82,21 @@ export function Module0() {
               </>
             ),
           },
-          { id: "sc", label: "Scenarios (automated)", body: <Scenarios list={S0} /> },
+          {
+            id: "access",
+            label: "Access (scopes, grants, blocks)",
+            body: (
+              <>
+                <p className="dt-note">
+                  Every permission is held at a scope: own, direct_reports, all_reports, department or tenant. Roles inherit from a parent; Employee and Manager are assigned automatically from HR data; a block always wins.
+                  Routes that are not yet scope-aware still require tenant scope.
+                </p>
+                <OpGroup title="Access administration" ops={M0_ACCESS} />
+                <Scenarios list={S0_ACCESS} />
+              </>
+            ),
+          },
+          { id: "sc", label: "Scenarios (automated)", body: <Scenarios list={[...S0, ...S0_ACCESS]} /> },
           { id: "ck", label: "Checklist", body: <Checklist title="MODULE 0" items={CHECKLIST[0]} /> },
         ]}
       />

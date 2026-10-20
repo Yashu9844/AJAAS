@@ -2,97 +2,97 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/identity/models"
-	"gorm.io/gorm"
+	"github.com/jaas/jaas/internal/identity/access"
 )
 
-func TestRequirePermission(t *testing.T) {
+// fakeAuthz returns a fixed scope per permission key.
+type fakeAuthz struct {
+	scopes map[string]access.Scope
+	err    error
+	calls  int
+}
+
+func (f *fakeAuthz) ScopeFor(_ context.Context, _, _ uuid.UUID, resource, action string) (access.Scope, error) {
+	f.calls++
+	return f.scopes[access.Key(resource, action)], f.err
+}
+
+func serve(t *testing.T, roles []string, withIDs bool, h ...gin.HandlerFunc) *httptest.ResponseRecorder {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
-	userRoleRepo := &MockUserRoleRepository{}
-	rolePermRepo := &MockRolePermissionRepository{}
-
-	tenantID := uuid.New()
-	userID := uuid.New()
-	roleID := uuid.New()
-
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		c.Set("tenant_id", tenantID)
-		c.Set("user_id", userID)
-		c.Next()
-	})
-
-	router.GET("/users", func(c *gin.Context) {
-		// Mock roles in token claims context
-		c.Set("roles", []string{"member"})
-		c.Next()
-	}, RequirePermission(nil, "users", "read", userRoleRepo, rolePermRepo), func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	router.GET("/admin-bypass", func(c *gin.Context) {
-		c.Set("roles", []string{"tenant_admin"})
-		c.Next()
-	}, RequirePermission(nil, "users", "read", userRoleRepo, rolePermRepo), func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	// 1. Success case: user has roles with matching permission
-	userRoleRepo.FindByUserIDFunc = func(ctx context.Context, db *gorm.DB, tid, uid uuid.UUID) ([]models.UserRole, error) {
-		return []models.UserRole{{RoleID: roleID}}, nil
+	r := gin.New()
+	setup := func(c *gin.Context) {
+		if withIDs {
+			c.Set("tenant_id", uuid.New())
+			c.Set("user_id", uuid.New())
+		}
+		c.Set("roles", roles)
 	}
-
-	rolePermRepo.FindByRoleIDFunc = func(ctx context.Context, db *gorm.DB, tid, rid uuid.UUID) ([]models.RolePermission, error) {
-		return []models.RolePermission{
-			{
-				Permission: &models.Permission{
-					Resource: "users",
-					Action:   "read",
-				},
-			},
-		}, nil
-	}
-
+	handlers := append([]gin.HandlerFunc{setup}, h...)
+	handlers = append(handlers, func(c *gin.Context) { c.String(http.StatusOK, string(ScopeFrom(c))) })
+	r.GET("/x", handlers...)
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/users", nil)
-	router.ServeHTTP(w, req)
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x", nil))
+	return w
+}
 
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d. Body: %s", w.Code, w.Body.String())
+func TestRequirePermissionNeedsTenantScope(t *testing.T) {
+	authz := &fakeAuthz{scopes: map[string]access.Scope{"users:read": access.ScopeTenant, "leave:approve": access.ScopeDirectReports}}
+	if w := serve(t, []string{"member"}, true, RequirePermission(authz, "users", "read")); w.Code != http.StatusOK || w.Body.String() != "tenant" {
+		t.Fatalf("tenant scope passes: %d %s", w.Code, w.Body)
 	}
-
-	// 2. Bypass case: tenant_admin
-	w2 := httptest.NewRecorder()
-	req2, _ := http.NewRequest("GET", "/admin-bypass", nil)
-	router.ServeHTTP(w2, req2)
-
-	if w2.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w2.Code)
+	if w := serve(t, []string{"member"}, true, RequirePermission(authz, "leave", "approve")); w.Code != http.StatusForbidden {
+		t.Fatalf("a narrower grant never passes a legacy route: %d", w.Code)
 	}
-
-	// 3. Forbidden case: user role doesn't have the permission
-	rolePermRepo.FindByRoleIDFunc = func(ctx context.Context, db *gorm.DB, tid, rid uuid.UUID) ([]models.RolePermission, error) {
-		return []models.RolePermission{
-			{
-				Permission: &models.Permission{
-					Resource: "users",
-					Action:   "write", // mismatch action
-				},
-			},
-		}, nil
+	if w := serve(t, []string{"member"}, true, RequirePermission(authz, "payroll", "read")); w.Code != http.StatusForbidden {
+		t.Fatalf("not held: %d", w.Code)
 	}
+}
 
-	w3 := httptest.NewRecorder()
-	req3, _ := http.NewRequest("GET", "/users", nil)
-	router.ServeHTTP(w3, req3)
+func TestRequireScopedPermission(t *testing.T) {
+	authz := &fakeAuthz{scopes: map[string]access.Scope{"leave:approve": access.ScopeAllReports}}
+	if w := serve(t, nil, true, RequireScopedPermission(authz, "leave", "approve", access.ScopeDirectReports)); w.Code != http.StatusOK || w.Body.String() != "all_reports" {
+		t.Fatalf("wider than the minimum passes and exposes the scope: %d %s", w.Code, w.Body)
+	}
+	if w := serve(t, nil, true, RequireScopedPermission(authz, "leave", "approve", access.ScopeDepartment)); w.Code != http.StatusForbidden {
+		t.Fatalf("narrower than the minimum: %d", w.Code)
+	}
+}
 
-	if w3.Code != http.StatusForbidden {
-		t.Errorf("expected 403, got %d", w3.Code)
+func TestTenantAdminBypassAndFailures(t *testing.T) {
+	authz := &fakeAuthz{}
+	if w := serve(t, []string{"tenant_admin"}, false, RequirePermission(authz, "anything", "goes")); w.Code != http.StatusOK || authz.calls != 0 {
+		t.Fatalf("tenant_admin bypasses without a lookup: %d", w.Code)
+	}
+	if w := serve(t, []string{"member"}, false, RequirePermission(authz, "users", "read")); w.Code != http.StatusForbidden {
+		t.Fatalf("missing ids: %d", w.Code)
+	}
+	failing := &fakeAuthz{err: errors.New("db down")}
+	if w := serve(t, nil, true, RequirePermission(failing, "users", "read")); w.Code != http.StatusInternalServerError {
+		t.Fatalf("resolver error: %d", w.Code)
+	}
+}
+
+func TestPermissionFlag(t *testing.T) {
+	authz := &fakeAuthz{scopes: map[string]access.Scope{"employee:read_sensitive": access.ScopeTenant, "employee:admin": access.ScopeOwn}}
+	read := func(key string) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			if v, _ := c.Get(key); v != true {
+				c.AbortWithStatus(http.StatusTeapot)
+			}
+		}
+	}
+	if w := serve(t, nil, true, PermissionFlag(authz, "employee", "read_sensitive", "k"), read("k")); w.Code != http.StatusOK {
+		t.Fatalf("flag set: %d", w.Code)
+	}
+	if w := serve(t, nil, true, PermissionFlag(authz, "employee", "admin", "k"), read("k")); w.Code != http.StatusTeapot {
+		t.Fatalf("own scope does not set a tenant flag: %d", w.Code)
 	}
 }

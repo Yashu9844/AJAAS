@@ -31,13 +31,20 @@ type UserService interface {
 // UserOption customises a UserService.
 type UserOption func(*userService)
 
-// WithRolePermissions enables the no-privilege-escalation check when users are created with roles.
+// WithRolePermissions enables the no-privilege-escalation check (flat roles) when users are created with roles.
 func WithRolePermissions(rp repositories.RolePermissionRepository) UserOption {
-	return func(s *userService) { s.rolePermRepo = rp }
+	return func(s *userService) {
+		s.resolver = NewAccessResolver(AccessResolverDeps{UserRoles: s.userRoleRepo, RolePerms: rp})
+	}
+}
+
+// WithAccessResolver enables the scoped, inheritance-aware no-privilege-escalation check (docs/ARCHITECTURE.md §17).
+func WithAccessResolver(r AccessResolver) UserOption {
+	return func(s *userService) { s.resolver = r }
 }
 
 type userService struct {
-	rolePermRepo repositories.RolePermissionRepository
+	resolver     AccessResolver // nil: only tenant_admin and system callers may assign roles
 	userRepo     repositories.UserRepository
 	roleRepo     repositories.RoleRepository
 	userRoleRepo repositories.UserRoleRepository
@@ -124,14 +131,17 @@ func (s *userService) resolveRoles(ctx context.Context, tx *gorm.DB, tenantID uu
 		if role == nil {
 			return nil, &sharedErrors.AppError{Code: "NOT_FOUND", Message: fmt.Sprintf("Role ID %s not found", rIDStr), StatusCode: 404}
 		}
+		if role.IsAutomatic {
+			return nil, errAutomaticRole
+		}
 		roles = append(roles, role)
 	}
 	if len(roles) > 0 {
-		if s.rolePermRepo == nil {
+		if s.resolver == nil {
 			if caller, ok := CallerFrom(ctx); ok && !caller.IsTenantAdmin() {
 				return nil, forbiddenGrant("Role assignment is not permitted for this caller")
 			}
-		} else if err := ensureCanAssignRoles(ctx, tx, tenantID, roles, s.userRoleRepo, s.rolePermRepo); err != nil {
+		} else if err := ensureCanAssignRoles(ctx, tx, s.resolver, tenantID, roles); err != nil {
 			return nil, err
 		}
 	}

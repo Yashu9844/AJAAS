@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/organization/controllers"
 	"github.com/jaas/jaas/internal/organization/services"
@@ -17,8 +16,7 @@ import (
 func RegisterRoutes(
 	router *gin.RouterGroup,
 	db *gorm.DB,
-	userRoleRepo identityRepos.UserRoleRepository,
-	rolePermRepo identityRepos.RolePermissionRepository,
+	authz identityMiddleware.Authorizer,
 	tenantResolver gin.HandlerFunc,
 	authMiddleware gin.HandlerFunc,
 	deptCtrl *controllers.DepartmentController,
@@ -34,8 +32,8 @@ func RegisterRoutes(
 	auditMW := func(action, resource string) gin.HandlerFunc {
 		return identityMiddleware.AuditLog(dbForAudit, auditSvc, action, resource)
 	}
-	read := identityMiddleware.RequirePermission(db, "organization", "read", userRoleRepo, rolePermRepo)
-	write := identityMiddleware.RequirePermission(db, "organization", "update", userRoleRepo, rolePermRepo)
+	read := identityMiddleware.RequirePermission(authz, "organization", "read")
+	write := identityMiddleware.RequirePermission(authz, "organization", "update")
 
 	depts := router.Group("/departments")
 	depts.Use(tenantResolver, authMiddleware, invalidate)

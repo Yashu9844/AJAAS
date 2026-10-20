@@ -442,12 +442,25 @@ paths:
                   type: string
                 permission_ids:
                   type: array
+                  description: Granted at tenant scope (legacy form).
                   items:
                     type: string
                     format: uuid
+                grants:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/GrantInput'
+                parent_role_id:
+                  type: string
+                  format: uuid
+                  description: The role inherits every grant of its parent (same tenant, acyclic, depth at most 10). The caller must hold everything the parent grants.
       responses:
         '201':
           description: Role created
+        '403':
+          description: A grant or the parent reaches further than the caller's own access
+        '409':
+          description: Name taken or inheritance cycle
     get:
       summary: List Tenant Roles
       tags:
@@ -544,17 +557,122 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - permission_ids
+              description: At least one of permission_ids or grants. Re-granting a held permission changes its scope.
               properties:
                 permission_ids:
                   type: array
                   items:
                     type: string
                     format: uuid
+                grants:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/GrantInput'
       responses:
         '200':
-          description: Permissions assigned to role
+          description: Permissions assigned to role (a predefined role stops being template-managed)
+
+  /roles/{id}/clone:
+    post:
+      summary: Clone a role (grants, scopes and parent) into a new custom role
+      tags: [Roles]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [name], properties: {name: {type: string, maxLength: 100}}}
+      responses:
+        '201': {description: Role created}
+        '403': {description: 'System roles cannot be cloned, or the copy reaches further than the caller access'}
+
+  /auth/me/access:
+    get:
+      summary: Explain the caller's effective access (scope and source of every permission)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: Explained access, content: {application/json: {schema: {$ref: '#/components/schemas/ExplainAccess'}}}}
+
+  /users/{id}/access:
+    get:
+      summary: Explain a user's effective access (access:read)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Explained access, content: {application/json: {schema: {$ref: '#/components/schemas/ExplainAccess'}}}}
+        '404': {description: Unknown user in this tenant}
+
+  /users/{id}/grants:
+    get:
+      summary: List a user's individual grants (access:read)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Grants (expired ones flagged)}
+    post:
+      summary: Grant one permission to one user at a scope, optionally until expires_at (access:manage)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/UserGrantRequest'}}}
+      responses:
+        '201': {description: Granted (replaces an existing grant of the same permission)}
+        '400': {description: Invalid scope or expires_at not in the future}
+        '403': {description: Wider than the caller's own access}
+
+  /users/{id}/grants/{permission_id}:
+    delete:
+      summary: Revoke an individual grant (access:manage)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}, {name: permission_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Revoked}
+        '404': {description: No such grant}
+
+  /users/{id}/blocks:
+    get:
+      summary: List a user's blocks (access:read)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Blocks}
+    post:
+      summary: Block one permission for one user; a block always wins over roles and grants (access:manage)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/UserBlockRequest'}}}
+      responses:
+        '201': {description: Blocked}
+        '409': {description: tenant_admin holders cannot be blocked}
+
+  /users/{id}/blocks/{permission_id}:
+    delete:
+      summary: Lift a block (access:manage)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}, {name: permission_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Unblocked}
+        '404': {description: No such block}
+
+  /access/automatic-roles/sync:
+    post:
+      summary: Reconcile the tenant's automatic Employee and Manager roles from HR data now (access:manage)
+      tags: [Access]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: 'Counts: added, removed'}
 
   /auth/me:
     get:
@@ -2435,6 +2553,48 @@ components:
       description: VALIDATION_ERROR with field details
       content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
   schemas:
+    GrantInput:
+      type: object
+      required: [permission_id]
+      properties:
+        permission_id: {type: string, format: uuid}
+        scope: {type: string, enum: [own, direct_reports, all_reports, department, tenant], default: tenant}
+    UserGrantRequest:
+      type: object
+      required: [permission_id]
+      properties:
+        permission_id: {type: string, format: uuid}
+        scope: {type: string, enum: [own, direct_reports, all_reports, department, tenant], default: tenant}
+        expires_at: {type: string, format: date-time}
+        reason: {type: string, maxLength: 500}
+    UserBlockRequest:
+      type: object
+      required: [permission_id]
+      properties:
+        permission_id: {type: string, format: uuid}
+        reason: {type: string, maxLength: 500}
+    ExplainAccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user_id: {type: string, format: uuid}
+            is_tenant_admin: {type: boolean}
+            roles: {type: array, items: {type: object, properties: {id: {type: string}, name: {type: string}, source: {type: string, enum: [manual, automatic]}}}}
+            permissions:
+              type: array
+              items:
+                type: object
+                properties:
+                  permission: {type: string, example: 'leave:approve'}
+                  module: {type: string}
+                  sensitive: {type: boolean}
+                  scope: {type: string}
+                  blocked: {type: boolean}
+                  sources:
+                    type: array
+                    items: {type: object, properties: {kind: {type: string, enum: [role, automatic_role, inherited, user_grant]}, role_id: {type: string}, role_name: {type: string}, scope: {type: string}}}
     ErrorEnvelope:
       type: object
       properties:

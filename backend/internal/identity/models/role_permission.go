@@ -13,6 +13,7 @@ type RolePermission struct {
 	RoleID       uuid.UUID `gorm:"type:uuid;not null;index:idx_role_permissions_role_id;uniqueIndex:uq_role_permissions_role_perm_tenant,priority:1" json:"role_id"`
 	PermissionID uuid.UUID `gorm:"type:uuid;not null;index:idx_role_permissions_permission_id;uniqueIndex:uq_role_permissions_role_perm_tenant,priority:2" json:"permission_id"`
 	TenantID     uuid.UUID `gorm:"type:uuid;not null;index:idx_role_permissions_tenant_id;uniqueIndex:uq_role_permissions_role_perm_tenant,priority:3" json:"tenant_id"`
+	Scope        string    `gorm:"type:varchar(20);not null;default:'tenant'" json:"scope"`
 	CreatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 

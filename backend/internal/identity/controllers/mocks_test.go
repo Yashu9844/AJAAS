@@ -167,6 +167,7 @@ func (m *MockUserService) DeactivateUser(ctx context.Context, tx *gorm.DB, tenan
 
 // MockRoleService stubs services.RoleService
 type MockRoleService struct {
+	CloneRoleFunc func(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.CloneRoleRequest) (*dto.RoleResponse, error)
 	CreateRoleFunc        func(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateRoleRequest) (*dto.RoleResponse, error)
 	GetRoleByIDFunc       func(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.RoleResponse, error)
 	ListRolesFunc         func(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.RoleListResponse, error)
@@ -223,6 +224,14 @@ func (m *MockRoleService) AssignRolesToUser(ctx context.Context, tx *gorm.DB, te
 		return m.AssignRolesToUserFunc(ctx, tx, tenantID, userID, req, correlationID)
 	}
 	return nil
+}
+
+// CloneRole stubs RoleService.CloneRole.
+func (m *MockRoleService) CloneRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.CloneRoleRequest) (*dto.RoleResponse, error) {
+	if m.CloneRoleFunc != nil {
+		return m.CloneRoleFunc(ctx, tx, tenantID, id, req)
+	}
+	return &dto.RoleResponse{ID: uuid.New().String(), Name: req.Name}, nil
 }
 
 // MockPermissionService stubs services.PermissionService

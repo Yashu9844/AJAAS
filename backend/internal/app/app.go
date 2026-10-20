@@ -104,6 +104,10 @@ func Build(o Options) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := registerCatalogues(context.Background(), identityModule); err != nil {
+		return nil, err
+	}
+	wireAutomaticRoles(o, identityModule, employeeModule, orgModule)
 
 	if cfg.Server.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -120,8 +124,8 @@ func Build(o Options) (*gin.Engine, error) {
 
 	v1 := router.Group("/api/v1")
 	identityModule.RegisterRoutes(v1)
-	orgModule.RegisterRoutes(v1, identityModule.UserRoleRepository(), identityModule.RolePermissionRepository(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
-	employeeModule.RegisterRoutes(v1, identityModule.UserRoleRepository(), identityModule.RolePermissionRepository(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
+	orgModule.RegisterRoutes(v1, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
+	employeeModule.RegisterRoutes(v1, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
 	registerPeopleRoutes(v1, o, identityModule, people)
 
 	router.GET("/health", func(c *gin.Context) {

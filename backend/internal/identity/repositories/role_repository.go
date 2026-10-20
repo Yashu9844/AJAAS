@@ -17,7 +17,10 @@ func NewRoleRepository() RoleRepository {
 }
 
 func (r *roleRepository) Create(ctx context.Context, tx *gorm.DB, role *models.Role) error {
-	return tx.WithContext(ctx).Create(role).Error
+	if err := tx.WithContext(ctx).Create(role).Error; err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, role.TenantID)
 }
 
 func (r *roleRepository) FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Role, error) {
@@ -63,9 +66,15 @@ func (r *roleRepository) FindAll(ctx context.Context, db *gorm.DB, tenantID uuid
 }
 
 func (r *roleRepository) Update(ctx context.Context, tx *gorm.DB, role *models.Role) error {
-	return tx.WithContext(ctx).Where("tenant_id = ? AND id = ?", role.TenantID, role.ID).Save(role).Error
+	if err := tx.WithContext(ctx).Where("tenant_id = ? AND id = ?", role.TenantID, role.ID).Omit("Permissions", "Users").Save(role).Error; err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, role.TenantID)
 }
 
 func (r *roleRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error {
-	return tx.WithContext(ctx).Delete(&models.Role{}, "tenant_id = ? AND id = ?", tenantID, id).Error
+	if err := tx.WithContext(ctx).Delete(&models.Role{}, "tenant_id = ? AND id = ?", tenantID, id).Error; err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, tenantID)
 }

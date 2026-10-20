@@ -15,6 +15,7 @@ type UserRole struct {
 	TenantID   uuid.UUID  `gorm:"type:uuid;not null;index:idx_user_roles_tenant_id;uniqueIndex:uq_user_roles_user_role_tenant,priority:3" json:"tenant_id"`
 	AssignedAt time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"assigned_at"`
 	AssignedBy *uuid.UUID `gorm:"type:uuid" json:"assigned_by,omitempty"`
+	Source     string     `gorm:"type:varchar(20);not null;default:'manual'" json:"source"`
 	CreatedAt  time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt  time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 

@@ -1,7 +1,11 @@
 package identity
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/identity/controllers"
 	"github.com/jaas/jaas/internal/identity/middleware"
 	"github.com/jaas/jaas/internal/identity/models"
@@ -13,7 +17,6 @@ import (
 	sharedQueue "github.com/jaas/jaas/internal/shared/queue"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"time"
 )
 
@@ -37,6 +40,7 @@ type Module struct {
 	mfaRepo      repositories.MFAConfigRepository
 	settingsRepo repositories.TenantSettingsRepository
 	auditRepo    repositories.AuditLogRepository
+	accessRepo   repositories.AccessRepository
 
 	// Services
 	auditSvc   services.AuditService
@@ -47,6 +51,10 @@ type Module struct {
 	permSvc    services.PermissionService
 	userSvc    services.UserService
 	authSvc    services.AuthService
+	resolver   services.AccessResolver
+	catalogue  services.Catalogue
+	accessSvc  services.AccessService
+	automatic  services.AutomaticRoles
 
 	// Controllers
 	tenantCtrl *controllers.TenantController
@@ -55,6 +63,7 @@ type Module struct {
 	roleCtrl   *controllers.RoleController
 	permCtrl   *controllers.PermissionController
 	auditCtrl  *controllers.AuditController
+	accessCtrl *controllers.AccessController
 
 	platformAdminKey string
 }
@@ -89,6 +98,7 @@ func NewModule(
 	m.mfaRepo = repositories.NewMFAConfigRepository()
 	m.settingsRepo = repositories.NewTenantSettingsRepository()
 	m.auditRepo = repositories.NewAuditLogRepository()
+	m.accessRepo = repositories.NewAccessRepository()
 
 	// 2. Initialize Services
 	jwtConfig := &sharedConfig.JWTConfig{
@@ -101,10 +111,22 @@ func NewModule(
 	m.tokenSvc = services.NewTokenService(jwtConfig)
 	m.sessionSvc = services.NewSessionService(m.sessionRepo, redisClient, time.Duration(accessTokenTTL)*time.Minute)
 
-	m.tenantSvc = services.NewTenantService(m.tenantRepo, m.roleRepo, publisher, m.auditSvc, services.WithAdminProvisioning(m.userRepo, m.userRoleRepo))
-	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc)
+	resolverDeps := services.AccessResolverDeps{DB: db, Access: m.accessRepo, UserRoles: m.userRoleRepo, RolePerms: m.rolePermRepo}
+	if redisClient != nil {
+		resolverDeps.Cache = redisClient
+	}
+	m.resolver = services.NewAccessResolver(resolverDeps)
+	m.catalogue = services.NewCatalogue(services.CatalogueDeps{DB: db, Roles: m.roleRepo, RolePerms: m.rolePermRepo, Access: m.accessRepo})
+	m.tenantSvc = services.NewTenantService(m.tenantRepo, m.roleRepo, publisher, m.auditSvc,
+		services.WithAdminProvisioning(m.userRepo, m.userRoleRepo), services.WithRoleProvisioner(m.catalogue.ProvisionTenant))
+	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc,
+		services.WithAccessModel(m.accessRepo, m.resolver))
 	m.permSvc = services.NewPermissionService(m.permRepo)
-	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc, services.WithRolePermissions(m.rolePermRepo))
+	m.accessSvc = services.NewAccessService(services.AccessServiceDeps{Users: m.userRepo, Perms: m.permRepo, UserRoles: m.userRoleRepo,
+		Access: m.accessRepo, Resolver: m.resolver, Audit: m.auditSvc})
+	m.automatic = services.NewAutomaticRoles(services.AutomaticRolesDeps{DB: db, Access: m.accessRepo, UserRoles: m.userRoleRepo,
+		Catalogue: m.catalogue, Logger: logger})
+	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc, services.WithAccessResolver(m.resolver))
 	m.authSvc = services.NewAuthService(
 		m.tenantRepo,
 		m.userRepo,
@@ -125,6 +147,8 @@ func NewModule(
 	m.roleCtrl = controllers.NewRoleController(db, m.roleSvc)
 	m.permCtrl = controllers.NewPermissionController(db, m.permSvc)
 	m.auditCtrl = controllers.NewAuditController(db, m.auditSvc)
+	m.accessCtrl = controllers.NewAccessController(db, m.accessSvc, m.automatic)
+	m.authCtrl.OnLogin(m.syncUserOnLogin)
 
 	return m
 }
@@ -132,20 +156,36 @@ func NewModule(
 // SetPlatformAdminKey configures the platform operator key guarding /tenants routes (empty = routes disabled).
 func (m *Module) SetPlatformAdminKey(key string) { m.platformAdminKey = key }
 
-// SeedPermissions idempotently inserts the global permission catalogue (see models.DefaultPermissions).
+// SeedPermissions registers M0's own permission catalogue (models.IdentityCatalogue).
 func (m *Module) SeedPermissions() error {
-	for _, p := range models.DefaultPermissions {
-		desc := p.Description
-		row := &models.Permission{Resource: p.Resource, Action: p.Action, Description: &desc}
-		if err := m.db.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "resource"}, {Name: "action"}},
-			DoNothing: true,
-		}).Create(row).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	return m.catalogue.Register(context.Background(), models.IdentityCatalogue)
 }
+
+// RegisterCatalogue registers another service's permission definitions and their predefined-role defaults.
+func (m *Module) RegisterCatalogue(ctx context.Context, defs []access.PermissionDef) error {
+	return m.catalogue.Register(ctx, defs)
+}
+
+// SyncRoleTemplates provisions predefined roles in every tenant; call it once all catalogues are registered.
+func (m *Module) SyncRoleTemplates(ctx context.Context) error { return m.catalogue.SyncAllTenants(ctx) }
+
+// SetAutomaticRoleSource installs the HR-backed source of the automatic employee/manager roles.
+func (m *Module) SetAutomaticRoleSource(src services.AutomaticRoleSource) { m.automatic.SetSource(src) }
+
+// RunAutomaticRoleSync reconciles automatic roles in every tenant each interval until ctx is cancelled.
+func (m *Module) RunAutomaticRoleSync(ctx context.Context, interval time.Duration) {
+	m.automatic.Run(ctx, interval)
+}
+
+// syncUserOnLogin refreshes the user's automatic roles at login; failures only delay the sync to the next sweep.
+func (m *Module) syncUserOnLogin(ctx context.Context, tenantID, userID uuid.UUID) {
+	if err := m.automatic.SyncUser(ctx, tenantID, userID); err != nil && m.logger != nil {
+		m.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("automatic role sync at login failed")
+	}
+}
+
+// Authorizer exposes access resolution to the permission middleware of dependent modules.
+func (m *Module) Authorizer() middleware.Authorizer { return m.resolver }
 
 // RegisterModels lists all domain entity models for migrations.
 func (m *Module) RegisterModels() []interface{} {
@@ -162,6 +202,8 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.PasswordResetToken{},
 		&models.MFAConfig{},
 		&models.AuditLog{},
+		&models.UserPermissionGrant{},
+		&models.UserPermissionBlock{},
 	}
 }
 
@@ -172,8 +214,7 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 		m.db,
 		m.redisClient,
 		m.tenantRepo,
-		m.userRoleRepo,
-		m.rolePermRepo,
+		m.resolver,
 		m.tokenSvc,
 		m.sessionSvc,
 		m.auditSvc,
@@ -183,6 +224,7 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 		m.roleCtrl,
 		m.permCtrl,
 		m.auditCtrl,
+		m.accessCtrl,
 		m.platformAdminKey,
 	)
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/jaas/jaas/internal/employee/repositories"
 	employeeRoutes "github.com/jaas/jaas/internal/employee/routes"
 	"github.com/jaas/jaas/internal/employee/services"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
+	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	sharedCache "github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/queue"
@@ -103,8 +103,7 @@ func (m *Module) RegisterModels() []interface{} {
 
 func (m *Module) RegisterRoutes(
 	router *gin.RouterGroup,
-	userRoleRepo identityRepos.UserRoleRepository,
-	rolePermRepo identityRepos.RolePermissionRepository,
+	authz identityMiddleware.Authorizer,
 	tenantResolver gin.HandlerFunc,
 	authMiddleware gin.HandlerFunc,
 	auditSvc identityServices.AuditService,
@@ -112,8 +111,7 @@ func (m *Module) RegisterRoutes(
 	employeeRoutes.RegisterRoutes(
 		router,
 		m.db,
-		userRoleRepo,
-		rolePermRepo,
+		authz,
 		tenantResolver,
 		authMiddleware,
 		m.empCtrl,

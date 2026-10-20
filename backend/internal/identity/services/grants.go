@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/identity/models"
-	"github.com/jaas/jaas/internal/identity/repositories"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"gorm.io/gorm"
 )
@@ -44,74 +46,61 @@ func forbiddenGrant(msg string) error {
 	return &sharedErrors.AppError{Code: "FORBIDDEN", Message: msg, StatusCode: 403}
 }
 
-// callerPermissionIDs resolves the permission ids the caller currently holds through their roles.
-func callerPermissionIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, caller Caller, urRepo repositories.UserRoleRepository, rpRepo repositories.RolePermissionRepository) (map[uuid.UUID]bool, error) {
-	urs, err := urRepo.FindByUserID(ctx, db, tenantID, caller.UserID)
-	if err != nil {
-		return nil, err
-	}
-	roleIDs := make([]uuid.UUID, 0, len(urs))
-	for _, ur := range urs {
-		roleIDs = append(roleIDs, ur.RoleID)
-	}
-	rps, err := rpRepo.FindByRoleIDs(ctx, db, tenantID, roleIDs)
-	if err != nil {
-		return nil, err
-	}
-	held := make(map[uuid.UUID]bool, len(rps))
-	for _, rp := range rps {
-		held[rp.PermissionID] = true
-	}
-	return held, nil
+// restricted reports whether the escalation rules apply: a real caller who is not tenant_admin.
+func restricted(ctx context.Context) (Caller, bool) {
+	caller, ok := CallerFrom(ctx)
+	return caller, ok && !caller.IsTenantAdmin()
 }
 
-// ensureCanGrantPermissions refuses to let a non-admin caller attach permissions they do not hold themselves.
-func ensureCanGrantPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, permIDs []uuid.UUID, urRepo repositories.UserRoleRepository, rpRepo repositories.RolePermissionRepository) error {
-	caller, ok := CallerFrom(ctx)
-	if !ok || caller.IsTenantAdmin() || len(permIDs) == 0 {
+// ensureCanGrant refuses to let a non-admin caller hand out any grant wider than one they hold themselves
+// (docs/ARCHITECTURE.md §17.2).
+func ensureCanGrant(ctx context.Context, db *gorm.DB, r AccessResolver, tenantID uuid.UUID, want []access.Grant) error {
+	caller, ok := restricted(ctx)
+	if !ok || len(want) == 0 {
 		return nil
 	}
-	held, err := callerPermissionIDs(ctx, db, tenantID, caller, urRepo, rpRepo)
+	held, err := r.Effective(ctx, db, tenantID, caller.UserID)
 	if err != nil {
 		return err
 	}
-	for _, id := range permIDs {
-		if !held[id] {
-			return forbiddenGrant("You cannot grant permissions you do not hold yourself")
+	if missing := held.Missing(want); len(missing) > 0 {
+		names := make([]string, len(missing))
+		for i, g := range missing {
+			names[i] = fmt.Sprintf("%s@%s", g.Permission, g.Scope)
 		}
+		return forbiddenGrant("You cannot grant access you do not hold yourself: " + strings.Join(names, ", "))
 	}
 	return nil
 }
 
-// ensureCanAssignRoles refuses to let a non-admin caller assign tenant_admin, or any role carrying permissions the
-// caller does not hold (otherwise users:update would be a path to full privilege).
-func ensureCanAssignRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roles []*models.Role, urRepo repositories.UserRoleRepository, rpRepo repositories.RolePermissionRepository) error {
-	caller, ok := CallerFrom(ctx)
-	if !ok || caller.IsTenantAdmin() || len(roles) == 0 {
+// ensureCanAssignRoles refuses to let a non-admin caller assign tenant_admin, or any role (with its inherited grants)
+// reaching further than the caller's own access.
+func ensureCanAssignRoles(ctx context.Context, db *gorm.DB, r AccessResolver, tenantID uuid.UUID, roles []*models.Role) error {
+	if _, ok := restricted(ctx); !ok || len(roles) == 0 {
 		return nil
 	}
-	roleIDs := make([]uuid.UUID, 0, len(roles))
-	for _, r := range roles {
-		if r.IsSystem && r.Name == "tenant_admin" {
+	ids := make([]uuid.UUID, 0, len(roles))
+	for _, role := range roles {
+		if role.IsSystem && role.Name == "tenant_admin" {
 			return forbiddenGrant("Only a tenant_admin can assign the tenant_admin role")
 		}
-		roleIDs = append(roleIDs, r.ID)
+		ids = append(ids, role.ID)
 	}
-	rps, err := rpRepo.FindByRoleIDs(ctx, db, tenantID, roleIDs)
-	if err != nil {
-		return err
-	}
-	if len(rps) == 0 {
+	return ensureCanGrantRoles(ctx, db, r, tenantID, ids)
+}
+
+// ensureCanGrantRoles checks the effective grants of roleIDs (e.g. a new parent) against the caller.
+func ensureCanGrantRoles(ctx context.Context, db *gorm.DB, r AccessResolver, tenantID uuid.UUID, roleIDs []uuid.UUID) error {
+	if _, ok := restricted(ctx); !ok || len(roleIDs) == 0 {
 		return nil
 	}
-	held, err := callerPermissionIDs(ctx, db, tenantID, caller, urRepo, rpRepo)
+	eff, err := r.RoleGrants(ctx, db, tenantID, roleIDs)
 	if err != nil {
 		return err
 	}
-	for _, rp := range rps {
-		if !held[rp.PermissionID] {
-			return forbiddenGrant("You cannot assign a role that carries permissions you do not hold yourself")
-		}
+	want := make([]access.Grant, 0, len(eff))
+	for _, e := range eff {
+		want = append(want, access.Grant{Permission: e.Permission, Scope: e.Scope})
 	}
-	return nil
+	return ensureCanGrant(ctx, db, r, tenantID, want)
 }

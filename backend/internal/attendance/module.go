@@ -15,14 +15,11 @@ import (
 	employeeDTO "github.com/jaas/jaas/internal/employee/dto"
 	employeeServices "github.com/jaas/jaas/internal/employee/services"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityModels "github.com/jaas/jaas/internal/identity/models"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/shared/cache"
 	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // punchRateLimit caps punches per IP (security.md AS-T5).
@@ -68,30 +65,11 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.AttendancePunch{}, &models.Regularization{}, &models.OutboxEvent{}}
 }
 
-// SeedPermissions idempotently inserts attendance:read|manage|approve (D3-10, connections C7).
-func (m *Module) SeedPermissions(ctx context.Context) error {
-	for action, desc := range map[string]string{
-		routes.ActionRead:    "View attendance records, summaries, shifts and regularizations",
-		routes.ActionManage:  "Create and change shifts and shift assignments",
-		routes.ActionApprove: "Approve or reject attendance regularizations",
-	} {
-		d := desc
-		p := &identityModels.Permission{Resource: "attendance", Action: action, Description: &d}
-		err := m.db.WithContext(ctx).Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "resource"}, {Name: "action"}}, DoNothing: true,
-		}).Create(p).Error
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // RouteDeps is the Module 0 + shared infrastructure the routes need (connections C4).
 type RouteDeps struct {
 	TenantResolver, Authenticate gin.HandlerFunc
-	UserRoles                    identityRepos.UserRoleRepository
-	RolePerms                    identityRepos.RolePermissionRepository
+	Authz                        identityMiddleware.Authorizer
 	Redis                        *cache.RedisClient
 }
 
@@ -101,7 +79,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 		TenantResolver: d.TenantResolver,
 		Authenticate:   d.Authenticate,
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(m.db, "attendance", action, d.UserRoles, d.RolePerms)
+			return identityMiddleware.RequirePermission(d.Authz, "attendance", action)
 		},
 		PunchLimit: sharedMiddleware.RateLimiter(d.Redis, punchRateLimit, time.Minute),
 	}

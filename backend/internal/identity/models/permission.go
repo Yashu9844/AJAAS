@@ -13,6 +13,8 @@ type Permission struct {
 	Resource    string    `gorm:"type:varchar(100);not null;uniqueIndex:uq_permissions_resource_action,priority:1;index:idx_permissions_resource" json:"resource"`
 	Action      string    `gorm:"type:varchar(50);not null;uniqueIndex:uq_permissions_resource_action,priority:2" json:"action"`
 	Description *string   `gorm:"type:varchar(500)" json:"description,omitempty"`
+	Module      string    `gorm:"type:varchar(50);not null;default:''" json:"module"`
+	IsSensitive bool      `gorm:"not null;default:false" json:"is_sensitive"`
 	CreatedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 }

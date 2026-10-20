@@ -19,8 +19,7 @@ func RegisterRoutes(
 	db *gorm.DB,
 	redisClient *sharedCache.RedisClient,
 	tenantRepo repositories.TenantRepository,
-	userRoleRepo repositories.UserRoleRepository,
-	rolePermRepo repositories.RolePermissionRepository,
+	authz identityMiddleware.Authorizer,
 	tokenSvc services.TokenService,
 	sessionSvc services.SessionService,
 	auditSvc services.AuditService,
@@ -30,6 +29,7 @@ func RegisterRoutes(
 	roleCtrl *controllers.RoleController,
 	permCtrl *controllers.PermissionController,
 	auditCtrl *controllers.AuditController,
+	accessCtrl *controllers.AccessController,
 	platformAdminKey string,
 ) {
 	// Initialize Middleware Instances
@@ -67,6 +67,7 @@ func RegisterRoutes(
 	{
 		authProtected.POST("/logout", authCtrl.Logout)
 		authProtected.GET("/me", roleCtrl.Me)
+		authProtected.GET("/me/access", accessCtrl.ExplainMe)
 	}
 
 	// User Profiles Group (Requires Tenant Subdomain Context + JWT Auth)
@@ -74,40 +75,68 @@ func RegisterRoutes(
 	users.Use(tenantResolver, authMiddleware)
 	{
 		users.POST("",
-			identityMiddleware.RequirePermission(db, "users", "create", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "create"),
 			identityMiddleware.AuditLog(db, auditSvc, "user.created", "user"),
 			userCtrl.Create,
 		)
 		users.GET("",
-			identityMiddleware.RequirePermission(db, "users", "read", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "read"),
 			userCtrl.List,
 		)
 		users.GET("/:id",
-			identityMiddleware.RequirePermission(db, "users", "read", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "read"),
 			userCtrl.GetByID,
 		)
 		users.PATCH("/:id",
-			identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "update"),
 			identityMiddleware.AuditLog(db, auditSvc, "user.updated", "user"),
 			userCtrl.Update,
 		)
 		users.POST("/:id/deactivate",
-			identityMiddleware.RequirePermission(db, "users", "delete", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "delete"),
 			identityMiddleware.AuditLog(db, auditSvc, "user.deactivated", "user"),
 			userCtrl.Deactivate,
 		)
 		users.POST("/:id/activate",
-			identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "update"),
 			identityMiddleware.AuditLog(db, auditSvc, "user.activated", "user"),
 			userCtrl.Activate,
 		)
 		users.DELETE("/:id/roles/:role_id",
-			identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "update"),
 			identityMiddleware.AuditLog(db, auditSvc, "role.removed", "user"),
 			roleCtrl.RemoveRoleFromUser,
 		)
+		users.GET("/:id/access",
+			identityMiddleware.RequirePermission(authz, "access", "read"),
+			accessCtrl.Explain,
+		)
+		users.GET("/:id/grants",
+			identityMiddleware.RequirePermission(authz, "access", "read"),
+			accessCtrl.ListGrants,
+		)
+		users.POST("/:id/grants",
+			identityMiddleware.RequirePermission(authz, "access", "manage"),
+			accessCtrl.Grant,
+		)
+		users.DELETE("/:id/grants/:permission_id",
+			identityMiddleware.RequirePermission(authz, "access", "manage"),
+			accessCtrl.RevokeGrant,
+		)
+		users.GET("/:id/blocks",
+			identityMiddleware.RequirePermission(authz, "access", "read"),
+			accessCtrl.ListBlocks,
+		)
+		users.POST("/:id/blocks",
+			identityMiddleware.RequirePermission(authz, "access", "manage"),
+			accessCtrl.Block,
+		)
+		users.DELETE("/:id/blocks/:permission_id",
+			identityMiddleware.RequirePermission(authz, "access", "manage"),
+			accessCtrl.Unblock,
+		)
 		users.POST("/:id/roles",
-			identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "users", "update"),
 			identityMiddleware.AuditLog(db, auditSvc, "role.assigned", "user"),
 			roleCtrl.AssignRolesToUser,
 		)
@@ -118,37 +147,53 @@ func RegisterRoutes(
 	roles.Use(tenantResolver, authMiddleware)
 	{
 		roles.POST("",
-			identityMiddleware.RequirePermission(db, "roles", "create", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "roles", "create"),
 			identityMiddleware.AuditLog(db, auditSvc, "role.created", "role"),
 			roleCtrl.Create,
 		)
 		roles.GET("",
-			identityMiddleware.RequirePermission(db, "roles", "read", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "roles", "read"),
 			roleCtrl.List,
 		)
 		roles.GET("/:id",
-			identityMiddleware.RequirePermission(db, "roles", "read", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "roles", "read"),
 			roleCtrl.GetByID,
 		)
 		roles.PATCH("/:id",
-			identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "roles", "update"),
 			identityMiddleware.AuditLog(db, auditSvc, "role.updated", "role"),
 			roleCtrl.Update,
 		)
 		roles.DELETE("/:id",
-			identityMiddleware.RequirePermission(db, "roles", "delete", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "roles", "delete"),
 			identityMiddleware.AuditLog(db, auditSvc, "role.deleted", "role"),
 			roleCtrl.Delete,
 		)
+		roles.POST("/:id/clone",
+			identityMiddleware.RequirePermission(authz, "roles", "create"),
+			identityMiddleware.AuditLog(db, auditSvc, "role.created", "role"),
+			roleCtrl.Clone,
+		)
 		roles.DELETE("/:id/permissions/:permission_id",
-			identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "roles", "update"),
 			identityMiddleware.AuditLog(db, auditSvc, "permission.removed", "role"),
 			roleCtrl.RemovePermission,
 		)
 		roles.POST("/:id/permissions",
-			identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "roles", "update"),
 			identityMiddleware.AuditLog(db, auditSvc, "permission.assigned", "role"),
 			roleCtrl.AssignPermissions,
+		)
+	}
+
+	// Access administration (tenant host + JWT + access:manage)
+	accessAdmin := router.Group("/access")
+	accessAdmin.Use(tenantResolver, authMiddleware)
+	{
+		accessAdmin.POST("/automatic-roles/sync",
+			identityMiddleware.RequirePermission(authz, "access", "manage"),
+			identityMiddleware.AuditLog(db, auditSvc, "access.automatic_roles_synced", "tenant"),
+			accessCtrl.SyncAutomaticRoles,
 		)
 	}
 
@@ -156,7 +201,7 @@ func RegisterRoutes(
 	audit := router.Group("/audit-logs")
 	audit.Use(tenantResolver, authMiddleware)
 	{
-		audit.GET("", identityMiddleware.RequirePermission(db, "audit", "read", userRoleRepo, rolePermRepo), auditCtrl.List)
+		audit.GET("", identityMiddleware.RequirePermission(authz, "audit", "read"), auditCtrl.List)
 	}
 
 	// Global Privileges Group (Requires JWT Auth)
@@ -164,7 +209,7 @@ func RegisterRoutes(
 	permissions.Use(authMiddleware)
 	{
 		permissions.GET("",
-			identityMiddleware.RequirePermission(db, "permissions", "read", userRoleRepo, rolePermRepo),
+			identityMiddleware.RequirePermission(authz, "permissions", "read"),
 			permCtrl.List,
 		)
 	}

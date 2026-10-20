@@ -35,6 +35,15 @@ type tenantService struct {
 	auditSvc     AuditService
 	userRepo     repositories.UserRepository
 	userRoleRepo repositories.UserRoleRepository
+	provision    RoleProvisioner
+}
+
+// RoleProvisioner creates a new tenant's predefined roles inside the tenant-creation transaction.
+type RoleProvisioner func(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) error
+
+// WithRoleProvisioner provisions predefined roles (docs/ARCHITECTURE.md §17) for every new tenant.
+func WithRoleProvisioner(p RoleProvisioner) TenantOption {
+	return func(s *tenantService) { s.provision = p }
 }
 
 // TenantOption customises a TenantService.
@@ -132,6 +141,12 @@ func (s *tenantService) CreateTenant(ctx context.Context, tx *gorm.DB, req dto.C
 	for i := range roles {
 		if err := s.roleRepo.Create(ctx, tx, &roles[i]); err != nil {
 			return nil, fmt.Errorf("failed to auto-create default system role %s: %w", roles[i].Name, err)
+		}
+	}
+
+	if s.provision != nil {
+		if err := s.provision(ctx, tx, tenant.ID); err != nil {
+			return nil, fmt.Errorf("failed to provision predefined roles: %w", err)
 		}
 	}
 

@@ -154,10 +154,12 @@ export const M0_ROLES: OpSpec[] = [
     [
       { name: "name", where: "body", required: true },
       { name: "description", where: "body" },
-      { name: "permission_ids", where: "body", type: "list", placeholder: "comma separated permission UUIDs" },
+      { name: "permission_ids", where: "body", type: "list", placeholder: "comma separated permission UUIDs (tenant scope)" },
+      { name: "grants", where: "body", type: "json", placeholder: '[{"permission_id":"<uuid>","scope":"direct_reports"}]', label: "grants (scoped)" },
+      { name: "parent_role_id", where: "body", placeholder: "optional: inherit everything this role grants" },
     ],
     [201],
-    { capture: [{ idKey: "roleId", from: "data.id" }], fetchAfter: "m0.role.get" },
+    { capture: [{ idKey: "roleId", from: "data.id" }], fetchAfter: "m0.role.get", note: "Scopes: own, direct_reports, all_reports, department, tenant. You cannot grant more than you hold." },
   ),
   t("m0.role.list", "List roles", "GET", "/roles", pg, [200]),
   t("m0.role.get", "Get role", "GET", "/roles/:id", [idf("id", "roleId")], [200]),
@@ -166,16 +168,24 @@ export const M0_ROLES: OpSpec[] = [
     "Update role",
     "PATCH",
     "/roles/:id",
-    [idf("id", "roleId"), { name: "name", where: "body" }, { name: "description", where: "body" }],
+    [idf("id", "roleId"), { name: "name", where: "body" }, { name: "description", where: "body" }, { name: "parent_role_id", where: "body", placeholder: "role UUID, or empty string to remove the parent" }],
     [200],
   ),
+  t("m0.role.clone", "Clone role", "POST", "/roles/:id/clone", [idf("id", "roleId"), { name: "name", where: "body", required: true }], [201], {
+    capture: [{ idKey: "roleId", from: "data.id" }],
+    note: "Copies grants, scopes and parent into a new custom role (predefined roles stay untouched).",
+  }),
   t("m0.role.delete", "Delete role", "DELETE", "/roles/:id", [idf("id", "roleId")], [200, 204]),
   t(
     "m0.role.assignPerms",
     "Assign permissions to role",
     "POST",
     "/roles/:id/permissions",
-    [idf("id", "roleId"), { name: "permission_ids", where: "body", type: "list", ref: "permissionId", required: true }],
+    [
+      idf("id", "roleId"),
+      { name: "permission_ids", where: "body", type: "list", ref: "permissionId" },
+      { name: "grants", where: "body", type: "json", placeholder: '[{"permission_id":"<uuid>","scope":"own"}]', label: "grants (scoped; re-granting changes the scope)" },
+    ],
     [200],
   ),
   t("m0.perm.list", "List permissions", "GET", "/permissions", pg, [200], {
@@ -184,7 +194,43 @@ export const M0_ROLES: OpSpec[] = [
   }),
 ];
 
-export const M0_OPS: OpSpec[] = [...M0_AUTH, ...M0_TENANTS, ...M0_USERS, ...M0_ROLES];
+export const M0_ACCESS: OpSpec[] = [
+  t("m0.access.me", "Explain my access", "GET", "/auth/me/access", [], [200], { note: "Every permission with its scope and where it comes from (role, inherited, automatic role, personal grant) and blocks." }),
+  t("m0.access.explain", "Explain a user's access", "GET", "/users/:id/access", [idf("id", "userId")], [200], { note: "Needs access:read." }),
+  t("m0.access.grants", "List user grants", "GET", "/users/:id/grants", [idf("id", "userId")], [200]),
+  t(
+    "m0.access.grant",
+    "Grant a permission to a user",
+    "POST",
+    "/users/:id/grants",
+    [
+      idf("id", "userId"),
+      { name: "permission_id", where: "body", ref: "permissionId", required: true },
+      { name: "scope", where: "body", type: "select", options: ["tenant", "department", "all_reports", "direct_reports", "own"] },
+      { name: "expires_at", where: "body", type: "datetime", placeholder: "optional, must be in the future" },
+      { name: "reason", where: "body" },
+    ],
+    [201],
+    { note: "Needs access:manage. Temporary cover / delegation: set expires_at." },
+  ),
+  t("m0.access.revoke", "Revoke a user grant", "DELETE", "/users/:id/grants/:permission_id", [idf("id", "userId"), idf("permission_id", "permissionId")], [200]),
+  t("m0.access.blocks", "List user blocks", "GET", "/users/:id/blocks", [idf("id", "userId")], [200]),
+  t(
+    "m0.access.block",
+    "Block a permission for a user",
+    "POST",
+    "/users/:id/blocks",
+    [idf("id", "userId"), { name: "permission_id", where: "body", ref: "permissionId", required: true }, { name: "reason", where: "body" }],
+    [201],
+    { note: "A block always wins over roles and grants. tenant_admin holders cannot be blocked (409)." },
+  ),
+  t("m0.access.unblock", "Remove a block", "DELETE", "/users/:id/blocks/:permission_id", [idf("id", "userId"), idf("permission_id", "permissionId")], [200]),
+  t("m0.access.sync", "Sync automatic roles now", "POST", "/access/automatic-roles/sync", [], [200], {
+    note: "Employee = has an active employee record; Manager = has active direct reports (HR mappings). Also runs at login and every 5 minutes.",
+  }),
+];
+
+export const M0_OPS: OpSpec[] = [...M0_AUTH, ...M0_TENANTS, ...M0_USERS, ...M0_ROLES, ...M0_ACCESS];
 
 // ============================ MODULE 1 ============================
 export const M1_DEPT: OpSpec[] = [
@@ -500,6 +546,9 @@ export const CHECKLIST: Record<0 | 1 | 2, ChecklistItem[]> = {
     { label: "Tenant isolation", keys: ["s0.isolation"] },
     { label: "Audit log", keys: ["s0.access"] },
     { label: "Error handling / auth negatives", keys: ["s0.errors"] },
+    { label: "Predefined roles, scopes, inheritance", keys: ["s0.scopes"] },
+    { label: "Personal grants and blocks", keys: ["s0.grants"] },
+    { label: "Automatic Employee / Manager roles", keys: ["s0.auto"] },
   ],
   1: [
     { label: "Departments (CRUD + hierarchy)", keys: ["s1.dept"] },

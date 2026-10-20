@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/employee/controllers"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"gorm.io/gorm"
 )
@@ -13,8 +12,7 @@ import (
 func RegisterRoutes(
 	router *gin.RouterGroup,
 	db *gorm.DB,
-	userRoleRepo identityRepos.UserRoleRepository,
-	rolePermRepo identityRepos.RolePermissionRepository,
+	authz identityMiddleware.Authorizer,
 	tenantResolver gin.HandlerFunc,
 	authMiddleware gin.HandlerFunc,
 	empCtrl *controllers.EmployeeController,
@@ -28,13 +26,13 @@ func RegisterRoutes(
 		return identityMiddleware.AuditLog(dbForAudit, auditSvc, action, resource)
 	}
 
-	read := identityMiddleware.RequirePermission(db, "employee", "read", userRoleRepo, rolePermRepo)
-	create := identityMiddleware.RequirePermission(db, "employee", "create", userRoleRepo, rolePermRepo)
-	update := identityMiddleware.RequirePermission(db, "employee", "update", userRoleRepo, rolePermRepo)
-	updateSensitive := identityMiddleware.RequirePermission(db, "employee", "update_sensitive", userRoleRepo, rolePermRepo)
-	admin := identityMiddleware.RequirePermission(db, "employee", "admin", userRoleRepo, rolePermRepo)
+	read := identityMiddleware.RequirePermission(authz, "employee", "read")
+	create := identityMiddleware.RequirePermission(authz, "employee", "create")
+	update := identityMiddleware.RequirePermission(authz, "employee", "update")
+	updateSensitive := identityMiddleware.RequirePermission(authz, "employee", "update_sensitive")
+	admin := identityMiddleware.RequirePermission(authz, "employee", "admin")
 	// Resolves employee:read_sensitive without blocking; the statutory handler only unmasks PII when it is true.
-	sensitiveFlag := identityMiddleware.PermissionFlag(db, "employee", "read_sensitive", "has_sensitive_perm", userRoleRepo, rolePermRepo)
+	sensitiveFlag := identityMiddleware.PermissionFlag(authz, "employee", "read_sensitive", "has_sensitive_perm")
 	// Unmasked reads of PII are security-relevant and always audited.
 	auditUnmasked := func(c *gin.Context) {
 		if c.Query("unmasked") == "true" {

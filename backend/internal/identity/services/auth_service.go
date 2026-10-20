@@ -191,6 +191,7 @@ func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginReque
 		AccessToken:  jwtToken,
 		RefreshToken: rawRefreshToken,
 		ExpiresAt:    expiresAt,
+		TenantID:     tenant.ID.String(),
 		User: dto.UserLoginSummary{
 			ID:        user.ID.String(),
 			Email:     user.Email,

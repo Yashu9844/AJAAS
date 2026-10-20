@@ -16,6 +16,8 @@ events, idempotent commands) needs the changes below. Items marked **gate** chan
 
 ## 3. B0 — access model (owner-approved 2026-10-20, `docs/ARCHITECTURE.md` §17)
 
+**Status 2026-10-20: built.** Unit tests green (access 100%, services 94.1%, middleware 91%); integration suite green incl. 6 new TestAccess* goldens; migration 000057 up/down/up clean and AutoMigrate-parity identical; swagger updated; console Access tab added (tsc/eslint/next build clean). Open: console scenarios not yet run live in the browser; automatic-role sweep runs every 5 min plus at login and on demand (not 60 s).
+
 Today: flat roles holding permissions; `tenant_admin` bypass; no scopes, no inheritance, no per-user exceptions, no
 predefined roles. Target design:
 

@@ -2,13 +2,10 @@
 package payroll
 
 import (
-	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityModels "github.com/jaas/jaas/internal/identity/models"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
 	"github.com/jaas/jaas/internal/payroll/controllers"
 	"github.com/jaas/jaas/internal/payroll/models"
 	"github.com/jaas/jaas/internal/payroll/repositories"
@@ -16,7 +13,6 @@ import (
 	"github.com/jaas/jaas/internal/payroll/services"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // Module is the Module 5 DI container.
@@ -58,35 +54,18 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.Payslip{}, &models.PayslipLine{}, &models.OutboxEvent{}}
 }
 
-// SeedPermissions idempotently inserts payroll:read|manage|approve (connections C7).
-func (m *Module) SeedPermissions(ctx context.Context) error {
-	for action, desc := range map[string]string{
-		routes.ActionRead:    "View salary structures, assignments, payroll runs and payslips",
-		routes.ActionManage:  "Manage salary structures and assignments; create and calculate payroll runs",
-		routes.ActionApprove: "Approve and finalize payroll runs",
-	} {
-		d := desc
-		err := m.db.WithContext(ctx).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "resource"}, {Name: "action"}}, DoNothing: true}).
-			Create(&identityModels.Permission{Resource: "payroll", Action: action, Description: &d}).Error
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // RouteDeps is the Module 0 infrastructure the routes need.
 type RouteDeps struct {
 	TenantResolver, Authenticate gin.HandlerFunc
-	UserRoles                    identityRepos.UserRoleRepository
-	RolePerms                    identityRepos.RolePermissionRepository
+	Authz                        identityMiddleware.Authorizer
 }
 
 // RegisterRoutes mounts Module 5 under rg.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 	routes.RegisterRoutes(rg, routes.Middleware{TenantResolver: d.TenantResolver, Authenticate: d.Authenticate,
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(m.db, "payroll", action, d.UserRoles, d.RolePerms)
+			return identityMiddleware.RequirePermission(d.Authz, "payroll", action)
 		}}, m.controllers)
 }
 

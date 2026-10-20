@@ -2,13 +2,10 @@
 package leave
 
 import (
-	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
-	identityModels "github.com/jaas/jaas/internal/identity/models"
-	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
 	"github.com/jaas/jaas/internal/leave/controllers"
 	"github.com/jaas/jaas/internal/leave/models"
 	"github.com/jaas/jaas/internal/leave/repositories"
@@ -16,7 +13,6 @@ import (
 	"github.com/jaas/jaas/internal/leave/services"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // Module is the Module 4 DI container.
@@ -65,29 +61,11 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.LedgerEntry{}, &models.OutboxEvent{}}
 }
 
-// SeedPermissions idempotently inserts leave:read|manage|approve (connections C7).
-func (m *Module) SeedPermissions(ctx context.Context) error {
-	for action, desc := range map[string]string{
-		routes.ActionRead:    "View leave requests, balances and ledgers of other employees",
-		routes.ActionManage:  "Manage leave types, holidays and balance adjustments",
-		routes.ActionApprove: "Approve or reject leave requests",
-	} {
-		d := desc
-		err := m.db.WithContext(ctx).Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "resource"}, {Name: "action"}}, DoNothing: true,
-		}).Create(&identityModels.Permission{Resource: "leave", Action: action, Description: &d}).Error
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // RouteDeps is the Module 0 infrastructure the routes need (connections C4).
 type RouteDeps struct {
 	TenantResolver, Authenticate gin.HandlerFunc
-	UserRoles                    identityRepos.UserRoleRepository
-	RolePerms                    identityRepos.RolePermissionRepository
+	Authz                        identityMiddleware.Authorizer
 }
 
 // RegisterRoutes mounts Module 4 under rg using Module 0 tenant/auth/RBAC middleware.
@@ -96,7 +74,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 		TenantResolver: d.TenantResolver,
 		Authenticate:   d.Authenticate,
 		Require: func(action string) gin.HandlerFunc {
-			return identityMiddleware.RequirePermission(m.db, "leave", action, d.UserRoles, d.RolePerms)
+			return identityMiddleware.RequirePermission(d.Authz, "leave", action)
 		},
 	}, m.controllers)
 }

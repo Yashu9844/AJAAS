@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"context"
+
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"net/http"
 
@@ -15,6 +17,12 @@ import (
 type AuthController struct {
 	db      *gorm.DB
 	authSvc services.AuthService
+	onLogin func(ctx context.Context, tenantID, userID uuid.UUID)
+}
+
+// OnLogin registers a best-effort hook run after every successful login (e.g. automatic-role sync).
+func (ctrl *AuthController) OnLogin(hook func(ctx context.Context, tenantID, userID uuid.UUID)) {
+	ctrl.onLogin = hook
 }
 
 // NewAuthController creates an AuthController instance.
@@ -46,8 +54,16 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-
+	ctrl.afterLogin(c.Request.Context(), res)
 	respondSuccess(c, http.StatusOK, res, nil)
+}
+
+func (ctrl *AuthController) afterLogin(ctx context.Context, res *dto.LoginResponse) {
+	tenantID, err1 := uuid.Parse(res.TenantID)
+	userID, err2 := uuid.Parse(res.User.ID)
+	if ctrl.onLogin != nil && err1 == nil && err2 == nil {
+		ctrl.onLogin(ctx, tenantID, userID)
+	}
 }
 
 func (ctrl *AuthController) Logout(c *gin.Context) {

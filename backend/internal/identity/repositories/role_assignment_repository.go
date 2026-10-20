@@ -15,8 +15,15 @@ func NewUserRoleRepository() UserRoleRepository {
 	return &userRoleRepository{}
 }
 
+// Create assigns a role; the source defaults to manual.
 func (r *userRoleRepository) Create(ctx context.Context, tx *gorm.DB, ur *models.UserRole) error {
-	return tx.WithContext(ctx).Create(ur).Error
+	if ur.Source == "" {
+		ur.Source = "manual"
+	}
+	if err := tx.WithContext(ctx).Create(ur).Error; err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, ur.TenantID)
 }
 
 func (r *userRoleRepository) FindByUserID(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserRole, error) {
@@ -50,15 +57,23 @@ func (r *userRoleRepository) CountByRoleID(ctx context.Context, db *gorm.DB, ten
 }
 
 func (r *userRoleRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error {
-	return tx.WithContext(ctx).
+	err := tx.WithContext(ctx).
 		Delete(&models.UserRole{}, "tenant_id = ? AND user_id = ? AND role_id = ?", tenantID, userID, roleID).
 		Error
+	if err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, tenantID)
 }
 
 func (r *userRoleRepository) DeleteByUserID(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error {
-	return tx.WithContext(ctx).
+	err := tx.WithContext(ctx).
 		Delete(&models.UserRole{}, "tenant_id = ? AND user_id = ?", tenantID, userID).
 		Error
+	if err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, tenantID)
 }
 
 type rolePermissionRepository struct{}
@@ -69,7 +84,13 @@ func NewRolePermissionRepository() RolePermissionRepository {
 }
 
 func (r *rolePermissionRepository) Create(ctx context.Context, tx *gorm.DB, rp *models.RolePermission) error {
-	return tx.WithContext(ctx).Create(rp).Error
+	if rp.Scope == "" {
+		rp.Scope = "tenant"
+	}
+	if err := tx.WithContext(ctx).Create(rp).Error; err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, rp.TenantID)
 }
 
 func (r *rolePermissionRepository) FindByRoleID(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) ([]models.RolePermission, error) {
@@ -97,13 +118,21 @@ func (r *rolePermissionRepository) FindByRoleIDs(ctx context.Context, db *gorm.D
 }
 
 func (r *rolePermissionRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error {
-	return tx.WithContext(ctx).
+	err := tx.WithContext(ctx).
 		Delete(&models.RolePermission{}, "tenant_id = ? AND role_id = ? AND permission_id = ?", tenantID, roleID, permissionID).
 		Error
+	if err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, tenantID)
 }
 
 func (r *rolePermissionRepository) DeleteByRoleID(ctx context.Context, tx *gorm.DB, tenantID, roleID uuid.UUID) error {
-	return tx.WithContext(ctx).
+	err := tx.WithContext(ctx).
 		Delete(&models.RolePermission{}, "tenant_id = ? AND role_id = ?", tenantID, roleID).
 		Error
+	if err != nil {
+		return err
+	}
+	return bumpAccessVersion(ctx, tx, tenantID)
 }

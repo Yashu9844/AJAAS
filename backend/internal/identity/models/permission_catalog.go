@@ -1,31 +1,42 @@
 package models
 
-// PermissionSeed is one row of the global permission catalogue.
-type PermissionSeed struct {
-	Resource    string
-	Action      string
-	Description string
+import "github.com/jaas/jaas/internal/identity/access"
+
+const identityModule = "identity"
+
+func tenantWide(templates ...string) map[string]access.Scope {
+	out := make(map[string]access.Scope, len(templates))
+	for _, t := range templates {
+		out[t] = access.ScopeTenant
+	}
+	return out
 }
 
-// DefaultPermissions is the catalogue enforced by the routes of Modules 0-2. It is seeded idempotently at startup
-// (the permissions table is global and has no create API).
-var DefaultPermissions = []PermissionSeed{
-	{"users", "create", "Create users"},
-	{"users", "read", "View users"},
-	{"users", "update", "Update users, assign/remove roles, activate"},
-	{"users", "delete", "Deactivate users"},
-	{"roles", "create", "Create roles"},
-	{"roles", "read", "View roles"},
-	{"roles", "update", "Update roles and their permissions"},
-	{"roles", "delete", "Delete roles"},
-	{"permissions", "read", "View the permission catalogue"},
-	{"audit", "read", "View the audit trail"},
-	{"organization", "read", "View departments, teams, designations, mappings, org chart"},
-	{"organization", "update", "Manage departments, teams, designations, mappings"},
-	{"employee", "read", "View employee directory and profiles (masked PII)"},
-	{"employee", "create", "Create employee profiles"},
-	{"employee", "update", "Update employee profiles, status and documents"},
-	{"employee", "read_sensitive", "View unmasked statutory / bank details"},
-	{"employee", "update_sensitive", "Edit statutory / bank details"},
-	{"employee", "admin", "Verify employee documents and administer employees"},
+// IdentityCatalogue is M0's own permission catalogue with the scopes predefined roles receive by default
+// (docs/ARCHITECTURE.md §17). Other services register theirs through identity.Module.RegisterCatalogue.
+var IdentityCatalogue = []access.PermissionDef{
+	{Module: identityModule, Resource: "users", Action: "create", Description: "Create users",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRAdmin)},
+	{Module: identityModule, Resource: "users", Action: "read", Description: "View users",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRManager, access.TemplateAuditor)},
+	{Module: identityModule, Resource: "users", Action: "update", Description: "Update users, assign/remove roles, activate",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRAdmin)},
+	{Module: identityModule, Resource: "users", Action: "delete", Description: "Deactivate users",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRAdmin)},
+	{Module: identityModule, Resource: "roles", Action: "create", Description: "Create roles",
+		Defaults: tenantWide(access.TemplateITAdmin)},
+	{Module: identityModule, Resource: "roles", Action: "read", Description: "View roles",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRAdmin, access.TemplateAuditor)},
+	{Module: identityModule, Resource: "roles", Action: "update", Description: "Update roles, their grants and inheritance",
+		Defaults: tenantWide(access.TemplateITAdmin)},
+	{Module: identityModule, Resource: "roles", Action: "delete", Description: "Delete roles",
+		Defaults: tenantWide(access.TemplateITAdmin)},
+	{Module: identityModule, Resource: "permissions", Action: "read", Description: "View the permission catalogue",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRAdmin, access.TemplateAuditor)},
+	{Module: identityModule, Resource: "audit", Action: "read", Description: "View the audit trail",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateAuditor, access.TemplateExecutive)},
+	{Module: identityModule, Resource: "access", Action: "read", Description: "View any user's effective access and its sources",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRAdmin, access.TemplateAuditor)},
+	{Module: identityModule, Resource: "access", Action: "manage", Description: "Grant, block and revoke individual user permissions; sync automatic roles",
+		Defaults: tenantWide(access.TemplateITAdmin, access.TemplateHRAdmin)},
 }
