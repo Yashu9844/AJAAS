@@ -38,12 +38,16 @@ func WithRolePermissions(rp repositories.RolePermissionRepository) UserOption {
 	}
 }
 
+// WithUserEvents records user events through sink (the transactional outbox in production).
+func WithUserEvents(sink EventSink) UserOption { return func(s *userService) { s.sink = sink } }
+
 // WithAccessResolver enables the scoped, inheritance-aware no-privilege-escalation check (docs/ARCHITECTURE.md §17).
 func WithAccessResolver(r AccessResolver) UserOption {
 	return func(s *userService) { s.resolver = r }
 }
 
 type userService struct {
+	sink         EventSink
 	resolver     AccessResolver // nil: only tenant_admin and system callers may assign roles
 	userRepo     repositories.UserRepository
 	roleRepo     repositories.RoleRepository
@@ -104,6 +108,7 @@ func NewUserService(
 		publisher:    publisher,
 		auditSvc:     auditSvc,
 	}
+	s.sink = publisherSink{pub: publisher}
 	for _, o := range opts {
 		o(s)
 	}
@@ -205,15 +210,14 @@ func (s *userService) CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 	eventPayload := events.UserCreatedPayload{
 		UserID:    user.ID,
 		TenantID:  tenantID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
 		Status:    user.Status,
 		RoleIDs:   assignedRoleIDs,
 		CreatedAt: user.CreatedAt,
 	}
 	evt := events.NewEvent(events.TypeUserCreated, events.RoutingKeyUserCreated, tenantID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyUserCreated, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return nil, err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenantID.String(), "", "user.created", "user", user.ID.String(), eventPayload, "", "")
 
@@ -291,13 +295,12 @@ func (s *userService) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 	eventPayload := events.UserInvitedPayload{
 		UserID:    user.ID,
 		TenantID:  tenantID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
 		InvitedAt: time.Now(),
 	}
 	evt := events.NewEvent(events.TypeUserInvited, events.RoutingKeyUserInvited, tenantID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyUserInvited, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return nil, err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenantID.String(), "", "user.invited", "user", user.ID.String(), eventPayload, "", "")
 
@@ -485,7 +488,9 @@ func (s *userService) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID,
 		DeactivatedAt: time.Now(),
 	}
 	evt := events.NewEvent(events.TypeUserDeactivated, events.RoutingKeyUserDeactivated, tenantID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyUserDeactivated, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenantID.String(), "", "user.deactivated", "user", id.String(), eventPayload, "", "")
 

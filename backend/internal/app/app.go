@@ -106,6 +106,7 @@ func Build(o Options) (*gin.Engine, error) {
 		return nil, err
 	}
 	wireAutomaticRoles(o, identityModule, employeeModule, orgModule)
+	startIdentityBackground(o, identityModule)
 
 	if cfg.Server.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -121,6 +122,7 @@ func Build(o Options) (*gin.Engine, error) {
 	router.Use(sharedMiddleware.CORS(o.CORSOrigins))
 
 	v1 := router.Group("/api/v1")
+	registerDevMailbox(v1, o, identityModule)
 	identityModule.RegisterRoutes(v1)
 	orgModule.RegisterRoutes(v1, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
 	employeeModule.RegisterRoutes(v1, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())

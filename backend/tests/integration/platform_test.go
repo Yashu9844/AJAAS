@@ -33,3 +33,28 @@ func TestCorrelationIDReachesAuditTrail(t *testing.T) {
 		t.Fatalf("invalid ids are replaced: %q", bad.Header.Get("X-Correlation-ID"))
 	}
 }
+
+func TestIdentityEventsGoThroughTheOutbox(t *testing.T) {
+	tc := newTenant(t)
+	if n := sqlStr(t, "SELECT count(*) FROM identity_events_outbox WHERE tenant_id = ? AND routing_key = 'identity.tenant.created'", tc.id); n != "1" {
+		t.Fatalf("tenant.created stored in the outbox: %s", n)
+	}
+	if v := sqlStr(t, "SELECT payload->>'event_version' FROM identity_events_outbox WHERE tenant_id = ? LIMIT 1", tc.id); v != "1" {
+		t.Fatalf("versioned envelope: %s", v)
+	}
+	// password reset: the token reaches the user through the secret channel, never the event
+	expect(t, call(t, "POST", "/auth/forgot-password", body(map[string]string{"tenant_slug": tc.slug, "email": tc.adminEmail})), 200, "forgot")
+	if n := sqlStr(t, "SELECT count(*) FROM identity_events_outbox WHERE tenant_id = ? AND payload::text LIKE '%reset_token%'", tc.id); n != "0" {
+		t.Fatal("reset token must not be stored in events")
+	}
+	box := call(t, "GET", "/dev/mailbox", platform(), query("tenant_id", tc.id, "email", tc.adminEmail))
+	expect(t, box, 200, "dev mailbox")
+	tok := box.str("data.0.token")
+	if tok == "" || box.str("data.0.kind") != "password_reset" {
+		t.Fatalf("reset secret delivered: %s", box.Raw)
+	}
+	newPw := "N3w-Passw0rd!"
+	expect(t, call(t, "POST", "/auth/reset-password", body(map[string]string{"token": tok, "new_password": newPw, "confirm_password": newPw})), 200, "reset")
+	login(t, tc.slug, tc.adminEmail, newPw)
+	expectErr(t, call(t, "GET", "/dev/mailbox", query("tenant_id", tc.id, "email", tc.adminEmail)), 401, "", "mailbox needs the platform key")
+}

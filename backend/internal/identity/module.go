@@ -14,6 +14,7 @@ import (
 	"github.com/jaas/jaas/internal/identity/services"
 	sharedCache "github.com/jaas/jaas/internal/shared/cache"
 	sharedConfig "github.com/jaas/jaas/internal/shared/config"
+	"github.com/jaas/jaas/internal/shared/outbox"
 	sharedQueue "github.com/jaas/jaas/internal/shared/queue"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
@@ -54,6 +55,9 @@ type Module struct {
 	resolver   services.AccessResolver
 	catalogue  services.Catalogue
 	accessSvc  services.AccessService
+	eventSink  services.EventSink
+	relay      *outbox.Relay
+	mailbox    *services.DevMailbox
 	automatic  services.AutomaticRoles
 
 	// Controllers
@@ -108,6 +112,9 @@ func NewModule(
 	}
 
 	m.auditSvc = services.NewAuditService(m.auditRepo, logger)
+	eventStore := outbox.NewStore(outboxTable)
+	m.eventSink = services.NewOutboxSink(eventStore)
+	m.relay = &outbox.Relay{DB: db, Store: eventStore, Publisher: publisher}
 	m.tokenSvc = services.NewTokenService(jwtConfig)
 	m.sessionSvc = services.NewSessionService(m.sessionRepo, redisClient, time.Duration(accessTokenTTL)*time.Minute)
 
@@ -118,15 +125,16 @@ func NewModule(
 	m.resolver = services.NewAccessResolver(resolverDeps)
 	m.catalogue = services.NewCatalogue(services.CatalogueDeps{DB: db, Roles: m.roleRepo, RolePerms: m.rolePermRepo, Access: m.accessRepo})
 	m.tenantSvc = services.NewTenantService(m.tenantRepo, m.roleRepo, publisher, m.auditSvc,
-		services.WithAdminProvisioning(m.userRepo, m.userRoleRepo), services.WithRoleProvisioner(m.catalogue.ProvisionTenant))
+		services.WithAdminProvisioning(m.userRepo, m.userRoleRepo), services.WithRoleProvisioner(m.catalogue.ProvisionTenant),
+		services.WithTenantEvents(m.eventSink))
 	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc,
-		services.WithAccessModel(m.accessRepo, m.resolver))
+		services.WithAccessModel(m.accessRepo, m.resolver), services.WithRoleEvents(m.eventSink))
 	m.permSvc = services.NewPermissionService(m.permRepo)
 	m.accessSvc = services.NewAccessService(services.AccessServiceDeps{Users: m.userRepo, Perms: m.permRepo, UserRoles: m.userRoleRepo,
 		Access: m.accessRepo, Resolver: m.resolver, Audit: m.auditSvc})
 	m.automatic = services.NewAutomaticRoles(services.AutomaticRolesDeps{DB: db, Access: m.accessRepo, UserRoles: m.userRoleRepo,
 		Catalogue: m.catalogue, Logger: logger})
-	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc, services.WithAccessResolver(m.resolver))
+	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc, services.WithAccessResolver(m.resolver), services.WithUserEvents(m.eventSink))
 	m.authSvc = services.NewAuthService(
 		m.tenantRepo,
 		m.userRepo,
@@ -138,6 +146,8 @@ func NewModule(
 		m.sessionSvc,
 		m.publisher,
 		m.auditSvc,
+		services.WithAuthEvents(m.eventSink),
+		services.WithSecretDelivery(secretRouter{m: m}),
 	)
 
 	// 3. Initialize Controllers
@@ -168,6 +178,29 @@ func (m *Module) RegisterCatalogue(ctx context.Context, defs []access.Permission
 
 // SyncRoleTemplates provisions predefined roles in every tenant; call it once all catalogues are registered.
 func (m *Module) SyncRoleTemplates(ctx context.Context) error { return m.catalogue.SyncAllTenants(ctx) }
+
+// outboxTable is M0's transactional outbox (migration 000059).
+const outboxTable = "identity_events_outbox"
+
+// RunEventRelay publishes committed identity events until ctx is cancelled.
+func (m *Module) RunEventRelay(ctx context.Context) { m.relay.Run(ctx) }
+
+// EnableDevMailbox keeps one-time secrets (reset and invitation tokens) in memory for development tooling. Never call
+// it outside development.
+func (m *Module) EnableDevMailbox() *services.DevMailbox {
+	m.mailbox = services.NewDevMailbox()
+	return m.mailbox
+}
+
+// secretRouter delivers secrets to the dev mailbox when enabled; production delivery arrives with M10 Notifications.
+type secretRouter struct{ m *Module }
+
+func (r secretRouter) Deliver(ctx context.Context, msg services.SecretMessage) error {
+	if r.m.mailbox != nil {
+		return r.m.mailbox.Deliver(ctx, msg)
+	}
+	return nil
+}
 
 // SetAutomaticRoleSource installs the HR-backed source of the automatic employee/manager roles.
 func (m *Module) SetAutomaticRoleSource(src services.AutomaticRoleSource) { m.automatic.SetSource(src) }

@@ -81,7 +81,9 @@ func (s *roleService) AssignRolesToUser(ctx context.Context, tx *gorm.DB, tenant
 	if len(assigned) > 0 {
 		payload := events.RoleAssignedPayload{UserID: userID, TenantID: tenantID, RoleIDs: assigned, AssignedAt: time.Now()}
 		evt := events.NewEvent(events.TypeRoleAssigned, events.RoutingKeyRoleAssigned, tenantID, correlationID, payload)
-		_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyRoleAssigned, evt)
+		if err := s.sink.Emit(ctx, tx, evt); err != nil {
+			return err
+		}
 		_ = s.auditSvc.Log(ctx, tx, tenantID.String(), "", "role.assigned", "user", userID.String(), payload, "", "")
 	}
 	return nil

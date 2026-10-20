@@ -26,6 +26,8 @@ type AuthService interface {
 }
 
 type authService struct {
+	secrets      SecretDelivery
+	sink         EventSink
 	tenantRepo   repositories.TenantRepository
 	userRepo     repositories.UserRepository
 	userRoleRepo repositories.UserRoleRepository
@@ -50,8 +52,9 @@ func NewAuthService(
 	sessionSvc SessionService,
 	publisher queue.EventPublisher,
 	auditSvc AuditService,
+	opts ...AuthOption,
 ) AuthService {
-	return &authService{
+	s := &authService{
 		tenantRepo:   tenantRepo,
 		userRepo:     userRepo,
 		userRoleRepo: userRoleRepo,
@@ -63,6 +66,11 @@ func NewAuthService(
 		publisher:    publisher,
 		auditSvc:     auditSvc,
 	}
+	s.sink = publisherSink{pub: publisher}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginRequest, ipAddress, userAgent string, correlationID uuid.UUID) (*dto.LoginResponse, error) {
@@ -176,14 +184,13 @@ func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginReque
 	eventPayload := events.UserCreatedPayload{ // mapping event user login
 		UserID:    user.ID,
 		TenantID:  tenant.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
 		Status:    user.Status,
 		CreatedAt: now,
 	}
 	evt := events.NewEvent("UserLoggedIn", "identity.user.login_success", tenant.ID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", "identity.user.login_success", evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return nil, err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenant.ID.String(), user.ID.String(), "login.success", "user", user.ID.String(), map[string]string{"session_id": session.ID.String()}, ipAddress, userAgent)
 
@@ -221,7 +228,9 @@ func (s *authService) Logout(ctx context.Context, tx *gorm.DB, tenantID, userID,
 		RevokedAt: time.Now(),
 	}
 	evt := events.NewEvent(events.TypeSessionRevoked, events.RoutingKeySessionRevoked, tenantID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeySessionRevoked, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenantID.String(), userID.String(), "logout", "user", userID.String(), map[string]string{"session_id": sessionID.String()}, "", "")
 
@@ -380,16 +389,23 @@ func (s *authService) ForgotPassword(ctx context.Context, tx *gorm.DB, req dto.F
 	if err := s.resetRepo.Create(ctx, tx, prt); err != nil {
 		return err
 	}
+	if s.secrets != nil {
+		_ = s.secrets.Deliver(ctx, SecretMessage{Kind: SecretPasswordReset, TenantID: tenant.ID, UserID: user.ID, Email: user.Email,
+			Token: rawToken, ExpiresAt: prt.ExpiresAt})
+	}
 
-	// Publish Event mapping payload containing raw reset token
+	// The event never carries the raw token (it is stored in the outbox and broker); the secret reaches the user only
+	// through the secret-delivery port.
 	eventPayload := map[string]interface{}{
-		"user_id":     user.ID.String(),
-		"tenant_id":   tenant.ID.String(),
-		"email":       user.Email,
-		"reset_token": rawToken,
+		"user_id":          user.ID.String(),
+		"tenant_id":        tenant.ID.String(),
+		"reset_request_id": prt.ID.String(),
+		"expires_at":       prt.ExpiresAt,
 	}
 	evt := events.NewEvent("PasswordResetRequested", "identity.password.reset_requested", tenant.ID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", "identity.password.reset_requested", evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenant.ID.String(), user.ID.String(), "password.reset_requested", "user", user.ID.String(), nil, "", "")
 
@@ -467,7 +483,9 @@ func (s *authService) ResetPassword(ctx context.Context, tx *gorm.DB, req dto.Re
 		ResetAt:  time.Now(),
 	}
 	evt := events.NewEvent(events.TypePasswordReset, events.RoutingKeyPasswordReset, prt.TenantID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyPasswordReset, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, prt.TenantID.String(), user.ID.String(), "password.reset_completed", "user", user.ID.String(), nil, "", "")
 
@@ -486,3 +504,12 @@ func dummyPasswordHash() []byte {
 	})
 	return dummyHash
 }
+
+// AuthOption customises an AuthService.
+type AuthOption func(*authService)
+
+// WithAuthEvents records auth events through sink (the transactional outbox in production).
+func WithAuthEvents(sink EventSink) AuthOption { return func(s *authService) { s.sink = sink } }
+
+// WithSecretDelivery sends one-time secrets (password-reset links) to users; without it nothing is sent.
+func WithSecretDelivery(d SecretDelivery) AuthOption { return func(s *authService) { s.secrets = d } }

@@ -32,6 +32,7 @@ type RoleService interface {
 }
 
 type roleService struct {
+	sink         EventSink
 	roleRepo     repositories.RoleRepository
 	permRepo     repositories.PermissionRepository
 	userRoleRepo repositories.UserRoleRepository
@@ -45,6 +46,9 @@ type roleService struct {
 
 // RoleOption customises a RoleService.
 type RoleOption func(*roleService)
+
+// WithRoleEvents records role events through sink (the transactional outbox in production).
+func WithRoleEvents(sink EventSink) RoleOption { return func(s *roleService) { s.sink = sink } }
 
 // WithAccessModel enables inheritance, scope changes and full access resolution for escalation checks.
 func WithAccessModel(repo repositories.AccessRepository, resolver AccessResolver) RoleOption {
@@ -66,6 +70,7 @@ func NewRoleService(
 		roleRepo: roleRepo, permRepo: permRepo, userRoleRepo: userRoleRepo, rolePermRepo: rolePermRepo,
 		userRepo: userRepo, publisher: publisher, auditSvc: auditSvc,
 	}
+	s.sink = publisherSink{pub: publisher}
 	for _, o := range opts {
 		o(s)
 	}
@@ -265,7 +270,9 @@ func (s *roleService) AssignPermissions(ctx context.Context, tx *gorm.DB, tenant
 	}
 	payload := events.PermissionAssignedPayload{RoleID: roleID, TenantID: tenantID, PermissionIDs: changed, AssignedAt: time.Now()}
 	evt := events.NewEvent(events.TypePermissionAssigned, events.RoutingKeyPermissionAssigned, tenantID, correlationID, payload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyPermissionAssigned, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return err
+	}
 	_ = s.auditSvc.Log(ctx, tx, tenantID.String(), "", "permission.assigned", "role", roleID.String(), payload, "", "")
 	return nil
 }

@@ -6,6 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// Exchange is the topic exchange identity events are published to.
+const Exchange = "jaas.identity.events"
+
+// EventVersion is the schema version of the envelope (docs/ARCHITECTURE.md §3.7).
+const EventVersion = 1
+
 // Event type string constants.
 const (
 	TypeTenantCreated      = "TenantCreated"
@@ -43,7 +49,9 @@ type Event struct {
 	EventID       uuid.UUID   `json:"event_id"`
 	EventType     string      `json:"event_type"`
 	RoutingKey    string      `json:"routing_key"`
-	Version       string      `json:"version"`
+	Version       string      `json:"version"`       // legacy string version, kept for existing consumers
+	EventVersion  int         `json:"event_version"` // envelope schema version
+	CausationID   *uuid.UUID  `json:"causation_id,omitempty"`
 	OccurredAt    time.Time   `json:"occurred_at"`
 	Producer      string      `json:"producer"`
 	TenantID      uuid.UUID   `json:"tenant_id"`
@@ -58,6 +66,7 @@ func NewEvent(eventType string, routingKey string, tenantID uuid.UUID, correlati
 		EventType:     eventType,
 		RoutingKey:    routingKey,
 		Version:       "1.0",
+		EventVersion:  EventVersion,
 		OccurredAt:    time.Now(),
 		Producer:      "identity-service",
 		TenantID:      tenantID,
@@ -93,9 +102,6 @@ type TenantSuspendedPayload struct {
 type UserCreatedPayload struct {
 	UserID    uuid.UUID   `json:"user_id"`
 	TenantID  uuid.UUID   `json:"tenant_id"`
-	Email     string      `json:"email"`
-	FirstName string      `json:"first_name"`
-	LastName  string      `json:"last_name"`
 	Status    string      `json:"status"`
 	RoleIDs   []uuid.UUID `json:"role_ids"`
 	CreatedBy uuid.UUID   `json:"created_by"`
@@ -105,9 +111,6 @@ type UserCreatedPayload struct {
 type UserInvitedPayload struct {
 	UserID    uuid.UUID `json:"user_id"`
 	TenantID  uuid.UUID `json:"tenant_id"`
-	Email     string    `json:"email"`
-	FirstName string    `json:"first_name"`
-	LastName  string    `json:"last_name"`
 	InvitedBy uuid.UUID `json:"invited_by"`
 	InvitedAt time.Time `json:"invited_at"`
 }

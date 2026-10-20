@@ -29,6 +29,7 @@ type TenantService interface {
 }
 
 type tenantService struct {
+	sink         EventSink
 	tenantRepo   repositories.TenantRepository
 	roleRepo     repositories.RoleRepository
 	publisher    queue.EventPublisher
@@ -40,6 +41,9 @@ type tenantService struct {
 
 // RoleProvisioner creates a new tenant's predefined roles inside the tenant-creation transaction.
 type RoleProvisioner func(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) error
+
+// WithTenantEvents records tenant events through sink (the transactional outbox in production).
+func WithTenantEvents(sink EventSink) TenantOption { return func(s *tenantService) { s.sink = sink } }
 
 // WithRoleProvisioner provisions predefined roles (docs/ARCHITECTURE.md §17) for every new tenant.
 func WithRoleProvisioner(p RoleProvisioner) TenantOption {
@@ -71,6 +75,7 @@ func NewTenantService(
 		publisher:  publisher,
 		auditSvc:   auditSvc,
 	}
+	s.sink = publisherSink{pub: publisher}
 	for _, o := range opts {
 		o(s)
 	}
@@ -187,7 +192,9 @@ func (s *tenantService) CreateTenant(ctx context.Context, tx *gorm.DB, req dto.C
 		CreatedAt: tenant.CreatedAt,
 	}
 	evt := events.NewEvent(events.TypeTenantCreated, events.RoutingKeyTenantCreated, tenant.ID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyTenantCreated, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return nil, err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenant.ID.String(), "", "tenant.created", "tenant", tenant.ID.String(), eventPayload, "", "")
 
@@ -298,7 +305,9 @@ func (s *tenantService) ActivateTenant(ctx context.Context, tx *gorm.DB, id uuid
 		ActivatedAt:    time.Now(),
 	}
 	evt := events.NewEvent(events.TypeTenantActivated, events.RoutingKeyTenantActivated, tenant.ID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyTenantActivated, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return nil, err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenant.ID.String(), "", "tenant.activated", "tenant", tenant.ID.String(), eventPayload, "", "")
 
@@ -334,7 +343,9 @@ func (s *tenantService) SuspendTenant(ctx context.Context, tx *gorm.DB, id uuid.
 		SuspendedAt:    time.Now(),
 	}
 	evt := events.NewEvent(events.TypeTenantSuspended, events.RoutingKeyTenantSuspended, tenant.ID, correlationID, eventPayload)
-	_ = s.publisher.Publish(ctx, "jaas.identity.events", events.RoutingKeyTenantSuspended, evt)
+	if err := s.sink.Emit(ctx, tx, evt); err != nil {
+		return nil, err
+	}
 
 	_ = s.auditSvc.Log(ctx, tx, tenant.ID.String(), "", "tenant.suspended", "tenant", tenant.ID.String(), eventPayload, "", "")
 
