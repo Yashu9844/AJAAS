@@ -27,6 +27,8 @@ type env struct {
 	goals                      *GoalService
 	reviews                    *ReviewService
 	relay                      *OutboxRelay
+	cals                       *CalibrationService
+	feedback                   *FeedbackService
 	hr, mgr, alice, bob, carol *employeeDTO.EmployeeResponse
 }
 
@@ -34,9 +36,11 @@ type env struct {
 func newEnv(t *testing.T) *env {
 	e := &env{t: t, st: newStore(), ppl: newPeople(), aud: &audit{}, pub: &publisher{}, tenant: uuid.New()}
 	clock := time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)
-	d := Deps{Tx: fakeRunner{e.st}, Repos: Repos{Cycles: fakeCycles{e.st}, Goals: fakeGoals{e.st}, Reviews: fakeReviews{e.st}, Outbox: fakeOutbox{e.st}},
+	d := Deps{Tx: fakeRunner{e.st}, Repos: Repos{Cycles: fakeCycles{e.st}, Goals: fakeGoals{e.st}, Reviews: fakeReviews{e.st},
+		Calibrations: fakeCalibrations{e.st}, Feedback: fakeFeedback{e.st}, Outbox: fakeOutbox{e.st}},
 		Employees: e.ppl, Managers: e.ppl, Audit: e.aud, Publisher: e.pub, Now: func() time.Time { clock = clock.Add(time.Minute); return clock }}
 	e.cycles, e.goals, e.reviews, e.relay = NewCycleService(d), NewGoalService(d), NewReviewService(d), NewOutboxRelay(d)
+	e.cals, e.feedback = NewCalibrationService(d), NewFeedbackService(d)
 	e.hr, e.mgr = e.ppl.add(e.tenant, "active"), e.ppl.add(e.tenant, "active")
 	e.alice, e.bob, e.carol = e.ppl.add(e.tenant, "active"), e.ppl.add(e.tenant, "probation"), e.ppl.add(e.tenant, "active")
 	e.ppl.managers[e.alice.UserID] = e.mgr.UserID

@@ -73,6 +73,40 @@ type ReviewRepository interface {
 	ExpirePending(ctx context.Context, tx *gorm.DB, tenantID, cycleID uuid.UUID, at time.Time) (int64, error)
 }
 
+// CalibrationRepository persists append-only calibrations (PM-019).
+type CalibrationRepository interface {
+	Create(ctx context.Context, tx *gorm.DB, c *models.Calibration) error
+	// Latest returns the employee's newest calibration in the cycle, or nil.
+	Latest(ctx context.Context, db *gorm.DB, tenantID, cycleID, employeeID uuid.UUID) (*models.Calibration, error)
+	// LatestPerEmployee returns each employee's newest calibration in the cycle.
+	LatestPerEmployee(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID) ([]models.Calibration, error)
+	List(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID, employeeID *uuid.UUID, page dto.Page) ([]models.Calibration, int64, error)
+}
+
+// FeedbackFilter narrows feedback lists (F2–F5).
+type FeedbackFilter struct {
+	ToID, FromID *uuid.UUID
+	PublicOnly   bool
+}
+
+// RequestFilter narrows feedback-request lists (F7, F8).
+type RequestFilter struct {
+	ResponderID, RequesterID *uuid.UUID
+	Status                   string
+}
+
+// FeedbackRepository persists continuous feedback and feedback requests (FB-001..FB-005).
+type FeedbackRepository interface {
+	Create(ctx context.Context, tx *gorm.DB, f *models.Feedback) error
+	List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f FeedbackFilter, page dto.Page) ([]models.Feedback, int64, error)
+	CreateRequest(ctx context.Context, tx *gorm.DB, r *models.FeedbackRequest) error
+	UpdateRequest(ctx context.Context, tx *gorm.DB, r *models.FeedbackRequest) error
+	LockRequest(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.FeedbackRequest, error)
+	// PendingExists reports a pending request for (requester, responder, about) (FB-004).
+	PendingExists(ctx context.Context, tx *gorm.DB, tenantID, requester, responder, about uuid.UUID) (bool, error)
+	ListRequests(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f RequestFilter, page dto.Page) ([]models.FeedbackRequest, int64, error)
+}
+
 // OutboxRepository persists outbox rows; relay methods are cross-tenant by design.
 type OutboxRepository interface {
 	Create(ctx context.Context, tx *gorm.DB, e *models.OutboxEvent) error

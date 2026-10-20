@@ -174,3 +174,80 @@ func (r *outboxRepository) FetchUnpublished(ctx context.Context, db *gorm.DB, li
 	err := db.WithContext(ctx).Where("published = ? AND attempts < ?", false, maxAttempts).Order("created_at ASC").Limit(limit).Find(&out).Error
 	return out, err
 }
+
+type calibrationRepository struct{}
+
+// NewCalibrationRepository builds a CalibrationRepository.
+func NewCalibrationRepository() CalibrationRepository { return &calibrationRepository{} }
+
+func (r *calibrationRepository) Create(ctx context.Context, tx *gorm.DB, c *models.Calibration) error {
+	return tx.WithContext(ctx).Create(c).Error
+}
+func (r *calibrationRepository) Latest(ctx context.Context, db *gorm.DB, tenantID, cycleID, employeeID uuid.UUID) (*models.Calibration, error) {
+	return first[models.Calibration](db.WithContext(ctx).Where("tenant_id = ? AND cycle_id = ? AND employee_id = ?", tenantID, cycleID, employeeID).
+		Order("created_at DESC, id DESC"))
+}
+func (r *calibrationRepository) LatestPerEmployee(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID) ([]models.Calibration, error) {
+	var out []models.Calibration
+	err := db.WithContext(ctx).Raw(`SELECT DISTINCT ON (employee_id) * FROM performance_calibrations
+		WHERE tenant_id = ? AND cycle_id = ? ORDER BY employee_id, created_at DESC, id DESC`, tenantID, cycleID).Scan(&out).Error
+	return out, err
+}
+func (r *calibrationRepository) List(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID, employeeID *uuid.UUID, page dto.Page) ([]models.Calibration, int64, error) {
+	q := db.WithContext(ctx).Model(&models.Calibration{}).Where("tenant_id = ? AND cycle_id = ?", tenantID, cycleID)
+	if employeeID != nil {
+		q = q.Where("employee_id = ?", *employeeID)
+	}
+	return paged[models.Calibration](q, "created_at DESC, id DESC", page)
+}
+
+type feedbackRepository struct{}
+
+// NewFeedbackRepository builds a FeedbackRepository.
+func NewFeedbackRepository() FeedbackRepository { return &feedbackRepository{} }
+
+func (r *feedbackRepository) Create(ctx context.Context, tx *gorm.DB, f *models.Feedback) error {
+	return tx.WithContext(ctx).Create(f).Error
+}
+func (r *feedbackRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f FeedbackFilter, page dto.Page) ([]models.Feedback, int64, error) {
+	q := db.WithContext(ctx).Model(&models.Feedback{}).Where("tenant_id = ?", tenantID)
+	if f.ToID != nil {
+		q = q.Where("to_employee_id = ?", *f.ToID)
+	}
+	if f.FromID != nil {
+		q = q.Where("from_employee_id = ?", *f.FromID)
+	}
+	if f.PublicOnly {
+		q = q.Where("visibility = ?", models.VisibilityPublic)
+	}
+	return paged[models.Feedback](q, "created_at DESC, id DESC", page)
+}
+func (r *feedbackRepository) CreateRequest(ctx context.Context, tx *gorm.DB, fr *models.FeedbackRequest) error {
+	return tx.WithContext(ctx).Create(fr).Error
+}
+func (r *feedbackRepository) UpdateRequest(ctx context.Context, tx *gorm.DB, fr *models.FeedbackRequest) error {
+	return tx.WithContext(ctx).Where("tenant_id = ?", fr.TenantID).Save(fr).Error
+}
+func (r *feedbackRepository) LockRequest(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.FeedbackRequest, error) {
+	return first[models.FeedbackRequest](tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_id = ? AND id = ?", tenantID, id))
+}
+func (r *feedbackRepository) PendingExists(ctx context.Context, tx *gorm.DB, tenantID, requester, responder, about uuid.UUID) (bool, error) {
+	var n int64
+	err := tx.WithContext(ctx).Model(&models.FeedbackRequest{}).Where(
+		"tenant_id = ? AND requester_employee_id = ? AND responder_employee_id = ? AND about_employee_id = ? AND status = ?",
+		tenantID, requester, responder, about, models.RequestPending).Count(&n).Error
+	return n > 0, err
+}
+func (r *feedbackRepository) ListRequests(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f RequestFilter, page dto.Page) ([]models.FeedbackRequest, int64, error) {
+	q := db.WithContext(ctx).Model(&models.FeedbackRequest{}).Where("tenant_id = ?", tenantID)
+	if f.ResponderID != nil {
+		q = q.Where("responder_employee_id = ?", *f.ResponderID)
+	}
+	if f.RequesterID != nil {
+		q = q.Where("requester_employee_id = ?", *f.RequesterID)
+	}
+	if f.Status != "" {
+		q = q.Where("status = ?", f.Status)
+	}
+	return paged[models.FeedbackRequest](q, "created_at DESC, id DESC", page)
+}

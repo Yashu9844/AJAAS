@@ -2826,6 +2826,94 @@ export const HR_PERFORMANCE: OpSpec[] = [
     "note": "Errors: 409 CYCLE_STATE (not draft)"
   },
   {
+    "key": "hr.performance.post.hr.performance.cycles.id.calibrations",
+    "label": "Calibrate an employee final rating while the cycle is in review (performance:calibrate)",
+    "method": "POST",
+    "path": "/hr/performance/cycles/:id/calibrations",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      },
+      {
+        "name": "employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "overall_score",
+        "where": "body",
+        "type": "number",
+        "placeholder": "4.25"
+      },
+      {
+        "name": "potential",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceCyclesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR (reason 10–1000, score 1–5, potential, no-op); 404 NOT_FOUND; 409 CYCLE_STATE (not in review), NOT_RATED (no submitted manager review)"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.cycles.id.calibrations",
+    "label": "Calibration history of a cycle, newest first (performance:read)",
+    "method": "GET",
+    "path": "/hr/performance/cycles/:id/calibrations",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      },
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
     "key": "hr.performance.post.hr.performance.cycles.id.complete",
     "label": "Complete a cycle in review; pending reviews expire (performance:manage)",
     "method": "POST",
@@ -2884,6 +2972,286 @@ export const HR_PERFORMANCE: OpSpec[] = [
       200
     ],
     "note": "Errors: 409 CYCLE_STATE (not review/completed)"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.feedback",
+    "label": "Give feedback to a colleague, optionally answering a request (public only for praise)",
+    "method": "POST",
+    "path": "/hr/performance/feedback",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "to_employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "praise",
+          "constructive"
+        ],
+        "required": true
+      },
+      {
+        "name": "visibility",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "private",
+          "public"
+        ],
+        "required": true
+      },
+      {
+        "name": "message",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "request_id",
+        "where": "body",
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceFeedbackId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR (self, public constructive, wrong recipient for the request); 404 EMPLOYEE_NOT_FOUND / NOT_FOUND (request not yours); 409 EMPLOYEE_STATE, REQUEST_STATE"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.feedback",
+    "label": "Feedback an employee received (their direct manager or performance:read)",
+    "method": "GET",
+    "path": "/hr/performance/feedback",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query",
+        "required": true
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 employee_id required; 404 NOT_FOUND (not your report)"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.feedback.given",
+    "label": "Feedback I gave",
+    "method": "GET",
+    "path": "/hr/performance/feedback/given",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.get.hr.performance.feedback.public",
+    "label": "Public praise wall of the tenant",
+    "method": "GET",
+    "path": "/hr/performance/feedback/public",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.get.hr.performance.feedback.received",
+    "label": "Feedback I received",
+    "method": "GET",
+    "path": "/hr/performance/feedback/received",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.post.hr.performance.feedback.requests",
+    "label": "Ask 1–10 colleagues for feedback about yourself or a direct report",
+    "method": "POST",
+    "path": "/hr/performance/feedback/requests",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "responder_employee_ids",
+        "where": "body",
+        "type": "list",
+        "required": true
+      },
+      {
+        "name": "about_employee_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "question",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceFeedbackId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND (about someone who is not your report); 409 CONFLICT (pending request exists), EMPLOYEE_STATE"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.feedback.requests.assigned",
+    "label": "Feedback requests I must answer",
+    "method": "GET",
+    "path": "/hr/performance/feedback/requests/assigned",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "answered",
+          "declined"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.get.hr.performance.feedback.requests.mine",
+    "label": "Feedback requests I made",
+    "method": "GET",
+    "path": "/hr/performance/feedback/requests/mine",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "answered",
+          "declined"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.post.hr.performance.feedback.requests.id.decline",
+    "label": "Decline a pending feedback request (the responder)",
+    "method": "POST",
+    "path": "/hr/performance/feedback/requests/:id/decline",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceFeedbackId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 REQUEST_STATE"
   },
   {
     "key": "hr.performance.post.hr.performance.goals",

@@ -27,4 +27,7 @@ var (
 	ErrHasKeyResults    = appErr(http.StatusConflict, "HAS_KEY_RESULTS", "progress of a goal with key results comes from its key results")
 	ErrEmployeeState    = appErr(http.StatusConflict, "EMPLOYEE_STATE", "the employee is not working (active, probation or notice)")
 	ErrDuplicateReview  = appErr(http.StatusConflict, "CONFLICT", "this reviewer is already assigned")
+	ErrNotRated         = appErr(http.StatusConflict, "NOT_RATED", "the employee has no submitted manager review in this cycle")
+	ErrRequestState     = appErr(http.StatusConflict, "REQUEST_STATE", "the feedback request is not pending")
+	ErrDuplicateRequest = appErr(http.StatusConflict, "CONFLICT", "a pending request to this colleague already exists")
 )

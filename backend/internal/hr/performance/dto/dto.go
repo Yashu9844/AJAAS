@@ -50,14 +50,84 @@ type LaunchResponse struct {
 	WithoutManager int           `json:"without_manager"`
 }
 
-// NineBoxEntry is one employee on the 9-box (PM-015); Box is "<performance>/<potential>" or "unrated".
+// NineBoxEntry is one employee on the 9-box (PM-015, PM-020); Box is "<performance>/<potential>" or "unrated".
 type NineBoxEntry struct {
 	EmployeeID   uuid.UUID    `json:"employee_id"`
 	GoalScore    score.Fixed  `json:"goal_score"`
 	OverallScore *score.Fixed `json:"overall_score,omitempty"`
 	Performance  string       `json:"performance,omitempty"`
 	Potential    string       `json:"potential,omitempty"`
+	Calibrated   bool         `json:"calibrated"`
 	Box          string       `json:"box"`
+}
+
+// CalibrateRequest is FR-CA001: at least one of overall_score / potential, always a reason.
+type CalibrateRequest struct {
+	EmployeeID   string       `json:"employee_id" binding:"required"`
+	OverallScore *score.Fixed `json:"overall_score"`
+	Potential    *string      `json:"potential"`
+	Reason       string       `json:"reason" binding:"required"`
+}
+
+// CalibrationResponse is one calibration row (PM-019).
+type CalibrationResponse struct {
+	ID                 uuid.UUID   `json:"id"`
+	CycleID            uuid.UUID   `json:"cycle_id"`
+	EmployeeID         uuid.UUID   `json:"employee_id"`
+	BeforeScore        score.Fixed `json:"before_score"`
+	BeforePotential    string      `json:"before_potential"`
+	AfterScore         score.Fixed `json:"after_score"`
+	AfterPotential     string      `json:"after_potential"`
+	Reason             string      `json:"reason"`
+	CalibratedByUserID uuid.UUID   `json:"calibrated_by_user_id"`
+	CreatedAt          time.Time   `json:"created_at"`
+}
+
+// FinalRating is PM-020: the latest calibration, else the latest submitted manager review.
+type FinalRating struct {
+	OverallScore score.Fixed `json:"overall_score"`
+	Potential    string      `json:"potential"`
+	Calibrated   bool        `json:"calibrated"`
+}
+
+// GiveFeedbackRequest is F1 (FB-001, FB-005).
+type GiveFeedbackRequest struct {
+	ToEmployeeID string  `json:"to_employee_id" binding:"required"`
+	Kind         string  `json:"kind" binding:"required,oneof=praise constructive"`
+	Visibility   string  `json:"visibility" binding:"required,oneof=private public"`
+	Message      string  `json:"message" binding:"required"`
+	RequestID    *string `json:"request_id"`
+}
+
+// FeedbackResponse is one piece of feedback.
+type FeedbackResponse struct {
+	ID             uuid.UUID  `json:"id"`
+	FromEmployeeID uuid.UUID  `json:"from_employee_id"`
+	ToEmployeeID   uuid.UUID  `json:"to_employee_id"`
+	Kind           string     `json:"kind"`
+	Visibility     string     `json:"visibility"`
+	Message        string     `json:"message"`
+	RequestID      *uuid.UUID `json:"request_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
+// RequestFeedbackRequest is F6 (FB-004).
+type RequestFeedbackRequest struct {
+	ResponderEmployeeIDs []string `json:"responder_employee_ids" binding:"required"`
+	AboutEmployeeID      *string  `json:"about_employee_id"`
+	Question             string   `json:"question" binding:"required"`
+}
+
+// FeedbackRequestResponse is one feedback request.
+type FeedbackRequestResponse struct {
+	ID                  uuid.UUID  `json:"id"`
+	RequesterEmployeeID uuid.UUID  `json:"requester_employee_id"`
+	ResponderEmployeeID uuid.UUID  `json:"responder_employee_id"`
+	AboutEmployeeID     uuid.UUID  `json:"about_employee_id"`
+	Question            string     `json:"question"`
+	Status              string     `json:"status"`
+	FeedbackID          *uuid.UUID `json:"feedback_id,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
 }
 
 // NineBoxResponse is C8.
@@ -176,6 +246,8 @@ type ReviewResponse struct {
 	Potential          *string        `json:"potential,omitempty"`
 	SubmittedAt        *time.Time     `json:"submitted_at,omitempty"`
 	CreatedAt          time.Time      `json:"created_at"`
+	// Final is the subject's final rating for the cycle, on /reviews/me only (PM-021).
+	Final *FinalRating `json:"final,omitempty"`
 }
 
 // PageMeta is list metadata.

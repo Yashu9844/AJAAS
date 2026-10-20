@@ -105,7 +105,8 @@ func (s *ReviewService) ListAssigned(ctx context.Context, a Actor, status string
 	return reviewResponses(rows, false), page.Meta(total), nil
 }
 
-// ListMine is V4 (PM-014): the caller's submitted reviews of completed cycles; peer reviewers stay anonymous.
+// ListMine is V4 (PM-014, PM-021): the caller's submitted reviews of completed cycles with the cycle's final rating;
+// peer reviewers stay anonymous and calibration reasons are never included.
 func (s *ReviewService) ListMine(ctx context.Context, a Actor, cycleID *uuid.UUID) ([]dto.ReviewResponse, error) {
 	self, err := s.employeeFor(ctx, a)
 	if err != nil {
@@ -132,7 +133,18 @@ func (s *ReviewService) ListMine(ctx context.Context, a Actor, cycleID *uuid.UUI
 			visible = append(visible, r)
 		}
 	}
-	return reviewResponses(visible, true), nil
+	out := reviewResponses(visible, true)
+	finals := map[uuid.UUID]*dto.FinalRating{}
+	for i := range out {
+		cid := out[i].CycleID
+		if _, ok := finals[cid]; !ok {
+			if finals[cid], err = s.finalRating(ctx, s.Tx.DB(), a.TenantID, cid, self.ID); err != nil {
+				return nil, err
+			}
+		}
+		out[i].Final = finals[cid]
+	}
+	return out, nil
 }
 
 // Get is V5: the reviewer or performance:read; anyone else 404.

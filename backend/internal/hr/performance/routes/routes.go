@@ -8,8 +8,9 @@ import (
 
 // Permission actions on resource "performance".
 const (
-	ActionRead   = "read"
-	ActionManage = "manage"
+	ActionRead      = "read"
+	ActionManage    = "manage"
+	ActionCalibrate = "calibrate"
 )
 
 // Middleware is the M0 middleware HR/Performance depends on.
@@ -20,10 +21,10 @@ type Middleware struct {
 	Flag func(action, key string) gin.HandlerFunc
 }
 
-// RegisterRoutes mounts all 22 operations. Self, manager and reviewer access is decided per request (PM-008, D7-05),
+// RegisterRoutes mounts all 33 operations. Self, manager and reviewer access is decided per request (PM-008, D7-05),
 // so those routes only authenticate and carry the read/manage flags.
 func RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Controller) {
-	read, manage := mw.Require(ActionRead), mw.Require(ActionManage)
+	read, manage, calibrate := mw.Require(ActionRead), mw.Require(ActionManage), mw.Require(ActionCalibrate)
 	p := rg.Group("/performance", mw.TenantResolver, mw.Authenticate,
 		mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage))
 
@@ -35,6 +36,8 @@ func RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Control
 	p.POST("/cycles/:id/launch-reviews", manage, ctl.LaunchReviews)
 	p.POST("/cycles/:id/complete", manage, ctl.CompleteCycle)
 	p.GET("/cycles/:id/nine-box", read, ctl.NineBox)
+	p.POST("/cycles/:id/calibrations", calibrate, ctl.Calibrate)
+	p.GET("/cycles/:id/calibrations", read, ctl.ListCalibrations)
 
 	p.POST("/goals", ctl.CreateGoal)
 	p.GET("/goals", ctl.ListGoals)
@@ -51,4 +54,14 @@ func RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Control
 	p.GET("/reviews/me", ctl.MyReviews)
 	p.GET("/reviews/:id", ctl.GetReview)
 	p.POST("/reviews/:id/submit", ctl.SubmitReview)
+
+	p.POST("/feedback", ctl.GiveFeedback)
+	p.GET("/feedback", ctl.FeedbackFor)
+	p.GET("/feedback/received", ctl.FeedbackReceived)
+	p.GET("/feedback/given", ctl.FeedbackGiven)
+	p.GET("/feedback/public", ctl.PublicFeedback)
+	p.POST("/feedback/requests", ctl.RequestFeedback)
+	p.GET("/feedback/requests/assigned", ctl.AssignedFeedbackRequests)
+	p.GET("/feedback/requests/mine", ctl.MyFeedbackRequests)
+	p.POST("/feedback/requests/:id/decline", ctl.DeclineFeedbackRequest)
 }

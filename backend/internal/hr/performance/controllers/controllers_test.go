@@ -28,7 +28,9 @@ func (s *stub) Create(_ context.Context, a services.Actor, _ dto.CreateCycleRequ
 	s.seen = a
 	return &dto.CycleResponse{}, s.err
 }
-func (s *stub) Get(context.Context, uuid.UUID, uuid.UUID) (*dto.CycleResponse, error) { return &dto.CycleResponse{}, s.err }
+func (s *stub) Get(context.Context, uuid.UUID, uuid.UUID) (*dto.CycleResponse, error) {
+	return &dto.CycleResponse{}, s.err
+}
 func (s *stub) List(_ context.Context, _ uuid.UUID, _ string, p dto.Page) ([]dto.CycleResponse, dto.PageMeta, error) {
 	s.page = p
 	return nil, p.Meta(0), s.err
@@ -36,11 +38,15 @@ func (s *stub) List(_ context.Context, _ uuid.UUID, _ string, p dto.Page) ([]dto
 func (s *stub) Update(context.Context, services.Actor, uuid.UUID, dto.UpdateCycleRequest) (*dto.CycleResponse, error) {
 	return &dto.CycleResponse{}, s.err
 }
-func (s *stub) Activate(context.Context, services.Actor, uuid.UUID) (*dto.CycleResponse, error) { return &dto.CycleResponse{}, s.err }
+func (s *stub) Activate(context.Context, services.Actor, uuid.UUID) (*dto.CycleResponse, error) {
+	return &dto.CycleResponse{}, s.err
+}
 func (s *stub) LaunchReviews(context.Context, services.Actor, uuid.UUID) (*dto.LaunchResponse, error) {
 	return &dto.LaunchResponse{}, s.err
 }
-func (s *stub) Complete(context.Context, services.Actor, uuid.UUID) (*dto.CycleResponse, error) { return &dto.CycleResponse{}, s.err }
+func (s *stub) Complete(context.Context, services.Actor, uuid.UUID) (*dto.CycleResponse, error) {
+	return &dto.CycleResponse{}, s.err
+}
 func (s *stub) NineBox(context.Context, uuid.UUID, uuid.UUID) (*dto.NineBoxResponse, error) {
 	return &dto.NineBoxResponse{}, s.err
 }
@@ -51,7 +57,9 @@ func (s *goalStub) Create(_ context.Context, a services.Actor, _ dto.CreateGoalR
 	s.seen = a
 	return &dto.GoalResponse{}, s.err
 }
-func (s *goalStub) Get(context.Context, services.Actor, uuid.UUID) (*dto.GoalResponse, error) { return &dto.GoalResponse{}, s.err }
+func (s *goalStub) Get(context.Context, services.Actor, uuid.UUID) (*dto.GoalResponse, error) {
+	return &dto.GoalResponse{}, s.err
+}
 func (s *goalStub) List(context.Context, services.Actor, repositories.GoalFilter, dto.Page) ([]dto.GoalResponse, dto.PageMeta, error) {
 	return nil, dto.PageMeta{}, s.err
 }
@@ -82,7 +90,9 @@ func (s *reviewStub) List(context.Context, uuid.UUID, repositories.ReviewFilter,
 func (s *reviewStub) ListAssigned(context.Context, services.Actor, string, dto.Page) ([]dto.ReviewResponse, dto.PageMeta, error) {
 	return nil, dto.PageMeta{}, s.err
 }
-func (s *reviewStub) ListMine(context.Context, services.Actor, *uuid.UUID) ([]dto.ReviewResponse, error) { return nil, s.err }
+func (s *reviewStub) ListMine(context.Context, services.Actor, *uuid.UUID) ([]dto.ReviewResponse, error) {
+	return nil, s.err
+}
 func (s *reviewStub) Get(context.Context, services.Actor, uuid.UUID) (*dto.ReviewResponse, error) {
 	return &dto.ReviewResponse{}, s.err
 }
@@ -106,7 +116,8 @@ func router(cy *stub, g *goalStub, r *reviewStub, anonymous bool) *gin.Engine {
 		Require: func(string) gin.HandlerFunc { return pass },
 		Flag: func(action, key string) gin.HandlerFunc {
 			return func(c *gin.Context) { c.Set(key, action == routes.ActionRead) }
-		}}, controllers.New(controllers.Services{Cycles: cy, Goals: g, Reviews: r}))
+		}}, controllers.New(controllers.Services{Cycles: cy, Goals: g, Reviews: r,
+		Calibrations: &calStub{stub{err: r.err}}, Feedback: &fbStub{stub{err: r.err}}}))
 	return e
 }
 
@@ -120,7 +131,7 @@ func call(e *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
 
 var id = uuid.NewString()
 
-// every operation with a valid request and its success status (22 operations).
+// every operation with a valid request and its success status (33 operations; parity ones in parity_controllers_test.go).
 var ops = []struct {
 	method, path, body string
 	status             int
@@ -150,8 +161,8 @@ var ops = []struct {
 }
 
 func TestControllers_EveryOperation(t *testing.T) {
-	if len(ops) != 22 {
-		t.Fatalf("22 operations, table has %d", len(ops))
+	if len(ops) != 33 {
+		t.Fatalf("33 operations, table has %d", len(ops))
 	}
 	cy, g, r := &stub{}, &goalStub{}, &reviewStub{}
 	e := router(cy, g, r, false)

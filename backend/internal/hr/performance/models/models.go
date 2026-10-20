@@ -1,4 +1,4 @@
-// Package models holds Module 7 (Performance) persistence models; migrations 000051–000056 are the SQL twin.
+// Package models holds HR/Performance persistence models; migrations/hr 000038–000046 are the SQL twin.
 package models
 
 import (
@@ -181,6 +181,78 @@ func (Review) TableName() string { return "performance_reviews" }
 
 // BeforeCreate assigns a UUID v4 when unset.
 func (r *Review) BeforeCreate(tx *gorm.DB) error { return assignID(&r.ID) }
+
+// Calibration is one append-only rating override next to the manager review (PM-018..PM-022).
+type Calibration struct {
+	ID                 uuid.UUID   `gorm:"type:uuid;primaryKey"`
+	TenantID           uuid.UUID   `gorm:"type:uuid;not null;index:idx_performance_calibrations_cycle_employee,priority:1"`
+	CycleID            uuid.UUID   `gorm:"type:uuid;not null;index:idx_performance_calibrations_cycle_employee,priority:2"`
+	EmployeeID         uuid.UUID   `gorm:"type:uuid;not null;index:idx_performance_calibrations_cycle_employee,priority:3"`
+	BeforeScore        score.Fixed `gorm:"type:numeric(3,2);not null"`
+	BeforePotential    string      `gorm:"type:varchar(10);not null"`
+	AfterScore         score.Fixed `gorm:"type:numeric(3,2);not null"`
+	AfterPotential     string      `gorm:"type:varchar(10);not null"`
+	Reason             string      `gorm:"type:varchar(1000);not null"`
+	CalibratedByUserID uuid.UUID   `gorm:"type:uuid;not null"`
+	CreatedAt          time.Time   `gorm:"not null;index:idx_performance_calibrations_cycle_employee,priority:4,sort:desc"`
+}
+
+// TableName maps to performance_calibrations (migration hr/000044).
+func (Calibration) TableName() string { return "performance_calibrations" }
+
+// BeforeCreate assigns a UUID v4 when unset.
+func (c *Calibration) BeforeCreate(tx *gorm.DB) error { return assignID(&c.ID) }
+
+// Feedback kinds, visibilities and request statuses (FB-001..FB-005).
+const (
+	FeedbackPraise       = "praise"
+	FeedbackConstructive = "constructive"
+	VisibilityPrivate    = "private"
+	VisibilityPublic     = "public"
+
+	RequestPending  = "pending"
+	RequestAnswered = "answered"
+	RequestDeclined = "declined"
+)
+
+// Feedback is one immutable piece of continuous feedback (FB-001..FB-003).
+type Feedback struct {
+	ID             uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	TenantID       uuid.UUID  `gorm:"type:uuid;not null;index:idx_performance_feedback_to,priority:1;index:idx_performance_feedback_from,priority:1"`
+	FromEmployeeID uuid.UUID  `gorm:"type:uuid;not null;index:idx_performance_feedback_from,priority:2"`
+	ToEmployeeID   uuid.UUID  `gorm:"type:uuid;not null;index:idx_performance_feedback_to,priority:2"`
+	Kind           string     `gorm:"type:varchar(20);not null"`
+	Visibility     string     `gorm:"type:varchar(10);not null"`
+	Message        string     `gorm:"type:varchar(2000);not null"`
+	RequestID      *uuid.UUID `gorm:"type:uuid"`
+	CreatedAt      time.Time  `gorm:"not null;index:idx_performance_feedback_to,priority:3,sort:desc;index:idx_performance_feedback_from,priority:3,sort:desc"`
+}
+
+// TableName maps to performance_feedback (migration hr/000046).
+func (Feedback) TableName() string { return "performance_feedback" }
+
+// BeforeCreate assigns a UUID v4 when unset.
+func (f *Feedback) BeforeCreate(tx *gorm.DB) error { return assignID(&f.ID) }
+
+// FeedbackRequest asks a colleague for feedback about the requester or a direct report (FB-004, FB-005).
+type FeedbackRequest struct {
+	ID                  uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	TenantID            uuid.UUID  `gorm:"type:uuid;not null;index:idx_performance_feedback_requests_responder,priority:1"`
+	RequesterEmployeeID uuid.UUID  `gorm:"type:uuid;not null"`
+	ResponderEmployeeID uuid.UUID  `gorm:"type:uuid;not null;index:idx_performance_feedback_requests_responder,priority:2"`
+	AboutEmployeeID     uuid.UUID  `gorm:"type:uuid;not null"`
+	Question            string     `gorm:"type:varchar(500);not null"`
+	Status              string     `gorm:"type:varchar(20);not null;index:idx_performance_feedback_requests_responder,priority:3"`
+	FeedbackID          *uuid.UUID `gorm:"type:uuid"`
+	CreatedAt           time.Time  `gorm:"not null"`
+	UpdatedAt           time.Time  `gorm:"not null"`
+}
+
+// TableName maps to performance_feedback_requests (migration hr/000045).
+func (FeedbackRequest) TableName() string { return "performance_feedback_requests" }
+
+// BeforeCreate assigns a UUID v4 when unset.
+func (r *FeedbackRequest) BeforeCreate(tx *gorm.DB) error { return assignID(&r.ID) }
 
 // OutboxEvent is a transactional-outbox row (FR-EV001).
 type OutboxEvent struct {

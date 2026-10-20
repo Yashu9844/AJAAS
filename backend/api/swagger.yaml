@@ -2810,6 +2810,107 @@ paths:
         '200': {description: 'Submitted', content: {application/json: {schema: {$ref: '#/components/schemas/ReviewEnvelope'}}}}
         '404': {description: 'NOT_FOUND (not the reviewer)'}
         '409': {description: 'REVIEW_STATE, CYCLE_STATE'}
+  /hr/performance/cycles/{id}/calibrations:
+    post:
+      summary: 'Calibrate an employee final rating while the cycle is in review (performance:calibrate)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CalibrateRequest'}}}}
+      responses:
+        '201': {description: 'Calibration recorded (before/after)', content: {application/json: {schema: {$ref: '#/components/schemas/CalibrationEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR (reason 10–1000, score 1–5, potential, no-op)'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE (not in review), NOT_RATED (no submitted manager review)'}
+    get:
+      summary: 'Calibration history of a cycle, newest first (performance:read)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}, {name: employee_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Calibrations', content: {application/json: {schema: {$ref: '#/components/schemas/CalibrationListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/performance/feedback:
+    post:
+      summary: 'Give feedback to a colleague, optionally answering a request (public only for praise)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/GiveFeedbackRequest'}}}}
+      responses:
+        '201': {description: 'Given', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR (self, public constructive, wrong recipient for the request)'}
+        '404': {description: 'EMPLOYEE_NOT_FOUND / NOT_FOUND (request not yours)'}
+        '409': {description: 'EMPLOYEE_STATE, REQUEST_STATE'}
+    get:
+      summary: 'Feedback an employee received (their direct manager or performance:read)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, required: true, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Feedback', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackListEnvelope'}}}}
+        '400': {description: 'employee_id required'}
+        '404': {description: 'NOT_FOUND (not your report)'}
+  /hr/performance/feedback/received:
+    get:
+      summary: 'Feedback I received'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Feedback', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackListEnvelope'}}}}
+  /hr/performance/feedback/given:
+    get:
+      summary: 'Feedback I gave'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Feedback', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackListEnvelope'}}}}
+  /hr/performance/feedback/public:
+    get:
+      summary: 'Public praise wall of the tenant'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Feedback', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackListEnvelope'}}}}
+  /hr/performance/feedback/requests:
+    post:
+      summary: 'Ask 1–10 colleagues for feedback about yourself or a direct report'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RequestFeedbackRequest'}}}}
+      responses:
+        '201': {description: 'One request per colleague', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackRequestArrayEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND (about someone who is not your report)'}
+        '409': {description: 'CONFLICT (pending request exists), EMPLOYEE_STATE'}
+  /hr/performance/feedback/requests/assigned:
+    get:
+      summary: 'Feedback requests I must answer'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending, answered, declined]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Requests', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackRequestListEnvelope'}}}}
+  /hr/performance/feedback/requests/mine:
+    get:
+      summary: 'Feedback requests I made'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending, answered, declined]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Requests', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackRequestListEnvelope'}}}}
+  /hr/performance/feedback/requests/{id}/decline:
+    post:
+      summary: 'Decline a pending feedback request (the responder)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Declined', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackRequestEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE'}
 components:
   securitySchemes:
     BearerAuth:
@@ -3586,6 +3687,7 @@ components:
                   overall_score: {type: number, multipleOf: 0.01}
                   performance: {type: string, enum: [low, medium, high]}
                   potential: {type: string, enum: [low, medium, high]}
+                  calibrated: {type: boolean}
                   box: {type: string, example: high/medium, description: '<performance>/<potential> or unrated'}
     CreateGoalRequest:
       type: object
@@ -3665,6 +3767,73 @@ components:
         overall_score: {type: number, multipleOf: 0.01}
         potential: {type: string, enum: [low, medium, high]}
         submitted_at: {type: string, format: date-time}
+        final: {type: object, description: 'On /reviews/me: the final rating (PM-020/021)', properties: {overall_score: {type: number, multipleOf: 0.01}, potential: {type: string}, calibrated: {type: boolean}}}
     ReviewEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Review'}}}
     ReviewListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Review'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
     ReviewArrayEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Review'}}}}
+    CalibrateRequest:
+      type: object
+      required: [employee_id, reason]
+      properties:
+        employee_id: {type: string, format: uuid}
+        overall_score: {type: number, minimum: 1, maximum: 5, example: 4.25}
+        potential: {type: string, enum: [low, medium, high]}
+        reason: {type: string, minLength: 10, maxLength: 1000}
+    Calibration:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        cycle_id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        before_score: {type: number, multipleOf: 0.01}
+        before_potential: {type: string, enum: [low, medium, high]}
+        after_score: {type: number, multipleOf: 0.01}
+        after_potential: {type: string, enum: [low, medium, high]}
+        reason: {type: string}
+        calibrated_by_user_id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    CalibrationEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Calibration'}}}
+    CalibrationListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Calibration'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    GiveFeedbackRequest:
+      type: object
+      required: [to_employee_id, kind, visibility, message]
+      properties:
+        to_employee_id: {type: string, format: uuid}
+        kind: {type: string, enum: [praise, constructive]}
+        visibility: {type: string, enum: [private, public]}
+        message: {type: string, maxLength: 2000}
+        request_id: {type: string, format: uuid, description: Answers this pending request}
+    Feedback:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        from_employee_id: {type: string, format: uuid}
+        to_employee_id: {type: string, format: uuid}
+        kind: {type: string, enum: [praise, constructive]}
+        visibility: {type: string, enum: [private, public]}
+        message: {type: string}
+        request_id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    FeedbackEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Feedback'}}}
+    FeedbackListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Feedback'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    RequestFeedbackRequest:
+      type: object
+      required: [responder_employee_ids, question]
+      properties:
+        responder_employee_ids: {type: array, minItems: 1, maxItems: 10, items: {type: string, format: uuid}}
+        about_employee_id: {type: string, format: uuid, description: Defaults to you; may be a direct report}
+        question: {type: string, maxLength: 500}
+    FeedbackRequest:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        requester_employee_id: {type: string, format: uuid}
+        responder_employee_id: {type: string, format: uuid}
+        about_employee_id: {type: string, format: uuid}
+        question: {type: string}
+        status: {type: string, enum: [pending, answered, declined]}
+        feedback_id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    FeedbackRequestEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/FeedbackRequest'}}}
+    FeedbackRequestArrayEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/FeedbackRequest'}}}}
+    FeedbackRequestListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/FeedbackRequest'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}

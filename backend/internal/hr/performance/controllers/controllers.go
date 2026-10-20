@@ -46,23 +46,32 @@ type ReviewService interface {
 	Submit(ctx context.Context, a services.Actor, id uuid.UUID, req dto.SubmitReviewRequest) (*dto.ReviewResponse, error)
 }
 
-// Controller serves all 22 HR/Performance operations.
+// Controller serves all 33 HR/Performance operations.
 type Controller struct {
-	cycles  CycleService
-	goals   GoalService
-	reviews ReviewService
+	cycles       CycleService
+	goals        GoalService
+	reviews      ReviewService
+	calibrations CalibrationService
+	feedback     FeedbackService
 }
 
 // Services bundles the controller's collaborators.
 type Services struct {
-	Cycles  CycleService
-	Goals   GoalService
-	Reviews ReviewService
+	Cycles       CycleService
+	Goals        GoalService
+	Reviews      ReviewService
+	Calibrations CalibrationService
+	Feedback     FeedbackService
 }
 
 // New builds the Controller.
 func New(s Services) *Controller {
-	return &Controller{cycles: s.Cycles, goals: s.Goals, reviews: s.Reviews}
+	return &Controller{cycles: s.Cycles, goals: s.Goals, reviews: s.Reviews, calibrations: s.Calibrations, feedback: s.Feedback}
+}
+
+// invalidQuery is a 400 for a bad or missing query parameter.
+func invalidQuery(msg string) error {
+	return &sharedErrors.AppError{Code: sharedErrors.ErrValidation.Code, Message: msg, StatusCode: http.StatusBadRequest}
 }
 
 // queryUUID parses an optional UUID query parameter; malformed → 400.
@@ -73,7 +82,7 @@ func queryUUID(c *gin.Context, name string) (*uuid.UUID, bool) {
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		fail(c, &sharedErrors.AppError{Code: sharedErrors.ErrValidation.Code, Message: name + " must be a UUID", StatusCode: http.StatusBadRequest})
+		fail(c, invalidQuery(name+" must be a UUID"))
 		return nil, false
 	}
 	return &id, true

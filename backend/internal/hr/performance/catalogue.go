@@ -13,5 +13,7 @@ func Catalogue() []access.PermissionDef {
 			Defaults: map[string]access.Scope{access.TemplateHRManager: access.ScopeTenant, access.TemplateAuditor: access.ScopeTenant}},
 		{Module: "hr", Resource: "performance", Action: routes.ActionManage, Description: "Run appraisal cycles, manage any goal and assign reviewers", Sensitive: true,
 			Defaults: map[string]access.Scope{access.TemplateHRManager: access.ScopeTenant}},
+		{Module: "hr", Resource: "performance", Action: routes.ActionCalibrate, Description: "Calibrate final ratings (score and potential) with a reason", Sensitive: true,
+			Defaults: map[string]access.Scope{access.TemplateHRManager: access.ScopeTenant}},
 	}
 }

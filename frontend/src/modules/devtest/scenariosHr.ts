@@ -329,6 +329,82 @@ export const S_PERFORMANCE: Scenario[] = [
     },
   },
   {
+    key: "hr.perf.calibration",
+    module: "performance",
+    title: "Calibration: overrides in review drive the 9-box and the final rating (G16, G17)",
+    description:
+      "Runs a cycle to review with a submitted manager review (3.5, medium), checks NOT_RATED and permission rules, calibrates twice (score, then potential), reads the history, sees the calibrated 9-box, completes and checks the subject's final rating.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const mgr = await member(r, A, uid, "cmg");
+      const alice = await member(r, A, uid, "cal");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Cal ${uid}`, code: `CL${uid}`.toUpperCase() }), 201);
+      await r.call("Alice reports to the manager", tn(A, "POST", "/hr/mappings", { user_id: alice.userId, department_id: str(d, "data.id"), is_primary: true, manager_user_id: mgr.userId }), 201);
+      const cy = await r.call("Create cycle", tn(A, "POST", "/hr/performance/cycles", { title: `Cal ${uid}`, start_date: "2026-01-01", end_date: "2026-06-30" }), 201);
+      const cid = str(cy, "data.id");
+      await r.call("Activate", tn(A, "POST", `/hr/performance/cycles/${cid}/activate`), 200);
+      await r.call("Alice sets a goal", tn(alice.S, "POST", "/hr/performance/goals", { cycle_id: cid, title: "Goal", weight: 50 }), 201);
+      const calib = (S: Session, b: Record<string, unknown>) => tn(S, "POST", `/hr/performance/cycles/${cid}/calibrations`, { employee_id: alice.empId, ...b });
+      await r.call("Calibrate while active → 409 CYCLE_STATE", calib(A, { overall_score: 4.25, reason: "calibration session" }), 409);
+      await r.call("Launch reviews", tn(A, "POST", `/hr/performance/cycles/${cid}/launch-reviews`), 200);
+      await r.call("Calibrate before the manager review → 409 NOT_RATED", calib(A, { overall_score: 4.25, reason: "calibration session" }), 409);
+      const mr = await r.call("Manager: reviews to write", tn(mgr.S, "GET", "/hr/performance/reviews/assigned"), 200);
+      await r.call("Manager submits (3.5, medium)", tn(mgr.S, "POST", `/hr/performance/reviews/${String(list(mr)[0]?.id ?? "")}/submit`, { ratings: perfRatings(4, 4, 3, 3), potential: "medium" }), 200);
+      await r.call("Employee cannot calibrate → 403", calib(alice.S, { overall_score: 5, reason: "I deserve more" }), 403);
+      await r.call("No-op calibration → 400", calib(A, { overall_score: 3.5, potential: "medium", reason: "nothing changes" }), 400);
+      await r.call("Calibrate score 3.5 → 4.25", calib(A, { overall_score: 4.25, reason: "delivery underrated across teams" }), 201, (e) =>
+        num(e, "data.before_score") === 3.5 && num(e, "data.after_score") === 4.25 ? null : "before/after mismatch",
+      );
+      await r.call("Calibrate potential → high", calib(A, { potential: "high", reason: "leadership in incident review" }), 201);
+      await r.call("History has two rows", tn(A, "GET", `/hr/performance/cycles/${cid}/calibrations`, undefined, { employee_id: alice.empId }), 200, (e) => (list(e).length === 2 ? null : "expected 2"));
+      await r.call("9-box: high/high, calibrated", tn(A, "GET", `/hr/performance/cycles/${cid}/nine-box`), 200, (e) => {
+        const en = list(e, "data.entries").find((x) => x.employee_id === alice.empId);
+        return en && en.box === "high/high" && en.calibrated === true ? null : "9-box not calibrated";
+      });
+      await r.call("Complete", tn(A, "POST", `/hr/performance/cycles/${cid}/complete`), 200);
+      await r.call("Alice sees the calibrated final rating", tn(alice.S, "GET", "/hr/performance/reviews/me", undefined, { cycle_id: cid }), 200, (e) => {
+        const f = getPath(e.resBody, "data.0.final") as Record<string, unknown> | undefined;
+        return f && f.overall_score === 4.25 && f.potential === "high" && f.calibrated === true ? null : "final rating mismatch";
+      });
+    },
+  },
+  {
+    key: "hr.perf.feedback",
+    module: "performance",
+    title: "Continuous feedback: praise wall, requests, answers, visibility (G18, G19)",
+    description:
+      "Bob praises Alice publicly; public constructive feedback is refused; Alice asks Bob for feedback (duplicates refused), Bob answers through the request; the manager sees the report's feedback, a colleague does not; Bob declines a second request.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const mgr = await member(r, A, uid, "fmg");
+      const alice = await member(r, A, uid, "fal");
+      const bob = await member(r, A, uid, "fbo");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Fb ${uid}`, code: `FB${uid}`.toUpperCase() }), 201);
+      await r.call("Alice reports to the manager", tn(A, "POST", "/hr/mappings", { user_id: alice.userId, department_id: str(d, "data.id"), is_primary: true, manager_user_id: mgr.userId }), 201);
+      const give = (S: Session, b: Record<string, unknown>) => tn(S, "POST", "/hr/performance/feedback", { to_employee_id: alice.empId, ...b });
+      await r.call("Bob praises Alice publicly", give(bob.S, { kind: "praise", visibility: "public", message: "Great launch!" }), 201);
+      await r.call("Public constructive → 400", give(bob.S, { kind: "constructive", visibility: "public", message: "x" }), 400);
+      await r.call("Feedback to yourself → 400", give(alice.S, { kind: "praise", visibility: "private", message: "me" }), 400);
+      const rq = await r.call("Alice asks Bob for feedback", tn(alice.S, "POST", "/hr/performance/feedback/requests", { responder_employee_ids: [bob.empId], question: "How did the launch go?" }), 201);
+      const rid = String(list(rq)[0]?.id ?? "");
+      await r.call("Asking again while pending → 409", tn(alice.S, "POST", "/hr/performance/feedback/requests", { responder_employee_ids: [bob.empId], question: "again" }), 409);
+      await r.call("Bob sees the request", tn(bob.S, "GET", "/hr/performance/feedback/requests/assigned", undefined, { status: "pending" }), 200, (e) => (list(e).length === 1 ? null : "one expected"));
+      await r.call("Manager cannot answer Bob's request → 404", give(mgr.S, { kind: "praise", visibility: "private", message: "m", request_id: rid }), 404);
+      await r.call("Bob answers", give(bob.S, { kind: "constructive", visibility: "private", message: "Add a rollback plan", request_id: rid }), 201);
+      await r.call("The request is answered", tn(alice.S, "GET", "/hr/performance/feedback/requests/mine", undefined, { status: "answered" }), 200, (e) => (list(e).length === 1 ? null : "not answered"));
+      await r.call("Alice received 2", tn(alice.S, "GET", "/hr/performance/feedback/received"), 200, (e) => (list(e).length === 2 ? null : "expected 2"));
+      await r.call("Manager sees the report's feedback", tn(mgr.S, "GET", "/hr/performance/feedback", undefined, { employee_id: alice.empId }), 200, (e) => (list(e).length === 2 ? null : "expected 2"));
+      await r.call("Colleague cannot → 404", tn(bob.S, "GET", "/hr/performance/feedback", undefined, { employee_id: alice.empId }), 404);
+      await r.call("Praise wall shows the public praise", tn(mgr.S, "GET", "/hr/performance/feedback/public"), 200, (e) =>
+        list(e).some((x) => x.to_employee_id === alice.empId && x.kind === "praise") ? null : "praise missing",
+      );
+      const rq2 = await r.call("Manager asks Bob about Alice", tn(mgr.S, "POST", "/hr/performance/feedback/requests", { responder_employee_ids: [bob.empId], about_employee_id: alice.empId, question: "Strengths?" }), 201);
+      const rid2 = String(list(rq2)[0]?.id ?? "");
+      await r.call("Bob declines", tn(bob.S, "POST", `/hr/performance/feedback/requests/${rid2}/decline`), 200);
+      await r.call("Declining twice → 409 REQUEST_STATE", tn(bob.S, "POST", `/hr/performance/feedback/requests/${rid2}/decline`), 409);
+    },
+  },
+  {
     key: "hr.perf.rbac",
     module: "performance",
     title: "RBAC: cycles readable by all, managed by performance:manage (G13)",

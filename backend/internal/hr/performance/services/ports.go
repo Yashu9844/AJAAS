@@ -48,10 +48,12 @@ type Actor struct {
 
 // Repos bundles the context repositories.
 type Repos struct {
-	Cycles  repositories.CycleRepository
-	Goals   repositories.GoalRepository
-	Reviews repositories.ReviewRepository
-	Outbox  repositories.OutboxRepository
+	Cycles       repositories.CycleRepository
+	Goals        repositories.GoalRepository
+	Reviews      repositories.ReviewRepository
+	Calibrations repositories.CalibrationRepository
+	Feedback     repositories.FeedbackRepository
+	Outbox       repositories.OutboxRepository
 }
 
 // Deps is everything an HR/Performance service needs.

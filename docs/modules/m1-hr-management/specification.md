@@ -245,8 +245,8 @@ product decision. Each is added to its context's specification (with goldens) wh
 | recruitment | Requisitions tied to positions (headcount) | P1 | depends on core |
 | recruitment | Competency scorecards, multi-step offer approval | P1 | |
 | recruitment | Careers portal, resume upload/parsing | P2 | M8 Documents |
-| performance | Calibration and rating override with audit | P1 | |
-| performance | Continuous feedback | P1 | |
+| performance | Calibration and rating override with audit | P1 | done 2026-10-20 (PM-018..022) |
+| performance | Continuous feedback | P1 | done 2026-10-20 (FB-001..006) |
 | performance | Templates per role, peer nomination | P2 | |
 
 ## 10. Cross-context contracts

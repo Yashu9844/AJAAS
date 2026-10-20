@@ -21,6 +21,11 @@
 | G13 | RBAC | member 403 on manage/read routes; self routes work | integration |
 | G14 | Pagination | clamped | controllers + integration |
 | G15 | Cascading | parent same cycle; depth 4 → GOAL_DEPTH | service |
+| G16 | Calibration | only in review; NOT_RATED without a manager review; no-op 400; append-only history with before/after; 9-box uses the final rating (`calibrated: true`) | service + integration |
+| G17 | Final rating for the subject | after completion `/reviews/me` carries `final`; reason and calibrator never shown | service + integration |
+| G18 | Feedback visibility | giver, recipient, recipient's manager, performance:read see private feedback; colleague 404; public praise on the wall; public constructive 400 | service + integration |
+| G19 | Feedback requests | 1–10 distinct working colleagues, not self/subject; duplicate pending 409; answer links + `answered`; wrong responder 404; wrong recipient 400; decline; answered → REQUEST_STATE | service + integration |
+| G20 | Feedback & calibration privacy | no message, question, reason, scores or potential in events/audit | service + integration |
 
 ## Test strategy and commands
 
@@ -45,3 +50,7 @@ node scripts/console-headless.mjs <slug> <admin-email> <password> hr.perf   # co
   contract in step with the router.
 - P9 console: `/dev-test/hr/performance` — 22 generated operation forms, scenarios `hr.perf.flow` (37 steps) and
   `hr.perf.rbac` (13 steps) pass against the live API (headless run, 2026-10-20; whole console 34/34).
+- Parity (2026-10-20): calibration (2 ops) and continuous feedback (9 ops); migrations hr 000044–000046 (up/down/up
+  verified on a scratch database); services 96.9% with goldens G16–G20 + failure injection; controllers + routes 99.8%
+  over 33 ops; integration `TestPerformanceCalibrationAndFeedback` green; console scenarios `hr.perf.calibration` (24
+  steps) and `hr.perf.feedback` (27 steps) pass; whole console 36/36.

@@ -73,7 +73,7 @@ Scope per masterplan (D7-01): appraisal cycles, goals/OKRs with key results and 
 | PM-016 | All ids are tenant-scoped; foreign ids → 404. |
 | PM-017 | Ratings, scores, potential and review text never appear in events or audit metadata. |
 
-### 5. API (22 operations, under `/api/v1/hr/performance`)
+### 5. API (22 core operations under `/api/v1/hr/performance`; 11 parity operations in §11–12, 33 in total)
 | # | Method & path | Access |
 |---|---|---|
 | C1 | POST `/cycles` | manage |
@@ -139,14 +139,65 @@ The success envelope, pagination (page ≥ 1, per_page 1–100, default 20) and 
 - EC-11: Cross-tenant ids → 404.
 
 ### 10. Out of scope (v1)
-- Calibration and rating overrides.
 - 360 review templates per role.
 - Automatic peer nomination.
 - Review reminders (M10 Notifications is unnumbered).
-- Compensation linkage (HR/Payroll is manual).
+- Compensation linkage (HR/Compensation consumes final ratings later).
 - Goal alignment visualisation (frontend).
-- Continuous feedback/kudos.
 - Multi-level manager chains (direct manager only).
+
+Calibration and continuous feedback were added on 2026-10-20 (HR parity P1, §11–12).
+
+### 11. Calibration (parity P1, 2026-10-20)
+
+Calibration lets HR align ratings across teams before a cycle closes, as in a calibration session. It never edits a
+submitted review: it records an override next to it.
+
+- **Permission:** `performance:calibrate` (sensitive; default `hr_manager` at tenant scope).
+- **FR-CA001** Calibrate `POST /cycles/{id}/calibrations {employee_id, overall_score?, potential?, reason}`. At least one
+  of `overall_score` (1.00–5.00, 2 decimals) or `potential` (low|medium|high) is required, and `reason` (10–1000
+  characters) is always required.
+- **FR-CA002** History `GET /cycles/{id}/calibrations?employee_id&page&per_page` (performance:read), newest first.
+
+| ID | Rule |
+|---|---|
+| PM-018 | Calibration only while the cycle is `review` (409 `CYCLE_STATE`). The employee must have a submitted manager review in the cycle (409 `NOT_RATED`). |
+| PM-019 | Each calibration is an append-only row with the before values (the current final score and potential), the after values, the reason, and who made it and when. Omitted fields keep their current final value. A calibration that changes nothing is 400. |
+| PM-020 | The **final rating** of an employee in a cycle is the latest calibration if one exists, otherwise the latest submitted manager review. The 9-box (PM-015) uses the final rating and marks `calibrated: true`. |
+| PM-021 | After completion, the subject's `GET /reviews/me` response carries `final` (score, potential, calibrated) for each completed cycle. Calibration reasons and the calibrator are never shown to the subject. |
+| PM-022 | Audit and events (`performance.rating_calibrated`) carry ids only: never scores, potential or reason (PM-017). |
+
+### 12. Continuous feedback (parity P1, 2026-10-20)
+
+Continuous feedback is not tied to a cycle. Any working employee can give feedback to a colleague or ask colleagues for
+feedback, at any time.
+
+| # | Method & path | Access |
+|---|---|---|
+| F1 | POST `/feedback` `{to_employee_id, kind: praise\|constructive, visibility: private\|public, message, request_id?}` | self |
+| F2 | GET `/feedback/received?page&per_page` | self |
+| F3 | GET `/feedback/given?page&per_page` | self |
+| F4 | GET `/feedback?employee_id&page&per_page` | the employee's manager, or performance:read |
+| F5 | GET `/feedback/public?page&per_page` | authenticated (praise wall) |
+| F6 | POST `/feedback/requests` `{responder_employee_ids[1..10], about_employee_id?, question}` | self; `about` = self or a direct report |
+| F7 | GET `/feedback/requests/assigned?status&page&per_page` | self (responder) |
+| F8 | GET `/feedback/requests/mine?status&page&per_page` | self (requester) |
+| F9 | POST `/feedback/requests/{id}/decline` | the responder |
+
+| ID | Rule |
+|---|---|
+| FB-001 | Giver ≠ recipient; both are working employees (409 `EMPLOYEE_STATE`); message 1–2000 characters; `public` only with `praise` (400). |
+| FB-002 | Visibility: `private` feedback is visible to the giver, the recipient, the recipient's direct manager and performance:read. `public` feedback is also visible to every tenant user on F5. Anyone else → 404. |
+| FB-003 | Feedback is immutable once given. |
+| FB-004 | Requests: the requester asks 1–10 distinct working colleagues (never the subject or the requester); question 1–500 characters. `about_employee_id` defaults to the requester and may be a direct report (else 404). One `pending` request per (requester, responder, about); a repeat → 409 `CONFLICT`. |
+| FB-005 | Answering: F1 with `request_id`. The caller must be the request's responder, the request must be `pending` (409 `REQUEST_STATE`), and `to_employee_id` must be the request's subject (400). The request becomes `answered` and links the feedback. Declining sets `declined`. |
+| FB-006 | Events `performance.feedback_given` and `performance.feedback_requested` and the audit rows carry ids, kind and visibility only, never the message or the question (PM-017). |
+
+Data (`migrations/hr` 000044–000046):
+
+- `performance_calibrations`, append-only;
+- `performance_feedback`, indexed by recipient and by giver;
+- `performance_feedback_requests`, with a unique pending (requester, responder, about) row.
 
 ## Assumptions
 

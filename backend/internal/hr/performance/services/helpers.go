@@ -104,7 +104,7 @@ func (b base) canAccessEmployee(ctx context.Context, a Actor, employeeID uuid.UU
 }
 
 // writeOutbox stores the event inside the business transaction (FR-EV001).
-func (b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, key string, payload events.Payload) (*models.OutboxEvent, error) {
+func (b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, key string, payload interface{}) (*models.OutboxEvent, error) {
 	env := events.New(key, events.Source{TenantID: a.TenantID, CorrelationID: a.CorrelationID, OccurredAt: b.Now()}, payload)
 	raw, err := json.Marshal(env)
 	if err != nil {

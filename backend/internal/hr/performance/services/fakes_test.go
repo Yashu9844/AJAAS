@@ -26,13 +26,17 @@ type store struct {
 	checkins []models.CheckIn
 	reviews  map[uuid.UUID]models.Review
 	outbox   map[uuid.UUID]models.OutboxEvent
+	cals     []models.Calibration
+	feedback []models.Feedback
+	requests map[uuid.UUID]models.FeedbackRequest
 	fail     map[string]error
 	tick     time.Duration
 }
 
 func newStore() *store {
 	return &store{cycles: map[uuid.UUID]models.Cycle{}, goals: map[uuid.UUID]models.Goal{}, krs: map[uuid.UUID]models.KeyResult{},
-		reviews: map[uuid.UUID]models.Review{}, outbox: map[uuid.UUID]models.OutboxEvent{}, fail: map[string]error{}}
+		reviews: map[uuid.UUID]models.Review{}, outbox: map[uuid.UUID]models.OutboxEvent{}, requests: map[uuid.UUID]models.FeedbackRequest{},
+		fail: map[string]error{}}
 }
 
 func cloneMap[K comparable, V any](m map[K]V) map[K]V {
@@ -55,7 +59,8 @@ type fakeRunner struct{ st *store }
 
 func (f fakeRunner) InTx(_ context.Context, fn func(*gorm.DB) error) error {
 	snap := store{cycles: cloneMap(f.st.cycles), goals: cloneMap(f.st.goals), krs: cloneMap(f.st.krs), checkins: append([]models.CheckIn(nil), f.st.checkins...),
-		reviews: cloneMap(f.st.reviews), outbox: cloneMap(f.st.outbox), fail: f.st.fail, tick: f.st.tick}
+		reviews: cloneMap(f.st.reviews), outbox: cloneMap(f.st.outbox), cals: append([]models.Calibration(nil), f.st.cals...),
+		feedback: append([]models.Feedback(nil), f.st.feedback...), requests: cloneMap(f.st.requests), fail: f.st.fail, tick: f.st.tick}
 	if err := fn(nil); err != nil {
 		*f.st = snap
 		return err
@@ -180,7 +185,9 @@ func (f fakeGoals) List(_ context.Context, _ *gorm.DB, tenantID uuid.UUID, flt r
 	rows, n := pageOf(out, p)
 	return rows, n, nil
 }
-func (f fakeGoals) LockOwner(context.Context, *gorm.DB, uuid.UUID, uuid.UUID) error { return f.st.err("goals.lockowner") }
+func (f fakeGoals) LockOwner(context.Context, *gorm.DB, uuid.UUID, uuid.UUID) error {
+	return f.st.err("goals.lockowner")
+}
 func (f fakeGoals) WeightSum(_ context.Context, _ *gorm.DB, tenantID, cycleID, employeeID, exclude uuid.UUID) (score.Fixed, error) {
 	if err := f.st.err("goals.weightsum"); err != nil {
 		return 0, err

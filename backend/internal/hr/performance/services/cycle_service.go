@@ -284,8 +284,8 @@ func (s *CycleService) ensureReview(ctx context.Context, tx *gorm.DB, c *models.
 		Type: typ, Status: models.ReviewPending, Ratings: models.Ratings{}, CreatedAt: now, UpdatedAt: now})
 }
 
-// NineBox is C8 (PM-015, D7-04): performance band from the latest submitted manager review × its potential, with the
-// goal score (PM-009) alongside; cycles in review or completed only.
+// NineBox is C8 (PM-015, PM-020, D7-04): performance band from the final rating (latest calibration, else latest
+// submitted manager review) × its potential, with the goal score (PM-009) alongside; cycles in review or completed only.
 func (s *CycleService) NineBox(ctx context.Context, tenantID, id uuid.UUID) (*dto.NineBoxResponse, error) {
 	c, err := s.Repos.Cycles.FindByID(ctx, s.Tx.DB(), tenantID, id)
 	if err != nil || c == nil {
@@ -303,34 +303,46 @@ func (s *CycleService) NineBox(ctx context.Context, tenantID, id uuid.UUID) (*dt
 	if err != nil {
 		return nil, err
 	}
-	return nineBox(c.ID, goals, reviews), nil
+	cals, err := s.Repos.Calibrations.LatestPerEmployee(ctx, s.Tx.DB(), tenantID, c.ID)
+	if err != nil {
+		return nil, err
+	}
+	return nineBox(c.ID, goals, finalRatings(reviews, cals)), nil
 }
 
-func nineBox(cycleID uuid.UUID, goals []models.Goal, reviews []models.Review) *dto.NineBoxResponse {
+// finalRatings is PM-020 for a whole cycle: each employee's latest calibration, else latest submitted manager review.
+func finalRatings(managerReviews []models.Review, cals []models.Calibration) map[uuid.UUID]*dto.FinalRating {
+	out := map[uuid.UUID]*dto.FinalRating{}
+	for id, r := range latestReviews(managerReviews) {
+		if f := managerRating(r); f != nil {
+			out[id] = f
+		}
+	}
+	for _, c := range cals {
+		out[c.EmployeeID] = &dto.FinalRating{OverallScore: c.AfterScore, Potential: c.AfterPotential, Calibrated: true}
+	}
+	return out
+}
+
+func nineBox(cycleID uuid.UUID, goals []models.Goal, finals map[uuid.UUID]*dto.FinalRating) *dto.NineBoxResponse {
 	weights, progress := map[uuid.UUID][]score.Fixed{}, map[uuid.UUID][]score.Fixed{}
 	for _, g := range goals {
 		weights[g.EmployeeID] = append(weights[g.EmployeeID], g.Weight)
 		progress[g.EmployeeID] = append(progress[g.EmployeeID], g.Progress)
 	}
-	latest := map[uuid.UUID]*models.Review{}
-	for i := range reviews {
-		r := &reviews[i]
-		if cur, ok := latest[r.EmployeeID]; !ok || r.SubmittedAt.After(*cur.SubmittedAt) {
-			latest[r.EmployeeID] = r
-		}
-	}
 	ids := map[uuid.UUID]bool{}
 	for id := range weights {
 		ids[id] = true
 	}
-	for id := range latest {
+	for id := range finals {
 		ids[id] = true
 	}
 	out := &dto.NineBoxResponse{CycleID: cycleID, Entries: []dto.NineBoxEntry{}, Counts: map[string]int{}}
 	for id := range ids {
 		e := dto.NineBoxEntry{EmployeeID: id, GoalScore: score.WeightedScore(weights[id], progress[id]), Box: unrated}
-		if r := latest[id]; r != nil && r.OverallScore != nil && r.Potential != nil {
-			e.OverallScore, e.Performance, e.Potential = r.OverallScore, score.Band(*r.OverallScore), *r.Potential
+		if f := finals[id]; f != nil {
+			overall := f.OverallScore
+			e.OverallScore, e.Performance, e.Potential, e.Calibrated = &overall, score.Band(overall), f.Potential, f.Calibrated
 			e.Box = e.Performance + "/" + e.Potential
 		}
 		out.Counts[e.Box]++

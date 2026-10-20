@@ -32,16 +32,16 @@
 | 4 Leave | types, holidays, ledger-backed balances, requests, approvals | 20 | 6 (000032–000037) | `jaas.leave.events` | on `main`, backend closed |
 | 5 Payroll | structures, CTC assignments, runs (maker-checker), statutory, payslips, CSV | 20 | 7 (000038–000044) | `jaas.payroll.events` | on `main`, backend closed |
 | 6 Recruitment | jobs, candidates + stage history, interviews, offers, hire saga | 20 | 6 (000045–000050) | `jaas.recruitment.events` | on `main`, backend closed |
-| 7 Performance & OKRs | cycles, goals + key results + check-ins, reviews, 9-box | 22 | 6 (hr 000038–000043) | `jaas.performance.events` | backend closed 2026-10-20 (branch `restructure_architecture`) |
+| 7 Performance & OKRs | cycles, goals + key results + check-ins, reviews, 9-box, calibration, continuous feedback | 33 | 9 (hr 000038–000046) | `jaas.performance.events` | backend closed 2026-10-20 (branch `restructure_architecture`) |
 
 **Totals on `main`:**
 - 144 routes + `/health`;
 - 50 migrations (56 on the HR/Performance branch);
 - integration suite 63/63; all unit packages green.
 
-**Totals on `restructure_architecture` (2026-10-20):** 181 module routes (Part 2) + health/JWKS; migrations re-baselined
-into `migrations/identity` (18) and `migrations/hr` (43); full unit and integration suites green, including
-`TestSwaggerMatchesRoutes` (contract ↔ router) and `TestImportBoundaries`; test console 34/34 scenarios. Migration numbers
+**Totals on `restructure_architecture` (2026-10-20):** 192 module routes (Part 2) + health/JWKS; migrations re-baselined
+into `migrations/identity` (18) and `migrations/hr` (46); full unit and integration suites green, including
+`TestSwaggerMatchesRoutes` (contract ↔ router) and `TestImportBoundaries`; test console 36/36 scenarios. Migration numbers
 in the table above are the pre-split ones.
 
 **Who built what:**
@@ -823,7 +823,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | POST | `/api/v1/hr/recruitment/offers/:id/decision` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.DecideOffer |
 | POST | `/api/v1/hr/recruitment/offers/:id/withdraw` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.WithdrawOffer |
 
-### M1 HR / Performance & OKRs — 22 routes
+### M1 HR / Performance & OKRs — 33 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -835,6 +835,8 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | POST | `/api/v1/hr/performance/cycles/:id/launch-reviews` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.LaunchReviews |
 | POST | `/api/v1/hr/performance/cycles/:id/complete` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.CompleteCycle |
 | GET | `/api/v1/hr/performance/cycles/:id/nine-box` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] read, ctl.NineBox |
+| POST | `/api/v1/hr/performance/cycles/:id/calibrations` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] calibrate, ctl.Calibrate |
+| GET | `/api/v1/hr/performance/cycles/:id/calibrations` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] read, ctl.ListCalibrations |
 | POST | `/api/v1/hr/performance/goals` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.CreateGoal |
 | GET | `/api/v1/hr/performance/goals` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.ListGoals |
 | GET | `/api/v1/hr/performance/goals/me` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.MyGoals |
@@ -849,8 +851,17 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/performance/reviews/me` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.MyReviews |
 | GET | `/api/v1/hr/performance/reviews/:id` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.GetReview |
 | POST | `/api/v1/hr/performance/reviews/:id/submit` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.SubmitReview |
+| POST | `/api/v1/hr/performance/feedback` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.GiveFeedback |
+| GET | `/api/v1/hr/performance/feedback` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.FeedbackFor |
+| GET | `/api/v1/hr/performance/feedback/received` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.FeedbackReceived |
+| GET | `/api/v1/hr/performance/feedback/given` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.FeedbackGiven |
+| GET | `/api/v1/hr/performance/feedback/public` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.PublicFeedback |
+| POST | `/api/v1/hr/performance/feedback/requests` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.RequestFeedback |
+| GET | `/api/v1/hr/performance/feedback/requests/assigned` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.AssignedFeedbackRequests |
+| GET | `/api/v1/hr/performance/feedback/requests/mine` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.MyFeedbackRequests |
+| POST | `/api/v1/hr/performance/feedback/requests/:id/decline` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.DeclineFeedbackRequest |
 
-Total routes registered by module route files: **181** (plus `GET /health`).
+Total routes registered by module route files: **192** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -1913,6 +1924,57 @@ Total routes registered by module route files: **181** (plus `GET /health`).
 - UNIQUE index `uq_performance_outbox_event_id` on `performance_events_outbox` (event_id)
 - index `idx_performance_outbox_tenant` on `performance_events_outbox` (tenant_id)
 - index `idx_performance_outbox_published` on `performance_events_outbox` (published) WHERE published = FALSE
+
+#### `hr/000044_create_performance_calibrations.up.sql`
+- **table `performance_calibrations`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `cycle_id` UUID — NOT NULL REFERENCES performance_cycles(id) ON DELETE CASCADE
+  - `employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `before_score` NUMERIC(3,2) — NOT NULL CHECK (before_score >= 1 AND before_score <= 5)
+  - `before_potential` VARCHAR(10) — NOT NULL CHECK (before_potential IN ('low', 'medium', 'high'))
+  - `after_score` NUMERIC(3,2) — NOT NULL CHECK (after_score >= 1 AND after_score <= 5)
+  - `after_potential` VARCHAR(10) — NOT NULL CHECK (after_potential IN ('low', 'medium', 'high'))
+  - `reason` VARCHAR(1000) — NOT NULL
+  - `calibrated_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (before_score <> after_score OR before_potential <> after_potential)
+- index `idx_performance_calibrations_cycle_employee` on `performance_calibrations` (tenant_id, cycle_id, employee_id, created_at DESC)
+
+#### `hr/000045_create_performance_feedback_requests.up.sql`
+- **table `performance_feedback_requests`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `requester_employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `responder_employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `about_employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `question` VARCHAR(500) — NOT NULL
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'answered', 'declined'))
+  - `feedback_id` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (responder_employee_id <> about_employee_id)
+  - _constraint:_ CHECK ((status = 'answered') = (feedback_id IS NOT NULL))
+- UNIQUE index `uq_performance_feedback_requests_pending` on `performance_feedback_requests` (tenant_id, requester_employee_id, responder_employee_id, about_employee_id) WHERE status = 'pending'
+- index `idx_performance_feedback_requests_responder` on `performance_feedback_requests` (tenant_id, responder_employee_id, status)
+- index `idx_performance_feedback_requests_requester` on `performance_feedback_requests` (tenant_id, requester_employee_id, status)
+
+#### `hr/000046_create_performance_feedback.up.sql`
+- **table `performance_feedback`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `from_employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `to_employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `kind` VARCHAR(20) — NOT NULL CHECK (kind IN ('praise', 'constructive'))
+  - `visibility` VARCHAR(10) — NOT NULL CHECK (visibility IN ('private', 'public'))
+  - `message` VARCHAR(2000) — NOT NULL
+  - `request_id` UUID — REFERENCES performance_feedback_requests(id)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (from_employee_id <> to_employee_id)
+  - _constraint:_ CHECK (visibility = 'private' OR kind = 'praise')
+- index `idx_performance_feedback_to` on `performance_feedback` (tenant_id, to_employee_id, created_at DESC)
+- index `idx_performance_feedback_from` on `performance_feedback` (tenant_id, from_employee_id, created_at DESC)
+- index `idx_performance_feedback_public` on `performance_feedback` (tenant_id, created_at DESC) WHERE visibility = 'public'
 
 ## C. Code inventory — every file, type and function
 
@@ -5144,10 +5206,10 @@ _Package:_ Package validators holds Module 6 field rules that struct tags cannot
 ### M1 HR / Performance & OKRs
 
 
-#### `internal/hr/performance/catalogue.go` (17 lines)
+#### `internal/hr/performance/catalogue.go` (19 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Performance's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). Self, manager and reviewer access needs no permission (PM-008).
 
-#### `internal/hr/performance/module.go` (66 lines)
+#### `internal/hr/performance/module.go` (68 lines)
 _Package:_ Package performance wires HR/Performance & OKRs (docs/modules/m1-hr-management/contexts/performance) into M1.
 - **type** `Module struct` — Module is the HR/Performance DI container.
 - **type** `Ports struct` — Ports are the collaborators HR/Performance consumes (design.md connections C2–C4).
@@ -5157,7 +5219,7 @@ _Package:_ Package performance wires HR/Performance & OKRs (docs/modules/m1-hr-m
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts HR/Performance under rg.
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
 
-#### `internal/hr/performance/controllers/controllers.go` (330 lines)
+#### `internal/hr/performance/controllers/controllers.go` (339 lines)
 - **type** `CycleService interface` — CycleService is the C1–C8 surface the edge needs.
 - **method** `CycleService.Create(ctx context.Context, a services.Actor, req dto.CreateCycleRequest) (*dto.CycleResponse, error)`
 - **method** `CycleService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.CycleResponse, error)`
@@ -5183,9 +5245,10 @@ _Package:_ Package performance wires HR/Performance & OKRs (docs/modules/m1-hr-m
 - **method** `ReviewService.ListMine(ctx context.Context, a services.Actor, cycleID *uuid.UUID) ([]dto.ReviewResponse, error)`
 - **method** `ReviewService.Get(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.ReviewResponse, error)`
 - **method** `ReviewService.Submit(ctx context.Context, a services.Actor, id uuid.UUID, req dto.SubmitReviewRequest) (*dto.ReviewResponse, error)`
-- **type** `Controller struct` — Controller serves all 22 HR/Performance operations.
+- **type** `Controller struct` — Controller serves all 33 HR/Performance operations.
 - **type** `Services struct` — Services bundles the controller's collaborators.
 - **func** `New(s Services) *Controller` — New builds the Controller.
+- **func** `invalidQuery(msg string) error` — invalidQuery is a 400 for a bad or missing query parameter.
 - **func** `queryUUID(c *gin.Context, name string) (*uuid.UUID, bool)` — queryUUID parses an optional UUID query parameter; malformed → 400.
 - **func** `(ctl *Controller) CreateCycle(c *gin.Context)`
 - **func** `(ctl *Controller) ListCycles(c *gin.Context)`
@@ -5210,6 +5273,32 @@ _Package:_ Package performance wires HR/Performance & OKRs (docs/modules/m1-hr-m
 - **func** `(ctl *Controller) GetReview(c *gin.Context)`
 - **func** `(ctl *Controller) SubmitReview(c *gin.Context)`
 
+#### `internal/hr/performance/controllers/parity_controllers.go` (151 lines)
+- **type** `CalibrationService interface` — CalibrationService is the calibration surface (FR-CA001, FR-CA002).
+- **method** `CalibrationService.Calibrate(ctx context.Context, a services.Actor, cycleID uuid.UUID, req dto.CalibrateRequest) (*dto.CalibrationResponse, error)`
+- **method** `CalibrationService.List(ctx context.Context, tenantID, cycleID uuid.UUID, employeeID *uuid.UUID, page dto.Page) ([]dto.CalibrationResponse, dto.PageMeta, error)`
+- **type** `FeedbackService interface` — FeedbackService is the continuous-feedback surface (F1–F9).
+- **method** `FeedbackService.Give(ctx context.Context, a services.Actor, req dto.GiveFeedbackRequest) (*dto.FeedbackResponse, error)`
+- **method** `FeedbackService.ListReceived(ctx context.Context, a services.Actor, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)`
+- **method** `FeedbackService.ListGiven(ctx context.Context, a services.Actor, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)`
+- **method** `FeedbackService.ListFor(ctx context.Context, a services.Actor, employeeID uuid.UUID, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)`
+- **method** `FeedbackService.ListPublic(ctx context.Context, tenantID uuid.UUID, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)`
+- **method** `FeedbackService.Request(ctx context.Context, a services.Actor, req dto.RequestFeedbackRequest) ([]dto.FeedbackRequestResponse, error)`
+- **method** `FeedbackService.ListAssigned(ctx context.Context, a services.Actor, status string, page dto.Page) ([]dto.FeedbackRequestResponse, dto.PageMeta, error)`
+- **method** `FeedbackService.ListMine(ctx context.Context, a services.Actor, status string, page dto.Page) ([]dto.FeedbackRequestResponse, dto.PageMeta, error)`
+- **method** `FeedbackService.Decline(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.FeedbackRequestResponse, error)`
+- **func** `(ctl *Controller) Calibrate(c *gin.Context)`
+- **func** `(ctl *Controller) ListCalibrations(c *gin.Context)`
+- **func** `(ctl *Controller) GiveFeedback(c *gin.Context)`
+- **func** `(ctl *Controller) FeedbackReceived(c *gin.Context)`
+- **func** `(ctl *Controller) FeedbackGiven(c *gin.Context)`
+- **func** `(ctl *Controller) FeedbackFor(c *gin.Context)`
+- **func** `(ctl *Controller) PublicFeedback(c *gin.Context)`
+- **func** `(ctl *Controller) RequestFeedback(c *gin.Context)`
+- **func** `(ctl *Controller) AssignedFeedbackRequests(c *gin.Context)`
+- **func** `(ctl *Controller) MyFeedbackRequests(c *gin.Context)`
+- **func** `(ctl *Controller) DeclineFeedbackRequest(c *gin.Context)`
+
 #### `internal/hr/performance/controllers/respond.go` (139 lines)
 _Package:_ Package controllers is HR/Performance's thin HTTP edge: parse → validate → service → envelope.
 - **type** `errorBody struct`
@@ -5225,13 +5314,20 @@ _Package:_ Package controllers is HR/Performance's thin HTTP edge: parse → val
 - **func** `respondList(c *gin.Context, data interface{}, meta dto.PageMeta, err error)` — respondList writes a paginated list or the mapped error.
 - **func** `pathIDIf(c *gin.Context, actorOK bool) (uuid.UUID, bool)` — pathIDIf parses :id only when the actor resolved (the actor failure already wrote 401).
 
-#### `internal/hr/performance/dto/dto.go` (214 lines)
+#### `internal/hr/performance/dto/dto.go` (286 lines)
 _Package:_ Package dto holds HR/Performance request and response shapes (specification.md §5).
 - **type** `CreateCycleRequest struct` — CreateCycleRequest is C1 (FR-CY001); criteria default when omitted.
 - **type** `UpdateCycleRequest struct` — UpdateCycleRequest is C4 (FR-CY002, draft only).
 - **type** `CycleResponse struct` — CycleResponse is a cycle.
 - **type** `LaunchResponse struct` — LaunchResponse is C6 (PM-010): the cycle plus how many reviews were created.
-- **type** `NineBoxEntry struct` — NineBoxEntry is one employee on the 9-box (PM-015); Box is "<performance>/<potential>" or "unrated".
+- **type** `NineBoxEntry struct` — NineBoxEntry is one employee on the 9-box (PM-015, PM-020); Box is "<performance>/<potential>" or "unrated".
+- **type** `CalibrateRequest struct` — CalibrateRequest is FR-CA001: at least one of overall_score / potential, always a reason.
+- **type** `CalibrationResponse struct` — CalibrationResponse is one calibration row (PM-019).
+- **type** `FinalRating struct` — FinalRating is PM-020: the latest calibration, else the latest submitted manager review.
+- **type** `GiveFeedbackRequest struct` — GiveFeedbackRequest is F1 (FB-001, FB-005).
+- **type** `FeedbackResponse struct` — FeedbackResponse is one piece of feedback.
+- **type** `RequestFeedbackRequest struct` — RequestFeedbackRequest is F6 (FB-004).
+- **type** `FeedbackRequestResponse struct` — FeedbackRequestResponse is one feedback request.
 - **type** `NineBoxResponse struct` — NineBoxResponse is C8.
 - **type** `CreateGoalRequest struct` — CreateGoalRequest is G1 (FR-GL001); employee_id defaults to the caller's profile.
 - **type** `UpdateGoalRequest struct` — UpdateGoalRequest is G5 (FR-GL003).
@@ -5250,12 +5346,13 @@ _Package:_ Package dto holds HR/Performance request and response shapes (specifi
 - **func** `(p Page) Offset() int { return (p.Page - 1) * p.PerPage }` — Offset is the SQL offset.
 - **func** `(p Page) Meta(total int64) PageMeta` — Meta builds list metadata.
 
-#### `internal/hr/performance/events/events.go` (59 lines)
+#### `internal/hr/performance/events/events.go` (73 lines)
 _Package:_ Package events defines HR/Performance event types and the shared envelope (FR-EV001).
 - **type** `Envelope struct` — Envelope is the platform event envelope (same shape as the other HR contexts).
 - **type** `Source struct` — Source identifies who and when an event came from.
 - **func** `New(routingKey string, src Source, payload interface{}) Envelope` — New wraps a payload in the envelope.
 - **type** `Payload struct` — Payload carries ids, statuses and progress only — never ratings, scores, potential or review text (FR-EV002, PM-017).
+- **type** `FeedbackPayload struct` — FeedbackPayload carries ids, kind and visibility only — never the message or the question (FB-006).
 
 #### `internal/hr/performance/lifecycle/lifecycle.go` (51 lines)
 _Package:_ Package lifecycle is Module 7's pure state machines: appraisal cycles (PM-002) and goals (FR-GL004).
@@ -5267,8 +5364,8 @@ _Package:_ Package lifecycle is Module 7's pure state machines: appraisal cycles
 - **func** `CheckInsOpen(s string) bool { return s == CycleActive || s == CycleReview }` — CheckInsOpen: progress check-ins in active or review (PM-007).
 - **func** `ReviewsOpen(s string) bool { return s == CycleReview }` — ReviewsOpen: reviewers are assigned and reviews submitted only in review (PM-011, PM-012).
 
-#### `internal/hr/performance/models/models.go` (211 lines)
-_Package:_ Package models holds Module 7 (Performance) persistence models; migrations 000051–000056 are the SQL twin.
+#### `internal/hr/performance/models/models.go` (283 lines)
+_Package:_ Package models holds HR/Performance persistence models; migrations/hr 000038–000046 are the SQL twin.
 - **type** `Criteria []string` — Criteria is a cycle's ordered rating criteria, stored as a JSON array (PM-001).
 - **func** `(c Criteria) Value() (driver.Value, error) { return marshalJSON(c) }` — Value encodes the criteria as JSON.
 - **func** `(c *Criteria) Scan(src interface{}) error { return unmarshalJSON(src, c) }` — Scan decodes the criteria from JSON.
@@ -5293,12 +5390,21 @@ _Package:_ Package models holds Module 7 (Performance) persistence models; migra
 - **type** `Review struct` — Review is one reviewer's assessment of one employee in one cycle (FR-RV).
 - **func** `(Review) TableName() string { return "performance_reviews" }` — TableName maps to performance_reviews (migration 000055).
 - **func** `(r *Review) BeforeCreate(tx *gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Calibration struct` — Calibration is one append-only rating override next to the manager review (PM-018..PM-022).
+- **func** `(Calibration) TableName() string { return "performance_calibrations" }` — TableName maps to performance_calibrations (migration hr/000044).
+- **func** `(c *Calibration) BeforeCreate(tx *gorm.DB) error { return assignID(&c.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Feedback struct` — Feedback is one immutable piece of continuous feedback (FB-001..FB-003).
+- **func** `(Feedback) TableName() string { return "performance_feedback" }` — TableName maps to performance_feedback (migration hr/000046).
+- **func** `(f *Feedback) BeforeCreate(tx *gorm.DB) error { return assignID(&f.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `FeedbackRequest struct` — FeedbackRequest asks a colleague for feedback about the requester or a direct report (FB-004, FB-005).
+- **func** `(FeedbackRequest) TableName() string { return "performance_feedback_requests" }` — TableName maps to performance_feedback_requests (migration hr/000045).
+- **func** `(r *FeedbackRequest) BeforeCreate(tx *gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **type** `OutboxEvent struct` — OutboxEvent is a transactional-outbox row (FR-EV001).
 - **func** `(OutboxEvent) TableName() string { return "performance_events_outbox" }` — TableName maps to performance_events_outbox (migration 000056).
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
-#### `internal/hr/performance/repositories/interfaces.go` (104 lines)
+#### `internal/hr/performance/repositories/interfaces.go` (138 lines)
 _Package:_ Package repositories is HR/Performance data access: tenant_id on every scoped query, `db`/`tx` passed per call.
 - **type** `CycleRepository interface` — CycleRepository persists appraisal cycles (FR-CY).
 - **method** `CycleRepository.Create(ctx context.Context, tx *gorm.DB, c *models.Cycle) error`
@@ -5330,6 +5436,21 @@ _Package:_ Package repositories is HR/Performance data access: tenant_id on ever
 - **method** `ReviewRepository.Exists(ctx context.Context, tx *gorm.DB, tenantID, cycleID, employeeID, reviewerID uuid.UUID, typ string) (bool, error)` — Exists reports whether the (cycle, employee, reviewer, type) assignment exists (PM-010, PM-011).
 - **method** `ReviewRepository.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ReviewFilter, page dto.Page) ([]models.Review, int64, error)`
 - **method** `ReviewRepository.ExpirePending(ctx context.Context, tx *gorm.DB, tenantID, cycleID uuid.UUID, at time.Time) (int64, error)` — ExpirePending marks the cycle's pending reviews expired (PM-013).
+- **type** `CalibrationRepository interface` — CalibrationRepository persists append-only calibrations (PM-019).
+- **method** `CalibrationRepository.Create(ctx context.Context, tx *gorm.DB, c *models.Calibration) error`
+- **method** `CalibrationRepository.Latest(ctx context.Context, db *gorm.DB, tenantID, cycleID, employeeID uuid.UUID) (*models.Calibration, error)` — Latest returns the employee's newest calibration in the cycle, or nil.
+- **method** `CalibrationRepository.LatestPerEmployee(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID) ([]models.Calibration, error)` — LatestPerEmployee returns each employee's newest calibration in the cycle.
+- **method** `CalibrationRepository.List(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID, employeeID *uuid.UUID, page dto.Page) ([]models.Calibration, int64, error)`
+- **type** `FeedbackFilter struct` — FeedbackFilter narrows feedback lists (F2–F5).
+- **type** `RequestFilter struct` — RequestFilter narrows feedback-request lists (F7, F8).
+- **type** `FeedbackRepository interface` — FeedbackRepository persists continuous feedback and feedback requests (FB-001..FB-005).
+- **method** `FeedbackRepository.Create(ctx context.Context, tx *gorm.DB, f *models.Feedback) error`
+- **method** `FeedbackRepository.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f FeedbackFilter, page dto.Page) ([]models.Feedback, int64, error)`
+- **method** `FeedbackRepository.CreateRequest(ctx context.Context, tx *gorm.DB, r *models.FeedbackRequest) error`
+- **method** `FeedbackRepository.UpdateRequest(ctx context.Context, tx *gorm.DB, r *models.FeedbackRequest) error`
+- **method** `FeedbackRepository.LockRequest(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.FeedbackRequest, error)`
+- **method** `FeedbackRepository.PendingExists(ctx context.Context, tx *gorm.DB, tenantID, requester, responder, about uuid.UUID) (bool, error)` — PendingExists reports a pending request for (requester, responder, about) (FB-004).
+- **method** `FeedbackRepository.ListRequests(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f RequestFilter, page dto.Page) ([]models.FeedbackRequest, int64, error)`
 - **type** `OutboxRepository interface` — OutboxRepository persists outbox rows; relay methods are cross-tenant by design.
 - **method** `OutboxRepository.Create(ctx context.Context, tx *gorm.DB, e *models.OutboxEvent) error`
 - **method** `OutboxRepository.MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
@@ -5338,7 +5459,7 @@ _Package:_ Package repositories is HR/Performance data access: tenant_id on ever
 - **func** `first[T any](q *gorm.DB) (*T, error)`
 - **func** `paged[T any](q *gorm.DB, order string, page dto.Page) ([]T, int64, error)`
 
-#### `internal/hr/performance/repositories/repositories.go` (176 lines)
+#### `internal/hr/performance/repositories/repositories.go` (253 lines)
 - **type** `cycleRepository struct{}`
 - **func** `NewCycleRepository() CycleRepository { return &cycleRepository{} }` — NewCycleRepository builds a CycleRepository.
 - **func** `(r *cycleRepository) Create(ctx context.Context, tx *gorm.DB, c *models.Cycle) error`
@@ -5376,11 +5497,26 @@ _Package:_ Package repositories is HR/Performance data access: tenant_id on ever
 - **func** `(r *outboxRepository) MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
 - **func** `(r *outboxRepository) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
 - **func** `(r *outboxRepository) FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
+- **type** `calibrationRepository struct{}`
+- **func** `NewCalibrationRepository() CalibrationRepository { return &calibrationRepository{} }` — NewCalibrationRepository builds a CalibrationRepository.
+- **func** `(r *calibrationRepository) Create(ctx context.Context, tx *gorm.DB, c *models.Calibration) error`
+- **func** `(r *calibrationRepository) Latest(ctx context.Context, db *gorm.DB, tenantID, cycleID, employeeID uuid.UUID) (*models.Calibration, error)`
+- **func** `(r *calibrationRepository) LatestPerEmployee(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID) ([]models.Calibration, error)`
+- **func** `(r *calibrationRepository) List(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID, employeeID *uuid.UUID, page dto.Page) ([]models.Calibration, int64, error)`
+- **type** `feedbackRepository struct{}`
+- **func** `NewFeedbackRepository() FeedbackRepository { return &feedbackRepository{} }` — NewFeedbackRepository builds a FeedbackRepository.
+- **func** `(r *feedbackRepository) Create(ctx context.Context, tx *gorm.DB, f *models.Feedback) error`
+- **func** `(r *feedbackRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f FeedbackFilter, page dto.Page) ([]models.Feedback, int64, error)`
+- **func** `(r *feedbackRepository) CreateRequest(ctx context.Context, tx *gorm.DB, fr *models.FeedbackRequest) error`
+- **func** `(r *feedbackRepository) UpdateRequest(ctx context.Context, tx *gorm.DB, fr *models.FeedbackRequest) error`
+- **func** `(r *feedbackRepository) LockRequest(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.FeedbackRequest, error)`
+- **func** `(r *feedbackRepository) PendingExists(ctx context.Context, tx *gorm.DB, tenantID, requester, responder, about uuid.UUID) (bool, error)`
+- **func** `(r *feedbackRepository) ListRequests(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f RequestFilter, page dto.Page) ([]models.FeedbackRequest, int64, error)`
 
-#### `internal/hr/performance/routes/routes.go` (54 lines)
+#### `internal/hr/performance/routes/routes.go` (67 lines)
 _Package:_ Package routes mounts HR/Performance endpoints (specification.md §5) behind M0 middleware.
 - **type** `Middleware struct` — Middleware is the M0 middleware HR/Performance depends on.
-- **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Controller)` — RegisterRoutes mounts all 22 operations. Self, manager and reviewer access is decided per request (PM-008, D7-05), so those routes only authenticate and carry the read/manage flags.
+- **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Controller)` — RegisterRoutes mounts all 33 operations. Self, manager and reviewer access is decided per request (PM-008, D7-05), so those routes only authenticate and carry the read/manage flags.
 
 #### `internal/hr/performance/score/score.go` (179 lines)
 _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredths fixed point, key-result and goal progress, weighted goal score, review overall score and 9-box bands. No floats are used for any stored or compared value.
@@ -5402,7 +5538,17 @@ _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredth
 - **func** `Overall(ratings []int) Fixed` — Overall is PM-012: the mean of integer ratings as a 2-decimal score; empty → 0.
 - **func** `Band(overall Fixed) string` — Band maps an overall score to its 9-box performance band: < 2.50 low, < 3.50 medium, else high.
 
-#### `internal/hr/performance/services/cycle_service.go` (349 lines)
+#### `internal/hr/performance/services/calibration_service.go` (152 lines)
+- **type** `CalibrationService struct{ base }` — CalibrationService implements calibration (PM-018..PM-022).
+- **func** `NewCalibrationService(d Deps) *CalibrationService { return &CalibrationService{base{d}} }` — NewCalibrationService builds the service.
+- **func** `(s *CalibrationService) Calibrate(ctx context.Context, a Actor, cycleID uuid.UUID, req dto.CalibrateRequest) (*dto.CalibrationResponse, error)` — Calibrate is FR-CA001: an append-only override of the employee's final rating while the cycle is in review.
+- **func** `(s *CalibrationService) List(ctx context.Context, tenantID, cycleID uuid.UUID, employeeID *uuid.UUID, page dto.Page) ([]dto.CalibrationResponse, dto.PageMeta, error)` — List is FR-CA002: the cycle's calibrations, newest first.
+- **func** `(b base) finalRating(ctx context.Context, db *gorm.DB, tenantID, cycleID, employeeID uuid.UUID) (*dto.FinalRating, error)` — finalRating is PM-020 for one employee: the latest calibration, else the latest submitted manager review; nil when neither exists.
+- **func** `latestReviews(reviews []models.Review) map[uuid.UUID]*models.Review` — latestReviews keeps each employee's most recently submitted review.
+- **func** `managerRating(r *models.Review) *dto.FinalRating`
+- **func** `calibrationResponse(c *models.Calibration) dto.CalibrationResponse`
+
+#### `internal/hr/performance/services/cycle_service.go` (361 lines)
 - **type** `CycleService struct{ base }` — CycleService implements FR-CY (C1–C8).
 - **func** `NewCycleService(d Deps) *CycleService { return &CycleService{base{d}} }` — NewCycleService builds the service.
 - **func** `(s *CycleService) Create(ctx context.Context, a Actor, req dto.CreateCycleRequest) (*dto.CycleResponse, error)` — Create is C1 (FR-CY001, PM-001).
@@ -5418,13 +5564,36 @@ _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredth
 - **func** `owners(goals []models.Goal) []uuid.UUID`
 - **func** `(s *CycleService) launchFor(ctx context.Context, tx *gorm.DB, c *models.Cycle, owner uuid.UUID, out *dto.LaunchResponse) error`
 - **func** `(s *CycleService) ensureReview(ctx context.Context, tx *gorm.DB, c *models.Cycle, employee, reviewer uuid.UUID, typ string) (bool, error)`
-- **func** `(s *CycleService) NineBox(ctx context.Context, tenantID, id uuid.UUID) (*dto.NineBoxResponse, error)` — NineBox is C8 (PM-015, D7-04): performance band from the latest submitted manager review × its potential, with the goal score (PM-009) alongside; cycles in review or completed only.
-- **func** `nineBox(cycleID uuid.UUID, goals []models.Goal, reviews []models.Review) *dto.NineBoxResponse`
+- **func** `(s *CycleService) NineBox(ctx context.Context, tenantID, id uuid.UUID) (*dto.NineBoxResponse, error)` — NineBox is C8 (PM-015, PM-020, D7-04): performance band from the final rating (latest calibration, else latest submitted manager review) × its potential, with the goal score (PM-009) alongside; cycles in review or completed only.
+- **func** `finalRatings(managerReviews []models.Review, cals []models.Calibration) map[uuid.UUID]*dto.FinalRating` — finalRatings is PM-020 for a whole cycle: each employee's latest calibration, else latest submitted manager review.
+- **func** `nineBox(cycleID uuid.UUID, goals []models.Goal, finals map[uuid.UUID]*dto.FinalRating) *dto.NineBoxResponse`
 - **func** `(s *CycleService) lock(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Cycle, error)`
 
-#### `internal/hr/performance/services/errors.go` (30 lines)
+#### `internal/hr/performance/services/errors.go` (33 lines)
 - **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
 - **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
+
+#### `internal/hr/performance/services/feedback_service.go` (325 lines)
+- **type** `FeedbackService struct{ base }` — FeedbackService implements continuous feedback (F1–F9, FB-001..FB-006).
+- **func** `NewFeedbackService(d Deps) *FeedbackService { return &FeedbackService{base{d}} }` — NewFeedbackService builds the service.
+- **func** `(s *FeedbackService) Give(ctx context.Context, a Actor, req dto.GiveFeedbackRequest) (*dto.FeedbackResponse, error)` — Give is F1: feedback to a colleague, optionally answering a request (FB-001, FB-005).
+- **func** `(s *FeedbackService) answer(ctx context.Context, tx *gorm.DB, a Actor, self, requestID uuid.UUID, f *models.Feedback) error` — answer is FB-005: the caller answers their pending request about the recipient.
+- **func** `(s *FeedbackService) ListReceived(ctx context.Context, a Actor, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)` — ListReceived is F2.
+- **func** `(s *FeedbackService) ListGiven(ctx context.Context, a Actor, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)` — ListGiven is F3.
+- **func** `(s *FeedbackService) ListFor(ctx context.Context, a Actor, employeeID uuid.UUID, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)` — ListFor is F4: feedback an employee received, for their direct manager or performance:read (FB-002).
+- **func** `(s *FeedbackService) ListPublic(ctx context.Context, tenantID uuid.UUID, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)` — ListPublic is F5: the tenant's praise wall.
+- **func** `(s *FeedbackService) list(ctx context.Context, tenantID uuid.UUID, f repositories.FeedbackFilter, page dto.Page) ([]dto.FeedbackResponse, dto.PageMeta, error)`
+- **func** `(s *FeedbackService) Request(ctx context.Context, a Actor, req dto.RequestFeedbackRequest) ([]dto.FeedbackRequestResponse, error)` — Request is F6 (FB-004): ask 1–10 working colleagues for feedback about yourself or a direct report.
+- **func** `(s *FeedbackService) subject(ctx context.Context, a Actor, self *employeeDTO.EmployeeResponse, raw *string) (uuid.UUID, error)` — subject resolves about_employee_id: the requester, or one of their direct reports (else 404).
+- **func** `(s *FeedbackService) responders(ctx context.Context, tenantID, requester, about uuid.UUID, raw []string) ([]uuid.UUID, error)` — responders validates FB-004: 1–10 distinct working colleagues, never the requester or the subject.
+- **func** `(s *FeedbackService) ListAssigned(ctx context.Context, a Actor, status string, page dto.Page) ([]dto.FeedbackRequestResponse, dto.PageMeta, error)` — ListAssigned is F7: requests the caller must answer.
+- **func** `(s *FeedbackService) ListMine(ctx context.Context, a Actor, status string, page dto.Page) ([]dto.FeedbackRequestResponse, dto.PageMeta, error)` — ListMine is F8: requests the caller made.
+- **func** `(s *FeedbackService) listRequests(ctx context.Context, a Actor, status string, page dto.Page, by func(uuid.UUID) repositories.RequestFilter) ([]dto.FeedbackRequestResponse, dto.PageMeta, error)`
+- **func** `(s *FeedbackService) Decline(ctx context.Context, a Actor, id uuid.UUID) (*dto.FeedbackRequestResponse, error)` — Decline is F9: the responder declines a pending request.
+- **func** `(s *FeedbackService) workingSelf(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — workingSelf is the caller's profile, which must be working (FB-001).
+- **func** `(s *FeedbackService) working(ctx context.Context, tenantID, id uuid.UUID) error` — working checks that an employee of the tenant exists and is working.
+- **func** `feedbackResponse(f *models.Feedback) dto.FeedbackResponse`
+- **func** `requestResponse(r *models.FeedbackRequest) dto.FeedbackRequestResponse`
 
 #### `internal/hr/performance/services/goal_service.go` (450 lines)
 - **type** `GoalService struct{ base }` — GoalService implements FR-GL (G1–G8).
@@ -5459,7 +5628,7 @@ _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredth
 - **func** `(b base) managerEmployee(ctx context.Context, tenantID uuid.UUID, emp *employeeDTO.EmployeeResponse) (*employeeDTO.EmployeeResponse, error)` — managerEmployee resolves an employee's direct manager's employee profile (D7-03); nil when there is none or the manager has no profile (A7-02).
 - **func** `(b base) managesEmployee(ctx context.Context, a Actor, employeeID uuid.UUID) (bool, error)` — managesEmployee reports whether the caller is the direct manager of the employee (PM-008).
 - **func** `(b base) canAccessEmployee(ctx context.Context, a Actor, employeeID uuid.UUID, write bool) (bool, error)` — canAccessEmployee is PM-008 for an owner: the permission flag, the owner themself, or the owner's manager. Denials are reported as false (callers answer 404, D7-05).
-- **func** `(b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, key string, payload events.Payload) (*models.OutboxEvent, error)` — writeOutbox stores the event inside the business transaction (FR-EV001).
+- **func** `(b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, key string, payload interface{}) (*models.OutboxEvent, error)` — writeOutbox stores the event inside the business transaction (FR-EV001).
 - **type** `auditEntry struct` — auditEntry is one audit row; metadata holds ids and statuses only (PM-017).
 - **func** `(b base) afterCommit(ctx context.Context, a Actor, e auditEntry, row *models.OutboxEvent)` — afterCommit writes the audit row and tries to publish the event; the relay retries what fails.
 - **func** `parseUUIDField(field, raw string) (uuid.UUID, error)`
@@ -5485,7 +5654,7 @@ _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredth
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled.
 
-#### `internal/hr/performance/services/ports.go` (77 lines)
+#### `internal/hr/performance/services/ports.go` (79 lines)
 _Package:_ Package services holds HR/Performance business rules (specification.md PM-001..PM-017).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is HR/Performance's view of HR/Employee (connection C4); employee/api.Directory satisfies it.
 - **method** `EmployeeDirectory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
@@ -5506,13 +5675,13 @@ _Package:_ Package services holds HR/Performance business rules (specification.m
 - **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
 
-#### `internal/hr/performance/services/review_service.go` (231 lines)
+#### `internal/hr/performance/services/review_service.go` (243 lines)
 - **type** `ReviewService struct{ base }` — ReviewService implements FR-RV (V1–V6).
 - **func** `NewReviewService(d Deps) *ReviewService { return &ReviewService{base{d}} }` — NewReviewService builds the service.
 - **func** `(s *ReviewService) Assign(ctx context.Context, a Actor, req dto.AssignReviewerRequest) (*dto.ReviewResponse, error)` — Assign is V1 (FR-RV001, PM-011).
 - **func** `(s *ReviewService) List(ctx context.Context, tenantID uuid.UUID, f repositories.ReviewFilter, page dto.Page) ([]dto.ReviewResponse, dto.PageMeta, error)` — List is V2 (performance:read).
 - **func** `(s *ReviewService) ListAssigned(ctx context.Context, a Actor, status string, page dto.Page) ([]dto.ReviewResponse, dto.PageMeta, error)` — ListAssigned is V3: reviews the caller must write.
-- **func** `(s *ReviewService) ListMine(ctx context.Context, a Actor, cycleID *uuid.UUID) ([]dto.ReviewResponse, error)` — ListMine is V4 (PM-014): the caller's submitted reviews of completed cycles; peer reviewers stay anonymous.
+- **func** `(s *ReviewService) ListMine(ctx context.Context, a Actor, cycleID *uuid.UUID) ([]dto.ReviewResponse, error)` — ListMine is V4 (PM-014, PM-021): the caller's submitted reviews of completed cycles with the cycle's final rating; peer reviewers stay anonymous and calibration reasons are never included.
 - **func** `(s *ReviewService) Get(ctx context.Context, a Actor, id uuid.UUID) (*dto.ReviewResponse, error)` — Get is V5: the reviewer or performance:read; anyone else 404.
 - **func** `(s *ReviewService) Submit(ctx context.Context, a Actor, id uuid.UUID, req dto.SubmitReviewRequest) (*dto.ReviewResponse, error)` — Submit is V6 (FR-RV003, PM-012): only the assigned reviewer, once, while the cycle is in review.
 - **func** `(s *ReviewService) fill(r *models.Review, criteria []string, req dto.SubmitReviewRequest) error` — fill validates ratings and potential against the cycle (PM-012) and marks the review submitted.
@@ -5697,16 +5866,19 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `internal/hr/recruitment/services/harness_test.go`: (helpers only)
 - `internal/hr/recruitment/validators/validators_test.go`: TestValidators
 
-### M1 HR / Performance & OKRs — 29 test functions in 10 files
+### M1 HR / Performance & OKRs — 38 test functions in 13 files
 - `internal/hr/performance/controllers/controllers_test.go`: TestControllers_EveryOperation, TestControllers_Errors, TestControllers_BadInput
+- `internal/hr/performance/controllers/parity_controllers_test.go`: TestControllers_ParityInput
 - `internal/hr/performance/lifecycle/lifecycle_test.go`: TestGolden_G2_CycleGraph, TestGolden_G2_GoalGraph
 - `internal/hr/performance/models/models_test.go`: TestPerformanceModels_TablesAndIndexes, TestPerformanceModels_ColumnTypes, TestPerformanceModels_JSONColumnsAndIDs
 - `internal/hr/performance/score/score_test.go`: TestParseAndCodec, TestGolden_G3_ScoreMath
 - `internal/hr/performance/services/admin_test.go`: TestCycles_CRUDAndStateGraph, TestReviews_AssignAndLists, TestGoals_Validation, TestOutboxRelay
 - `internal/hr/performance/services/failures_test.go`: TestFailures_Propagate, TestFailures_Submit
+- `internal/hr/performance/services/fakes_parity_test.go`: (helpers only)
 - `internal/hr/performance/services/fakes_test.go`: (helpers only)
 - `internal/hr/performance/services/golden_test.go`: TestGolden_G4_WeightCap, TestGolden_G5_KeyResultProgress, TestGolden_G6_Access, TestGolden_G7_CycleLocks, TestGolden_G8_LaunchReviews, TestGolden_G9_Submit, TestGolden_G10_SubjectVisibility, TestGolden_G11_NineBox, TestGolden_G12_Privacy, TestGolden_G15_Cascading
 - `internal/hr/performance/services/harness_test.go`: (helpers only)
+- `internal/hr/performance/services/parity_test.go`: TestGolden_G16_Calibration, TestCalibration_Validation, TestGolden_G17_FinalRatingForSubject, TestGolden_G18_FeedbackVisibility, TestGolden_G19_FeedbackRequests, TestGolden_G20_ParityPrivacy, TestFeedback_Validation, TestFailures_Parity
 - `internal/hr/performance/validators/validators_test.go`: TestCriteria_PM001, TestDatesWeightsProgressKR, TestRatings_PM012
 
 ### Integration suite (`backend/tests/integration`)
@@ -5722,6 +5894,7 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `org_test.go`: TestDepartmentLifecycleAndHierarchy, TestDepartmentDepthLimit, TestTeamLifecycle, TestDesignationLifecycle, TestMappingRulesAndUserDeactivationConvergence, TestOrgChartIsReadYourWritesConsistent, TestOrgChartUserChain, TestOrgRBAC
 - `payroll_test.go`: TestPayrollLifecycle, TestPayrollRBACAndIsolation
 - `perf_test.go`: TestPerformanceBudgets
+- `performance_parity_test.go`: TestPerformanceCalibrationAndFeedback
 - `performance_test.go`: TestPerformanceLifecycle
 - `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
@@ -6759,6 +6932,26 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 | V4 | GET `/reviews/me?cycle_id` | self (subject, PM-014) |
 | V5 | GET `/reviews/{id}` | reviewer or read |
 | V6 | POST `/reviews/{id}/submit` | reviewer |
+| PM-018 | Calibration only while the cycle is `review` (409 `CYCLE_STATE`). The employee must have a submitted manager review in the cycle (409 `NOT_RATED`). |
+| PM-019 | Each calibration is an append-only row with the before values (the current final score and potential), the after values, the reason, and who made it and when. Omitted fields keep their current final value. A calibration that changes nothing is 400. |
+| PM-020 | The **final rating** of an employee in a cycle is the latest calibration if one exists, otherwise the latest submitted manager review. The 9-box (PM-015) uses the final rating and marks `calibrated: true`. |
+| PM-021 | After completion, the subject's `GET /reviews/me` response carries `final` (score, potential, calibrated) for each completed cycle. Calibration reasons and the calibrator are never shown to the subject. |
+| PM-022 | Audit and events (`performance.rating_calibrated`) carry ids only: never scores, potential or reason (PM-017). |
+| F1 | POST `/feedback` `{to_employee_id, kind: praise\|constructive, visibility: private\|public, message, request_id?}` | self |
+| F2 | GET `/feedback/received?page&per_page` | self |
+| F3 | GET `/feedback/given?page&per_page` | self |
+| F4 | GET `/feedback?employee_id&page&per_page` | the employee's manager, or performance:read |
+| F5 | GET `/feedback/public?page&per_page` | authenticated (praise wall) |
+| F6 | POST `/feedback/requests` `{responder_employee_ids[1..10], about_employee_id?, question}` | self; `about` = self or a direct report |
+| F7 | GET `/feedback/requests/assigned?status&page&per_page` | self (responder) |
+| F8 | GET `/feedback/requests/mine?status&page&per_page` | self (requester) |
+| F9 | POST `/feedback/requests/{id}/decline` | the responder |
+| FB-001 | Giver ≠ recipient; both are working employees (409 `EMPLOYEE_STATE`); message 1–2000 characters; `public` only with `praise` (400). |
+| FB-002 | Visibility: `private` feedback is visible to the giver, the recipient, the recipient's direct manager and performance:read. `public` feedback is also visible to every tenant user on F5. Anyone else → 404. |
+| FB-003 | Feedback is immutable once given. |
+| FB-004 | Requests: the requester asks 1–10 distinct working colleagues (never the subject or the requester); question 1–500 characters. `about_employee_id` defaults to the requester and may be a direct report (else 404). One `pending` request per (requester, responder, about); a repeat → 409 `CONFLICT`. |
+| FB-005 | Answering: F1 with `request_id`. The caller must be the request's responder, the request must be `pending` (409 `REQUEST_STATE`), and `to_employee_id` must be the request's subject (400). The request becomes `answered` and links the feedback. Declining sets `declined`. |
+| FB-006 | Events `performance.feedback_given` and `performance.feedback_requested` and the audit rows carry ids, kind and visibility only, never the message or the question (PM-017). |
 
 **Requirements and rules (ID-tagged bullets)**
 
@@ -6796,6 +6989,8 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 - EC-09: Subject lists reviews before completion → empty. After completion, peer reviews have no reviewer id.
 - EC-10: A cascading chain of depth 4 → 409 `GOAL_DEPTH`.
 - EC-11: Cross-tenant ids → 404.
+- **FR-CA001** Calibrate `POST /cycles/{id}/calibrations {employee_id, overall_score?, potential?, reason}`. At least one
+- **FR-CA002** History `GET /cycles/{id}/calibrations?employee_id&page&per_page` (performance:read), newest first.
 
 **Errors**
 
@@ -6820,7 +7015,15 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 - D7-08 (P5) HR/Performance reads the direct manager through its own `ManagerDirectory` port; the HR root passes
   `organization.Module.DirectManager` (primary active mapping), so performance never imports HR/Organization (import-boundary test).
 - D7-09 (P6) A parent goal from another tenant is 404 (PM-016); a parent in another cycle or cancelled is 400.
+- D7-10 (parity) Calibration records an override next to the manager review instead of editing it, so the submitted
+  review stays immutable (PM-012) and every change is auditable with a reason; the "final rating" is derived (PM-020).
+- D7-11 (parity) A separate `performance:calibrate` permission: calibration changes outcomes for people outside one's
+  team, so it is narrower than `performance:manage` (which runs cycles).
+- D7-12 (parity) Continuous feedback is cycle-independent and visible to the recipient's direct manager; public
+  visibility is limited to praise so the wall cannot carry criticism.
 ##### Changelog
 2026-10-09 — P1 DONE: HR/Performance = Performance & OKRs (D7-01); design frozen; Notifications scaffold unnumbered.
 2026-10-09 — P2 DONE: models, migrations, score + lifecycle goldens.
 2026-10-20 — P3–P9 DONE: backend, unit + integration goldens, swagger, console page; context complete for its v1 scope.
+2026-10-20 — Parity design: calibration (PM-018..PM-022) and continuous feedback (FB-001..FB-006), goldens G16–G20.
+2026-10-20 — Parity DONE: calibration + continuous feedback built and verified (33 ops in total).

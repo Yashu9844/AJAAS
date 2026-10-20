@@ -15,6 +15,10 @@ const (
 	GoalUpdated     = "performance.goal_updated"
 	ReviewSubmitted = "performance.review_submitted"
 	CycleCompleted  = "performance.cycle_completed"
+	// Parity additions (PM-022, FB-006).
+	RatingCalibrated  = "performance.rating_calibrated"
+	FeedbackGiven     = "performance.feedback_given"
+	FeedbackRequested = "performance.feedback_requested"
 
 	envelopeVersion = "1.0"
 	producer        = "performance-service"
@@ -56,4 +60,14 @@ type Payload struct {
 	Status     string       `json:"status,omitempty"`
 	ReviewType string       `json:"review_type,omitempty"`
 	Progress   *score.Fixed `json:"progress,omitempty"`
+}
+
+// FeedbackPayload carries ids, kind and visibility only — never the message or the question (FB-006).
+type FeedbackPayload struct {
+	FeedbackID *uuid.UUID `json:"feedback_id,omitempty"`
+	RequestID  *uuid.UUID `json:"request_id,omitempty"`
+	FromID     uuid.UUID  `json:"from_employee_id"`
+	ToID       uuid.UUID  `json:"to_employee_id"`
+	Kind       string     `json:"kind,omitempty"`
+	Visibility string     `json:"visibility,omitempty"`
 }

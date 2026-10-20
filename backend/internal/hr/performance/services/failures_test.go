@@ -21,42 +21,86 @@ func TestFailures_Propagate(t *testing.T) {
 			_, err := e.cycles.Create(ctx, e.admin(), dto.CreateCycleRequest{Title: "x", StartDate: "2026-01-01", EndDate: "2026-01-02"})
 			return err
 		}},
-		{"cycles.find", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.Get(ctx, e.tenant, cy); return err }},
-		{"cycles.find", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.NineBox(ctx, e.tenant, cy); return err }},
+		{"cycles.find", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.Get(ctx, e.tenant, cy)
+			return err
+		}},
+		{"cycles.find", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.NineBox(ctx, e.tenant, cy)
+			return err
+		}},
 		{"cycles.list", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error {
 			_, _, err := e.cycles.List(ctx, e.tenant, "", dto.ParsePage("", ""))
 			return err
 		}},
-		{"cycles.update", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.LaunchReviews(ctx, e.admin(), cy); return err }},
+		{"cycles.update", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.LaunchReviews(ctx, e.admin(), cy)
+			return err
+		}},
 		{"cycles.lock", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
 			_, err := e.cycles.Update(ctx, e.admin(), cy, dto.UpdateCycleRequest{})
 			return err
 		}},
-		{"goals.open", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.LaunchReviews(ctx, e.admin(), cy); return err }},
-		{"reviews.exists", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.LaunchReviews(ctx, e.admin(), cy); return err }},
-		{"reviews.create", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.LaunchReviews(ctx, e.admin(), cy); return err }},
-		{"managers", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.LaunchReviews(ctx, e.admin(), cy); return err }},
-		{"employees.get", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.LaunchReviews(ctx, e.admin(), cy); return err }},
-		{"outbox.create", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { _, err := e.cycles.LaunchReviews(ctx, e.admin(), cy); _ = err; _, err = e.cycles.Complete(ctx, e.admin(), cy); return err }},
+		{"goals.open", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.LaunchReviews(ctx, e.admin(), cy)
+			return err
+		}},
+		{"reviews.exists", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.LaunchReviews(ctx, e.admin(), cy)
+			return err
+		}},
+		{"reviews.create", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.LaunchReviews(ctx, e.admin(), cy)
+			return err
+		}},
+		{"managers", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.LaunchReviews(ctx, e.admin(), cy)
+			return err
+		}},
+		{"employees.get", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.LaunchReviews(ctx, e.admin(), cy)
+			return err
+		}},
+		{"outbox.create", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.cycles.LaunchReviews(ctx, e.admin(), cy)
+			_ = err
+			_, err = e.cycles.Complete(ctx, e.admin(), cy)
+			return err
+		}},
 		{"goals.weightsum", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { return e.newGoal(cy) }},
 		{"goals.lockowner", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { return e.newGoal(cy) }},
 		{"goals.create", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { return e.newGoal(cy) }},
 		{"employees.byuser", func(e *env, cy uuid.UUID, _ *dto.GoalResponse) error { return e.newGoal(cy) }},
-		{"goals.find", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { _, err := e.goals.Get(ctx, e.as(e.alice), g.ID); return err }},
+		{"goals.find", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
+			_, err := e.goals.Get(ctx, e.as(e.alice), g.ID)
+			return err
+		}},
 		{"goals.list", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error {
 			_, _, err := e.goals.List(ctx, e.admin(), repositories.GoalFilter{}, dto.ParsePage("", ""))
 			return err
 		}},
-		{"goals.lock", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { _, err := e.goals.SetStatus(ctx, e.as(e.alice), g.ID, "completed"); return err }},
-		{"goals.update", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { _, err := e.goals.SetStatus(ctx, e.as(e.alice), g.ID, "completed"); return err }},
+		{"goals.lock", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
+			_, err := e.goals.SetStatus(ctx, e.as(e.alice), g.ID, "completed")
+			return err
+		}},
+		{"goals.update", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
+			_, err := e.goals.SetStatus(ctx, e.as(e.alice), g.ID, "completed")
+			return err
+		}},
 		{"goals.update", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
 			_, err := e.goals.Update(ctx, e.as(e.alice), g.ID, dto.UpdateGoalRequest{Title: sp("x")})
 			return err
 		}},
 		{"krs.create", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { return e.newKR(g) }},
 		{"krs.list", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { return e.newKR(g) }},
-		{"krs.list", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { _, err := e.goals.Get(ctx, e.as(e.alice), g.ID); return err }},
-		{"checkins.list", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { _, err := e.goals.Get(ctx, e.as(e.alice), g.ID); return err }},
+		{"krs.list", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
+			_, err := e.goals.Get(ctx, e.as(e.alice), g.ID)
+			return err
+		}},
+		{"checkins.list", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
+			_, err := e.goals.Get(ctx, e.as(e.alice), g.ID)
+			return err
+		}},
 		{"checkins.create", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
 			_, err := e.goals.CheckIn(ctx, e.as(e.alice), g.ID, dto.CheckInRequest{Progress: fxp("1")})
 			return err
@@ -69,17 +113,26 @@ func TestFailures_Propagate(t *testing.T) {
 			_, err := e.goals.CheckIn(ctx, e.as(e.alice), g.ID, dto.CheckInRequest{KeyResultID: &kr, Value: fxp("1")})
 			return err
 		}},
-		{"managers", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error { _, err := e.goals.Get(ctx, e.as(e.carol), g.ID); return err }},
+		{"managers", func(e *env, _ uuid.UUID, g *dto.GoalResponse) error {
+			_, err := e.goals.Get(ctx, e.as(e.carol), g.ID)
+			return err
+		}},
 		{"reviews.list", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error {
 			_, _, err := e.reviews.List(ctx, e.tenant, repositories.ReviewFilter{}, dto.ParsePage("", ""))
 			return err
 		}},
-		{"reviews.list", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error { _, err := e.reviews.ListMine(ctx, e.as(e.alice), nil); return err }},
+		{"reviews.list", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.reviews.ListMine(ctx, e.as(e.alice), nil)
+			return err
+		}},
 		{"reviews.list", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error {
 			_, _, err := e.reviews.ListAssigned(ctx, e.as(e.alice), "", dto.ParsePage("", ""))
 			return err
 		}},
-		{"reviews.find", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error { _, err := e.reviews.Get(ctx, e.admin(), uuid.New()); return err }},
+		{"reviews.find", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error {
+			_, err := e.reviews.Get(ctx, e.admin(), uuid.New())
+			return err
+		}},
 		{"reviews.lock", func(e *env, _ uuid.UUID, _ *dto.GoalResponse) error {
 			_, err := e.reviews.Submit(ctx, e.as(e.alice), uuid.New(), dto.SubmitReviewRequest{Ratings: ratings})
 			return err
