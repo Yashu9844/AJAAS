@@ -152,11 +152,11 @@ func TestAccessAutomaticRoles(t *testing.T) {
 	roles := tc.rolesByKey(t)
 	mgrID, mgrEmail := tc.newUser(t, "boss")
 	repID, _ := tc.newUser(t, "rep")
-	expect(t, tc.do(t, "POST", "/employees", body(empBody(mgrID, "B-"+strings.ToUpper(uniq()), nil))), 201, "boss profile")
-	expect(t, tc.do(t, "POST", "/employees", body(empBody(repID, "R-"+strings.ToUpper(uniq()), nil))), 201, "rep profile")
-	d := tc.do(t, "POST", "/departments", body(map[string]any{"name": "Sales " + uniq()}))
+	expect(t, tc.do(t, "POST", "/hr/employees", body(empBody(mgrID, "B-"+strings.ToUpper(uniq()), nil))), 201, "boss profile")
+	expect(t, tc.do(t, "POST", "/hr/employees", body(empBody(repID, "R-"+strings.ToUpper(uniq()), nil))), 201, "rep profile")
+	d := tc.do(t, "POST", "/hr/departments", body(map[string]any{"name": "Sales " + uniq()}))
 	expect(t, d, 201, "department")
-	m := tc.do(t, "POST", "/mappings", body(map[string]any{"user_id": repID, "department_id": d.str("data.id"), "is_primary": true, "manager_user_id": mgrID}))
+	m := tc.do(t, "POST", "/hr/mappings", body(map[string]any{"user_id": repID, "department_id": d.str("data.id"), "is_primary": true, "manager_user_id": mgrID}))
 	expect(t, m, 201, "reporting line")
 
 	// login syncs the user's automatic roles
@@ -170,7 +170,7 @@ func TestAccessAutomaticRoles(t *testing.T) {
 	expectErr(t, tc.do(t, "DELETE", "/users/"+mgrID+"/roles/"+roles["manager"]["id"].(string)), 409, "ROLE_AUTOMATIC", "manual remove")
 
 	// the reporting line ends → the tenant sync removes Manager, keeps Employee
-	expect(t, tc.do(t, "POST", "/mappings/"+m.str("data.id")+"/deactivate"), 200, "end reporting line")
+	expect(t, tc.do(t, "POST", "/hr/mappings/"+m.str("data.id")+"/deactivate"), 200, "end reporting line")
 	s := tc.do(t, "POST", "/access/automatic-roles/sync")
 	expect(t, s, 200, "sync")
 	if s.get("data.removed").(float64) < 1 || s.get("data.added").(float64) < 1 {

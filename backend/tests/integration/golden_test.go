@@ -12,19 +12,19 @@ import (
 func TestGoldenM1_TeamMoveKeepsMappingsConsistent(t *testing.T) {
 	tc := newTenant(t)
 	d1, d2 := tc.mkDept(t, "G8a"), tc.mkDept(t, "G8b")
-	team := tc.do(t, "POST", "/teams", body(map[string]string{"name": "Mover", "department_id": d1}))
+	team := tc.do(t, "POST", "/hr/teams", body(map[string]string{"name": "Mover", "department_id": d1}))
 	expect(t, team, 201, "team")
 	tid := team.str("data.id")
 	uid, _ := tc.newUser(t, "mv")
-	m := tc.do(t, "POST", "/mappings", body(map[string]any{"user_id": uid, "department_id": d1, "team_id": tid, "is_primary": true}))
+	m := tc.do(t, "POST", "/hr/mappings", body(map[string]any{"user_id": uid, "department_id": d1, "team_id": tid, "is_primary": true}))
 	expect(t, m, 201, "mapping")
 	mid := m.str("data.id")
 
-	expect(t, tc.do(t, "PATCH", "/teams/"+tid, body(map[string]string{"department_id": d2})), 200, "move team")
-	if tc.do(t, "GET", "/teams/"+tid).str("data.department_id") != d2 {
+	expect(t, tc.do(t, "PATCH", "/hr/teams/"+tid, body(map[string]string{"department_id": d2})), 200, "move team")
+	if tc.do(t, "GET", "/hr/teams/"+tid).str("data.department_id") != d2 {
 		t.Fatal("team did not move")
 	}
-	g := tc.do(t, "GET", "/mappings/"+mid)
+	g := tc.do(t, "GET", "/hr/mappings/"+mid)
 	if g.str("data.team_id") != tid || g.str("data.department_id") != d2 {
 		t.Fatalf("mapping must follow its team to the new department (no mixed dept/team): %s", g.Raw)
 	}
@@ -37,20 +37,20 @@ func TestGoldenM1_TeamMoveKeepsMappingsConsistent(t *testing.T) {
 func TestGoldenM1_AuditOnEveryOrgWrite(t *testing.T) {
 	tc := newTenant(t)
 	d := tc.mkDept(t, "Aud")
-	tc.do(t, "PATCH", "/departments/"+d, body(map[string]string{"description": "x"}))
-	team := tc.do(t, "POST", "/teams", body(map[string]string{"name": "AT", "department_id": d}))
+	tc.do(t, "PATCH", "/hr/departments/"+d, body(map[string]string{"description": "x"}))
+	team := tc.do(t, "POST", "/hr/teams", body(map[string]string{"name": "AT", "department_id": d}))
 	tid := team.str("data.id")
-	tc.do(t, "PATCH", "/teams/"+tid, body(map[string]string{"description": "x"}))
-	des := tc.do(t, "POST", "/designations", body(map[string]string{"title": "AD " + uniq()}))
+	tc.do(t, "PATCH", "/hr/teams/"+tid, body(map[string]string{"description": "x"}))
+	des := tc.do(t, "POST", "/hr/designations", body(map[string]string{"title": "AD " + uniq()}))
 	gid := des.str("data.id")
-	tc.do(t, "PATCH", "/designations/"+gid, body(map[string]string{"description": "x"}))
+	tc.do(t, "PATCH", "/hr/designations/"+gid, body(map[string]string{"description": "x"}))
 	uid, _ := tc.newUser(t, "aud")
-	m := tc.do(t, "POST", "/mappings", body(map[string]any{"user_id": uid, "department_id": d}))
-	tc.do(t, "PATCH", "/mappings/"+m.str("data.id"), body(map[string]any{"is_primary": true}))
-	tc.do(t, "POST", "/mappings/"+m.str("data.id")+"/deactivate")
-	tc.do(t, "POST", "/designations/"+gid+"/deactivate")
-	tc.do(t, "POST", "/teams/"+tid+"/deactivate")
-	tc.do(t, "POST", "/departments/"+d+"/deactivate")
+	m := tc.do(t, "POST", "/hr/mappings", body(map[string]any{"user_id": uid, "department_id": d}))
+	tc.do(t, "PATCH", "/hr/mappings/"+m.str("data.id"), body(map[string]any{"is_primary": true}))
+	tc.do(t, "POST", "/hr/mappings/"+m.str("data.id")+"/deactivate")
+	tc.do(t, "POST", "/hr/designations/"+gid+"/deactivate")
+	tc.do(t, "POST", "/hr/teams/"+tid+"/deactivate")
+	tc.do(t, "POST", "/hr/departments/"+d+"/deactivate")
 
 	logs := tc.do(t, "GET", "/audit-logs", query("per_page", "100"))
 	for _, want := range []string{
@@ -76,7 +76,7 @@ func TestGoldenNoSecretLeakage(t *testing.T) {
 	tc := newTenant(t)
 	uid, email := tc.newUser(t, "leak")
 	eid := tc.mkEmployee(t, "leak")
-	tc.do(t, "PUT", "/employees/"+eid+"/statutory", body(map[string]string{"tax_id": "ABCDE1234F", "bank_account_number": "123456789012", "bank_name": "B"}))
+	tc.do(t, "PUT", "/hr/employees/"+eid+"/statutory", body(map[string]string{"tax_id": "ABCDE1234F", "bank_account_number": "123456789012", "bank_name": "B"}))
 	l := login(t, tc.slug, email, password)
 	forbidden := []string{"password_hash", "passwordhash", "token_hash", "tokenhash", "$2a$", "$2b$", "jwt_secret", "refresh_tokens", "mfa_secret"}
 	payloads := []resp{
@@ -86,13 +86,13 @@ func TestGoldenNoSecretLeakage(t *testing.T) {
 		tc.do(t, "GET", "/roles"),
 		tc.do(t, "GET", "/permissions"),
 		tc.do(t, "GET", "/audit-logs", query("per_page", "100")),
-		tc.do(t, "GET", "/employees", query("per_page", "100")),
-		tc.do(t, "GET", "/employees/"+eid),
-		tc.do(t, "GET", "/employees/"+eid+"/statutory"),
+		tc.do(t, "GET", "/hr/employees", query("per_page", "100")),
+		tc.do(t, "GET", "/hr/employees/"+eid),
+		tc.do(t, "GET", "/hr/employees/"+eid+"/statutory"),
 		call(t, "GET", "/tenants", platform()),
 		call(t, "GET", "/auth/me", token(tc.token)),
-		tc.do(t, "GET", "/departments"),
-		tc.do(t, "GET", "/org-chart"),
+		tc.do(t, "GET", "/hr/departments"),
+		tc.do(t, "GET", "/hr/org-chart"),
 	}
 	for i, p := range payloads {
 		low := strings.ToLower(p.Raw)
@@ -112,30 +112,30 @@ func TestGoldenNoSecretLeakage(t *testing.T) {
 func TestGoldenM2_EmployeeForForeignTenantUser(t *testing.T) {
 	a, b := newTenant(t), newTenant(t)
 	foreign, _ := b.newUser(t, "foreign")
-	expectErr(t, a.do(t, "POST", "/employees", body(empBody(foreign, "G4-"+uniq(), nil))), 404, "NOT_FOUND", "user from another tenant")
+	expectErr(t, a.do(t, "POST", "/hr/employees", body(empBody(foreign, "G4-"+uniq(), nil))), 404, "NOT_FOUND", "user from another tenant")
 }
 
 // M2-G2: onboarding is atomic — profile, employment, contact and timeline all exist after a single 201.
 func TestGoldenM2_AtomicOnboarding(t *testing.T) {
 	tc := newTenant(t)
 	id := tc.mkEmployee(t, "atomic", map[string]any{"personal_email": "a@b.co", "work_phone": "+91"})
-	g := tc.do(t, "GET", "/employees/"+id)
+	g := tc.do(t, "GET", "/hr/employees/"+id)
 	if g.get("data.employment") == nil || g.get("data.contact") == nil || g.str("data.employment.employment_type") == "" {
 		t.Fatalf("profile/employment/contact must all exist: %s", g.Raw)
 	}
-	if !timelineHas(tc.do(t, "GET", "/employees/"+id+"/timeline"), "hired") {
+	if !timelineHas(tc.do(t, "GET", "/hr/employees/"+id+"/timeline"), "hired") {
 		t.Fatal("timeline must exist")
 	}
 	// a failed onboarding leaves nothing behind
 	uid, _ := tc.newUser(t, "atomic2")
-	before := tc.do(t, "GET", "/employees", query("per_page", "100"))
-	expectErr(t, tc.do(t, "POST", "/employees", body(empBody(uid, "bad code!", nil))), 400, "VALIDATION_ERROR", "invalid")
-	after := tc.do(t, "GET", "/employees", query("per_page", "100"))
+	before := tc.do(t, "GET", "/hr/employees", query("per_page", "100"))
+	expectErr(t, tc.do(t, "POST", "/hr/employees", body(empBody(uid, "bad code!", nil))), 400, "VALIDATION_ERROR", "invalid")
+	after := tc.do(t, "GET", "/hr/employees", query("per_page", "100"))
 	if len(before.list("data")) != len(after.list("data")) {
 		t.Fatal("failed onboarding must not leave a partial profile")
 	}
 	// the user is still free to be onboarded afterwards
-	expect(t, tc.do(t, "POST", "/employees", body(empBody(uid, "OK-"+uniq(), nil))), 201, "retry succeeds")
+	expect(t, tc.do(t, "POST", "/hr/employees", body(empBody(uid, "OK-"+uniq(), nil))), 201, "retry succeeds")
 }
 
 // M1-G2: rejected hierarchy changes leave no partial write.
@@ -143,11 +143,11 @@ func TestGoldenM1_RejectedHierarchyChangeLeavesNoTrace(t *testing.T) {
 	tc := newTenant(t)
 	p := tc.mkDept(t, "G2p")
 	c := tc.mkDept(t, "G2c", p)
-	beforeP := tc.do(t, "GET", "/departments/"+p).Raw
-	beforeC := tc.do(t, "GET", "/departments/"+c).Raw
-	expectErr(t, tc.do(t, "PATCH", "/departments/"+p, body(map[string]string{"parent_department_id": c, "name": "Hijacked"})), 409, "CONFLICT", "cycle")
-	expectErr(t, tc.do(t, "PATCH", "/departments/"+p, body(map[string]string{"parent_department_id": p, "name": "Hijacked"})), 400, "VALIDATION_ERROR", "self parent")
-	if tc.do(t, "GET", "/departments/"+p).Raw != beforeP || tc.do(t, "GET", "/departments/"+c).Raw != beforeC {
+	beforeP := tc.do(t, "GET", "/hr/departments/"+p).Raw
+	beforeC := tc.do(t, "GET", "/hr/departments/"+c).Raw
+	expectErr(t, tc.do(t, "PATCH", "/hr/departments/"+p, body(map[string]string{"parent_department_id": c, "name": "Hijacked"})), 409, "CONFLICT", "cycle")
+	expectErr(t, tc.do(t, "PATCH", "/hr/departments/"+p, body(map[string]string{"parent_department_id": p, "name": "Hijacked"})), 400, "VALIDATION_ERROR", "self parent")
+	if tc.do(t, "GET", "/hr/departments/"+p).Raw != beforeP || tc.do(t, "GET", "/hr/departments/"+c).Raw != beforeC {
 		t.Fatal("a rejected hierarchy change modified data (partial write)")
 	}
 }

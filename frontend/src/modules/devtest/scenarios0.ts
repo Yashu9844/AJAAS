@@ -207,8 +207,8 @@ export const S0: Scenario[] = [
       await r.call("limited user: POST /users (lacks users:create) → 403", tn(S, "POST", "/users", { email: `n.${uid}@example.com`, password: PASSWORD, first_name: "N", last_name: "N" }), 403);
       await r.call("limited user: GET /roles (lacks roles:read) → 403", tn(S, "GET", "/roles"), 403);
       await r.call("limited user: PATCH /users/:id (lacks users:update) → 403", tn(S, "PATCH", `/users/${u.id}`, { first_name: "X" }), 403);
-      await r.call("limited user: GET /departments (lacks organization:read) → 403", tn(S, "GET", "/departments"), 403);
-      await r.call("limited user: GET /employees (lacks employee:read) → 403", tn(S, "GET", "/employees"), 403);
+      await r.call("limited user: GET /departments (lacks organization:read) → 403", tn(S, "GET", "/hr/departments"), 403);
+      await r.call("limited user: GET /employees (lacks employee:read) → 403", tn(S, "GET", "/hr/employees"), 403);
       await r.call("admin grants roles:read to role", tn(A, "POST", `/roles/${rid}/permissions`, { permission_ids: [pRoles] }), 200);
       await r.call("limited user: GET /roles now allowed → 200", tn(S, "GET", "/roles"), 200);
       await r.call("tenant_admin bypass: GET /roles → 200", tn(A, "GET", "/roles"), 200);
@@ -311,16 +311,16 @@ export const S0: Scenario[] = [
       r.need(A.slug !== B.slug, "sessions A and B must be different tenants");
       await r.call("Token A on tenant-B host → 403", { ...tn(A, "GET", "/users"), slug: B.slug }, 403);
       await r.call("Token B on tenant-A host → 403", { ...tn(B, "GET", "/users"), slug: A.slug }, 403);
-      await r.call("Token A on tenant-B host (departments) → 403", { ...tn(A, "GET", "/departments"), slug: B.slug }, 403);
-      await r.call("Token A on tenant-B host (employees) → 403", { ...tn(A, "GET", "/employees"), slug: B.slug }, 403);
-      const dB = await r.call("B creates a department", tn(B, "POST", "/departments", { name: `B-dept-${uid}`, code: `BD${uid.toUpperCase()}` }), 201);
+      await r.call("Token A on tenant-B host (departments) → 403", { ...tn(A, "GET", "/hr/departments"), slug: B.slug }, 403);
+      await r.call("Token A on tenant-B host (employees) → 403", { ...tn(A, "GET", "/hr/employees"), slug: B.slug }, 403);
+      const dB = await r.call("B creates a department", tn(B, "POST", "/hr/departments", { name: `B-dept-${uid}`, code: `BD${uid.toUpperCase()}` }), 201);
       const dId = str(dB, "data.id");
       r.need(dId, "B department id missing");
-      await r.call("A GET B's department by id (own host) → 404", tn(A, "GET", `/departments/${dId}`), 404);
-      await r.call("A PATCH B's department by id → 404", tn(A, "PATCH", `/departments/${dId}`, { name: "hijacked" }), 404);
-      await r.call("A deactivate B's department by id → 404", tn(A, "POST", `/departments/${dId}/deactivate`), 404);
-      await r.call("A's department list does not contain B's department", tn(A, "GET", "/departments", undefined, { per_page: "100" }), 200, listLacks(dId));
-      await r.call("B still sees its department unchanged", tn(B, "GET", `/departments/${dId}`), 200, expectFields(["data.name", `B-dept-${uid}`]));
+      await r.call("A GET B's department by id (own host) → 404", tn(A, "GET", `/hr/departments/${dId}`), 404);
+      await r.call("A PATCH B's department by id → 404", tn(A, "PATCH", `/hr/departments/${dId}`, { name: "hijacked" }), 404);
+      await r.call("A deactivate B's department by id → 404", tn(A, "POST", `/hr/departments/${dId}/deactivate`), 404);
+      await r.call("A's department list does not contain B's department", tn(A, "GET", "/hr/departments", undefined, { per_page: "100" }), 200, listLacks(dId));
+      await r.call("B still sees its department unchanged", tn(B, "GET", `/hr/departments/${dId}`), 200, expectFields(["data.name", `B-dept-${uid}`]));
       const bUser = B.user?.id ?? "";
       r.need(bUser, "B user id missing");
       await r.call("A GET B's user by id → 404", tn(A, "GET", `/users/${bUser}`), 404);
@@ -328,7 +328,7 @@ export const S0: Scenario[] = [
       const bRole = B.user?.roles[0]?.id ?? "";
       if (bRole) await r.call("A GET B's role by id → 404", tn(A, "GET", `/roles/${bRole}`), 404);
       await r.call("A assigns B's role to A's user → rejected", tn(A, "POST", `/users/${A.user?.id}/roles`, { role_ids: [bRole || ZERO] }), [400, 404, 422]);
-      await r.call("Cleanup: B deactivates its department", tn(B, "POST", `/departments/${dId}/deactivate`), 200);
+      await r.call("Cleanup: B deactivates its department", tn(B, "POST", `/hr/departments/${dId}/deactivate`), 200);
     },
   },
 ];

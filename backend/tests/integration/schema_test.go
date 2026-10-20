@@ -40,14 +40,14 @@ func TestMigrationsAreIdempotentAndComplete(t *testing.T) {
 func TestBusinessCodesAreTenantScoped(t *testing.T) {
 	a, b := newTenant(t), newTenant(t)
 	for _, tc := range []*tenantCtx{a, b} {
-		expect(t, tc.do(t, "POST", "/departments", body(map[string]string{"name": "Engineering", "code": "ENG"})), 201, "department in "+tc.slug)
-		expect(t, tc.do(t, "POST", "/designations", body(map[string]string{"title": "Engineer", "code": "ENGR"})), 201, "designation in "+tc.slug)
+		expect(t, tc.do(t, "POST", "/hr/departments", body(map[string]string{"name": "Engineering", "code": "ENG"})), 201, "department in "+tc.slug)
+		expect(t, tc.do(t, "POST", "/hr/designations", body(map[string]string{"title": "Engineer", "code": "ENGR"})), 201, "designation in "+tc.slug)
 		uid, _ := tc.newUser(t, "codes")
-		expect(t, tc.do(t, "POST", "/employees", body(empBody(uid, "EMP-001", nil))), 201, "employee in "+tc.slug)
+		expect(t, tc.do(t, "POST", "/hr/employees", body(empBody(uid, "EMP-001", nil))), 201, "employee in "+tc.slug)
 		did := tc.mkDept(t, "Teams")
-		expect(t, tc.do(t, "POST", "/teams", body(map[string]string{"name": "Core", "code": "CORE", "department_id": did})), 201, "team in "+tc.slug)
+		expect(t, tc.do(t, "POST", "/hr/teams", body(map[string]string{"name": "Core", "code": "CORE", "department_id": did})), 201, "team in "+tc.slug)
 	}
 	// ...but never twice inside the same tenant
-	expectErr(t, a.do(t, "POST", "/departments", body(map[string]string{"name": "Other", "code": "ENG"})), 409, "CONFLICT", "same-tenant duplicate")
-	expectErr(t, a.do(t, "POST", "/departments", body(map[string]string{"name": "engineering"})), 409, "CONFLICT", "case-insensitive duplicate name")
+	expectErr(t, a.do(t, "POST", "/hr/departments", body(map[string]string{"name": "Other", "code": "ENG"})), 409, "CONFLICT", "same-tenant duplicate")
+	expectErr(t, a.do(t, "POST", "/hr/departments", body(map[string]string{"name": "engineering"})), 409, "CONFLICT", "case-insensitive duplicate name")
 }

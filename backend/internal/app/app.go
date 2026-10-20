@@ -8,10 +8,10 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jaas/jaas/internal/employee"
+	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/identity"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
-	"github.com/jaas/jaas/internal/organization"
+	"github.com/jaas/jaas/internal/hr/organization"
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
 	"github.com/jaas/jaas/internal/shared/database"
@@ -134,9 +134,11 @@ func Build(o Options) (*gin.Engine, error) {
 	v1 := router.Group("/api/v1")
 	registerDevMailbox(v1, o, identityModule)
 	identityModule.RegisterRoutes(v1)
-	orgModule.RegisterRoutes(v1, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
-	employeeModule.RegisterRoutes(v1, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
-	registerPeopleRoutes(v1, o, identityModule, people)
+	// M1 HR Management: every HR route lives under /api/v1/hr (docs/modules/m1-hr-management/decisions.md DHR-03).
+	hr := v1.Group("/hr")
+	orgModule.RegisterRoutes(hr, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
+	employeeModule.RegisterRoutes(hr, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
+	registerPeopleRoutes(hr, o, identityModule, people)
 
 	registerHealth(router, o.DB, o.Redis)
 	identityModule.RegisterWellKnown(router)

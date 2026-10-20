@@ -31,10 +31,10 @@ func TestPerformanceBudgets(t *testing.T) {
 	did := tc.mkDept(t, "Perf")
 	tc.mkEmployee(t, "perf")
 
-	single := measure(40, func() { tc.do(t, "GET", "/departments/"+did) })
+	single := measure(40, func() { tc.do(t, "GET", "/hr/departments/"+did) })
 	list := measure(40, func() { tc.do(t, "GET", "/users", query("per_page", "100")) })
-	chart := measure(40, func() { tc.do(t, "GET", "/org-chart") })
-	emps := measure(40, func() { tc.do(t, "GET", "/employees", query("per_page", "100")) })
+	chart := measure(40, func() { tc.do(t, "GET", "/hr/org-chart") })
+	emps := measure(40, func() { tc.do(t, "GET", "/hr/employees", query("per_page", "100")) })
 	login := measure(5, func() {
 		call(t, "POST", "/auth/login", body(map[string]string{"tenant_slug": tc.slug, "email": tc.adminEmail, "password": password}))
 	})

@@ -19,8 +19,8 @@ func TestInjectionAttemptsAreInert(t *testing.T) {
 	evil := "x' OR '1'='1'; DROP TABLE users; --"
 	expectErr(t, call(t, "POST", "/auth/login", body(map[string]string{"tenant_slug": evil, "email": tc.adminEmail, "password": password})), 401, "INVALID_CREDENTIALS", "slug injection")
 	expectErr(t, call(t, "POST", "/auth/login", body(map[string]string{"tenant_slug": tc.slug, "email": "a@b.co' OR 1=1 --", "password": evil})), 400, "VALIDATION_ERROR", "email must be a real email")
-	expect(t, tc.do(t, "GET", "/employees", query("search", evil)), 200, "search injection")
-	expect(t, tc.do(t, "GET", "/employees", query("status", evil)), 200, "status injection")
+	expect(t, tc.do(t, "GET", "/hr/employees", query("search", evil)), 200, "search injection")
+	expect(t, tc.do(t, "GET", "/hr/employees", query("status", evil)), 200, "status injection")
 	// the users table is intact and the admin can still log in
 	login(t, tc.slug, tc.adminEmail, password)
 	// a hostile Host header cannot pick another tenant for an authenticated caller

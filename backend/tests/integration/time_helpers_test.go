@@ -17,11 +17,11 @@ type timeCtx struct {
 func newTimeTenant(t *testing.T) *timeCtx {
 	t.Helper()
 	tc := &timeCtx{tenantCtx: newTenant(t)}
-	r := tc.do(t, "POST", "/employees", body(empBody(tc.adminID, "ADM-"+strings.ToUpper(uniq()), nil)))
+	r := tc.do(t, "POST", "/hr/employees", body(empBody(tc.adminID, "ADM-"+strings.ToUpper(uniq()), nil)))
 	expect(t, r, 201, "admin employee profile")
 	tc.adminEmp = r.str("data.id")
 	uid, email := tc.newUser(t, "mem")
-	r = tc.do(t, "POST", "/employees", body(empBody(uid, "MEM-"+strings.ToUpper(uniq()), nil)))
+	r = tc.do(t, "POST", "/hr/employees", body(empBody(uid, "MEM-"+strings.ToUpper(uniq()), nil)))
 	expect(t, r, 201, "member employee profile")
 	tc.memberUser, tc.memberEmp = uid, r.str("data.id")
 	tc.memberTok = login(t, tc.slug, email, password).str("data.access_token")

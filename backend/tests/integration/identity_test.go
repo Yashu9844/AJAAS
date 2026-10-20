@@ -387,8 +387,8 @@ func TestRBACEnforcement(t *testing.T) {
 	expectErr(t, call(t, "GET", "/roles", host(tc.slug), token(lim)), 403, "FORBIDDEN", "roles:read")
 	expectErr(t, call(t, "GET", "/permissions", host(tc.slug), token(lim)), 403, "FORBIDDEN", "permissions:read")
 	expectErr(t, call(t, "GET", "/audit-logs", host(tc.slug), token(lim)), 403, "FORBIDDEN", "audit:read")
-	expectErr(t, call(t, "GET", "/departments", host(tc.slug), token(lim)), 403, "FORBIDDEN", "organization:read")
-	expectErr(t, call(t, "GET", "/employees", host(tc.slug), token(lim)), 403, "FORBIDDEN", "employee:read")
+	expectErr(t, call(t, "GET", "/hr/departments", host(tc.slug), token(lim)), 403, "FORBIDDEN", "organization:read")
+	expectErr(t, call(t, "GET", "/hr/employees", host(tc.slug), token(lim)), 403, "FORBIDDEN", "employee:read")
 
 	tc.grant(t, rid, "roles", "read")
 	expect(t, call(t, "GET", "/roles", host(tc.slug), token(lim)), 200, "roles:read granted — effective immediately")
@@ -441,7 +441,7 @@ func TestAuditTrail(t *testing.T) {
 
 func TestPaginationIsClampedEverywhere(t *testing.T) {
 	tc := newTenant(t)
-	for _, path := range []string{"/users", "/roles", "/permissions", "/audit-logs", "/departments", "/teams", "/designations", "/employees"} {
+	for _, path := range []string{"/users", "/roles", "/permissions", "/audit-logs", "/hr/departments", "/hr/teams", "/hr/designations", "/hr/employees"} {
 		r := tc.do(t, "GET", path, query("per_page", "0"))
 		expect(t, r, 200, path+" per_page=0")
 		if r.get("meta.per_page") != float64(20) {
@@ -469,10 +469,10 @@ func TestErrorEnvelopeIsUniform(t *testing.T) {
 		tc.do(t, "POST", "/users", rawBody("{oops")),
 		tc.do(t, "POST", "/users", body(map[string]string{})),
 		tc.do(t, "GET", "/roles/"+zeroUUID),
-		tc.do(t, "GET", "/departments/not-a-uuid"),
-		tc.do(t, "POST", "/departments", rawBody("{oops")),
-		tc.do(t, "GET", "/employees/not-a-uuid"),
-		tc.do(t, "POST", "/employees", body(map[string]string{})),
+		tc.do(t, "GET", "/hr/departments/not-a-uuid"),
+		tc.do(t, "POST", "/hr/departments", rawBody("{oops")),
+		tc.do(t, "GET", "/hr/employees/not-a-uuid"),
+		tc.do(t, "POST", "/hr/employees", body(map[string]string{})),
 		call(t, "POST", "/auth/logout"),
 		call(t, "POST", "/auth/login", body(map[string]string{})),
 		call(t, "POST", "/tenants", platform(), body(map[string]string{})),
@@ -509,8 +509,8 @@ func TestTenantIsolation(t *testing.T) {
 
 	// a token is only valid on its own tenant host
 	expectErr(t, call(t, "GET", "/users", host(b.slug), token(a.token)), 403, "FORBIDDEN", "A token on B host")
-	expectErr(t, call(t, "GET", "/departments", host(b.slug), token(a.token)), 403, "FORBIDDEN", "A token on B host (org)")
-	expectErr(t, call(t, "GET", "/employees", host(b.slug), token(a.token)), 403, "FORBIDDEN", "A token on B host (employees)")
+	expectErr(t, call(t, "GET", "/hr/departments", host(b.slug), token(a.token)), 403, "FORBIDDEN", "A token on B host (org)")
+	expectErr(t, call(t, "GET", "/hr/employees", host(b.slug), token(a.token)), 403, "FORBIDDEN", "A token on B host (employees)")
 
 	// records of B are invisible to A even by id
 	buID, _ := b.newUser(t, "iso")
@@ -524,18 +524,18 @@ func TestTenantIsolation(t *testing.T) {
 	expectErr(t, a.do(t, "GET", "/roles/"+brole), 404, "NOT_FOUND", "role by id")
 	expectErr(t, a.do(t, "POST", "/users/"+a.adminID+"/roles", body(map[string]any{"role_ids": []string{brole}})), 404, "NOT_FOUND", "assign foreign role")
 
-	bd := b.do(t, "POST", "/departments", body(map[string]any{"name": "B dept"}))
+	bd := b.do(t, "POST", "/hr/departments", body(map[string]any{"name": "B dept"}))
 	expect(t, bd, 201, "B dept")
 	bdID := bd.str("data.id")
-	expectErr(t, a.do(t, "GET", "/departments/"+bdID), 404, "NOT_FOUND", "dept by id")
-	expectErr(t, a.do(t, "PATCH", "/departments/"+bdID, body(map[string]string{"name": "x"})), 404, "NOT_FOUND", "patch dept")
-	expectErr(t, a.do(t, "POST", "/departments/"+bdID+"/deactivate"), 404, "NOT_FOUND", "deactivate dept")
-	if a.do(t, "GET", "/departments", query("per_page", "100")).has("data", "id", bdID) {
+	expectErr(t, a.do(t, "GET", "/hr/departments/"+bdID), 404, "NOT_FOUND", "dept by id")
+	expectErr(t, a.do(t, "PATCH", "/hr/departments/"+bdID, body(map[string]string{"name": "x"})), 404, "NOT_FOUND", "patch dept")
+	expectErr(t, a.do(t, "POST", "/hr/departments/"+bdID+"/deactivate"), 404, "NOT_FOUND", "deactivate dept")
+	if a.do(t, "GET", "/hr/departments", query("per_page", "100")).has("data", "id", bdID) {
 		t.Fatal("B department leaked into A list")
 	}
 	// a foreign department/user cannot be referenced from A's records
-	expectErr(t, a.do(t, "POST", "/teams", body(map[string]string{"name": "t", "department_id": bdID})), 404, "NOT_FOUND", "team in foreign dept")
-	expectErr(t, a.do(t, "POST", "/mappings", body(map[string]any{"user_id": buID, "department_id": a.mkDept(t, "iso-own")})), 404, "NOT_FOUND", "mapping for foreign user")
+	expectErr(t, a.do(t, "POST", "/hr/teams", body(map[string]string{"name": "t", "department_id": bdID})), 404, "NOT_FOUND", "team in foreign dept")
+	expectErr(t, a.do(t, "POST", "/hr/mappings", body(map[string]any{"user_id": buID, "department_id": a.mkDept(t, "iso-own")})), 404, "NOT_FOUND", "mapping for foreign user")
 	// the same email can exist in two tenants (uniqueness is per tenant)
 	email := "same@shared.test"
 	expect(t, a.do(t, "POST", "/users", body(map[string]string{"email": email, "password": password, "first_name": "S", "last_name": "A"})), 201, "A same email")
@@ -544,7 +544,7 @@ func TestTenantIsolation(t *testing.T) {
 	expectErr(t, call(t, "POST", "/auth/login", body(map[string]string{"tenant_slug": b.slug, "email": a.adminEmail, "password": password})), 401, "INVALID_CREDENTIALS", "A creds on B")
 	// A's employee-facing data
 	ae := a.mkEmployee(t, "iso")
-	expectErr(t, b.do(t, "GET", "/employees/"+ae), 404, "NOT_FOUND", "employee by id")
-	expectErr(t, b.do(t, "GET", "/employees/"+ae+"/statutory"), 404, "NOT_FOUND", "statutory by id")
-	expectErr(t, b.do(t, "GET", "/employees/"+ae+"/timeline"), 404, "NOT_FOUND", "timeline by id")
+	expectErr(t, b.do(t, "GET", "/hr/employees/"+ae), 404, "NOT_FOUND", "employee by id")
+	expectErr(t, b.do(t, "GET", "/hr/employees/"+ae+"/statutory"), 404, "NOT_FOUND", "statutory by id")
+	expectErr(t, b.do(t, "GET", "/hr/employees/"+ae+"/timeline"), 404, "NOT_FOUND", "timeline by id")
 }

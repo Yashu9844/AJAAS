@@ -100,10 +100,10 @@ export const S0_ACCESS: Scenario[] = [
       const rep = await mkUser(r, A, uid, "rep");
       const joining = "2026-01-15T00:00:00Z";
       for (const [u, code] of [[boss, `B${uid}`], [rep, `R${uid}`]] as const) {
-        await r.call(`Employee profile ${code}`, tn(A, "POST", "/employees", { user_id: u.id, employee_code: code.toUpperCase(), first_name: "Dt", last_name: code, employment_type: "full_time", joining_date: joining }), 201);
+        await r.call(`Employee profile ${code}`, tn(A, "POST", "/hr/employees", { user_id: u.id, employee_code: code.toUpperCase(), first_name: "Dt", last_name: code, employment_type: "full_time", joining_date: joining }), 201);
       }
-      const dept = await r.call("Department", tn(A, "POST", "/departments", { name: `Dt dept ${uid}` }), 201);
-      const map = await r.call("Reporting line rep → boss", tn(A, "POST", "/mappings", { user_id: rep.id, department_id: str(dept, "data.id"), is_primary: true, manager_user_id: boss.id }), 201);
+      const dept = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Dt dept ${uid}` }), 201);
+      const map = await r.call("Reporting line rep → boss", tn(A, "POST", "/hr/mappings", { user_id: rep.id, department_id: str(dept, "data.id"), is_primary: true, manager_user_id: boss.id }), 201);
       const L = await login(r, "Login as boss (syncs automatic roles)", A.slug, boss.email, PASSWORD);
       await r.call("boss holds Employee + Manager (automatic)", { method: "GET", scope: "global", path: "/auth/me", token: L.at }, 200, (e) =>
         has(e, "data.roles", "name", "Manager") && has(e, "data.roles", "name", "Employee") && has(e, "data.roles", "source", "automatic") ? null : "automatic roles missing",
@@ -112,7 +112,7 @@ export const S0_ACCESS: Scenario[] = [
       const mgr = byKey(roles(list), "manager")?.id;
       await r.call("Assign Manager by hand → 409", tn(A, "POST", `/users/${rep.id}/roles`, { role_ids: [mgr] }), 409);
       await r.call("Remove Manager by hand → 409", tn(A, "DELETE", `/users/${boss.id}/roles/${mgr}`), 409);
-      await r.call("End the reporting line", tn(A, "POST", `/mappings/${str(map, "data.id")}/deactivate`), 200);
+      await r.call("End the reporting line", tn(A, "POST", `/hr/mappings/${str(map, "data.id")}/deactivate`), 200);
       await r.call("Sync automatic roles", tn(A, "POST", "/access/automatic-roles/sync"), 200);
       await r.call("boss is Employee only now", tn(A, "GET", `/users/${boss.id}/access`), 200, (e) => {
         const raw = JSON.stringify(e.resBody);

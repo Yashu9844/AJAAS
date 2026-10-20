@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jaas/jaas/internal/attendance"
-	"github.com/jaas/jaas/internal/employee"
+	"github.com/jaas/jaas/internal/hr/attendance"
+	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/identity"
 	"github.com/jaas/jaas/internal/identity/access"
-	"github.com/jaas/jaas/internal/leave"
-	"github.com/jaas/jaas/internal/organization"
-	"github.com/jaas/jaas/internal/payroll"
-	"github.com/jaas/jaas/internal/recruitment"
+	"github.com/jaas/jaas/internal/hr/leave"
+	"github.com/jaas/jaas/internal/hr/organization"
+	"github.com/jaas/jaas/internal/hr/payroll"
+	"github.com/jaas/jaas/internal/hr/recruitment"
 )
 
 // peopleModules are the people-operations modules built on Modules 0–2: Attendance (3), Leave (4), Payroll (5),

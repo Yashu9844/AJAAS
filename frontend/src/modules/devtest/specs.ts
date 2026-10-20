@@ -238,7 +238,7 @@ export const M1_DEPT: OpSpec[] = [
     "m1.dept.create",
     "Create department",
     "POST",
-    "/departments",
+    "/hr/departments",
     [
       { name: "name", where: "body", required: true },
       { name: "code", where: "body", placeholder: "ENG (2-32)" },
@@ -248,13 +248,13 @@ export const M1_DEPT: OpSpec[] = [
     [201],
     { capture: [{ idKey: "deptId", from: "data.id" }], fetchAfter: "m1.dept.get" },
   ),
-  t("m1.dept.list", "List departments", "GET", "/departments", pg, [200]),
-  t("m1.dept.get", "Get department", "GET", "/departments/:id", [idf("id", "deptId")], [200]),
+  t("m1.dept.list", "List departments", "GET", "/hr/departments", pg, [200]),
+  t("m1.dept.get", "Get department", "GET", "/hr/departments/:id", [idf("id", "deptId")], [200]),
   t(
     "m1.dept.update",
     "Update department",
     "PATCH",
-    "/departments/:id",
+    "/hr/departments/:id",
     [
       idf("id", "deptId"),
       { name: "name", where: "body" },
@@ -267,7 +267,7 @@ export const M1_DEPT: OpSpec[] = [
     "m1.dept.deactivate",
     "Deactivate department",
     "POST",
-    "/departments/:id/deactivate",
+    "/hr/departments/:id/deactivate",
     [idf("id", "deptId"), { name: "force", where: "query", type: "select", options: ["", "true", "false"] }, { name: "reason", where: "body" }],
     [200],
   ),
@@ -278,7 +278,7 @@ export const M1_TEAM: OpSpec[] = [
     "m1.team.create",
     "Create team",
     "POST",
-    "/teams",
+    "/hr/teams",
     [
       { name: "name", where: "body", required: true },
       { name: "department_id", where: "body", ref: "deptId", required: true },
@@ -289,13 +289,13 @@ export const M1_TEAM: OpSpec[] = [
     [201],
     { capture: [{ idKey: "teamId", from: "data.id" }], fetchAfter: "m1.team.get" },
   ),
-  t("m1.team.list", "List teams", "GET", "/teams", [...pg, { name: "department_id", where: "query" }], [200]),
-  t("m1.team.get", "Get team", "GET", "/teams/:id", [idf("id", "teamId")], [200]),
+  t("m1.team.list", "List teams", "GET", "/hr/teams", [...pg, { name: "department_id", where: "query" }], [200]),
+  t("m1.team.get", "Get team", "GET", "/hr/teams/:id", [idf("id", "teamId")], [200]),
   t(
     "m1.team.update",
     "Update team",
     "PATCH",
-    "/teams/:id",
+    "/hr/teams/:id",
     [
       idf("id", "teamId"),
       { name: "name", where: "body" },
@@ -305,7 +305,7 @@ export const M1_TEAM: OpSpec[] = [
     ],
     [200],
   ),
-  t("m1.team.deactivate", "Deactivate team", "POST", "/teams/:id/deactivate", [idf("id", "teamId"), { name: "reason", where: "body" }], [200]),
+  t("m1.team.deactivate", "Deactivate team", "POST", "/hr/teams/:id/deactivate", [idf("id", "teamId"), { name: "reason", where: "body" }], [200]),
 ];
 
 export const M1_DESIG: OpSpec[] = [
@@ -313,7 +313,7 @@ export const M1_DESIG: OpSpec[] = [
     "m1.desig.create",
     "Create designation",
     "POST",
-    "/designations",
+    "/hr/designations",
     [
       { name: "title", where: "body", required: true },
       { name: "code", where: "body" },
@@ -323,17 +323,17 @@ export const M1_DESIG: OpSpec[] = [
     [201],
     { capture: [{ idKey: "desigId", from: "data.id" }], fetchAfter: "m1.desig.get" },
   ),
-  t("m1.desig.list", "List designations", "GET", "/designations", pg, [200]),
-  t("m1.desig.get", "Get designation", "GET", "/designations/:id", [idf("id", "desigId")], [200]),
+  t("m1.desig.list", "List designations", "GET", "/hr/designations", pg, [200]),
+  t("m1.desig.get", "Get designation", "GET", "/hr/designations/:id", [idf("id", "desigId")], [200]),
   t(
     "m1.desig.update",
     "Update designation",
     "PATCH",
-    "/designations/:id",
+    "/hr/designations/:id",
     [idf("id", "desigId"), { name: "title", where: "body" }, { name: "level", where: "body", type: "number" }, { name: "description", where: "body" }],
     [200],
   ),
-  t("m1.desig.deactivate", "Deactivate designation", "POST", "/designations/:id/deactivate", [idf("id", "desigId"), { name: "reason", where: "body" }], [200]),
+  t("m1.desig.deactivate", "Deactivate designation", "POST", "/hr/designations/:id/deactivate", [idf("id", "desigId"), { name: "reason", where: "body" }], [200]),
 ];
 
 export const M1_MAP: OpSpec[] = [
@@ -341,7 +341,7 @@ export const M1_MAP: OpSpec[] = [
     "m1.map.create",
     "Create mapping (user ↔ dept/team/designation)",
     "POST",
-    "/mappings",
+    "/hr/mappings",
     [
       { name: "user_id", where: "body", ref: "userId", required: true },
       { name: "department_id", where: "body", ref: "deptId" },
@@ -353,13 +353,13 @@ export const M1_MAP: OpSpec[] = [
     [201],
     { capture: [{ idKey: "mappingId", from: "data.id" }], fetchAfter: "m1.map.get" },
   ),
-  t("m1.map.list", "List mappings of a user", "GET", "/mappings", [...pg, { name: "user_id", where: "query", ref: "userId", required: true }], [200]),
-  t("m1.map.get", "Get mapping", "GET", "/mappings/:id", [idf("id", "mappingId")], [200]),
+  t("m1.map.list", "List mappings of a user", "GET", "/hr/mappings", [...pg, { name: "user_id", where: "query", ref: "userId", required: true }], [200]),
+  t("m1.map.get", "Get mapping", "GET", "/hr/mappings/:id", [idf("id", "mappingId")], [200]),
   t(
     "m1.map.update",
     "Update mapping",
     "PATCH",
-    "/mappings/:id",
+    "/hr/mappings/:id",
     [
       idf("id", "mappingId"),
       { name: "department_id", where: "body" },
@@ -370,7 +370,7 @@ export const M1_MAP: OpSpec[] = [
     ],
     [200],
   ),
-  t("m1.map.deactivate", "Deactivate mapping", "POST", "/mappings/:id/deactivate", [idf("id", "mappingId"), { name: "reason", where: "body" }], [200]),
+  t("m1.map.deactivate", "Deactivate mapping", "POST", "/hr/mappings/:id/deactivate", [idf("id", "mappingId"), { name: "reason", where: "body" }], [200]),
 ];
 
 export const M1_CHART: OpSpec[] = [
@@ -378,14 +378,14 @@ export const M1_CHART: OpSpec[] = [
     "m1.chart.tree",
     "Org chart (department tree)",
     "GET",
-    "/org-chart",
+    "/hr/org-chart",
     [
       { name: "max_depth", where: "query", type: "number", placeholder: "10" },
       { name: "include_inactive", where: "query", type: "select", options: ["", "true", "false"] },
     ],
     [200],
   ),
-  t("m1.chart.chain", "Reporting chain of a user", "GET", "/org-chart/chain", [{ name: "user_id", where: "query", ref: "userId", required: true }], [200]),
+  t("m1.chart.chain", "Reporting chain of a user", "GET", "/hr/org-chart/chain", [{ name: "user_id", where: "query", ref: "userId", required: true }], [200]),
 ];
 
 export const M1_OPS: OpSpec[] = [...M1_DEPT, ...M1_TEAM, ...M1_DESIG, ...M1_MAP, ...M1_CHART];
@@ -398,7 +398,7 @@ export const M2_EMP: OpSpec[] = [
     "m2.emp.create",
     "Create employee",
     "POST",
-    "/employees",
+    "/hr/employees",
     [
       { name: "user_id", where: "body", ref: "userId", required: true },
       { name: "employee_code", where: "body", required: true, placeholder: "EMP-001 (A-Z0-9-)" },
@@ -427,16 +427,16 @@ export const M2_EMP: OpSpec[] = [
     "m2.emp.list",
     "List employees",
     "GET",
-    "/employees",
+    "/hr/employees",
     [...pg, { name: "status", where: "query", type: "select", options: EMP_STATUS }, { name: "search", where: "query" }, { name: "department_id", where: "query" }],
     [200],
   ),
-  t("m2.emp.get", "Get employee", "GET", "/employees/:id", [idf("id", "employeeId")], [200]),
+  t("m2.emp.get", "Get employee", "GET", "/hr/employees/:id", [idf("id", "employeeId")], [200]),
   t(
     "m2.emp.update",
     "Update employee (profile fields)",
     "PATCH",
-    "/employees/:id",
+    "/hr/employees/:id",
     [
       idf("id", "employeeId"),
       { name: "first_name", where: "body" },
@@ -454,7 +454,7 @@ export const M2_EMP: OpSpec[] = [
     "m2.emp.status",
     "Transition status",
     "POST",
-    "/employees/:id/status",
+    "/hr/employees/:id/status",
     [
       idf("id", "employeeId"),
       { name: "status", where: "body", type: "select", options: EMP_STATUS, required: true },
@@ -466,15 +466,15 @@ export const M2_EMP: OpSpec[] = [
     ],
     [200],
   ),
-  t("m2.emp.deactivate", "Deactivate employee", "POST", "/employees/:id/deactivate", [idf("id", "employeeId")], [200]),
-  t("m2.emp.me", "Get my employee profile (self-service)", "GET", "/employees/me", [], [200], {
+  t("m2.emp.deactivate", "Deactivate employee", "POST", "/hr/employees/:id/deactivate", [idf("id", "employeeId")], [200]),
+  t("m2.emp.me", "Get my employee profile (self-service)", "GET", "/hr/employees/me", [], [200], {
     note: "Uses the token of the logged-in user; that user needs an employee profile.",
   }),
   t(
     "m2.emp.updateMe",
     "Update my contact (self-service)",
     "PATCH",
-    "/employees/me",
+    "/hr/employees/me",
     [
       { name: "personal_phone", where: "body" },
       { name: "current_address", where: "body" },
@@ -486,12 +486,12 @@ export const M2_EMP: OpSpec[] = [
 ];
 
 export const M2_STAT: OpSpec[] = [
-  t("m2.stat.get", "Get statutory & bank details", "GET", "/employees/:id/statutory", [idf("id", "employeeId"), { name: "unmasked", where: "query", type: "select", options: ["", "true"] }], [200]),
+  t("m2.stat.get", "Get statutory & bank details", "GET", "/hr/employees/:id/statutory", [idf("id", "employeeId"), { name: "unmasked", where: "query", type: "select", options: ["", "true"] }], [200]),
   t(
     "m2.stat.put",
     "Upsert statutory & bank details",
     "PUT",
-    "/employees/:id/statutory",
+    "/hr/employees/:id/statutory",
     [
       idf("id", "employeeId"),
       { name: "tax_id", where: "body" },
@@ -509,7 +509,7 @@ export const M2_DOC: OpSpec[] = [
     "m2.doc.upload",
     "Register document (metadata + URL)",
     "POST",
-    "/employees/:id/documents",
+    "/hr/employees/:id/documents",
     [
       idf("id", "employeeId"),
       { name: "document_type", where: "body", required: true, placeholder: "passport" },
@@ -521,9 +521,9 @@ export const M2_DOC: OpSpec[] = [
     [201],
     { capture: [{ idKey: "docId", from: "data.id" }], note: "The backend stores metadata only (no file upload endpoint)." },
   ),
-  t("m2.doc.list", "List documents", "GET", "/employees/:id/documents", [idf("id", "employeeId")], [200]),
-  t("m2.doc.verify", "Verify document", "POST", "/employees/:id/documents/:doc_id/verify", [idf("id", "employeeId"), idf("doc_id", "docId")], [200]),
-  t("m2.timeline.list", "Timeline", "GET", "/employees/:id/timeline", [idf("id", "employeeId")], [200]),
+  t("m2.doc.list", "List documents", "GET", "/hr/employees/:id/documents", [idf("id", "employeeId")], [200]),
+  t("m2.doc.verify", "Verify document", "POST", "/hr/employees/:id/documents/:doc_id/verify", [idf("id", "employeeId"), idf("doc_id", "docId")], [200]),
+  t("m2.timeline.list", "Timeline", "GET", "/hr/employees/:id/timeline", [idf("id", "employeeId")], [200]),
 ];
 
 export const M2_OPS: OpSpec[] = [...M2_EMP, ...M2_STAT, ...M2_DOC];

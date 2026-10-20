@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/employee"
+	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/identity"
-	"github.com/jaas/jaas/internal/organization"
+	"github.com/jaas/jaas/internal/hr/organization"
 )
 
 // automaticRoleSweep is how often every tenant's automatic roles are reconciled; logins sync the user immediately.

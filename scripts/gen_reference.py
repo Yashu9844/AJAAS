@@ -62,9 +62,15 @@ def package_doc(src):
     return ' '.join(l[2:].strip() for l in m.group(1).strip().split('\n'))
 
 
+HR = {'organization', 'employee', 'attendance', 'leave', 'payroll', 'recruitment', 'performance'}
+
+
+def module_dir(module):
+    return os.path.join(INTERNAL, 'hr', module) if module in HR else os.path.join(INTERNAL, module)
+
+
 def go_files(module):
-    base = INTERNAL if module != 'shared' else os.path.join(INTERNAL, 'shared')
-    base = os.path.join(INTERNAL, module)
+    base = module_dir(module)
     for dirpath, _, files in sorted(os.walk(base)):
         for f in sorted(files):
             if f.endswith('.go') and not f.endswith('_test.go'):
@@ -72,7 +78,7 @@ def go_files(module):
 
 
 def test_files(module):
-    base = os.path.join(INTERNAL, module)
+    base = module_dir(module)
     res = []
     for dirpath, _, files in sorted(os.walk(base)):
         for f in sorted(files):
@@ -84,7 +90,7 @@ def test_files(module):
 
 
 def routes(module):
-    p = os.path.join(INTERNAL, module, 'routes', 'routes.go')
+    p = os.path.join(module_dir(module), 'routes', 'routes.go')
     if not os.path.exists(p):
         return []
     rows = []
@@ -119,7 +125,8 @@ def routes(module):
             rest = r.group(4).strip().rstrip(')').strip(', ')
             if gmw:
                 rest = f'[group: {gmw}] ' + rest
-            rows.append((r.group(2), '/api/v1' + prefix + r.group(3), rest))
+            base = '/api/v1/hr' if module in HR else '/api/v1'
+            rows.append((r.group(2), base + prefix + r.group(3), rest))
     return rows
 
 

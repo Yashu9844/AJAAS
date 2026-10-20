@@ -843,7 +843,7 @@ paths:
         '200':
           description: List of global privileges
 
-  /departments:
+  /hr/departments:
     post:
       summary: Create Department
       tags:
@@ -905,7 +905,7 @@ paths:
         '200':
           description: Paginated department list
 
-  /departments/{id}:
+  /hr/departments/{id}:
     get:
       summary: Get Department
       tags:
@@ -959,7 +959,7 @@ paths:
         '409':
           description: Cycle detected or name conflict
 
-  /departments/{id}/deactivate:
+  /hr/departments/{id}/deactivate:
     post:
       summary: Deactivate Department
       tags:
@@ -989,7 +989,7 @@ paths:
         '409':
           description: Department has active teams/mappings without force=true
 
-  /teams:
+  /hr/teams:
     post:
       summary: Create Team
       tags:
@@ -1049,7 +1049,7 @@ paths:
         '200':
           description: Paginated teams list
 
-  /teams/{id}:
+  /hr/teams/{id}:
     get:
       summary: Get Team
       tags:
@@ -1102,7 +1102,7 @@ paths:
         '200':
           description: Team updated
 
-  /teams/{id}/deactivate:
+  /hr/teams/{id}/deactivate:
     post:
       summary: Deactivate Team
       tags:
@@ -1123,7 +1123,7 @@ paths:
         '409':
           description: Active mappings attached to team
 
-  /designations:
+  /hr/designations:
     post:
       summary: Create Designation
       tags:
@@ -1171,7 +1171,7 @@ paths:
         '200':
           description: Paginated designation list
 
-  /designations/{id}:
+  /hr/designations/{id}:
     get:
       summary: Get Designation
       tags:
@@ -1220,7 +1220,7 @@ paths:
         '200':
           description: Designation updated
 
-  /designations/{id}/deactivate:
+  /hr/designations/{id}/deactivate:
     post:
       summary: Deactivate Designation
       tags:
@@ -1239,7 +1239,7 @@ paths:
         '200':
           description: Designation deactivated
 
-  /mappings:
+  /hr/mappings:
     post:
       summary: Create Org Mapping
       tags:
@@ -1304,7 +1304,7 @@ paths:
         '200':
           description: List of mappings
 
-  /mappings/{id}:
+  /hr/mappings/{id}:
     get:
       summary: Get Mapping
       tags:
@@ -1361,7 +1361,7 @@ paths:
         '200':
           description: Mapping updated
 
-  /mappings/{id}/deactivate:
+  /hr/mappings/{id}/deactivate:
     post:
       summary: Deactivate Mapping
       tags:
@@ -1388,7 +1388,7 @@ paths:
         '200':
           description: Mapping deactivated
 
-  /org-chart:
+  /hr/org-chart:
     get:
       summary: Get Organization Chart Forest
       tags:
@@ -1411,7 +1411,7 @@ paths:
         '200':
           description: Full organizational tree hierarchy
 
-  /org-chart/chain:
+  /hr/org-chart/chain:
     get:
       summary: Get User Reporting Chain
       tags:
@@ -1430,7 +1430,7 @@ paths:
         '200':
           description: Upward management hierarchy and direct reports
 
-  /employees:
+  /hr/employees:
     post:
       summary: Create Employee Profile
       tags:
@@ -1510,7 +1510,7 @@ paths:
         '200':
           description: Paginated employee directory
 
-  /employees/me:
+  /hr/employees/me:
     get:
       summary: Get Self Employee Profile
       tags:
@@ -1546,7 +1546,7 @@ paths:
         '200':
           description: Self contact updated
 
-  /employees/{id}:
+  /hr/employees/{id}:
     get:
       summary: Get Employee Profile
       tags:
@@ -1598,7 +1598,7 @@ paths:
         '200':
           description: Employee updated
 
-  /employees/{id}/status:
+  /hr/employees/{id}/status:
     post:
       summary: Transition Employee Status
       tags:
@@ -1635,7 +1635,7 @@ paths:
         '200':
           description: Status transition recorded
 
-  /employees/{id}/statutory:
+  /hr/employees/{id}/statutory:
     get:
       summary: Get Statutory & Bank Details
       tags:
@@ -1691,7 +1691,7 @@ paths:
         '200':
           description: Statutory information saved
 
-  /employees/{id}/documents:
+  /hr/employees/{id}/documents:
     post:
       summary: Upload Employee Document Metadata
       tags:
@@ -1750,7 +1750,7 @@ paths:
         '200':
           description: List of documents
 
-  /employees/{id}/documents/{doc_id}/verify:
+  /hr/employees/{id}/documents/{doc_id}/verify:
     post:
       summary: Verify Employee Document
       tags:
@@ -1775,7 +1775,7 @@ paths:
         '200':
           description: Document marked as verified
 
-  /employees/{id}/timeline:
+  /hr/employees/{id}/timeline:
     get:
       summary: Get Employee Career Timeline
       tags:
@@ -1796,7 +1796,7 @@ paths:
 
 
   # ---------------- Module 3: Attendance, Shifts & Time Tracking ----------------
-  /attendance/punch:
+  /hr/attendance/punch:
     post:
       summary: Punch IN or OUT (self, server clock — AT-001)
       tags: [Attendance]
@@ -1814,7 +1814,7 @@ paths:
         '409': {description: ALREADY_PUNCHED_IN | NOT_PUNCHED_IN | DUPLICATE_PUNCH | SESSION_EXPIRED}
         '429': {description: RATE_LIMITED}
 
-  /attendance/me/today:
+  /hr/attendance/me/today:
     get:
       summary: Today's attendance state for the caller
       tags: [Attendance]
@@ -1823,7 +1823,7 @@ paths:
         '200': {description: Today view, content: {application/json: {schema: {$ref: '#/components/schemas/TodayEnvelope'}}}}
         '404': {description: EMPLOYEE_NOT_FOUND}
 
-  /attendance/me:
+  /hr/attendance/me:
     get:
       summary: Caller's own records (max 62 days, default last 7)
       tags: [Attendance]
@@ -1835,7 +1835,7 @@ paths:
         '200': {description: Records, content: {application/json: {schema: {$ref: '#/components/schemas/RecordListEnvelope'}}}}
         '400': {$ref: '#/components/responses/ValidationError'}
 
-  /attendance/records:
+  /hr/attendance/records:
     get:
       summary: List attendance records (attendance:read)
       tags: [Attendance]
@@ -1851,7 +1851,7 @@ paths:
         '200': {description: Paginated records, content: {application/json: {schema: {$ref: '#/components/schemas/RecordListEnvelope'}}}}
         '403': {description: FORBIDDEN}
 
-  /attendance/records/{id}:
+  /hr/attendance/records/{id}:
     get:
       summary: Record with all punches incl. superseded (attendance:read)
       tags: [Attendance]
@@ -1861,7 +1861,7 @@ paths:
         '200': {description: Record detail, content: {application/json: {schema: {$ref: '#/components/schemas/RecordDetailEnvelope'}}}}
         '404': {description: NOT_FOUND (also for other tenants' ids)}
 
-  /attendance/summary:
+  /hr/attendance/summary:
     get:
       summary: Daily presence summary (attendance:read, AT-020)
       tags: [Attendance]
@@ -1871,7 +1871,7 @@ paths:
       responses:
         '200': {description: Summary, content: {application/json: {schema: {$ref: '#/components/schemas/SummaryEnvelope'}}}}
 
-  /attendance/regularizations:
+  /hr/attendance/regularizations:
     post:
       summary: Request a timesheet correction (self)
       tags: [Regularizations]
@@ -1897,7 +1897,7 @@ paths:
       responses:
         '200': {description: Paginated list, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationListEnvelope'}}}}
 
-  /attendance/regularizations/me:
+  /hr/attendance/regularizations/me:
     get:
       summary: Caller's own regularizations
       tags: [Regularizations]
@@ -1909,7 +1909,7 @@ paths:
       responses:
         '200': {description: Paginated list, content: {application/json: {schema: {$ref: '#/components/schemas/RegularizationListEnvelope'}}}}
 
-  /attendance/regularizations/{id}/cancel:
+  /hr/attendance/regularizations/{id}/cancel:
     post:
       summary: Cancel own pending request (AT-018)
       tags: [Regularizations]
@@ -1920,7 +1920,7 @@ paths:
         '404': {description: NOT_FOUND (not yours)}
         '409': {description: REGULARIZATION_NOT_PENDING}
 
-  /attendance/regularizations/{id}/approve:
+  /hr/attendance/regularizations/{id}/approve:
     post:
       summary: Approve and apply to the record (attendance:approve, AT-017)
       tags: [Regularizations]
@@ -1935,7 +1935,7 @@ paths:
         '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
         '409': {description: REGULARIZATION_NOT_PENDING}
 
-  /attendance/regularizations/{id}/reject:
+  /hr/attendance/regularizations/{id}/reject:
     post:
       summary: Reject with a comment (attendance:approve)
       tags: [Regularizations]
@@ -1951,7 +1951,7 @@ paths:
         '400': {description: VALIDATION_ERROR (comment required)}
         '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
 
-  /shifts:
+  /hr/shifts:
     post:
       summary: Create a shift (attendance:manage)
       tags: [Shifts]
@@ -1976,7 +1976,7 @@ paths:
       responses:
         '200': {description: Paginated shifts, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftListEnvelope'}}}}
 
-  /shifts/{id}:
+  /hr/shifts/{id}:
     get:
       summary: Get a shift (attendance:read)
       tags: [Shifts]
@@ -1998,7 +1998,7 @@ paths:
       responses:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
 
-  /shifts/{id}/deactivate:
+  /hr/shifts/{id}/deactivate:
     post:
       summary: Deactivate a shift (attendance:manage, AT-012)
       tags: [Shifts]
@@ -2008,7 +2008,7 @@ paths:
         '200': {description: Deactivated, content: {application/json: {schema: {$ref: '#/components/schemas/ShiftEnvelope'}}}}
         '409': {description: SHIFT_IN_USE | CONFLICT}
 
-  /shifts/{id}/assignments:
+  /hr/shifts/{id}/assignments:
     post:
       summary: Assign an employee to the shift (attendance:manage, AT-011)
       tags: [Shifts]
@@ -2037,7 +2037,7 @@ paths:
 
 
   # ---------------- Module 4: Leave & Absence Management ----------------
-  /leave/types:
+  /hr/leave/types:
     post:
       summary: Create a leave type (leave:manage)
       tags: [Leave]
@@ -2058,7 +2058,7 @@ paths:
       responses:
         '200': {description: Paginated types, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeListEnvelope'}}}}
 
-  /leave/types/{id}:
+  /hr/leave/types/{id}:
     get:
       summary: Get a leave type (authenticated)
       tags: [Leave]
@@ -2077,7 +2077,7 @@ paths:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeEnvelope'}}}}
         '409': {description: CONFLICT}
 
-  /leave/types/{id}/deactivate:
+  /hr/leave/types/{id}/deactivate:
     post:
       summary: Deactivate a leave type (leave:manage)
       tags: [Leave]
@@ -2087,7 +2087,7 @@ paths:
         '200': {description: Deactivated, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveTypeEnvelope'}}}}
         '409': {description: CONFLICT (already inactive)}
 
-  /leave/holidays:
+  /hr/leave/holidays:
     post:
       summary: Add a holiday (leave:manage)
       tags: [Leave]
@@ -2104,7 +2104,7 @@ paths:
       responses:
         '200': {description: Holidays, content: {application/json: {schema: {$ref: '#/components/schemas/HolidayListEnvelope'}}}}
 
-  /leave/holidays/{id}:
+  /hr/leave/holidays/{id}:
     delete:
       summary: Delete a holiday (leave:manage)
       tags: [Leave]
@@ -2114,7 +2114,7 @@ paths:
         '200': {description: Deleted, content: {application/json: {schema: {$ref: '#/components/schemas/HolidayEnvelope'}}}}
         '404': {description: NOT_FOUND}
 
-  /leave/balances/me:
+  /hr/leave/balances/me:
     get:
       summary: Caller's current-year balances (self; lazily accrues)
       tags: [Leave]
@@ -2123,7 +2123,7 @@ paths:
         '200': {description: Balances, content: {application/json: {schema: {$ref: '#/components/schemas/BalanceListEnvelope'}}}}
         '404': {description: EMPLOYEE_NOT_FOUND}
 
-  /leave/balances:
+  /hr/leave/balances:
     get:
       summary: An employee's balances (leave:read)
       tags: [Leave]
@@ -2132,7 +2132,7 @@ paths:
       responses:
         '200': {description: Balances, content: {application/json: {schema: {$ref: '#/components/schemas/BalanceListEnvelope'}}}}
 
-  /leave/balances/adjust:
+  /hr/leave/balances/adjust:
     post:
       summary: HR balance adjustment (leave:manage, LV-017)
       tags: [Leave]
@@ -2142,7 +2142,7 @@ paths:
         '200': {description: Adjusted balance, content: {application/json: {schema: {$ref: '#/components/schemas/BalanceEnvelope'}}}}
         '400': {$ref: '#/components/responses/ValidationError'}
 
-  /leave/ledger:
+  /hr/leave/ledger:
     get:
       summary: Balance ledger (leave:read)
       tags: [Leave]
@@ -2155,7 +2155,7 @@ paths:
       responses:
         '200': {description: Ledger rows, content: {application/json: {schema: {$ref: '#/components/schemas/LedgerListEnvelope'}}}}
 
-  /leave/requests/preview:
+  /hr/leave/requests/preview:
     post:
       summary: Price a request without saving (self)
       tags: [Leave]
@@ -2165,7 +2165,7 @@ paths:
         '200': {description: Preview, content: {application/json: {schema: {$ref: '#/components/schemas/LeavePreviewEnvelope'}}}}
         '400': {description: VALIDATION_ERROR | INVALID_LEAVE_RANGE | LEAVE_NOTICE | NO_WORKING_DAYS | LEAVE_TOO_LONG}
 
-  /leave/requests:
+  /hr/leave/requests:
     post:
       summary: Apply for leave (self; reserves balance)
       tags: [Leave]
@@ -2190,7 +2190,7 @@ paths:
       responses:
         '200': {description: Paginated requests, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestListEnvelope'}}}}
 
-  /leave/requests/me:
+  /hr/leave/requests/me:
     get:
       summary: Caller's own requests (self)
       tags: [Leave]
@@ -2202,7 +2202,7 @@ paths:
       responses:
         '200': {description: Paginated requests, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestListEnvelope'}}}}
 
-  /leave/requests/{id}:
+  /hr/leave/requests/{id}:
     get:
       summary: Get a request (leave:read)
       tags: [Leave]
@@ -2212,7 +2212,7 @@ paths:
         '200': {description: Request, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveRequestEnvelope'}}}}
         '404': {description: NOT_FOUND}
 
-  /leave/requests/{id}/cancel:
+  /hr/leave/requests/{id}/cancel:
     post:
       summary: Cancel own request (self, LV-011)
       tags: [Leave]
@@ -2223,7 +2223,7 @@ paths:
         '404': {description: NOT_FOUND (not yours)}
         '409': {description: LEAVE_ALREADY_STARTED | LEAVE_NOT_CANCELLABLE}
 
-  /leave/requests/{id}/approve:
+  /hr/leave/requests/{id}/approve:
     post:
       summary: Approve (leave:approve; marks attendance on_leave)
       tags: [Leave]
@@ -2235,7 +2235,7 @@ paths:
         '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
         '409': {description: LEAVE_NOT_PENDING}
 
-  /leave/requests/{id}/reject:
+  /hr/leave/requests/{id}/reject:
     post:
       summary: Reject with a comment (leave:approve)
       tags: [Leave]
@@ -2250,7 +2250,7 @@ paths:
 
 
   # ---------------- Module 5: Payroll & Statutory Compliance ----------------
-  /payroll/structures:
+  /hr/payroll/structures:
     post:
       summary: Create a salary structure (payroll:manage)
       tags: [Payroll]
@@ -2267,7 +2267,7 @@ paths:
       parameters: [{name: status, in: query, schema: {type: string, enum: [active, inactive]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Structures, content: {application/json: {schema: {$ref: '#/components/schemas/StructureListEnvelope'}}}}
-  /payroll/structures/{id}:
+  /hr/payroll/structures/{id}:
     get:
       summary: Get a structure (payroll:read)
       tags: [Payroll]
@@ -2284,7 +2284,7 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateStructureRequest'}}}}
       responses:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/StructureEnvelope'}}}}
-  /payroll/structures/{id}/deactivate:
+  /hr/payroll/structures/{id}/deactivate:
     post:
       summary: Deactivate a structure (payroll:manage)
       tags: [Payroll]
@@ -2293,7 +2293,7 @@ paths:
       responses:
         '200': {description: Deactivated, content: {application/json: {schema: {$ref: '#/components/schemas/StructureEnvelope'}}}}
         '409': {description: CONFLICT}
-  /payroll/assignments:
+  /hr/payroll/assignments:
     post:
       summary: Assign CTC + structure to an employee (payroll:manage)
       tags: [Payroll]
@@ -2310,7 +2310,7 @@ paths:
       parameters: [{name: employee_id, in: query, required: true, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: History, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentListEnvelopeP'}}}}
-  /payroll/assignments/me:
+  /hr/payroll/assignments/me:
     get:
       summary: Caller's current assignment with full-month breakdown (self)
       tags: [Payroll]
@@ -2318,7 +2318,7 @@ paths:
       responses:
         '200': {description: Own salary, content: {application/json: {schema: {$ref: '#/components/schemas/MyAssignmentEnvelope'}}}}
         '404': {description: NOT_FOUND | EMPLOYEE_NOT_FOUND}
-  /payroll/assignments/preview:
+  /hr/payroll/assignments/preview:
     post:
       summary: Price a CTC on a structure without saving (payroll:manage)
       tags: [Payroll]
@@ -2327,7 +2327,7 @@ paths:
       responses:
         '200': {description: Breakdown, content: {application/json: {schema: {$ref: '#/components/schemas/BreakdownEnvelope'}}}}
         '400': {description: VALIDATION_ERROR | STRUCTURE_OVERFLOW}
-  /payroll/runs:
+  /hr/payroll/runs:
     post:
       summary: Create a payroll run for a month (payroll:manage)
       tags: [Payroll]
@@ -2344,7 +2344,7 @@ paths:
       parameters: [{name: status, in: query, schema: {type: string, enum: [draft, calculated, approved, finalized]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Runs, content: {application/json: {schema: {$ref: '#/components/schemas/RunListEnvelope'}}}}
-  /payroll/runs/{id}:
+  /hr/payroll/runs/{id}:
     get:
       summary: Get a run with totals and warnings (payroll:read)
       tags: [Payroll]
@@ -2353,7 +2353,7 @@ paths:
       responses:
         '200': {description: Run, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
         '404': {description: NOT_FOUND}
-  /payroll/runs/{id}/calculate:
+  /hr/payroll/runs/{id}/calculate:
     post:
       summary: Calculate or recalculate payslips (payroll:manage)
       tags: [Payroll]
@@ -2362,7 +2362,7 @@ paths:
       responses:
         '200': {description: Calculated, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
         '409': {description: RUN_STATE}
-  /payroll/runs/{id}/approve:
+  /hr/payroll/runs/{id}/approve:
     post:
       summary: Approve a calculated run; approver must differ from the calculator (payroll:approve)
       tags: [Payroll]
@@ -2372,7 +2372,7 @@ paths:
         '200': {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
         '403': {description: SELF_APPROVAL_FORBIDDEN | FORBIDDEN}
         '409': {description: RUN_STATE}
-  /payroll/runs/{id}/finalize:
+  /hr/payroll/runs/{id}/finalize:
     post:
       summary: Finalize an approved run; payslips become visible (payroll:approve)
       tags: [Payroll]
@@ -2381,7 +2381,7 @@ paths:
       responses:
         '200': {description: Finalized, content: {application/json: {schema: {$ref: '#/components/schemas/RunEnvelope'}}}}
         '409': {description: RUN_STATE}
-  /payroll/runs/{id}/payslips:
+  /hr/payroll/runs/{id}/payslips:
     get:
       summary: Payslips of a run (payroll:read)
       tags: [Payroll]
@@ -2389,7 +2389,7 @@ paths:
       parameters: [{$ref: '#/components/parameters/ID'}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Payslips, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipListEnvelope'}}}}
-  /payroll/runs/{id}/payout.csv:
+  /hr/payroll/runs/{id}/payout.csv:
     get:
       summary: Payout export employee_code,employee_name,net_pay — finalized only (payroll:read)
       tags: [Payroll]
@@ -2398,7 +2398,7 @@ paths:
       responses:
         '200': {description: CSV file, content: {text/csv: {schema: {type: string}}}}
         '409': {description: RUN_STATE}
-  /payroll/payslips/{id}:
+  /hr/payroll/payslips/{id}:
     get:
       summary: Any payslip (payroll:read)
       tags: [Payroll]
@@ -2407,7 +2407,7 @@ paths:
       responses:
         '200': {description: Payslip, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipEnvelope'}}}}
         '404': {description: NOT_FOUND}
-  /payroll/payslips/me:
+  /hr/payroll/payslips/me:
     get:
       summary: Caller's payslips of finalized runs (self)
       tags: [Payroll]
@@ -2415,7 +2415,7 @@ paths:
       parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Own payslips, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipListEnvelope'}}}}
-  /payroll/payslips/me/{id}:
+  /hr/payroll/payslips/me/{id}:
     get:
       summary: One own finalized payslip (self); anything else is 404
       tags: [Payroll]
@@ -2425,7 +2425,7 @@ paths:
         '200': {description: Payslip, content: {application/json: {schema: {$ref: '#/components/schemas/PayslipEnvelope'}}}}
         '404': {description: NOT_FOUND}
 
-  /recruitment/jobs:
+  /hr/recruitment/jobs:
     post:
       summary: Create a job opening in draft (recruitment:manage)
       tags: [Recruitment]
@@ -2441,7 +2441,7 @@ paths:
       parameters: [{name: status, in: query, schema: {type: string, enum: [draft, open, on_hold, closed, filled]}}, {name: department_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Jobs, content: {application/json: {schema: {$ref: '#/components/schemas/JobListEnvelope'}}}}
-  /recruitment/jobs/{id}:
+  /hr/recruitment/jobs/{id}:
     get:
       summary: Get a job opening (recruitment:read)
       tags: [Recruitment]
@@ -2459,7 +2459,7 @@ paths:
       responses:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/JobEnvelope'}}}}
         '409': {description: JOB_STATE}
-  /recruitment/jobs/{id}/status:
+  /hr/recruitment/jobs/{id}/status:
     post:
       summary: Change job status; draft→open, open↔on_hold, any non-final→closed; filled is automatic (recruitment:manage)
       tags: [Recruitment]
@@ -2469,7 +2469,7 @@ paths:
       responses:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/JobEnvelope'}}}}
         '409': {description: JOB_STATE}
-  /recruitment/candidates:
+  /hr/recruitment/candidates:
     post:
       summary: Add a candidate to an open job; email unique per job, case-insensitive (recruitment:manage)
       tags: [Recruitment]
@@ -2485,7 +2485,7 @@ paths:
       parameters: [{name: job_id, in: query, schema: {type: string, format: uuid}}, {name: stage, in: query, schema: {$ref: '#/components/schemas/CandidateStage'}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Candidates, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateListEnvelope'}}}}
-  /recruitment/candidates/{id}:
+  /hr/recruitment/candidates/{id}:
     get:
       summary: Get a candidate with stage history (recruitment:read)
       tags: [Recruitment]
@@ -2503,7 +2503,7 @@ paths:
       responses:
         '200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateEnvelope'}}}}
         '409': {description: CONFLICT or INVALID_STAGE (hired)}
-  /recruitment/candidates/{id}/stage:
+  /hr/recruitment/candidates/{id}/stage:
     post:
       summary: Move a candidate along the pipeline (recruitment:manage)
       tags: [Recruitment]
@@ -2513,7 +2513,7 @@ paths:
       responses:
         '200': {description: Moved, content: {application/json: {schema: {$ref: '#/components/schemas/CandidateEnvelope'}}}}
         '409': {description: INVALID_STAGE}
-  /recruitment/candidates/{id}/hire:
+  /hr/recruitment/candidates/{id}/hire:
     post:
       summary: Hire a candidate with an accepted offer; invites a user and creates the employee profile (recruitment:hire)
       tags: [Recruitment]
@@ -2523,7 +2523,7 @@ paths:
       responses:
         '200': {description: Hired, content: {application/json: {schema: {$ref: '#/components/schemas/HireEnvelope'}}}}
         '409': {description: NOT_HIREABLE, JOB_NOT_OPEN or CONFLICT (employee code / email taken)}
-  /recruitment/interviews:
+  /hr/recruitment/interviews:
     post:
       summary: Schedule an interview for a candidate in stage interview (recruitment:manage)
       tags: [Recruitment]
@@ -2539,7 +2539,7 @@ paths:
       parameters: [{name: candidate_id, in: query, required: true, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Interviews, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewListEnvelope'}}}}
-  /recruitment/interviews/me:
+  /hr/recruitment/interviews/me:
     get:
       summary: My interviews as interviewer (authenticated employee)
       tags: [Recruitment]
@@ -2548,7 +2548,7 @@ paths:
       responses:
         '200': {description: Interviews, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewListEnvelope'}}}}
         '404': {description: EMPLOYEE_NOT_FOUND}
-  /recruitment/interviews/{id}/feedback:
+  /hr/recruitment/interviews/{id}/feedback:
     post:
       summary: Submit feedback on my scheduled interview (assigned interviewer only)
       tags: [Recruitment]
@@ -2559,7 +2559,7 @@ paths:
         '200': {description: Completed, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewEnvelope'}}}}
         '404': {description: NOT_FOUND (not your interview)}
         '409': {description: INTERVIEW_STATE}
-  /recruitment/interviews/{id}/cancel:
+  /hr/recruitment/interviews/{id}/cancel:
     post:
       summary: Cancel a scheduled interview (recruitment:manage)
       tags: [Recruitment]
@@ -2568,7 +2568,7 @@ paths:
       responses:
         '200': {description: Cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/InterviewEnvelope'}}}}
         '409': {description: INTERVIEW_STATE}
-  /recruitment/offers:
+  /hr/recruitment/offers:
     post:
       summary: Make an offer; candidate moves to stage offer (recruitment:manage)
       tags: [Recruitment]
@@ -2584,7 +2584,7 @@ paths:
       parameters: [{name: candidate_id, in: query, required: true, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
       responses:
         '200': {description: Offers, content: {application/json: {schema: {$ref: '#/components/schemas/OfferListEnvelope'}}}}
-  /recruitment/offers/{id}/decision:
+  /hr/recruitment/offers/{id}/decision:
     post:
       summary: Record the candidate's decision (recruitment:manage)
       tags: [Recruitment]
@@ -2594,7 +2594,7 @@ paths:
       responses:
         '200': {description: Decided, content: {application/json: {schema: {$ref: '#/components/schemas/OfferEnvelope'}}}}
         '409': {description: OFFER_STATE (not open or expired)}
-  /recruitment/offers/{id}/withdraw:
+  /hr/recruitment/offers/{id}/withdraw:
     post:
       summary: Withdraw an open offer (recruitment:manage)
       tags: [Recruitment]
