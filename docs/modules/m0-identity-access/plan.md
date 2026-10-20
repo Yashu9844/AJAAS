@@ -14,7 +14,52 @@ The review compared the code with `docs/ARCHITECTURE.md` §3 (universal rules), 
 Nothing in M0 is wrong for a single-process system, but the target (independently deployable services, durable
 events, idempotent commands) needs the changes below. Items marked **gate** change schema or public API.
 
-## 3. Gaps and Phase B steps
+## 3. B0 — access model (owner-approved 2026-10-20, `docs/ARCHITECTURE.md` §17)
+
+Today: flat roles holding permissions; `tenant_admin` bypass; no scopes, no inheritance, no per-user exceptions, no
+predefined roles. Target design:
+
+**Schema (migration 000057, owner GO given 2026-10-20):**
+
+| Table | Change |
+|---|---|
+| `permissions` | + `module` (catalogue grouping), + `is_sensitive` |
+| `roles` | + `parent_role_id` (same tenant, acyclic, depth ≤ 10), + `template_key` (unique per tenant when set), + `is_automatic`, + `template_managed` (true until a tenant edits the role) |
+| `role_permissions` | + `scope` (`own`, `direct_reports`, `all_reports`, `department`, `tenant`; default `tenant`) |
+| `user_roles` | + `source` (`manual` or `automatic`) |
+| `user_permission_grants` (new) | tenant, user, permission, scope, `expires_at`, reason, granted_by; one row per user + permission |
+| `user_permission_blocks` (new) | tenant, user, permission, reason, created_by; one row per user + permission |
+| `tenants` | + `access_version` (bumped in the same transaction as any access write; part of the cache key) |
+
+**Behaviour:**
+
+- Effective access = assigned roles (manual + automatic) with their ancestors' grants ∪ unexpired user grants, minus
+  blocks; widest scope wins per permission. Cached in Redis per user under the tenant's `access_version` (5 min TTL);
+  any access write bumps the version, so changes apply on the next request.
+- Catalogue registration: services register permission definitions (module, sensitive flag, and default scopes per
+  predefined role) through `identity.Module.RegisterCatalogue`; M0's own definitions use the same call. HR modules
+  switch from writing the `permissions` table to this call.
+- Predefined roles per tenant (created at tenant creation and back-filled at boot): executive ⊃ hr_admin ⊃
+  hr_manager ⊃ manager ⊃ employee; side roles payroll_admin, payroll_approver, finance, recruiter, interviewer,
+  it_admin, auditor (parent employee). Boot sync adds newly registered default grants only to roles still
+  `template_managed`; the first tenant edit sets it false and the role is never touched again.
+- Automatic roles `employee` and `manager` (source `automatic`) cannot be assigned or removed by hand. A reconciler
+  sets them from HR facts (active employee profile; has active direct reports) through a port implemented in
+  `internal/app` — every 60 s and on demand (`POST /access/automatic-roles/sync`). Phase C replaces polling with
+  HR events.
+- Safe rollout: the existing `RequirePermission` requires **tenant** scope (routes written before scopes assume
+  tenant-wide access), so a narrower template grant can never widen access. `RequireScopedPermission(resource,
+  action, scopes…)` admits the narrower scopes a route declares and puts the caller's scope in the request context
+  for the owning service to enforce; HR routes adopt it in Phase C.
+- Anti-escalation with scopes: a non-admin caller can only grant (to a role or a user) a permission they hold at an
+  equal or wider scope; only `tenant_admin` grants `tenant_admin`; blocks and grants are audited.
+- APIs: role create/update/grant accept `grants: [{permission_id, scope}]` and `parent_role_id` (old
+  `permission_ids` still accepted = tenant scope); `POST /roles/{id}/clone`; `GET/POST /users/{id}/grants`,
+  `DELETE /users/{id}/grants/{permission_id}`; `GET/POST /users/{id}/blocks`, `DELETE /users/{id}/blocks/{permission_id}`;
+  `GET /users/{id}/access` (explain: each effective permission, scope, sources, blocked); `GET /auth/me/access`;
+  `POST /access/automatic-roles/sync`. New permissions `access:read`, `access:manage`.
+
+## 4. Gaps and Phase B steps
 
 | # | Gap (evidence) | Change | Gate |
 |---|---|---|---|
@@ -29,10 +74,10 @@ events, idempotent commands) needs the changes below. Items marked **gate** chan
 | B9 | Login identity is `(tenant, email)` per tenant — matches §3.5; no change. Password minimum 8, bcrypt 12, reset 1 h, access 15 min, refresh 7 days — match §3.10 | none (re-check before release) | — |
 | B10 | Tables in schema `public` | move to schema `identity` together with HR's schema split (HR plan step C.7) | gate (schema) |
 
-Order: B7 → B6 → B1 → B2 → B3 → B5 → B4 → B10 (B10 runs with HR Phase C step 7). Each step: RED tests first,
-integration ring green, console page updated, docs updated, one commit.
+Order: B0 → B7 → B6 → B1 → B2 → B3 → B5 → B4 → B10 (B10 runs with HR Phase C step 7). Each step: RED tests
+first, integration ring green, console page updated, docs updated, one commit.
 
-## 4. Later (not in Phase B)
+## 5. Later (not in Phase B)
 
 - MFA (TOTP) — needs a product decision; table exists.
 - SSO / SAML / OIDC for enterprise tenants.

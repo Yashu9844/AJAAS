@@ -22,8 +22,8 @@ Exactly one phase is CURRENT. Phases with a human gate stop for the owner's GO b
 
 | Phase | Objective | Status | Gate |
 |---|---|---|---|
-| A | Architecture + docs restructure (this bundle, `docs/ARCHITECTURE.md`, document cleanup) | DONE — awaiting owner review | owner review |
-| B | M0 alignment (M0 `plan.md` §3) | NEXT | schema/API gate |
+| A | Architecture + docs restructure (this bundle, `docs/ARCHITECTURE.md`, document cleanup) | DONE — approved 2026-10-20 | done |
+| B | M0 alignment incl. access model (M0 `plan.md` §3–4) | CURRENT | GO given 2026-10-20 |
 | C | HR service boundary (§3 below) | LATER | schema/API gate |
 | D | Test console for M0 + all built HR contexts | LATER | — |
 | E | Complete HR (§4 below) | LATER | per-context design gate |
@@ -46,7 +46,7 @@ Each step ends with unit + integration rings green and a commit.
 7. **Schemas** (gate): Postgres schemas `identity` and `hr`, migration directories split; remove HR → M0 foreign
    keys; consolidate outboxes. Because nothing runs in production, the proposal is to **re-baseline** migrations
    (fresh numbered sets per schema) instead of writing data-moving migrations; dev/test databases are recreated.
-   Needs owner GO.
+   Owner GO given 2026-10-20 (DHR-09).
 8. **Idempotency-Key** on every retryable HR command (HR-010) with tests; hire saga state in `saga_operations`.
 9. **Events**: new envelope, `jaas.hr.events`, alias period for old routing keys; forbidden-field scan test.
 10. Regenerate `docs/SYSTEM_REFERENCE.md`; update context docs for new paths; DoD.

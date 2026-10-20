@@ -11,8 +11,8 @@ Operating System, followed by service-by-service technical designs.
 > **This is the single architecture authority.** Module numbering is M0 Identity & Access plus the 12 product
 > modules M1--M12 below. The older "Module 1--7" labels (Organization, Employee, Attendance, Leave, Payroll,
 > Recruitment, Performance) are **bounded contexts inside M1 HR Management**, never separate modules.
-> Sections 12--16 record what was adopted for this repository: repository layout, HR scope, the test console
-> standard, the document map, and the migration status.
+> Sections 12--17 record what was adopted for this repository: repository layout, HR scope, the test console
+> standard, the document map, the migration status, and the access model.
 
 ## 1. Decision summary
 
@@ -1393,9 +1393,48 @@ backend. The console is how the owner verifies each module by hand without waiti
 
 | Restructure phase | Section 8 phase | Scope | Status |
 |---|---|---|---|
-| A — architecture and docs | 0 | this file, module bundles, document cleanup, M0 gap analysis | done 2026-10-20; awaiting owner review |
-| B — M0 alignment | 1–2 | gaps listed in `docs/modules/m0-identity-access/plan.md` | next |
+| A — architecture and docs | 0 | this file, module bundles, document cleanup, M0 gap analysis | done; approved by owner 2026-10-20 |
+| B — M0 alignment | 1–2 | access model (§17) and gaps listed in `docs/modules/m0-identity-access/plan.md` | current |
 | C — HR service boundary | 3 | section 12 "Target" column for M1, shared idempotency/outbox/inbox | later |
 | D — test console | 2 (shell) | console covering M0 and every built HR context | later |
 | E — complete HR | 3 | finish `performance`, then `core`, `onboarding`, `compensation`, `learning`, `benefits` | later |
 | Afterwards | 4–7 | M7 Approvals and M8 Documents, then M2–M6 and M9–M12 | later |
+
+## 17. Access model (adopted 2026-10-20)
+
+Hierarchical, scoped, role-based access with per-person exceptions — the model used by enterprise HCM suites.
+
+### 17.1 Building blocks
+
+| Concept | Definition |
+|---|---|
+| Permission | `resource:action` from a catalogue each service registers with M0 (grouped by module, e.g. HR › Leave › approve). Sensitive permissions are flagged. |
+| Scope | how far a granted permission reaches: `own` (the caller's records), `direct_reports`, `all_reports` (whole reporting chain below the caller), `department` (caller's department and its sub-departments), `tenant` (everyone). Scopes are ordered: own < direct_reports < all_reports < department < tenant for escalation checks. |
+| Grant | a (permission, scope) pair. |
+| Role | a named, tenant-owned set of grants with an optional parent role; a role's effective grants = its own grants ∪ its parent's effective grants (acyclic, depth ≤ 10). |
+| Predefined roles | seeded per tenant, editable or cloneable, never silently overwritten: Tenant Admin (all), CEO / Executive, HR Admin, HR Manager, Manager, Employee; side roles Payroll Admin, Payroll Approver, Finance, Recruiter, Interviewer, IT Admin, Auditor. Inheritance: Employee ⊂ Manager ⊂ HR Manager ⊂ HR Admin ⊂ CEO / Executive; Tenant Admin bypasses checks. |
+| Automatic roles | **Employee** is held by every user with an employee record; **Manager** by every user who currently has direct reports. They are derived from HR facts (no manual assignment) and change as the org changes. |
+| User grant | a grant given to one user directly, optional `expires_at` (temporary cover, delegation). |
+| User block | a permission removed from one user regardless of roles; **a block always wins**. |
+
+### 17.2 Rules
+
+- Effective access of a user = union of grants from assigned roles, automatic roles and unexpired user grants, minus
+  blocks. When several grants give the same permission, the widest scope applies.
+- Anti-escalation: nobody can create or assign a grant (permission + scope) wider than one they hold themselves;
+  Tenant Admin can be granted only by a Tenant Admin or the platform.
+- Sensitive data needs its sensitive permission in addition to scope (`docs/modules/m1-hr-management/specification.md` §2.2).
+- Separation of duties (maker ≠ checker) is enforced by the owning service regardless of grants.
+- Every change to roles, inheritance, grants and blocks is audited; an "explain access" API shows each effective
+  permission with its source (role, inherited role, automatic role, user grant) and any block.
+
+### 17.3 Responsibilities
+
+- **M0** owns the catalogue, roles, inheritance, user grants, blocks and predefined-role templates, and answers
+  "which scopes does this user hold for `resource:action`" (cached per user, invalidated by an access version that
+  changes on any relevant write).
+- **The service that owns the data evaluates the scope** against its own facts. HR resolves `direct_reports`,
+  `all_reports` and `department` from its reporting lines; M0 never reads HR tables. HR tells M0 who currently
+  qualifies for the automatic Manager and Employee roles through an event/port, so M0 keeps no copy of the org chart.
+- Every endpoint declares its permission and the scopes that apply to it; a route contract test checks the
+  declaration.

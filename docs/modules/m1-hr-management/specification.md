@@ -47,11 +47,18 @@ Role names are tenant data, not code. Code checks permissions only.
 
 - Permission strings are `resource:action`. Every HR resource is prefixed by its context, e.g. `leave:approve`,
   `payroll:manage`. Planned contexts add `core:*`, `onboarding:*`, `compensation:*`, `learning:*`, `benefits:*`.
-- Three scopes decide what a holder may touch, evaluated in this order:
-  1. **Self** — the caller's own employee record; needs authentication only, never a permission.
-  2. **Manager** — the caller's direct reports (from `organization` reporting lines); indirect chain only where a
-     context says so. Manager scope never grants sensitive fields.
-  3. **Permission** — tenant-wide for the resource.
+- Access follows `docs/ARCHITECTURE.md` §17: every grant is a permission **with a scope** — `own`,
+  `direct_reports`, `all_reports`, `department`, `tenant` — held through predefined or custom roles (with
+  inheritance), the automatic `employee` and `manager` roles, or per-user grants, minus per-user blocks.
+- HR evaluates the scope against its own facts: `own` = the caller's employee record (self-service endpoints need
+  authentication only); `direct_reports` / `all_reports` from `organization` reporting lines; `department` = the
+  caller's department and its sub-departments; `tenant` = everyone. Each HR endpoint declares which scopes it accepts.
+  Manager-type scopes never grant sensitive fields on their own.
+- Predefined-role defaults HR registers (examples; full table frozen per context): employee — own records;
+  manager — `leave:approve`, `attendance:approve`, `performance:manage` at `direct_reports`, `employee:read` at
+  `all_reports`; hr_manager — HR operations at `tenant`; hr_admin — everything in HR incl. sensitive at `tenant`;
+  payroll_admin — `payroll:read|manage`; payroll_approver — `payroll:read|approve`; recruiter — `recruitment:*`;
+  interviewer — own interviews only.
 - **Sensitive** reads/writes need a separate action (`employee:read_sensitive`, `compensation:read`,
   `benefits:read_sensitive`, ...). Masking is the default.
 - **Separation of duties:** the maker of a payroll run, merit cycle, or high-impact lifecycle action cannot approve

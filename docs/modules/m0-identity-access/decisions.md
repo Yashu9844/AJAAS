@@ -24,3 +24,8 @@ No broker consumer exists, so user deactivation converges org mappings and emplo
 ### 2026-10-06 — hardening pass (branch `fix/module-0-2-hardening`)
 Verification-console findings fixed and pinned by tests; full list in the hardening report in `docs/modules/m0-identity-access/testing.md`. Highlights: logout + refresh revocation, platform-key protected tenant routes, admin bootstrap, permission seed, non-escalating grants, audit read API, `/auth/me`, activate/unassign endpoints, atomic transactions, standard error envelope, atomic rate limiter, SQL migration runner.
 Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pass; coverage 86.5 % (services 93-97 %); migrations up/down/up clean.
+
+2026-10-20 — Access model adopted (owner-approved; `docs/ARCHITECTURE.md` §17, `plan.md` §3 B0): scoped grants,
+role inheritance, predefined and automatic roles, per-user grants with expiry and blocks (blocks win), access
+version for cache invalidation, explain-access API. Legacy `RequirePermission` requires tenant scope so no existing
+route widens; scoped routes opt in through `RequireScopedPermission`.

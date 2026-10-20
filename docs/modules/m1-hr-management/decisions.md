@@ -56,3 +56,18 @@ Service-level decisions. Context-level decisions (D1-…, D3-…, D4-…, D5-…
 - **Decision:** a context's feature is not done until its `/dev-test` page and scenarios exist and pass live.
 - **Reason:** owner verifies each module by hand without waiting for product UI.
 - **Trade-off:** small frontend work per backend phase.
+
+## DHR-08 (2026-10-20) Scoped, hierarchical access
+
+- **Decision:** HR authorization uses the M0 access model (`docs/ARCHITECTURE.md` §17): permission + scope, role
+  inheritance, predefined and automatic roles, per-user grants and blocks (blocks win). HR evaluates scopes against
+  its reporting lines; every HR endpoint declares its accepted scopes.
+- **Reason:** owner requirement — CEO / HR / manager / employee access like enterprise HR systems, with predefined
+  roles and per-person exceptions.
+- **Trade-off:** HR routes keep requiring tenant scope until they adopt scoped checks in Phase C.
+
+## DHR-09 (2026-10-20) Re-baseline migrations at the schema split
+
+- **Decision:** at Phase C step 7 the `identity` and `hr` schemas start from fresh migration sets; dev and test
+  databases are recreated. Owner approved.
+- **Reason:** nothing runs in production; data-moving migrations would be effort without a consumer.
