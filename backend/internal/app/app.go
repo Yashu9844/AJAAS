@@ -76,7 +76,7 @@ func Build(o Options) (*gin.Engine, error) {
 			return nil, fmt.Errorf("identity auto-migration failed: %w", err)
 		}
 	} else {
-		applied, err := database.RunMigrations(context.Background(), o.DB, migrations.FS)
+		applied, err := database.RunMigrationSets(context.Background(), o.DB, migrations.Sets())
 		if err != nil {
 			return nil, err
 		}

@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jaas/jaas/internal/shared/database"
 	"net/http"
 	"net/http/httptest"
 	neturl "net/url"
@@ -73,7 +74,8 @@ func setup(m *testing.M) (int, error) {
 	host, port := env("JAAS_TEST_DB_HOST", "localhost"), env("JAAS_TEST_DB_PORT", "5432")
 	user, pass := env("JAAS_TEST_DB_USER", "postgres"), env("JAAS_TEST_DB_PASSWORD", "postgres")
 	dsn := func(db string) string {
-		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable connect_timeout=3", host, port, user, pass, db)
+		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable connect_timeout=3 search_path=%s",
+			host, port, user, pass, db, database.SearchPath)
 	}
 	quiet := &gorm.Config{TranslateError: true, Logger: gormlogger.Default.LogMode(gormlogger.Silent)}
 

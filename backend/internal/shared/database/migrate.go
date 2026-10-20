@@ -4,65 +4,109 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"regexp"
 	"sort"
 	"strings"
 
 	"gorm.io/gorm"
 )
 
+// SearchPath is the schema search path of the in-process monolith: every service's schema, then public. Each
+// service's tables live in its own schema; the shared path lets the single process reach both while separate
+// deployments get one schema each (docs/ARCHITECTURE.md §12).
+const SearchPath = "identity,hr,public"
+
 const migrationsTable = "schema_migrations"
 
-// RunMigrations applies, in order and each inside its own transaction, every *.up.sql file of fsys that has not been
-// applied yet, recording versions in schema_migrations. A Postgres advisory lock serialises concurrent starters.
-// It returns the versions applied by this call.
-func RunMigrations(ctx context.Context, db *gorm.DB, fsys fs.FS) ([]string, error) {
-	if err := db.WithContext(ctx).Exec(
-		"CREATE TABLE IF NOT EXISTS " + migrationsTable + " (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
-	).Error; err != nil {
-		return nil, fmt.Errorf("create %s: %w", migrationsTable, err)
-	}
+// migrationLockKey serialises concurrent starters across every schema.
+const migrationLockKey = 727274
 
-	entries, err := fs.Glob(fsys, "*.up.sql")
+var schemaName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
+
+// MigrationSet is one service's migrations, applied into its own schema.
+type MigrationSet struct {
+	Schema string
+	FS     fs.FS
+}
+
+// RunMigrationSets applies every set in order. Within a set each pending *.up.sql runs in its own transaction with
+// search_path set to the set's schema, and is recorded in <schema>.schema_migrations. It returns "schema/version" for
+// every migration applied by this call.
+func RunMigrationSets(ctx context.Context, db *gorm.DB, sets []MigrationSet) ([]string, error) {
+	var applied []string
+	for _, set := range sets {
+		got, err := runSet(ctx, db, set)
+		if err != nil {
+			return applied, err
+		}
+		applied = append(applied, got...)
+	}
+	return applied, nil
+}
+
+func runSet(ctx context.Context, db *gorm.DB, set MigrationSet) ([]string, error) {
+	if !schemaName.MatchString(set.Schema) {
+		return nil, fmt.Errorf("invalid schema name %q", set.Schema)
+	}
+	table := set.Schema + "." + migrationsTable
+	if err := db.WithContext(ctx).Exec("CREATE SCHEMA IF NOT EXISTS " + set.Schema).Error; err != nil {
+		return nil, fmt.Errorf("create schema %s: %w", set.Schema, err)
+	}
+	if err := db.WithContext(ctx).Exec("CREATE TABLE IF NOT EXISTS " + table +
+		" (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())").Error; err != nil {
+		return nil, fmt.Errorf("create %s: %w", table, err)
+	}
+	entries, err := fs.Glob(set.FS, "*.up.sql")
 	if err != nil {
 		return nil, err
 	}
 	sort.Strings(entries)
-
 	var applied []string
 	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// released automatically when the transaction ends
-		if err := tx.Exec("SELECT pg_advisory_xact_lock(727274)").Error; err != nil {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", migrationLockKey).Error; err != nil {
 			return err
 		}
-		done := map[string]bool{}
-		var versions []string
-		if err := tx.Raw("SELECT version FROM " + migrationsTable).Scan(&versions).Error; err != nil {
+		done, err := appliedVersions(tx, table)
+		if err != nil {
 			return err
 		}
-		for _, v := range versions {
-			done[v] = true
+		if err := tx.Exec("SET LOCAL search_path TO " + set.Schema + ", public").Error; err != nil {
+			return err
 		}
 		for _, name := range entries {
 			version := strings.TrimSuffix(name, ".up.sql")
 			if done[version] {
 				continue
 			}
-			sqlBytes, err := fs.ReadFile(fsys, name)
-			if err != nil {
+			if err := applyFile(tx, set, name, table, version); err != nil {
 				return err
 			}
-			if err := tx.Exec(string(sqlBytes)).Error; err != nil {
-				return fmt.Errorf("migration %s failed: %w", name, err)
-			}
-			if err := tx.Exec("INSERT INTO "+migrationsTable+" (version) VALUES (?)", version).Error; err != nil {
-				return err
-			}
-			applied = append(applied, version)
+			applied = append(applied, set.Schema+"/"+version)
 		}
 		return nil
 	})
-	if err != nil {
+	return applied, err
+}
+
+func appliedVersions(tx *gorm.DB, table string) (map[string]bool, error) {
+	var versions []string
+	if err := tx.Raw("SELECT version FROM " + table).Scan(&versions).Error; err != nil {
 		return nil, err
 	}
-	return applied, nil
+	done := make(map[string]bool, len(versions))
+	for _, v := range versions {
+		done[v] = true
+	}
+	return done, nil
+}
+
+func applyFile(tx *gorm.DB, set MigrationSet, name, table, version string) error {
+	sqlBytes, err := fs.ReadFile(set.FS, name)
+	if err != nil {
+		return err
+	}
+	if err := tx.Exec(string(sqlBytes)).Error; err != nil {
+		return fmt.Errorf("migration %s/%s failed: %w", set.Schema, name, err)
+	}
+	return tx.Exec("INSERT INTO "+table+" (version) VALUES (?)", version).Error
 }

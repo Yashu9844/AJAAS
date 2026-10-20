@@ -2,7 +2,7 @@ package integration
 
 import (
 	"context"
-	"strings"
+	"io/fs"
 	"testing"
 
 	"github.com/jaas/jaas/internal/shared/database"
@@ -10,29 +10,47 @@ import (
 )
 
 func TestMigrationsAreIdempotentAndComplete(t *testing.T) {
-	applied, err := database.RunMigrations(context.Background(), testDB, migrations.FS)
+	applied, err := database.RunMigrationSets(context.Background(), testDB, migrations.Sets())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(applied) != 0 {
 		t.Fatalf("second run must apply nothing, applied %v", applied)
 	}
-	var n int64
-	testDB.Raw("SELECT count(*) FROM schema_migrations").Scan(&n)
-	files, _ := migrations.FS.ReadDir(".")
-	ups := 0
-	for _, f := range files {
-		if strings.HasSuffix(f.Name(), ".up.sql") {
-			ups++
+	for _, set := range migrations.Sets() {
+		var n int64
+		testDB.Raw("SELECT count(*) FROM " + set.Schema + ".schema_migrations").Scan(&n)
+		ups, _ := fs.Glob(set.FS, "*.up.sql")
+		if int(n) != len(ups) || len(ups) < 15 {
+			t.Fatalf("%s.schema_migrations has %d rows for %d up files", set.Schema, n, len(ups))
 		}
-	}
-	if int(n) != ups || ups < 25 {
-		t.Fatalf("schema_migrations has %d rows for %d up files", n, ups)
 	}
 	var perms int64
 	testDB.Raw("SELECT count(*) FROM permissions").Scan(&perms)
 	if perms < 18 {
 		t.Fatalf("permission catalogue not seeded: %d", perms)
+	}
+}
+
+// Each service owns one schema (DHR-09): identity tables in identity, HR tables in hr, nothing in public, and no
+// foreign key crosses a schema boundary.
+func TestSchemasAreOwnedAndIsolated(t *testing.T) {
+	for table, schema := range map[string]string{"tenants": "identity", "users": "identity", "roles": "identity",
+		"identity_events_outbox": "identity", "departments": "hr", "employee_profiles": "hr", "leave_ledger": "hr",
+		"payroll_runs": "hr", "recruitment_jobs": "hr", "performance_cycles": "hr"} {
+		if got := sqlStr(t, "SELECT table_schema FROM information_schema.tables WHERE table_name = ?", table); got != schema {
+			t.Errorf("%s lives in %q, want %q", table, got, schema)
+		}
+	}
+	if n := sqlStr(t, "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"); n != "0" {
+		t.Fatalf("no tables in public: %s", n)
+	}
+	cross := sqlStr(t, `SELECT count(*) FROM information_schema.referential_constraints rc
+		JOIN information_schema.table_constraints fk ON fk.constraint_name = rc.constraint_name AND fk.constraint_schema = rc.constraint_schema
+		JOIN information_schema.table_constraints pk ON pk.constraint_name = rc.unique_constraint_name AND pk.constraint_schema = rc.unique_constraint_schema
+		WHERE fk.table_schema <> pk.table_schema`)
+	if cross != "0" {
+		t.Fatalf("foreign keys cross schema boundaries: %s", cross)
 	}
 }
 

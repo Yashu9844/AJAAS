@@ -140,7 +140,9 @@ func TestAccessAntiEscalation(t *testing.T) {
 	mgr := scopedRole(t, tc, map[string]string{"access:manage": "tenant", "access:read": "tenant", "roles:create": "tenant", "users:read": "own"}, "")
 	tok, _ := tc.tokenFor(t, "am", mgr)
 	uid, _ := tc.newUser(t, "victim")
-	as := func(method, path string, b any) resp { return call(t, method, path, host(tc.slug), token(tok), body(b)) }
+	as := func(method, path string, b any) resp {
+		return call(t, method, path, host(tc.slug), token(tok), body(b))
+	}
 	expectErr(t, as("POST", "/users/"+uid+"/grants", map[string]any{"permission_id": tc.permID(t, "users", "read"), "scope": "tenant"}), 403, "FORBIDDEN", "wider than held")
 	expect(t, as("POST", "/users/"+uid+"/grants", map[string]any{"permission_id": tc.permID(t, "users", "read"), "scope": "own"}), 201, "same scope")
 	expectErr(t, as("POST", "/users/"+uid+"/grants", map[string]any{"permission_id": tc.permID(t, "payroll", "approve")}), 403, "FORBIDDEN", "not held")

@@ -12,8 +12,8 @@ import (
 // NewDatabase initializes a GORM PostgreSQL connection with a configured connection pool.
 func NewDatabase(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode,
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s search_path=%s",
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode, SearchPath,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
