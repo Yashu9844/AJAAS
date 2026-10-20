@@ -69,6 +69,9 @@ type Module struct {
 	permCtrl   *controllers.PermissionController
 	auditCtrl  *controllers.AuditController
 	accessCtrl *controllers.AccessController
+	inviteCtrl *controllers.InvitationController
+	inviteSvc  services.InvitationService
+	inviteRepo repositories.InvitationRepository
 
 	platformAdminKey string
 }
@@ -131,11 +134,14 @@ func NewModule(
 	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc,
 		services.WithAccessModel(m.accessRepo, m.resolver), services.WithRoleEvents(m.eventSink))
 	m.permSvc = services.NewPermissionService(m.permRepo)
+	m.inviteRepo = repositories.NewInvitationRepository()
+	m.inviteSvc = services.NewInvitationService(services.InvitationDeps{Invitations: m.inviteRepo, Users: m.userRepo,
+		Tokens: m.tokenSvc, Secrets: secretRouter{m: m}, Sink: m.eventSink, Audit: m.auditSvc})
 	m.accessSvc = services.NewAccessService(services.AccessServiceDeps{Users: m.userRepo, Perms: m.permRepo, UserRoles: m.userRoleRepo,
 		Access: m.accessRepo, Resolver: m.resolver, Audit: m.auditSvc})
 	m.automatic = services.NewAutomaticRoles(services.AutomaticRolesDeps{DB: db, Access: m.accessRepo, UserRoles: m.userRoleRepo,
 		Catalogue: m.catalogue, Logger: logger})
-	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc, services.WithAccessResolver(m.resolver), services.WithUserEvents(m.eventSink))
+	m.userSvc = services.NewUserService(m.userRepo, m.roleRepo, m.userRoleRepo, m.sessionRepo, m.tokenRepo, publisher, m.auditSvc, services.WithAccessResolver(m.resolver), services.WithUserEvents(m.eventSink), services.WithInvitations(m.inviteSvc))
 	m.authSvc = services.NewAuthService(
 		m.tenantRepo,
 		m.userRepo,
@@ -159,6 +165,7 @@ func NewModule(
 	m.permCtrl = controllers.NewPermissionController(db, m.permSvc)
 	m.auditCtrl = controllers.NewAuditController(db, m.auditSvc)
 	m.accessCtrl = controllers.NewAccessController(db, m.accessSvc, m.automatic)
+	m.inviteCtrl = controllers.NewInvitationController(db, m.userSvc, m.inviteSvc)
 	m.authCtrl.OnLogin(m.syncUserOnLogin)
 
 	return m
@@ -255,6 +262,7 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.AuditLog{},
 		&models.UserPermissionGrant{},
 		&models.UserPermissionBlock{},
+		&models.Invitation{},
 	}
 }
 
@@ -276,6 +284,7 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 		m.permCtrl,
 		m.auditCtrl,
 		m.accessCtrl,
+		m.inviteCtrl,
 		m.platformAdminKey,
 	)
 }

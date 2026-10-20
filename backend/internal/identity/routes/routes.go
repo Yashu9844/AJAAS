@@ -30,6 +30,7 @@ func RegisterRoutes(
 	permCtrl *controllers.PermissionController,
 	auditCtrl *controllers.AuditController,
 	accessCtrl *controllers.AccessController,
+	inviteCtrl *controllers.InvitationController,
 	platformAdminKey string,
 ) {
 	// Initialize Middleware Instances
@@ -46,6 +47,7 @@ func RegisterRoutes(
 		// Rate limiter: 5 forgot passwords per 1 hour
 		auth.POST("/forgot-password", sharedMiddleware.RateLimiter(redisClient, 5, 1*time.Hour), authCtrl.ForgotPassword)
 		auth.POST("/reset-password", authCtrl.ResetPassword)
+		auth.POST("/accept-invitation", sharedMiddleware.FailureRateLimiter(redisClient, 10, 15*time.Minute), inviteCtrl.Accept)
 	}
 
 	// Tenant Operations (Global / Admin operations)
@@ -184,6 +186,16 @@ func RegisterRoutes(
 			identityMiddleware.AuditLog(db, auditSvc, "permission.assigned", "role"),
 			roleCtrl.AssignPermissions,
 		)
+	}
+
+	// Invitations (tenant host + JWT + users:*)
+	invitations := router.Group("/invitations")
+	invitations.Use(tenantResolver, authMiddleware)
+	{
+		invitations.POST("", identityMiddleware.RequirePermission(authz, "users", "create"), inviteCtrl.Create)
+		invitations.GET("", identityMiddleware.RequirePermission(authz, "users", "read"), inviteCtrl.List)
+		invitations.POST("/:id/resend", identityMiddleware.RequirePermission(authz, "users", "create"), inviteCtrl.Resend)
+		invitations.POST("/:id/revoke", identityMiddleware.RequirePermission(authz, "users", "update"), inviteCtrl.Revoke)
 	}
 
 	// Access administration (tenant host + JWT + access:manage)

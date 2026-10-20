@@ -38,6 +38,9 @@ func WithRolePermissions(rp repositories.RolePermissionRepository) UserOption {
 	}
 }
 
+// WithInvitations issues an invitation (token delivered to the user) whenever a user is invited.
+func WithInvitations(inv InvitationService) UserOption { return func(s *userService) { s.invites = inv } }
+
 // WithUserEvents records user events through sink (the transactional outbox in production).
 func WithUserEvents(sink EventSink) UserOption { return func(s *userService) { s.sink = sink } }
 
@@ -47,6 +50,7 @@ func WithAccessResolver(r AccessResolver) UserOption {
 }
 
 type userService struct {
+	invites      InvitationService
 	sink         EventSink
 	resolver     AccessResolver // nil: only tenant_admin and system callers may assign roles
 	userRepo     repositories.UserRepository
@@ -225,7 +229,11 @@ func (s *userService) CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 }
 
 func (s *userService) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.InviteUserRequest, correlationID uuid.UUID) (*dto.UserResponse, error) {
-	// Verify email uniqueness
+	// Roles are validated (existence, automatic roles, no privilege escalation) before anything is written.
+	roles, err := s.resolveRoles(ctx, tx, tenantID, req.RoleIDs)
+	if err != nil {
+		return nil, err
+	}
 	existing, err := s.userRepo.FindByEmail(ctx, tx, tenantID, req.Email)
 	if err != nil {
 		return nil, err
@@ -251,41 +259,15 @@ func (s *userService) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid
 		return nil, err
 	}
 
-	// Map and associate default roles
-	var assignedRoleIDs []uuid.UUID
-	if len(req.RoleIDs) > 0 {
-		seenRoles := map[uuid.UUID]bool{}
-		for _, rIDStr := range req.RoleIDs {
-			roleID, err := uuid.Parse(rIDStr)
-			if err != nil {
-				return nil, sharedErrors.ErrValidation
-			}
-			if seenRoles[roleID] {
-				continue
-			}
-			seenRoles[roleID] = true
-
-			role, err := s.roleRepo.FindByID(ctx, tx, tenantID, roleID)
-			if err != nil {
-				return nil, err
-			}
-			if role == nil {
-				return nil, &sharedErrors.AppError{
-					Code:       "NOT_FOUND",
-					Message:    fmt.Sprintf("Role ID %s not found", rIDStr),
-					StatusCode: 404,
-				}
-			}
-
-			ur := &models.UserRole{
-				UserID:   user.ID,
-				RoleID:   roleID,
-				TenantID: tenantID,
-			}
-			if err := s.userRoleRepo.Create(ctx, tx, ur); err != nil {
-				return nil, err
-			}
-			assignedRoleIDs = append(assignedRoleIDs, roleID)
+	for _, role := range roles {
+		ur := &models.UserRole{UserID: user.ID, RoleID: role.ID, TenantID: tenantID, Source: "manual"}
+		if err := s.userRoleRepo.Create(ctx, tx, ur); err != nil {
+			return nil, err
+		}
+	}
+	if s.invites != nil {
+		if _, err := s.invites.Issue(ctx, tx, user); err != nil {
+			return nil, err
 		}
 	}
 

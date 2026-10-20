@@ -20,6 +20,7 @@ const (
 	TypeUserCreated        = "UserCreated"
 	TypeUserInvited        = "UserInvited"
 	TypeUserDeactivated    = "UserDeactivated"
+	TypeUserActivated      = "UserActivated"
 	TypeRoleAssigned       = "RoleAssigned"
 	TypeRoleRevoked        = "RoleRevoked"
 	TypePermissionAssigned = "PermissionAssigned"
@@ -36,6 +37,7 @@ const (
 	RoutingKeyUserCreated        = "identity.user.created"
 	RoutingKeyUserInvited        = "identity.user.invited"
 	RoutingKeyUserDeactivated    = "identity.user.deactivated"
+	RoutingKeyUserActivated      = "identity.user.activated"
 	RoutingKeyRoleAssigned       = "identity.role.assigned"
 	RoutingKeyRoleRevoked        = "identity.role.revoked"
 	RoutingKeyPermissionAssigned = "identity.permission.assigned"
@@ -76,6 +78,13 @@ func NewEvent(eventType string, routingKey string, tenantID uuid.UUID, correlati
 }
 
 // --- Payload Structs ---
+
+// UserActivatedPayload reports an invited user who accepted the invitation.
+type UserActivatedPayload struct {
+	UserID      uuid.UUID `json:"user_id"`
+	TenantID    uuid.UUID `json:"tenant_id"`
+	ActivatedAt time.Time `json:"activated_at"`
+}
 
 type TenantCreatedPayload struct {
 	TenantID  uuid.UUID `json:"tenant_id"`

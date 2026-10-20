@@ -103,21 +103,21 @@ func (s *authService) Login(ctx context.Context, tx *gorm.DB, req dto.LoginReque
 		return nil, sharedErrors.ErrInvalidCredentials
 	}
 
-	// AU-004: Check if User Status is active
-	if user.Status != "active" {
-		return nil, &sharedErrors.AppError{
-			Code:       "ACCOUNT_NOT_ACTIVE",
-			Message:    "User account is not active",
-			StatusCode: 403,
-		}
-	}
-
 	// 3. Verify bcrypt password hash
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
 		// Log failed login attempt
 		_ = s.auditSvc.Log(ctx, tx, tenant.ID.String(), user.ID.String(), "login.failed", "user", user.ID.String(), map[string]string{"email": req.Email, "reason": "invalid password"}, ipAddress, userAgent)
 		return nil, sharedErrors.ErrInvalidCredentials
+	}
+
+	// AU-004: the account state is revealed only to someone who proved the password (no account enumeration).
+	if user.Status != "active" {
+		return nil, &sharedErrors.AppError{
+			Code:       "ACCOUNT_NOT_ACTIVE",
+			Message:    "User account is not active",
+			StatusCode: 403,
+		}
 	}
 
 	// 4. Create active Session
