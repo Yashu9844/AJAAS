@@ -26,6 +26,8 @@ type Envelope struct {
 	EventType     string      `json:"event_type"`
 	RoutingKey    string      `json:"routing_key"`
 	Version       string      `json:"version"`
+	EventVersion  int         `json:"event_version"` // envelope schema version (docs/ARCHITECTURE.md §3.7)
+	CausationID   *uuid.UUID  `json:"causation_id,omitempty"`
 	OccurredAt    time.Time   `json:"occurred_at"`
 	Producer      string      `json:"producer"`
 	TenantID      uuid.UUID   `json:"tenant_id"`
@@ -41,7 +43,7 @@ type Source struct {
 
 // New wraps a payload in the envelope.
 func New(routingKey string, src Source, payload interface{}) Envelope {
-	return Envelope{EventID: uuid.New(), EventType: routingKey, RoutingKey: routingKey, Version: envelopeVersion,
+	return Envelope{EventID: uuid.New(), EventType: routingKey, RoutingKey: routingKey, Version: envelopeVersion, EventVersion: 1,
 		OccurredAt: src.OccurredAt.UTC(), Producer: producer, TenantID: src.TenantID, CorrelationID: src.CorrelationID, Payload: payload}
 }
 
