@@ -19,7 +19,9 @@ type AuditLog struct {
 	Metadata   json.RawMessage `gorm:"type:jsonb" json:"metadata,omitempty"`
 	IPAddress  *string         `gorm:"type:varchar(45)" json:"ip_address,omitempty"`
 	UserAgent  *string         `gorm:"type:varchar(500)" json:"user_agent,omitempty"`
-	CreatedAt  time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP;index:idx_audit_logs_created_at;index:idx_audit_logs_tenant_created,priority:2" json:"created_at"`
+	// CorrelationID ties the row to the request (and its events) that caused it.
+	CorrelationID *uuid.UUID `gorm:"type:uuid;index:idx_audit_logs_correlation_id" json:"correlation_id,omitempty"`
+	CreatedAt     time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP;index:idx_audit_logs_created_at;index:idx_audit_logs_tenant_created,priority:2" json:"created_at"`
 }
 
 // BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.

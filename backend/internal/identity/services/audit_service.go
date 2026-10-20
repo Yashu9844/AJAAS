@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/identity/dto"
@@ -77,6 +78,9 @@ func (s *auditService) Log(ctx context.Context, tx *gorm.DB, tenantID, userID st
 		IPAddress:  ip,
 		UserAgent:  ua,
 	}
+	if corr, ok := sharedMiddleware.CorrelationIDFrom(ctx); ok {
+		log.CorrelationID = &corr
+	}
 
 	err = s.auditRepo.Create(ctx, tx, log)
 	if err != nil {
@@ -101,6 +105,10 @@ func (s *auditService) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID
 			uid = &v
 		}
 		data[i] = dto.AuditLogResponse{ID: l.ID.String(), UserID: uid, Action: l.Action, Resource: l.Resource, ResourceID: l.ResourceID, Metadata: l.Metadata, IPAddress: l.IPAddress, CreatedAt: l.CreatedAt}
+		if l.CorrelationID != nil {
+			corr := l.CorrelationID.String()
+			data[i].CorrelationID = &corr
+		}
 	}
 	pages := int(total) / perPage
 	if int(total)%perPage != 0 {

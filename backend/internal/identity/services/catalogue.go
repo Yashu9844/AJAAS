@@ -16,7 +16,9 @@ import (
 type Transactor func(ctx context.Context, fn func(tx *gorm.DB) error) error
 
 func dbTransactor(db *gorm.DB) Transactor {
-	return func(ctx context.Context, fn func(tx *gorm.DB) error) error { return db.WithContext(ctx).Transaction(fn) }
+	return func(ctx context.Context, fn func(tx *gorm.DB) error) error {
+		return db.WithContext(ctx).Transaction(fn)
+	}
 }
 
 // Catalogue registers the permission catalogue and keeps every tenant's predefined roles in sync

@@ -14,7 +14,9 @@ type AuditLogResponse struct {
 	ResourceID *string         `json:"resource_id,omitempty"`
 	Metadata   json.RawMessage `json:"metadata,omitempty"`
 	IPAddress  *string         `json:"ip_address,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
+	// CorrelationID links the row to the request and the events it produced.
+	CorrelationID *string   `json:"correlation_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // AuditLogListResponse holds paginated audit records.

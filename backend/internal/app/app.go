@@ -6,8 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/employee"
@@ -128,8 +126,6 @@ func Build(o Options) (*gin.Engine, error) {
 	employeeModule.RegisterRoutes(v1, identityModule.Authorizer(), identityModule.TenantResolver(), identityModule.AuthMiddleware(), identityModule.AuditService())
 	registerPeopleRoutes(v1, o, identityModule, people)
 
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "UP", "timestamp": time.Now().Format(time.RFC3339)})
-	})
+	registerHealth(router, o.DB, o.Redis)
 	return router, nil
 }

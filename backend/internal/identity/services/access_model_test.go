@@ -350,7 +350,9 @@ func TestRoleServiceScopesParentsAndClone(t *testing.T) {
 	svc := accessRoles(f)
 	ctx := context.Background()
 	p := f.perm("leave", "approve")
-	grant := func(scope string) []dto.GrantInput { return []dto.GrantInput{{PermissionID: p.ID.String(), Scope: scope}} }
+	grant := func(scope string) []dto.GrantInput {
+		return []dto.GrantInput{{PermissionID: p.ID.String(), Scope: scope}}
+	}
 	if _, err := svc.CreateRole(ctx, nil, f.tenant, dto.CreateRoleRequest{Name: "x", PermissionIDs: []string{p.ID.String()}, Grants: grant("own")}); !isStatus(err, 400) {
 		t.Fatalf("conflicting duplicate scopes: %v", err)
 	}

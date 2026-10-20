@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"net/http"
@@ -47,7 +48,7 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 
 	ipAddress := c.ClientIP()
 	userAgent := c.Request.UserAgent()
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 
 	res, err := ctrl.authSvc.Login(c.Request.Context(), ctrl.db, req, ipAddress, userAgent, correlationID)
 	if err != nil {
@@ -81,7 +82,7 @@ func (ctrl *AuthController) Logout(c *gin.Context) {
 	userID := userIDVal.(uuid.UUID)
 	sessionID := sessionIDVal.(uuid.UUID)
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	err := ctrl.authSvc.Logout(c.Request.Context(), ctrl.db, tenantID, userID, sessionID, correlationID)
 	if err != nil {
 		respondError(c, err)
@@ -103,7 +104,7 @@ func (ctrl *AuthController) Refresh(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	res, err := ctrl.authSvc.RefreshToken(c.Request.Context(), ctrl.db, req, correlationID)
 	if err != nil {
 		respondError(c, err)
@@ -125,7 +126,7 @@ func (ctrl *AuthController) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	err := ctrl.authSvc.ForgotPassword(c.Request.Context(), ctrl.db, req, correlationID)
 	if err != nil {
 		respondError(c, err)
@@ -148,7 +149,7 @@ func (ctrl *AuthController) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	err := ctrl.authSvc.ResetPassword(c.Request.Context(), ctrl.db, req, correlationID)
 	if err != nil {
 		respondError(c, err)

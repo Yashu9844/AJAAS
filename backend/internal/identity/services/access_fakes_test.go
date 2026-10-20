@@ -70,7 +70,9 @@ func (f *fakeAccess) assign(user uuid.UUID, r *models.Role, source string) {
 
 // ---- repositories.AccessRepository
 
-func (f *fakeAccess) AccessVersion(context.Context, *gorm.DB, uuid.UUID) (int64, error) { return f.version, f.err }
+func (f *fakeAccess) AccessVersion(context.Context, *gorm.DB, uuid.UUID) (int64, error) {
+	return f.version, f.err
+}
 func (f *fakeAccess) TenantRoles(context.Context, *gorm.DB, uuid.UUID) ([]models.Role, error) {
 	out := make([]models.Role, 0, len(f.roles))
 	for _, r := range f.roles {
@@ -176,7 +178,9 @@ func (f *fakeAccess) AllPermissions(context.Context, *gorm.DB) ([]models.Permiss
 	}
 	return out, f.err
 }
-func (f *fakeAccess) TenantIDs(context.Context, *gorm.DB, bool) ([]uuid.UUID, error) { return f.tenants, f.err }
+func (f *fakeAccess) TenantIDs(context.Context, *gorm.DB, bool) ([]uuid.UUID, error) {
+	return f.tenants, f.err
+}
 
 // ---- role / assignment / permission repositories backed by the same state
 
@@ -289,7 +293,9 @@ func (f *fakeAccess) rolePermRepo() *MockRolePermissionRepository {
 
 func (f *fakeAccess) permRepo() *MockPermissionRepository {
 	return &MockPermissionRepository{
-		FindByIDFunc: func(_ context.Context, _ *gorm.DB, id uuid.UUID) (*models.Permission, error) { return f.perms[id], f.err },
+		FindByIDFunc: func(_ context.Context, _ *gorm.DB, id uuid.UUID) (*models.Permission, error) {
+			return f.perms[id], f.err
+		},
 		FindByIDsFunc: func(_ context.Context, _ *gorm.DB, ids []uuid.UUID) ([]models.Permission, error) {
 			var out []models.Permission
 			for _, id := range ids {

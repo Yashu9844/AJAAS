@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/jaas/jaas/internal/shared/database"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -185,7 +186,7 @@ func (ctrl *RoleController) AssignPermissions(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	err = ctrl.roleSvc.AssignPermissions(reqCtx(c), tx, tenantID, id, req, correlationID)
 	if err = database.Finish(tx, err); err != nil {
@@ -222,7 +223,7 @@ func (ctrl *RoleController) AssignRolesToUser(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	err = ctrl.roleSvc.AssignRolesToUser(reqCtx(c), tx, tenantID, userID, req, correlationID)
 	if err = database.Finish(tx, err); err != nil {

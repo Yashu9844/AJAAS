@@ -26,14 +26,18 @@ func (s stubAccess) ListGrants(context.Context, *gorm.DB, uuid.UUID, uuid.UUID) 
 func (s stubAccess) Grant(context.Context, *gorm.DB, uuid.UUID, uuid.UUID, dto.UserGrantRequest) (*dto.UserGrantResponse, error) {
 	return &dto.UserGrantResponse{Permission: "users:read"}, s.err
 }
-func (s stubAccess) RevokeGrant(context.Context, *gorm.DB, uuid.UUID, uuid.UUID, uuid.UUID) error { return s.err }
+func (s stubAccess) RevokeGrant(context.Context, *gorm.DB, uuid.UUID, uuid.UUID, uuid.UUID) error {
+	return s.err
+}
 func (s stubAccess) ListBlocks(context.Context, *gorm.DB, uuid.UUID, uuid.UUID) ([]dto.UserBlockResponse, error) {
 	return nil, s.err
 }
 func (s stubAccess) Block(context.Context, *gorm.DB, uuid.UUID, uuid.UUID, dto.UserBlockRequest) (*dto.UserBlockResponse, error) {
 	return &dto.UserBlockResponse{}, s.err
 }
-func (s stubAccess) Unblock(context.Context, *gorm.DB, uuid.UUID, uuid.UUID, uuid.UUID) error { return s.err }
+func (s stubAccess) Unblock(context.Context, *gorm.DB, uuid.UUID, uuid.UUID, uuid.UUID) error {
+	return s.err
+}
 func (s stubAccess) Explain(context.Context, *gorm.DB, uuid.UUID, uuid.UUID) (*dto.ExplainAccessResponse, error) {
 	return &dto.ExplainAccessResponse{}, s.err
 }
@@ -45,7 +49,7 @@ func (s stubAuto) SyncTenant(context.Context, uuid.UUID) (int, int, error) {
 	return 1, 2, s.err
 }
 func (s stubAuto) SyncUser(context.Context, uuid.UUID, uuid.UUID) error { return s.err }
-func (stubAuto) Run(context.Context, time.Duration)                       {}
+func (stubAuto) Run(context.Context, time.Duration)                     {}
 
 func accessRouter(svc services.AccessService, auto services.AutomaticRoles, withTenant bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)

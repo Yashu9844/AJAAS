@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"github.com/jaas/jaas/internal/shared/database"
+	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,7 @@ func (ctrl *TenantController) Create(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New() // generated context correlation tracking
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	res, err := ctrl.tenantSvc.CreateTenant(c.Request.Context(), tx, req, correlationID)
 	if err = database.Finish(tx, err); err != nil {
@@ -114,7 +115,7 @@ func (ctrl *TenantController) Activate(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	res, err := ctrl.tenantSvc.ActivateTenant(c.Request.Context(), tx, id, correlationID)
 	if err = database.Finish(tx, err); err != nil {
@@ -133,7 +134,7 @@ func (ctrl *TenantController) Suspend(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	res, err := ctrl.tenantSvc.SuspendTenant(c.Request.Context(), tx, id, correlationID)
 	if err = database.Finish(tx, err); err != nil {

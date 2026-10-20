@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/jaas/jaas/internal/shared/database"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -45,7 +46,7 @@ func (ctrl *UserController) Create(c *gin.Context) {
 		return
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	res, err := ctrl.userSvc.CreateUser(reqCtx(c), tx, tenantID, req, correlationID)
 	if err = database.Finish(tx, err); err != nil {
@@ -157,7 +158,7 @@ func (ctrl *UserController) Deactivate(c *gin.Context) {
 		}
 	}
 
-	correlationID := uuid.New()
+	correlationID := sharedMiddleware.CorrelationOrNew(c.Request.Context())
 	tx := database.BeginTx(c.Request.Context(), ctrl.db)
 	err = ctrl.userSvc.DeactivateUser(c.Request.Context(), tx, tenantID, id, correlationID)
 	if err = database.Finish(tx, err); err != nil {

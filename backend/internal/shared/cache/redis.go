@@ -113,3 +113,8 @@ func (r *RedisClient) Decr(ctx context.Context, key string) error {
 func (r *RedisClient) TTL(ctx context.Context, key string) (time.Duration, error) {
 	return r.client.TTL(ctx, key).Result()
 }
+
+// Ping checks the connection (readiness probes).
+func (r *RedisClient) Ping(ctx context.Context) error {
+	return r.client.Ping(ctx).Err()
+}

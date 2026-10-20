@@ -13,13 +13,15 @@ func RequestLogger(log *logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
-		// Generate request tracking ID if not set
-		requestID := c.GetHeader("X-Request-ID")
-		if requestID == "" {
-			requestID = uuid.New().String()
-		}
-		c.Header("X-Request-ID", requestID)
+		// One validated correlation ID per request: echoed back, stored in the gin and request contexts, and carried
+		// into audit rows and events (docs/ARCHITECTURE.md §3.4).
+		corr := incomingCorrelation(c.GetHeader(CorrelationHeader), c.GetHeader(RequestIDHeader))
+		requestID := corr.String()
+		c.Header(CorrelationHeader, requestID)
+		c.Header(RequestIDHeader, requestID)
 		c.Set("request_id", requestID)
+		c.Set("correlation_id", corr)
+		c.Request = c.Request.WithContext(WithCorrelationID(c.Request.Context(), corr))
 
 		// Process request
 		c.Next()
