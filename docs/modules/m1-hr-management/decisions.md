@@ -66,6 +66,21 @@ Service-level decisions. Context-level decisions (D1-…, D3-…, D4-…, D5-…
   roles and per-person exceptions.
 - **Trade-off:** HR routes keep requiring tenant scope until they adopt scoped checks in Phase C.
 
+## DHR-10 (2026-10-20) Phase C implementation choices
+
+- **Schemas:** each service's tables live in its own Postgres schema (`identity`, `hr`) with its own migration set
+  (`backend/migrations/identity`, `backend/migrations/hr`, tracked in `<schema>.schema_migrations`). The in-process
+  monolith connects with `search_path=identity,hr,public` so SQL stays unqualified; a separately deployed service gets
+  only its own schema. No foreign key crosses a schema (integration test).
+- **Ports:** HR reaches M0 only through `internal/hr/identityport` (in-process adapter in `identityport/inprocess`);
+  contexts reach each other only through `<context>/dto` and `<context>/api`; shared value types (`Days`, `Money`)
+  live in `internal/hr/kernel`. `TestImportBoundaries` enforces all three.
+- **Events:** every envelope carries `event_version` (1) and optional `causation_id`. Outboxes and exchanges stay per
+  context (`jaas.<context>.events`, `<context>_events_outbox` in schema `hr`) — consolidating them would only rename
+  routing keys without a consumer needing it.
+- **Routes:** HR contexts keep their sub-paths under `/api/v1/hr` (`/hr/departments`, `/hr/employees`,
+  `/hr/attendance/...`, `/hr/shifts`, `/hr/leave/...`, `/hr/payroll/...`, `/hr/recruitment/...`).
+
 ## DHR-09 (2026-10-20) Re-baseline migrations at the schema split
 
 - **Decision:** at Phase C step 7 the `identity` and `hr` schemas start from fresh migration sets; dev and test

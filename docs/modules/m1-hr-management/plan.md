@@ -23,12 +23,18 @@ Exactly one phase is CURRENT. Phases with a human gate stop for the owner's GO b
 | Phase | Objective | Status | Gate |
 |---|---|---|---|
 | A | Architecture + docs restructure (this bundle, `docs/ARCHITECTURE.md`, document cleanup) | DONE — approved 2026-10-20 | done |
-| B | M0 alignment incl. access model (M0 `plan.md` §3–4) | CURRENT | GO given 2026-10-20 |
-| C | HR service boundary (§3 below) | LATER | schema/API gate |
-| D | Test console for M0 + all built HR contexts | LATER | — |
+| B | M0 alignment incl. access model (M0 `plan.md` §3–4) | DONE 2026-10-20 | GO given 2026-10-20 |
+| C | HR service boundary (§3 below) | DONE 2026-10-20 | GO given 2026-10-20 |
+| D | Test console for M0 + all built HR contexts | CURRENT | — |
 | E | Complete HR (§4 below) | LATER | per-context design gate |
 
 ## 3. Phase C — HR service boundary (steps)
+
+**Result (2026-10-20):** all steps done except the consolidated outbox/exchange (kept per context, DHR-10) and the
+generic saga table (the hire saga is already resumable through `recruitment_candidates.hired_user_id`; the last-seat
+orphan fix stays in E.10). Commits: `f257c5e` (move + `/api/v1/hr`), `5b6f030` (HR root, identityport, kernel,
+employee/api, boundary test), `6969751` (schemas + re-baseline), `fd2d97c` (event envelope). Unit, integration
+(incl. `TestSchemasAreOwnedAndIsolated`, `TestImportBoundaries`) and migration up/down/up cycles are green.
 
 Each step ends with unit + integration rings green and a commit.
 

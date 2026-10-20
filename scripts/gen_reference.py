@@ -130,13 +130,20 @@ def routes(module):
     return rows
 
 
+def migration_files():
+    """Yield (label, path) for every up migration, per schema set (identity, then hr)."""
+    base = os.path.join(BACKEND, 'migrations')
+    for schema in ('identity', 'hr'):
+        d = os.path.join(base, schema)
+        for f in sorted(os.listdir(d)):
+            if f.endswith('.up.sql'):
+                yield schema + '/' + f, os.path.join(d, f)
+
+
 def migrations():
-    d = os.path.join(BACKEND, 'migrations')
     out = []
-    for f in sorted(os.listdir(d)):
-        if not f.endswith('.up.sql'):
-            continue
-        sql = read(os.path.join(d, f))
+    for f, path in migration_files():
+        sql = read(path)
         for m in re.finditer(r'CREATE TABLE (?:IF NOT EXISTS )?(\w+) \((.*?)\n\);', sql, re.S):
             cols = []
             for raw in m.group(2).split('\n'):

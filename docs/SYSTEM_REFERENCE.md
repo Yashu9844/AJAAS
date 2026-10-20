@@ -12,7 +12,12 @@
 >
 > Regenerate the appendix with `python scripts/gen_reference.py <repo> <out>` instead of hand-editing it.
 
-> **Numbering (2026-10-20):** this reference uses the canonical names from `docs/ARCHITECTURE.md` — M0 Identity and the HR bounded contexts `HR/<Context>` of M1 HR Management. Code paths and routes are the pre-restructure ones (restructure Phase C moves HR to `internal/hr/` and `/api/v1/hr`); regenerate after that phase.
+> **Read this first (2026-10-20):** Part 2 below is regenerated from the current code (HR under
+> `backend/internal/hr/<context>`, routes under `/api/v1/hr`, migrations per schema in `backend/migrations/identity`
+> and `backend/migrations/hr`). Part 1 is the narrative written before restructure Phases B–C: its module logic is
+> still accurate, but for paths, schemas, the access model, idempotency, outbox, invitations and EdDSA tokens see
+> `docs/ARCHITECTURE.md` §12–17 and the module plans (`docs/modules/m0-identity-access/plan.md`,
+> `docs/modules/m1-hr-management/plan.md`).
 
 ---
 
@@ -620,7 +625,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 ## A. HTTP routes (all modules)
 
 
-### M0 Identity & Access — 29 routes
+### M0 Identity & Access — 44 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -628,6 +633,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | POST | `/api/v1/auth/refresh` | authCtrl.Refresh |
 | POST | `/api/v1/auth/forgot-password` | sharedMiddleware.RateLimiter(redisClient, 5, 1*time.Hour), authCtrl.ForgotPassword |
 | POST | `/api/v1/auth/reset-password` | authCtrl.ResetPassword |
+| POST | `/api/v1/auth/accept-invitation` | sharedMiddleware.FailureRateLimiter(redisClient, 10, 15*time.Minute), inviteCtrl.Accept |
 | POST | `/api/v1/tenants` | [group: identityMiddleware.PlatformAdmin(platformAdminKey)] tenantCtrl.Create |
 | GET | `/api/v1/tenants` | [group: identityMiddleware.PlatformAdmin(platformAdminKey)] tenantCtrl.List |
 | GET | `/api/v1/tenants/:id` | [group: identityMiddleware.PlatformAdmin(platformAdminKey)] tenantCtrl.GetByID |
@@ -636,176 +642,190 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | POST | `/api/v1/tenants/:id/suspend` | [group: identityMiddleware.PlatformAdmin(platformAdminKey)] tenantCtrl.Suspend |
 | POST | `/api/v1/auth/logout` | [group: authMiddleware] authCtrl.Logout |
 | GET | `/api/v1/auth/me` | [group: authMiddleware] roleCtrl.Me |
-| POST | `/api/v1/users` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "create", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "user.created", "user"), userCtrl.Create |
-| GET | `/api/v1/users` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "read", userRoleRepo, rolePermRepo), userCtrl.List |
-| GET | `/api/v1/users/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "read", userRoleRepo, rolePermRepo), userCtrl.GetByID |
-| PATCH | `/api/v1/users/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "user.updated", "user"), userCtrl.Update |
-| POST | `/api/v1/users/:id/deactivate` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "delete", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "user.deactivated", "user"), userCtrl.Deactivate |
-| POST | `/api/v1/users/:id/activate` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "user.activated", "user"), userCtrl.Activate |
-| DELETE | `/api/v1/users/:id/roles/:role_id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "role.removed", "user"), roleCtrl.RemoveRoleFromUser |
-| POST | `/api/v1/users/:id/roles` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "users", "update", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "role.assigned", "user"), roleCtrl.AssignRolesToUser |
-| POST | `/api/v1/roles` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "roles", "create", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "role.created", "role"), roleCtrl.Create |
-| GET | `/api/v1/roles` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "roles", "read", userRoleRepo, rolePermRepo), roleCtrl.List |
-| GET | `/api/v1/roles/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "roles", "read", userRoleRepo, rolePermRepo), roleCtrl.GetByID |
-| PATCH | `/api/v1/roles/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "role.updated", "role"), roleCtrl.Update |
-| DELETE | `/api/v1/roles/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "roles", "delete", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "role.deleted", "role"), roleCtrl.Delete |
-| DELETE | `/api/v1/roles/:id/permissions/:permission_id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "permission.removed", "role"), roleCtrl.RemovePermission |
-| POST | `/api/v1/roles/:id/permissions` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "roles", "update", userRoleRepo, rolePermRepo), identityMiddleware.AuditLog(db, auditSvc, "permission.assigned", "role"), roleCtrl.AssignPermissions |
-| GET | `/api/v1/audit-logs` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(db, "audit", "read", userRoleRepo, rolePermRepo), auditCtrl.List |
-| GET | `/api/v1/permissions` | [group: authMiddleware] identityMiddleware.RequirePermission(db, "permissions", "read", userRoleRepo, rolePermRepo), permCtrl.List |
+| GET | `/api/v1/auth/me/access` | [group: authMiddleware] accessCtrl.ExplainMe |
+| POST | `/api/v1/users` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "create"), identityMiddleware.AuditLog(db, auditSvc, "user.created", "user"), userCtrl.Create |
+| GET | `/api/v1/users` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "read"), userCtrl.List |
+| GET | `/api/v1/users/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "read"), userCtrl.GetByID |
+| PATCH | `/api/v1/users/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "update"), identityMiddleware.AuditLog(db, auditSvc, "user.updated", "user"), userCtrl.Update |
+| POST | `/api/v1/users/:id/deactivate` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "delete"), identityMiddleware.AuditLog(db, auditSvc, "user.deactivated", "user"), userCtrl.Deactivate |
+| POST | `/api/v1/users/:id/activate` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "update"), identityMiddleware.AuditLog(db, auditSvc, "user.activated", "user"), userCtrl.Activate |
+| DELETE | `/api/v1/users/:id/roles/:role_id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "update"), identityMiddleware.AuditLog(db, auditSvc, "role.removed", "user"), roleCtrl.RemoveRoleFromUser |
+| GET | `/api/v1/users/:id/access` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "read"), accessCtrl.Explain |
+| GET | `/api/v1/users/:id/grants` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "read"), accessCtrl.ListGrants |
+| POST | `/api/v1/users/:id/grants` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "manage"), accessCtrl.Grant |
+| DELETE | `/api/v1/users/:id/grants/:permission_id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "manage"), accessCtrl.RevokeGrant |
+| GET | `/api/v1/users/:id/blocks` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "read"), accessCtrl.ListBlocks |
+| POST | `/api/v1/users/:id/blocks` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "manage"), accessCtrl.Block |
+| DELETE | `/api/v1/users/:id/blocks/:permission_id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "manage"), accessCtrl.Unblock |
+| POST | `/api/v1/users/:id/roles` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "update"), identityMiddleware.AuditLog(db, auditSvc, "role.assigned", "user"), roleCtrl.AssignRolesToUser |
+| POST | `/api/v1/roles` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "create"), identityMiddleware.AuditLog(db, auditSvc, "role.created", "role"), roleCtrl.Create |
+| GET | `/api/v1/roles` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "read"), roleCtrl.List |
+| GET | `/api/v1/roles/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "read"), roleCtrl.GetByID |
+| PATCH | `/api/v1/roles/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "update"), identityMiddleware.AuditLog(db, auditSvc, "role.updated", "role"), roleCtrl.Update |
+| DELETE | `/api/v1/roles/:id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "delete"), identityMiddleware.AuditLog(db, auditSvc, "role.deleted", "role"), roleCtrl.Delete |
+| POST | `/api/v1/roles/:id/clone` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "create"), identityMiddleware.AuditLog(db, auditSvc, "role.created", "role"), roleCtrl.Clone |
+| DELETE | `/api/v1/roles/:id/permissions/:permission_id` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "update"), identityMiddleware.AuditLog(db, auditSvc, "permission.removed", "role"), roleCtrl.RemovePermission |
+| POST | `/api/v1/roles/:id/permissions` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "roles", "update"), identityMiddleware.AuditLog(db, auditSvc, "permission.assigned", "role"), roleCtrl.AssignPermissions |
+| POST | `/api/v1/invitations` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "create"), inviteCtrl.Create |
+| GET | `/api/v1/invitations` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "read"), inviteCtrl.List |
+| POST | `/api/v1/invitations/:id/resend` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "create"), inviteCtrl.Resend |
+| POST | `/api/v1/invitations/:id/revoke` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "users", "update"), inviteCtrl.Revoke |
+| POST | `/api/v1/access/automatic-roles/sync` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "access", "manage"), identityMiddleware.AuditLog(db, auditSvc, "access.automatic_roles_synced", "tenant"), accessCtrl.SyncAutomaticRoles |
+| GET | `/api/v1/audit-logs` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "audit", "read"), auditCtrl.List |
+| GET | `/api/v1/permissions` | [group: authMiddleware] identityMiddleware.RequirePermission(authz, "permissions", "read"), permCtrl.List |
 
 ### M1 HR / Organization — 22 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
-| POST | `/api/v1/departments` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("department.created", "department"), deptCtrl.Create |
-| GET | `/api/v1/departments` | [group: tenantResolver, authMiddleware, invalidate] read, deptCtrl.List |
-| GET | `/api/v1/departments/:id` | [group: tenantResolver, authMiddleware, invalidate] read, deptCtrl.GetByID |
-| PATCH | `/api/v1/departments/:id` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("department.updated", "department"), deptCtrl.Update |
-| POST | `/api/v1/departments/:id/deactivate` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("department.deactivated", "department"), deptCtrl.Deactivate |
-| POST | `/api/v1/teams` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("team.created", "team"), teamCtrl.Create |
-| GET | `/api/v1/teams` | [group: tenantResolver, authMiddleware, invalidate] read, teamCtrl.List |
-| GET | `/api/v1/teams/:id` | [group: tenantResolver, authMiddleware, invalidate] read, teamCtrl.GetByID |
-| PATCH | `/api/v1/teams/:id` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("team.updated", "team"), teamCtrl.Update |
-| POST | `/api/v1/teams/:id/deactivate` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("team.deactivated", "team"), teamCtrl.Deactivate |
-| POST | `/api/v1/designations` | [group: tenantResolver, authMiddleware] write, auditMW("designation.created", "designation"), desigCtrl.Create |
-| GET | `/api/v1/designations` | [group: tenantResolver, authMiddleware] read, desigCtrl.List |
-| GET | `/api/v1/designations/:id` | [group: tenantResolver, authMiddleware] read, desigCtrl.GetByID |
-| PATCH | `/api/v1/designations/:id` | [group: tenantResolver, authMiddleware] write, auditMW("designation.updated", "designation"), desigCtrl.Update |
-| POST | `/api/v1/designations/:id/deactivate` | [group: tenantResolver, authMiddleware] write, auditMW("designation.deactivated", "designation"), desigCtrl.Deactivate |
-| POST | `/api/v1/mappings` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("mapping.created", "mapping"), mappingCtrl.Create |
-| GET | `/api/v1/mappings` | [group: tenantResolver, authMiddleware, invalidate] read, mappingCtrl.ListByUser |
-| GET | `/api/v1/mappings/:id` | [group: tenantResolver, authMiddleware, invalidate] read, mappingCtrl.GetByID |
-| PATCH | `/api/v1/mappings/:id` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("mapping.updated", "mapping"), mappingCtrl.Update |
-| POST | `/api/v1/mappings/:id/deactivate` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("mapping.deactivated", "mapping"), mappingCtrl.Deactivate |
-| GET | `/api/v1/org-chart` | [group: tenantResolver, authMiddleware, read] chartCtrl.Chart |
-| GET | `/api/v1/org-chart/chain` | [group: tenantResolver, authMiddleware, read] chartCtrl.UserChain |
+| POST | `/api/v1/hr/departments` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("department.created", "department"), deptCtrl.Create |
+| GET | `/api/v1/hr/departments` | [group: tenantResolver, authMiddleware, invalidate] read, deptCtrl.List |
+| GET | `/api/v1/hr/departments/:id` | [group: tenantResolver, authMiddleware, invalidate] read, deptCtrl.GetByID |
+| PATCH | `/api/v1/hr/departments/:id` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("department.updated", "department"), deptCtrl.Update |
+| POST | `/api/v1/hr/departments/:id/deactivate` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("department.deactivated", "department"), deptCtrl.Deactivate |
+| POST | `/api/v1/hr/teams` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("team.created", "team"), teamCtrl.Create |
+| GET | `/api/v1/hr/teams` | [group: tenantResolver, authMiddleware, invalidate] read, teamCtrl.List |
+| GET | `/api/v1/hr/teams/:id` | [group: tenantResolver, authMiddleware, invalidate] read, teamCtrl.GetByID |
+| PATCH | `/api/v1/hr/teams/:id` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("team.updated", "team"), teamCtrl.Update |
+| POST | `/api/v1/hr/teams/:id/deactivate` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("team.deactivated", "team"), teamCtrl.Deactivate |
+| POST | `/api/v1/hr/designations` | [group: tenantResolver, authMiddleware] write, auditMW("designation.created", "designation"), desigCtrl.Create |
+| GET | `/api/v1/hr/designations` | [group: tenantResolver, authMiddleware] read, desigCtrl.List |
+| GET | `/api/v1/hr/designations/:id` | [group: tenantResolver, authMiddleware] read, desigCtrl.GetByID |
+| PATCH | `/api/v1/hr/designations/:id` | [group: tenantResolver, authMiddleware] write, auditMW("designation.updated", "designation"), desigCtrl.Update |
+| POST | `/api/v1/hr/designations/:id/deactivate` | [group: tenantResolver, authMiddleware] write, auditMW("designation.deactivated", "designation"), desigCtrl.Deactivate |
+| POST | `/api/v1/hr/mappings` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("mapping.created", "mapping"), mappingCtrl.Create |
+| GET | `/api/v1/hr/mappings` | [group: tenantResolver, authMiddleware, invalidate] read, mappingCtrl.ListByUser |
+| GET | `/api/v1/hr/mappings/:id` | [group: tenantResolver, authMiddleware, invalidate] read, mappingCtrl.GetByID |
+| PATCH | `/api/v1/hr/mappings/:id` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("mapping.updated", "mapping"), mappingCtrl.Update |
+| POST | `/api/v1/hr/mappings/:id/deactivate` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("mapping.deactivated", "mapping"), mappingCtrl.Deactivate |
+| GET | `/api/v1/hr/org-chart` | [group: tenantResolver, authMiddleware, read] chartCtrl.Chart |
+| GET | `/api/v1/hr/org-chart/chain` | [group: tenantResolver, authMiddleware, read] chartCtrl.UserChain |
 
 ### M1 HR / Employee — 14 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
-| GET | `/api/v1/employees/me` | [group: tenantResolver, authMiddleware] empCtrl.GetMe |
-| PATCH | `/api/v1/employees/me` | [group: tenantResolver, authMiddleware] auditMW("employee.self_updated", "employee"), empCtrl.UpdateMe |
-| POST | `/api/v1/employees` | [group: tenantResolver, authMiddleware] create, auditMW("employee.created", "employee"), empCtrl.Create |
-| GET | `/api/v1/employees` | [group: tenantResolver, authMiddleware] read, empCtrl.List |
-| GET | `/api/v1/employees/:id` | [group: tenantResolver, authMiddleware] read, empCtrl.GetByID |
-| PATCH | `/api/v1/employees/:id` | [group: tenantResolver, authMiddleware] update, auditMW("employee.updated", "employee"), empCtrl.Update |
-| POST | `/api/v1/employees/:id/status` | [group: tenantResolver, authMiddleware] update, auditMW("employee.status_changed", "employee"), empCtrl.TransitionStatus |
-| POST | `/api/v1/employees/:id/deactivate` | [group: tenantResolver, authMiddleware] update, auditMW("employee.deactivated", "employee"), empCtrl.Deactivate |
-| GET | `/api/v1/employees/:id/statutory` | [group: tenantResolver, authMiddleware] read, sensitiveFlag, auditUnmasked, statCtrl.Get |
-| PUT | `/api/v1/employees/:id/statutory` | [group: tenantResolver, authMiddleware] updateSensitive, auditMW("employee.statutory_updated", "employee"), statCtrl.Upsert |
-| POST | `/api/v1/employees/:id/documents` | [group: tenantResolver, authMiddleware] update, auditMW("employee.document_uploaded", "employee"), docCtrl.Upload |
-| GET | `/api/v1/employees/:id/documents` | [group: tenantResolver, authMiddleware] read, docCtrl.List |
-| POST | `/api/v1/employees/:id/documents/:doc_id/verify` | [group: tenantResolver, authMiddleware] admin, auditMW("employee.document_verified", "employee"), docCtrl.Verify |
-| GET | `/api/v1/employees/:id/timeline` | [group: tenantResolver, authMiddleware] read, tlCtrl.List |
+| GET | `/api/v1/hr/employees/me` | [group: tenantResolver, authMiddleware] empCtrl.GetMe |
+| PATCH | `/api/v1/hr/employees/me` | [group: tenantResolver, authMiddleware] auditMW("employee.self_updated", "employee"), empCtrl.UpdateMe |
+| POST | `/api/v1/hr/employees` | [group: tenantResolver, authMiddleware] create, auditMW("employee.created", "employee"), empCtrl.Create |
+| GET | `/api/v1/hr/employees` | [group: tenantResolver, authMiddleware] read, empCtrl.List |
+| GET | `/api/v1/hr/employees/:id` | [group: tenantResolver, authMiddleware] read, empCtrl.GetByID |
+| PATCH | `/api/v1/hr/employees/:id` | [group: tenantResolver, authMiddleware] update, auditMW("employee.updated", "employee"), empCtrl.Update |
+| POST | `/api/v1/hr/employees/:id/status` | [group: tenantResolver, authMiddleware] update, auditMW("employee.status_changed", "employee"), empCtrl.TransitionStatus |
+| POST | `/api/v1/hr/employees/:id/deactivate` | [group: tenantResolver, authMiddleware] update, auditMW("employee.deactivated", "employee"), empCtrl.Deactivate |
+| GET | `/api/v1/hr/employees/:id/statutory` | [group: tenantResolver, authMiddleware] read, sensitiveFlag, auditUnmasked, statCtrl.Get |
+| PUT | `/api/v1/hr/employees/:id/statutory` | [group: tenantResolver, authMiddleware] updateSensitive, auditMW("employee.statutory_updated", "employee"), statCtrl.Upsert |
+| POST | `/api/v1/hr/employees/:id/documents` | [group: tenantResolver, authMiddleware] update, auditMW("employee.document_uploaded", "employee"), docCtrl.Upload |
+| GET | `/api/v1/hr/employees/:id/documents` | [group: tenantResolver, authMiddleware] read, docCtrl.List |
+| POST | `/api/v1/hr/employees/:id/documents/:doc_id/verify` | [group: tenantResolver, authMiddleware] admin, auditMW("employee.document_verified", "employee"), docCtrl.Verify |
+| GET | `/api/v1/hr/employees/:id/timeline` | [group: tenantResolver, authMiddleware] read, tlCtrl.List |
 
 ### M1 HR / Attendance — 19 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
-| POST | `/api/v1/attendance/punch` | [group: mw.TenantResolver, mw.Authenticate] mw.PunchLimit, ctl.Attendance.Punch |
-| GET | `/api/v1/attendance/me/today` | [group: mw.TenantResolver, mw.Authenticate] ctl.Attendance.Today |
-| GET | `/api/v1/attendance/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Attendance.Mine |
-| GET | `/api/v1/attendance/records` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Attendance.List |
-| GET | `/api/v1/attendance/records/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Attendance.Detail |
-| GET | `/api/v1/attendance/summary` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Attendance.Summary |
-| POST | `/api/v1/attendance/regularizations` | [group: mw.TenantResolver, mw.Authenticate] ctl.Regularization.Create |
-| GET | `/api/v1/attendance/regularizations/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Regularization.ListMine |
-| GET | `/api/v1/attendance/regularizations` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Regularization.List |
-| POST | `/api/v1/attendance/regularizations/:id/cancel` | [group: mw.TenantResolver, mw.Authenticate] ctl.Regularization.Cancel |
-| POST | `/api/v1/attendance/regularizations/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Regularization.Approve |
-| POST | `/api/v1/attendance/regularizations/:id/reject` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Regularization.Reject |
-| POST | `/api/v1/shifts` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Create |
-| GET | `/api/v1/shifts` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Shift.List |
-| GET | `/api/v1/shifts/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Shift.Get |
-| PATCH | `/api/v1/shifts/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Update |
-| POST | `/api/v1/shifts/:id/deactivate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Deactivate |
-| POST | `/api/v1/shifts/:id/assignments` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Assign |
-| GET | `/api/v1/shift-assignments` | mw.TenantResolver, mw.Authenticate, read, ctl.Shift.ListAssignments |
+| POST | `/api/v1/hr/attendance/punch` | [group: mw.TenantResolver, mw.Authenticate] mw.PunchLimit, ctl.Attendance.Punch |
+| GET | `/api/v1/hr/attendance/me/today` | [group: mw.TenantResolver, mw.Authenticate] ctl.Attendance.Today |
+| GET | `/api/v1/hr/attendance/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Attendance.Mine |
+| GET | `/api/v1/hr/attendance/records` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Attendance.List |
+| GET | `/api/v1/hr/attendance/records/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Attendance.Detail |
+| GET | `/api/v1/hr/attendance/summary` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Attendance.Summary |
+| POST | `/api/v1/hr/attendance/regularizations` | [group: mw.TenantResolver, mw.Authenticate] ctl.Regularization.Create |
+| GET | `/api/v1/hr/attendance/regularizations/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Regularization.ListMine |
+| GET | `/api/v1/hr/attendance/regularizations` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Regularization.List |
+| POST | `/api/v1/hr/attendance/regularizations/:id/cancel` | [group: mw.TenantResolver, mw.Authenticate] ctl.Regularization.Cancel |
+| POST | `/api/v1/hr/attendance/regularizations/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Regularization.Approve |
+| POST | `/api/v1/hr/attendance/regularizations/:id/reject` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Regularization.Reject |
+| POST | `/api/v1/hr/shifts` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Create |
+| GET | `/api/v1/hr/shifts` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Shift.List |
+| GET | `/api/v1/hr/shifts/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Shift.Get |
+| PATCH | `/api/v1/hr/shifts/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Update |
+| POST | `/api/v1/hr/shifts/:id/deactivate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Deactivate |
+| POST | `/api/v1/hr/shifts/:id/assignments` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Assign |
+| GET | `/api/v1/hr/shift-assignments` | mw.TenantResolver, mw.Authenticate, read, ctl.Shift.ListAssignments |
 
 ### M1 HR / Leave — 20 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
-| POST | `/api/v1/leave/types` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.CreateType |
-| GET | `/api/v1/leave/types` | [group: mw.TenantResolver, mw.Authenticate] ctl.Policy.ListTypes |
-| GET | `/api/v1/leave/types/:id` | [group: mw.TenantResolver, mw.Authenticate] ctl.Policy.GetType |
-| PATCH | `/api/v1/leave/types/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.UpdateType |
-| POST | `/api/v1/leave/types/:id/deactivate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.DeactivateType |
-| POST | `/api/v1/leave/holidays` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.CreateHoliday |
-| GET | `/api/v1/leave/holidays` | [group: mw.TenantResolver, mw.Authenticate] ctl.Policy.ListHolidays |
-| DELETE | `/api/v1/leave/holidays/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.DeleteHoliday |
-| GET | `/api/v1/leave/balances/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Balance.Mine |
-| GET | `/api/v1/leave/balances` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Balance.ForEmployee |
-| POST | `/api/v1/leave/balances/adjust` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Balance.Adjust |
-| GET | `/api/v1/leave/ledger` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Balance.Ledger |
-| POST | `/api/v1/leave/requests/preview` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.Preview |
-| POST | `/api/v1/leave/requests` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.Apply |
-| GET | `/api/v1/leave/requests/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.ListMine |
-| POST | `/api/v1/leave/requests/:id/cancel` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.Cancel |
-| GET | `/api/v1/leave/requests` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Request.List |
-| GET | `/api/v1/leave/requests/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Request.Get |
-| POST | `/api/v1/leave/requests/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Request.Approve |
-| POST | `/api/v1/leave/requests/:id/reject` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Request.Reject |
+| POST | `/api/v1/hr/leave/types` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.CreateType |
+| GET | `/api/v1/hr/leave/types` | [group: mw.TenantResolver, mw.Authenticate] ctl.Policy.ListTypes |
+| GET | `/api/v1/hr/leave/types/:id` | [group: mw.TenantResolver, mw.Authenticate] ctl.Policy.GetType |
+| PATCH | `/api/v1/hr/leave/types/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.UpdateType |
+| POST | `/api/v1/hr/leave/types/:id/deactivate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.DeactivateType |
+| POST | `/api/v1/hr/leave/holidays` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.CreateHoliday |
+| GET | `/api/v1/hr/leave/holidays` | [group: mw.TenantResolver, mw.Authenticate] ctl.Policy.ListHolidays |
+| DELETE | `/api/v1/hr/leave/holidays/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Policy.DeleteHoliday |
+| GET | `/api/v1/hr/leave/balances/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Balance.Mine |
+| GET | `/api/v1/hr/leave/balances` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Balance.ForEmployee |
+| POST | `/api/v1/hr/leave/balances/adjust` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Balance.Adjust |
+| GET | `/api/v1/hr/leave/ledger` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Balance.Ledger |
+| POST | `/api/v1/hr/leave/requests/preview` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.Preview |
+| POST | `/api/v1/hr/leave/requests` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.Apply |
+| GET | `/api/v1/hr/leave/requests/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.ListMine |
+| POST | `/api/v1/hr/leave/requests/:id/cancel` | [group: mw.TenantResolver, mw.Authenticate] ctl.Request.Cancel |
+| GET | `/api/v1/hr/leave/requests` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Request.List |
+| GET | `/api/v1/hr/leave/requests/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Request.Get |
+| POST | `/api/v1/hr/leave/requests/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Request.Approve |
+| POST | `/api/v1/hr/leave/requests/:id/reject` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Request.Reject |
 
 ### M1 HR / Payroll — 20 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
-| POST | `/api/v1/payroll/structures` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.CreateStructure |
-| GET | `/api/v1/payroll/structures` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Setup.ListStructures |
-| GET | `/api/v1/payroll/structures/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Setup.GetStructure |
-| PATCH | `/api/v1/payroll/structures/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.UpdateStructure |
-| POST | `/api/v1/payroll/structures/:id/deactivate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.DeactivateStructure |
-| POST | `/api/v1/payroll/assignments` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.Assign |
-| GET | `/api/v1/payroll/assignments` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Setup.ListAssignments |
-| GET | `/api/v1/payroll/assignments/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Setup.MyAssignment |
-| POST | `/api/v1/payroll/assignments/preview` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.Preview |
-| POST | `/api/v1/payroll/runs` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Run.CreateRun |
-| GET | `/api/v1/payroll/runs` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.ListRuns |
-| GET | `/api/v1/payroll/runs/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.GetRun |
-| POST | `/api/v1/payroll/runs/:id/calculate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Run.Calculate |
-| POST | `/api/v1/payroll/runs/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Run.Approve |
-| POST | `/api/v1/payroll/runs/:id/finalize` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Run.Finalize |
-| GET | `/api/v1/payroll/runs/:id/payslips` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.RunPayslips |
-| GET | `/api/v1/payroll/runs/:id/payout.csv` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.PayoutCSV |
-| GET | `/api/v1/payroll/payslips/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Run.MyPayslips |
-| GET | `/api/v1/payroll/payslips/me/:id` | [group: mw.TenantResolver, mw.Authenticate] ctl.Run.MyPayslip |
-| GET | `/api/v1/payroll/payslips/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.GetPayslip |
+| POST | `/api/v1/hr/payroll/structures` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.CreateStructure |
+| GET | `/api/v1/hr/payroll/structures` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Setup.ListStructures |
+| GET | `/api/v1/hr/payroll/structures/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Setup.GetStructure |
+| PATCH | `/api/v1/hr/payroll/structures/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.UpdateStructure |
+| POST | `/api/v1/hr/payroll/structures/:id/deactivate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.DeactivateStructure |
+| POST | `/api/v1/hr/payroll/assignments` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.Assign |
+| GET | `/api/v1/hr/payroll/assignments` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Setup.ListAssignments |
+| GET | `/api/v1/hr/payroll/assignments/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Setup.MyAssignment |
+| POST | `/api/v1/hr/payroll/assignments/preview` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Setup.Preview |
+| POST | `/api/v1/hr/payroll/runs` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Run.CreateRun |
+| GET | `/api/v1/hr/payroll/runs` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.ListRuns |
+| GET | `/api/v1/hr/payroll/runs/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.GetRun |
+| POST | `/api/v1/hr/payroll/runs/:id/calculate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Run.Calculate |
+| POST | `/api/v1/hr/payroll/runs/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Run.Approve |
+| POST | `/api/v1/hr/payroll/runs/:id/finalize` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Run.Finalize |
+| GET | `/api/v1/hr/payroll/runs/:id/payslips` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.RunPayslips |
+| GET | `/api/v1/hr/payroll/runs/:id/payout.csv` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.PayoutCSV |
+| GET | `/api/v1/hr/payroll/payslips/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Run.MyPayslips |
+| GET | `/api/v1/hr/payroll/payslips/me/:id` | [group: mw.TenantResolver, mw.Authenticate] ctl.Run.MyPayslip |
+| GET | `/api/v1/hr/payroll/payslips/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.GetPayslip |
 
 ### M1 HR / Recruitment — 20 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
-| POST | `/api/v1/recruitment/jobs` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateJob |
-| GET | `/api/v1/recruitment/jobs` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListJobs |
-| GET | `/api/v1/recruitment/jobs/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.GetJob |
-| PATCH | `/api/v1/recruitment/jobs/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateJob |
-| POST | `/api/v1/recruitment/jobs/:id/status` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.SetJobStatus |
-| POST | `/api/v1/recruitment/candidates` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateCandidate |
-| GET | `/api/v1/recruitment/candidates` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListCandidates |
-| GET | `/api/v1/recruitment/candidates/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.GetCandidate |
-| PATCH | `/api/v1/recruitment/candidates/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateCandidate |
-| POST | `/api/v1/recruitment/candidates/:id/stage` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.MoveStage |
-| POST | `/api/v1/recruitment/candidates/:id/hire` | [group: mw.TenantResolver, mw.Authenticate] hire, ctl.Hire |
-| POST | `/api/v1/recruitment/interviews` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.ScheduleInterview |
-| GET | `/api/v1/recruitment/interviews` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListInterviews |
-| GET | `/api/v1/recruitment/interviews/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.MyInterviews |
-| POST | `/api/v1/recruitment/interviews/:id/feedback` | [group: mw.TenantResolver, mw.Authenticate] ctl.Feedback |
-| POST | `/api/v1/recruitment/interviews/:id/cancel` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CancelInterview |
-| POST | `/api/v1/recruitment/offers` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateOffer |
-| GET | `/api/v1/recruitment/offers` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListOffers |
-| POST | `/api/v1/recruitment/offers/:id/decision` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.DecideOffer |
-| POST | `/api/v1/recruitment/offers/:id/withdraw` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.WithdrawOffer |
+| POST | `/api/v1/hr/recruitment/jobs` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateJob |
+| GET | `/api/v1/hr/recruitment/jobs` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListJobs |
+| GET | `/api/v1/hr/recruitment/jobs/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.GetJob |
+| PATCH | `/api/v1/hr/recruitment/jobs/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateJob |
+| POST | `/api/v1/hr/recruitment/jobs/:id/status` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.SetJobStatus |
+| POST | `/api/v1/hr/recruitment/candidates` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateCandidate |
+| GET | `/api/v1/hr/recruitment/candidates` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListCandidates |
+| GET | `/api/v1/hr/recruitment/candidates/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.GetCandidate |
+| PATCH | `/api/v1/hr/recruitment/candidates/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateCandidate |
+| POST | `/api/v1/hr/recruitment/candidates/:id/stage` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.MoveStage |
+| POST | `/api/v1/hr/recruitment/candidates/:id/hire` | [group: mw.TenantResolver, mw.Authenticate] hire, ctl.Hire |
+| POST | `/api/v1/hr/recruitment/interviews` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.ScheduleInterview |
+| GET | `/api/v1/hr/recruitment/interviews` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListInterviews |
+| GET | `/api/v1/hr/recruitment/interviews/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.MyInterviews |
+| POST | `/api/v1/hr/recruitment/interviews/:id/feedback` | [group: mw.TenantResolver, mw.Authenticate] ctl.Feedback |
+| POST | `/api/v1/hr/recruitment/interviews/:id/cancel` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CancelInterview |
+| POST | `/api/v1/hr/recruitment/offers` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateOffer |
+| GET | `/api/v1/hr/recruitment/offers` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListOffers |
+| POST | `/api/v1/hr/recruitment/offers/:id/decision` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.DecideOffer |
+| POST | `/api/v1/hr/recruitment/offers/:id/withdraw` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.WithdrawOffer |
 
-Total routes registered by module route files: **144** (plus `GET /health`).
+Total routes registered by module route files: **159** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
 
 
-#### `000001_create_tenants.up.sql`
+#### `identity/000001_create_tenants.up.sql`
 - **table `tenants`**
   - `id` UUID — PRIMARY KEY
   - `name` VARCHAR(255) — NOT NULL
@@ -821,7 +841,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_tenants_status` on `tenants` (status)
 - index `idx_tenants_deleted_at` on `tenants` (deleted_at)
 
-#### `000002_create_users.up.sql`
+#### `identity/000002_create_users.up.sql`
 - **table `users`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
@@ -843,7 +863,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_users_status` on `users` (status)
 - index `idx_users_deleted_at` on `users` (deleted_at)
 
-#### `000003_create_roles.up.sql`
+#### `identity/000003_create_roles.up.sql`
 - **table `roles`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
@@ -857,7 +877,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_roles_tenant_id` on `roles` (tenant_id)
 - index `idx_roles_deleted_at` on `roles` (deleted_at)
 
-#### `000004_create_permissions.up.sql`
+#### `identity/000004_create_permissions.up.sql`
 - **table `permissions`**
   - `id` UUID — PRIMARY KEY
   - `resource` VARCHAR(100) — NOT NULL
@@ -868,7 +888,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_permissions_resource_action` on `permissions` (resource, action)
 - index `idx_permissions_resource` on `permissions` (resource)
 
-#### `000005_create_user_roles.up.sql`
+#### `identity/000005_create_user_roles.up.sql`
 - **table `user_roles`**
   - `id` UUID — PRIMARY KEY
   - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -883,7 +903,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_user_roles_role_id` on `user_roles` (role_id)
 - index `idx_user_roles_tenant_id` on `user_roles` (tenant_id)
 
-#### `000006_create_role_permissions.up.sql`
+#### `identity/000006_create_role_permissions.up.sql`
 - **table `role_permissions`**
   - `id` UUID — PRIMARY KEY
   - `role_id` UUID — NOT NULL REFERENCES roles(id) ON DELETE CASCADE
@@ -896,7 +916,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_role_permissions_permission_id` on `role_permissions` (permission_id)
 - index `idx_role_permissions_tenant_id` on `role_permissions` (tenant_id)
 
-#### `000007_create_sessions.up.sql`
+#### `identity/000007_create_sessions.up.sql`
 - **table `sessions`**
   - `id` UUID — PRIMARY KEY
   - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -912,7 +932,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_sessions_user_tenant` on `sessions` (user_id, tenant_id)
 - index `idx_sessions_expires_at` on `sessions` (expires_at)
 
-#### `000008_create_refresh_tokens.up.sql`
+#### `identity/000008_create_refresh_tokens.up.sql`
 - **table `refresh_tokens`**
   - `id` UUID — PRIMARY KEY
   - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -927,7 +947,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_refresh_tokens_tenant_id` on `refresh_tokens` (tenant_id)
 - index `idx_refresh_tokens_user_tenant` on `refresh_tokens` (user_id, tenant_id)
 
-#### `000009_create_password_reset_tokens.up.sql`
+#### `identity/000009_create_password_reset_tokens.up.sql`
 - **table `password_reset_tokens`**
   - `id` UUID — PRIMARY KEY
   - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -941,7 +961,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_password_reset_tokens_user_id` on `password_reset_tokens` (user_id)
 - index `idx_password_reset_tokens_tenant_id` on `password_reset_tokens` (tenant_id)
 
-#### `000010_create_mfa_configs.up.sql`
+#### `identity/000010_create_mfa_configs.up.sql`
 - **table `mfa_configs`**
   - `id` UUID — PRIMARY KEY
   - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -956,7 +976,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_mfa_configs_user_id` on `mfa_configs` (user_id)
 - index `idx_mfa_configs_tenant_id` on `mfa_configs` (tenant_id)
 
-#### `000011_create_tenant_settings.up.sql`
+#### `identity/000011_create_tenant_settings.up.sql`
 - **table `tenant_settings`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
@@ -967,7 +987,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_tenant_settings_tenant_key` on `tenant_settings` (tenant_id, key)
 - index `idx_tenant_settings_tenant_id` on `tenant_settings` (tenant_id)
 
-#### `000012_create_audit_logs.up.sql`
+#### `identity/000012_create_audit_logs.up.sql`
 - **table `audit_logs`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
@@ -987,10 +1007,105 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_audit_logs_tenant_created` on `audit_logs` (tenant_id, created_at)
 - index `idx_audit_logs_tenant_action` on `audit_logs` (tenant_id, action)
 
-#### `000013_create_departments.up.sql`
-- **table `departments`**
+#### `identity/000013_refresh_token_session_link.up.sql`
+- index `idx_refresh_tokens_session_id` on `refresh_tokens` (session_id)
+- ALTER `refresh_tokens` ADD COLUMN IF NOT EXISTS session_id UUID
+- ALTER `refresh_tokens` ADD COLUMN IF NOT EXISTS revoked_reason VARCHAR(20)
+
+#### `identity/000014_access_model.up.sql`
+- **table `user_permission_grants`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  - `permission_id` UUID — NOT NULL REFERENCES permissions(id) ON DELETE CASCADE
+  - `scope` VARCHAR(20) — NOT NULL
+  - _constraint:_ CONSTRAINT chk_user_permission_grants_scope CHECK (scope IN ('own', 'direct_reports', 'all_reports', 'department', 'tenant'))
+  - `expires_at` TIMESTAMPTZ
+  - `reason` VARCHAR(500)
+  - `granted_by` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `user_permission_blocks`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  - `permission_id` UUID — NOT NULL REFERENCES permissions(id) ON DELETE CASCADE
+  - `reason` VARCHAR(500)
+  - `created_by` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_roles_parent_role_id` on `roles` (parent_role_id)
+- UNIQUE index `uq_roles_tenant_template_key` on `roles` (tenant_id, template_key) WHERE template_key IS NOT NULL AND deleted_at IS NULL
+- UNIQUE index `uq_user_permission_grants` on `user_permission_grants` (tenant_id, user_id, permission_id)
+- UNIQUE index `uq_user_permission_blocks` on `user_permission_blocks` (tenant_id, user_id, permission_id)
+- ALTER `permissions` ADD COLUMN module VARCHAR(50) NOT NULL DEFAULT ''
+- ALTER `permissions` ADD COLUMN is_sensitive BOOLEAN NOT NULL DEFAULT false
+- ALTER `roles` ADD COLUMN parent_role_id UUID REFERENCES roles(id) ON DELETE SET NULL
+- ALTER `roles` ADD COLUMN template_key VARCHAR(50)
+- ALTER `roles` ADD COLUMN is_automatic BOOLEAN NOT NULL DEFAULT false
+- ALTER `roles` ADD COLUMN template_managed BOOLEAN NOT NULL DEFAULT false
+- ALTER `role_permissions` ADD COLUMN scope VARCHAR(20) NOT NULL DEFAULT 'tenant' CONSTRAINT chk_role_permissions_scope CHECK (scope IN ('own', 'direct_reports', 'all_reports', 'department', 'tenant'))
+- ALTER `user_roles` ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'manual' CONSTRAINT chk_user_roles_source CHECK (source IN ('manual', 'automatic'))
+- ALTER `tenants` ADD COLUMN access_version BIGINT NOT NULL DEFAULT 0
+
+#### `identity/000015_audit_correlation.up.sql`
+- index `idx_audit_logs_correlation_id` on `audit_logs` (correlation_id)
+- ALTER `audit_logs` ADD COLUMN correlation_id UUID
+
+#### `identity/000016_create_identity_events_outbox.up.sql`
+- **table `identity_events_outbox`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `event_id` UUID — NOT NULL
+  - `exchange` VARCHAR(100) — NOT NULL
+  - `event_type` VARCHAR(100) — NOT NULL
+  - `routing_key` VARCHAR(100) — NOT NULL
+  - `payload` JSONB — NOT NULL
+  - `published` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `published_at` TIMESTAMPTZ
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `last_error` TEXT
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_identity_outbox_event_id` on `identity_events_outbox` (event_id)
+- index `idx_identity_outbox_tenant` on `identity_events_outbox` (tenant_id)
+- index `idx_identity_outbox_pending` on `identity_events_outbox` (created_at) WHERE published = FALSE
+
+#### `identity/000017_create_idempotency_records.up.sql`
+- **table `idempotency_records`**
+  - `id` UUID — PRIMARY KEY
+  - `scope` VARCHAR(200) — NOT NULL
+  - `method` VARCHAR(10) — NOT NULL
+  - `path` VARCHAR(500) — NOT NULL
+  - `key` VARCHAR(255) — NOT NULL
+  - `request_hash` CHAR(64) — NOT NULL
+  - `status` VARCHAR(20) — NOT NULL CONSTRAINT chk_idempotency_status CHECK (status IN ('processing', 'completed'))
+  - `response_status` INTEGER — NOT NULL DEFAULT 0
+  - `response_body` BYTEA
+  - `content_type` VARCHAR(100) — NOT NULL DEFAULT ''
+  - `created_at` TIMESTAMPTZ — NOT NULL
+  - `expires_at` TIMESTAMPTZ — NOT NULL
+- UNIQUE index `uq_idempotency_key` on `idempotency_records` (scope, method, path, key)
+- index `idx_idempotency_expires` on `idempotency_records` (expires_at)
+
+#### `identity/000018_create_invitations.up.sql`
+- **table `invitations`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  - `email` VARCHAR(255) — NOT NULL
+  - `token_hash` CHAR(64) — NOT NULL
+  - `expires_at` TIMESTAMPTZ — NOT NULL
+  - `accepted_at` TIMESTAMPTZ
+  - `revoked_at` TIMESTAMPTZ
+  - `created_by` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_invitations_token_hash` on `invitations` (token_hash)
+- index `idx_invitations_tenant_user` on `invitations` (tenant_id, user_id)
+
+#### `hr/000001_create_departments.up.sql`
+- **table `departments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
   - `name` VARCHAR(100) — NOT NULL
   - `code` VARCHAR(32)
   - `description` VARCHAR(500)
@@ -1006,15 +1121,15 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_departments_status` on `departments` (status)
 - index `idx_departments_deleted_at` on `departments` (deleted_at)
 
-#### `000014_create_teams.up.sql`
+#### `hr/000002_create_teams.up.sql`
 - **table `teams`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `department_id` UUID — NOT NULL REFERENCES departments(id) ON DELETE RESTRICT
   - `name` VARCHAR(100) — NOT NULL
   - `code` VARCHAR(32)
   - `description` VARCHAR(500)
-  - `lead_user_id` UUID — REFERENCES users(id) ON DELETE SET NULL
+  - `lead_user_id` UUID
   - `status` VARCHAR(20) — NOT NULL DEFAULT 'active'
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
   - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1027,10 +1142,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_teams_status` on `teams` (status)
 - index `idx_teams_deleted_at` on `teams` (deleted_at)
 
-#### `000015_create_designations.up.sql`
+#### `hr/000003_create_designations.up.sql`
 - **table `designations`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `title` VARCHAR(100) — NOT NULL
   - `code` VARCHAR(32)
   - `level` INT
@@ -1046,16 +1161,16 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_designations_status` on `designations` (status)
 - index `idx_designations_deleted_at` on `designations` (deleted_at)
 
-#### `000016_create_mappings.up.sql`
+#### `hr/000004_create_mappings.up.sql`
 - **table `mappings`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
-  - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
+  - `user_id` UUID — NOT NULL
   - `department_id` UUID — REFERENCES departments(id) ON DELETE RESTRICT
   - `team_id` UUID — REFERENCES teams(id) ON DELETE RESTRICT
   - `designation_id` UUID — REFERENCES designations(id) ON DELETE RESTRICT
   - `is_primary` BOOLEAN — NOT NULL DEFAULT FALSE
-  - `manager_user_id` UUID — REFERENCES users(id) ON DELETE SET NULL
+  - `manager_user_id` UUID
   - `status` VARCHAR(20) — NOT NULL DEFAULT 'active'
   - `reason` VARCHAR(500)
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1072,7 +1187,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_mappings_primary` on `mappings` (is_primary) WHERE is_primary = TRUE
 - index `idx_mappings_status` on `mappings` (status)
 
-#### `000017_create_org_events_outbox.up.sql`
+#### `hr/000005_create_org_events_outbox.up.sql`
 - **table `org_events_outbox`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL
@@ -1086,11 +1201,11 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_org_outbox_next_retry` on `org_events_outbox` (next_retry_at) WHERE next_retry_at IS NOT NULL
 - index `idx_org_outbox_tenant_id` on `org_events_outbox` (tenant_id)
 
-#### `000018_create_employee_profiles.up.sql`
+#### `hr/000006_create_employee_profiles.up.sql`
 - **table `employee_profiles`**
   - `id` UUID — PRIMARY KEY DEFAULT gen_random_uuid()
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
-  - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
+  - `user_id` UUID — NOT NULL
   - `employee_code` VARCHAR(32) — NOT NULL
   - `first_name` VARCHAR(100) — NOT NULL
   - `last_name` VARCHAR(100) — NOT NULL
@@ -1109,10 +1224,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_emp_profile_status` on `employee_profiles` (tenant_id, status)
 - index `idx_emp_profile_deleted_at` on `employee_profiles` (deleted_at)
 
-#### `000019_create_employment_details.up.sql`
+#### `hr/000007_create_employment_details.up.sql`
 - **table `employment_details`**
   - `id` UUID — PRIMARY KEY DEFAULT gen_random_uuid()
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `employment_type` VARCHAR(30) — NOT NULL DEFAULT 'full_time'
   - `joining_date` DATE — NOT NULL
@@ -1128,10 +1243,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `idx_emp_detail_tenant_profile` on `employment_details` (tenant_id, employee_profile_id)
 - index `idx_emp_detail_deleted_at` on `employment_details` (deleted_at)
 
-#### `000020_create_employee_contacts.up.sql`
+#### `hr/000008_create_employee_contacts.up.sql`
 - **table `employee_contacts`**
   - `id` UUID — PRIMARY KEY DEFAULT gen_random_uuid()
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `personal_email` VARCHAR(255)
   - `work_phone` VARCHAR(50)
@@ -1145,10 +1260,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `idx_emp_contact_tenant_profile` on `employee_contacts` (tenant_id, employee_profile_id)
 - index `idx_emp_contact_deleted_at` on `employee_contacts` (deleted_at)
 
-#### `000021_create_employee_statutory.up.sql`
+#### `hr/000009_create_employee_statutory.up.sql`
 - **table `employee_statutory`**
   - `id` UUID — PRIMARY KEY DEFAULT gen_random_uuid()
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `tax_id` VARCHAR(100)
   - `national_id` VARCHAR(100)
@@ -1161,10 +1276,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_emp_statutory_profile` on `employee_statutory` (employee_profile_id)
 - index `idx_emp_statutory_deleted_at` on `employee_statutory` (deleted_at)
 
-#### `000022_create_employee_documents.up.sql`
+#### `hr/000010_create_employee_documents.up.sql`
 - **table `employee_documents`**
   - `id` UUID — PRIMARY KEY DEFAULT gen_random_uuid()
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `document_type` VARCHAR(50) — NOT NULL
   - `file_name` VARCHAR(255) — NOT NULL
@@ -1172,17 +1287,17 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `file_size` BIGINT — NOT NULL
   - `mime_type` VARCHAR(100) — NOT NULL
   - `verified_at` TIMESTAMPTZ
-  - `verified_by` UUID — REFERENCES users(id) ON DELETE SET NULL
+  - `verified_by` UUID
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
   - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
   - `deleted_at` TIMESTAMPTZ
 - index `idx_emp_docs_tenant_profile` on `employee_documents` (tenant_id, employee_profile_id)
 - index `idx_emp_docs_deleted_at` on `employee_documents` (deleted_at)
 
-#### `000023_create_employee_timelines.up.sql`
+#### `hr/000011_create_employee_timelines.up.sql`
 - **table `employee_timelines`**
   - `id` UUID — PRIMARY KEY DEFAULT gen_random_uuid()
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `event_type` VARCHAR(50) — NOT NULL
   - `effective_date` DATE — NOT NULL
@@ -1194,10 +1309,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_emp_timelines_tenant_profile` on `employee_timelines` (tenant_id, employee_profile_id)
 - index `idx_emp_timelines_effective` on `employee_timelines` (tenant_id, effective_date)
 
-#### `000024_create_employee_events_outbox.up.sql`
+#### `hr/000012_create_employee_events_outbox.up.sql`
 - **table `employee_events_outbox`**
   - `id` UUID — PRIMARY KEY DEFAULT gen_random_uuid()
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `event_id` UUID — NOT NULL UNIQUE
   - `event_type` VARCHAR(100) — NOT NULL
   - `routing_key` VARCHAR(100) — NOT NULL
@@ -1211,15 +1326,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `deleted_at` TIMESTAMPTZ
 - index `idx_emp_outbox_published` on `employee_events_outbox` (published)
 
-#### `000025_refresh_token_session_link.up.sql`
-- index `idx_refresh_tokens_session_id` on `refresh_tokens` (session_id)
-- ALTER `refresh_tokens` ADD COLUMN IF NOT EXISTS session_id UUID
-- ALTER `refresh_tokens` ADD COLUMN IF NOT EXISTS revoked_reason VARCHAR(20)
-
-#### `000026_create_shifts.up.sql`
+#### `hr/000013_create_shifts.up.sql`
 - **table `shifts`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `name` VARCHAR(100) — NOT NULL
   - `code` VARCHAR(32)
   - `start_minute` INT — NOT NULL CHECK (start_minute BETWEEN 0 AND 1439)
@@ -1241,25 +1351,25 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_shifts_status` on `shifts` (status)
 - index `idx_shifts_deleted_at` on `shifts` (deleted_at)
 
-#### `000027_create_shift_assignments.up.sql`
+#### `hr/000014_create_shift_assignments.up.sql`
 - **table `shift_assignments`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `shift_id` UUID — NOT NULL REFERENCES shifts(id) ON DELETE RESTRICT
   - `effective_from` DATE — NOT NULL
   - `effective_to` DATE
-  - `created_by_user_id` UUID — REFERENCES users(id) ON DELETE SET NULL
+  - `created_by_user_id` UUID
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
   - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
   - _constraint:_ CONSTRAINT chk_shift_assignments_range CHECK (effective_to IS NULL OR effective_to >= effective_from)
 - index `idx_shift_assignments_employee` on `shift_assignments` (tenant_id, employee_profile_id, effective_from)
 - index `idx_shift_assignments_shift` on `shift_assignments` (shift_id)
 
-#### `000028_create_attendance_records.up.sql`
+#### `hr/000015_create_attendance_records.up.sql`
 - **table `attendance_records`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `attendance_date` DATE — NOT NULL
   - `shift_id` UUID — REFERENCES shifts(id) ON DELETE SET NULL
@@ -1277,10 +1387,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_attendance_records_employee_date` on `attendance_records` (tenant_id, employee_profile_id, attendance_date)
 - index `idx_attendance_records_tenant_date_status` on `attendance_records` (tenant_id, attendance_date, status)
 
-#### `000029_create_attendance_punches.up.sql`
+#### `hr/000016_create_attendance_punches.up.sql`
 - **table `attendance_punches`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `attendance_record_id` UUID — NOT NULL REFERENCES attendance_records(id) ON DELETE CASCADE
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `punch_time` TIMESTAMPTZ — NOT NULL
@@ -1295,10 +1405,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_attendance_punches_employee_time` on `attendance_punches` (tenant_id, employee_profile_id, punch_time)
 - index `idx_attendance_punches_record` on `attendance_punches` (attendance_record_id)
 
-#### `000030_create_attendance_regularizations.up.sql`
+#### `hr/000017_create_attendance_regularizations.up.sql`
 - **table `attendance_regularizations`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `attendance_date` DATE — NOT NULL
   - `attendance_record_id` UUID — REFERENCES attendance_records(id) ON DELETE SET NULL
@@ -1306,8 +1416,8 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `requested_punch_out` TIMESTAMPTZ — NOT NULL
   - `reason` VARCHAR(500) — NOT NULL
   - `status` VARCHAR(20) — NOT NULL DEFAULT 'pending'
-  - `requested_by_user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
-  - `reviewer_user_id` UUID — REFERENCES users(id) ON DELETE SET NULL
+  - `requested_by_user_id` UUID — NOT NULL
+  - `reviewer_user_id` UUID
   - `reviewed_at` TIMESTAMPTZ
   - `review_comment` VARCHAR(500)
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1317,7 +1427,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_attendance_regularizations_employee_date` on `attendance_regularizations` (tenant_id, employee_profile_id, attendance_date)
 - index `idx_attendance_regularizations_tenant_status` on `attendance_regularizations` (tenant_id, status)
 
-#### `000031_create_attendance_events_outbox.up.sql`
+#### `hr/000018_create_attendance_events_outbox.up.sql`
 - **table `attendance_events_outbox`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL
@@ -1334,10 +1444,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_attendance_outbox_tenant` on `attendance_events_outbox` (tenant_id)
 - index `idx_attendance_outbox_published` on `attendance_events_outbox` (published) WHERE published = FALSE
 
-#### `000032_create_leave_types.up.sql`
+#### `hr/000019_create_leave_types.up.sql`
 - **table `leave_types`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `name` VARCHAR(100) — NOT NULL
   - `code` VARCHAR(10) — NOT NULL CHECK (code ~ '^[A-Z0-9_]{2,10}$')
   - `is_paid` BOOLEAN — NOT NULL DEFAULT TRUE
@@ -1359,10 +1469,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_leave_types_status` on `leave_types` (status)
 - index `idx_leave_types_deleted_at` on `leave_types` (deleted_at)
 
-#### `000033_create_leave_holidays.up.sql`
+#### `hr/000020_create_leave_holidays.up.sql`
 - **table `leave_holidays`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `holiday_date` DATE — NOT NULL
   - `name` VARCHAR(100) — NOT NULL
   - `is_optional` BOOLEAN — NOT NULL DEFAULT FALSE
@@ -1372,10 +1482,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_leave_holidays_tenant_date` on `leave_holidays` (tenant_id, holiday_date) WHERE deleted_at IS NULL
 - index `idx_leave_holidays_deleted_at` on `leave_holidays` (deleted_at)
 
-#### `000034_create_leave_balances.up.sql`
+#### `hr/000021_create_leave_balances.up.sql`
 - **table `leave_balances`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `leave_type_id` UUID — NOT NULL REFERENCES leave_types(id) ON DELETE CASCADE
   - `year` INT — NOT NULL CHECK (year BETWEEN 2000 AND 2200)
@@ -1388,10 +1498,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - UNIQUE index `uq_leave_balances_employee_type_year` on `leave_balances` (tenant_id, employee_profile_id, leave_type_id, year)
 
-#### `000035_create_leave_requests.up.sql`
+#### `hr/000022_create_leave_requests.up.sql`
 - **table `leave_requests`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `leave_type_id` UUID — NOT NULL REFERENCES leave_types(id)
   - `start_date` DATE — NOT NULL
@@ -1412,10 +1522,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_leave_requests_employee_start` on `leave_requests` (tenant_id, employee_profile_id, start_date)
 - index `idx_leave_requests_tenant_status` on `leave_requests` (tenant_id, status)
 
-#### `000036_create_leave_ledger.up.sql`
+#### `hr/000023_create_leave_ledger.up.sql`
 - **table `leave_ledger`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `leave_type_id` UUID — NOT NULL REFERENCES leave_types(id) ON DELETE CASCADE
   - `year` INT — NOT NULL
@@ -1427,7 +1537,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - index `idx_leave_ledger_balance` on `leave_ledger` (tenant_id, employee_profile_id, leave_type_id, year)
 
-#### `000037_create_leave_events_outbox.up.sql`
+#### `hr/000024_create_leave_events_outbox.up.sql`
 - **table `leave_events_outbox`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL
@@ -1444,10 +1554,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_leave_outbox_tenant` on `leave_events_outbox` (tenant_id)
 - index `idx_leave_outbox_published` on `leave_events_outbox` (published) WHERE published = FALSE
 
-#### `000038_create_payroll_structures.up.sql`
+#### `hr/000025_create_payroll_structures.up.sql`
 - **table `payroll_structures`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `name` VARCHAR(100) — NOT NULL
   - `description` VARCHAR(500)
   - `pf_enabled` BOOLEAN — NOT NULL DEFAULT TRUE
@@ -1462,10 +1572,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_payroll_structures_tenant_id` on `payroll_structures` (tenant_id)
 - index `idx_payroll_structures_deleted_at` on `payroll_structures` (deleted_at)
 
-#### `000039_create_payroll_components.up.sql`
+#### `hr/000026_create_payroll_components.up.sql`
 - **table `payroll_components`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `structure_id` UUID — NOT NULL REFERENCES payroll_structures(id) ON DELETE CASCADE
   - `code` VARCHAR(20) — NOT NULL CHECK (code ~ '^[A-Z0-9_]{2,20}$')
   - `name` VARCHAR(100) — NOT NULL
@@ -1476,10 +1586,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `position` INT — NOT NULL
 - UNIQUE index `uq_payroll_components_structure_code` on `payroll_components` (structure_id, code)
 
-#### `000040_create_payroll_assignments.up.sql`
+#### `hr/000027_create_payroll_assignments.up.sql`
 - **table `payroll_assignments`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `structure_id` UUID — NOT NULL REFERENCES payroll_structures(id)
   - `annual_ctc` NUMERIC(14,2) — NOT NULL CHECK (annual_ctc > 0)
@@ -1491,10 +1601,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - _constraint:_ CONSTRAINT chk_payroll_assignments_range CHECK (effective_to IS NULL OR effective_to >= effective_from)
 - index `idx_payroll_assignments_employee` on `payroll_assignments` (tenant_id, employee_profile_id, effective_from)
 
-#### `000041_create_payroll_runs.up.sql`
+#### `hr/000028_create_payroll_runs.up.sql`
 - **table `payroll_runs`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `year` INT — NOT NULL CHECK (year BETWEEN 2000 AND 2200)
   - `month` INT — NOT NULL CHECK (month BETWEEN 1 AND 12)
   - `status` VARCHAR(20) — NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'calculated', 'approved', 'finalized'))
@@ -1513,10 +1623,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - UNIQUE index `uq_payroll_runs_tenant_period` on `payroll_runs` (tenant_id, year, month)
 
-#### `000042_create_payroll_payslips.up.sql`
+#### `hr/000029_create_payroll_payslips.up.sql`
 - **table `payroll_payslips`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `run_id` UUID — NOT NULL REFERENCES payroll_runs(id) ON DELETE CASCADE
   - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
   - `employee_code` VARCHAR(50) — NOT NULL
@@ -1533,7 +1643,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_payroll_payslips_run_employee` on `payroll_payslips` (run_id, employee_profile_id)
 - index `idx_payroll_payslips_employee` on `payroll_payslips` (tenant_id, employee_profile_id)
 
-#### `000043_create_payroll_payslip_lines.up.sql`
+#### `hr/000030_create_payroll_payslip_lines.up.sql`
 - **table `payroll_payslip_lines`**
   - `id` UUID — PRIMARY KEY
   - `payslip_id` UUID — NOT NULL REFERENCES payroll_payslips(id) ON DELETE CASCADE
@@ -1544,7 +1654,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `position` INT — NOT NULL
 - index `idx_payroll_payslip_lines_payslip` on `payroll_payslip_lines` (payslip_id)
 
-#### `000044_create_payroll_events_outbox.up.sql`
+#### `hr/000031_create_payroll_events_outbox.up.sql`
 - **table `payroll_events_outbox`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL
@@ -1561,10 +1671,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_payroll_outbox_tenant` on `payroll_events_outbox` (tenant_id)
 - index `idx_payroll_outbox_published` on `payroll_events_outbox` (published) WHERE published = FALSE
 
-#### `000045_create_recruitment_jobs.up.sql`
+#### `hr/000032_create_recruitment_jobs.up.sql`
 - **table `recruitment_jobs`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `title` VARCHAR(150) — NOT NULL
   - `department_id` UUID
   - `designation_id` UUID
@@ -1582,10 +1692,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - index `idx_recruitment_jobs_tenant_status` on `recruitment_jobs` (tenant_id, status)
 
-#### `000046_create_recruitment_candidates.up.sql`
+#### `hr/000033_create_recruitment_candidates.up.sql`
 - **table `recruitment_candidates`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `job_id` UUID — NOT NULL REFERENCES recruitment_jobs(id) ON DELETE CASCADE
   - `first_name` VARCHAR(100) — NOT NULL
   - `last_name` VARCHAR(100) — NOT NULL
@@ -1603,10 +1713,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_recruitment_candidates_job_email` on `recruitment_candidates` (job_id, lower(email))
 - index `idx_recruitment_candidates_job_stage` on `recruitment_candidates` (tenant_id, job_id, stage)
 
-#### `000047_create_recruitment_stage_events.up.sql`
+#### `hr/000034_create_recruitment_stage_events.up.sql`
 - **table `recruitment_stage_events`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `candidate_id` UUID — NOT NULL REFERENCES recruitment_candidates(id) ON DELETE CASCADE
   - `from_stage` VARCHAR(20)
   - `to_stage` VARCHAR(20) — NOT NULL
@@ -1615,10 +1725,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - index `idx_recruitment_stage_events_candidate` on `recruitment_stage_events` (candidate_id)
 
-#### `000048_create_recruitment_interviews.up.sql`
+#### `hr/000035_create_recruitment_interviews.up.sql`
 - **table `recruitment_interviews`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `candidate_id` UUID — NOT NULL REFERENCES recruitment_candidates(id) ON DELETE CASCADE
   - `round_name` VARCHAR(100) — NOT NULL
   - `interviewer_employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
@@ -1635,10 +1745,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_recruitment_interviews_interviewer` on `recruitment_interviews` (tenant_id, interviewer_employee_id)
 - index `idx_recruitment_interviews_candidate` on `recruitment_interviews` (candidate_id)
 
-#### `000049_create_recruitment_offers.up.sql`
+#### `hr/000036_create_recruitment_offers.up.sql`
 - **table `recruitment_offers`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `candidate_id` UUID — NOT NULL REFERENCES recruitment_candidates(id) ON DELETE CASCADE
   - `offered_ctc` NUMERIC(14,2) — NOT NULL CHECK (offered_ctc > 0)
   - `joining_date` DATE — NOT NULL
@@ -1651,7 +1761,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_recruitment_offers_open` on `recruitment_offers` (candidate_id) WHERE status = 'offered'
 - index `idx_recruitment_offers_candidate` on `recruitment_offers` (candidate_id)
 
-#### `000050_create_recruitment_events_outbox.up.sql`
+#### `hr/000037_create_recruitment_events_outbox.up.sql`
 - **table `recruitment_events_outbox`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL
@@ -1668,10 +1778,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_recruitment_outbox_tenant` on `recruitment_events_outbox` (tenant_id)
 - index `idx_recruitment_outbox_published` on `recruitment_events_outbox` (published) WHERE published = FALSE
 
-#### `000051_create_performance_cycles.up.sql`
+#### `hr/000038_create_performance_cycles.up.sql`
 - **table `performance_cycles`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `title` VARCHAR(150) — NOT NULL
   - `start_date` DATE — NOT NULL
   - `end_date` DATE — NOT NULL
@@ -1686,10 +1796,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - _constraint:_ CHECK (end_date >= start_date)
 - index `idx_performance_cycles_tenant_status` on `performance_cycles` (tenant_id, status)
 
-#### `000052_create_performance_goals.up.sql`
+#### `hr/000039_create_performance_goals.up.sql`
 - **table `performance_goals`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `cycle_id` UUID — NOT NULL REFERENCES performance_cycles(id) ON DELETE CASCADE
   - `employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
   - `parent_goal_id` UUID — REFERENCES performance_goals(id)
@@ -1705,10 +1815,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - index `idx_performance_goals_cycle_employee` on `performance_goals` (tenant_id, cycle_id, employee_id)
 - index `idx_performance_goals_parent` on `performance_goals` (parent_goal_id)
 
-#### `000053_create_performance_key_results.up.sql`
+#### `hr/000040_create_performance_key_results.up.sql`
 - **table `performance_key_results`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `goal_id` UUID — NOT NULL REFERENCES performance_goals(id) ON DELETE CASCADE
   - `title` VARCHAR(200) — NOT NULL
   - `unit` VARCHAR(20)
@@ -1720,10 +1830,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - _constraint:_ CHECK (target_value <> start_value)
 - index `idx_performance_key_results_goal` on `performance_key_results` (goal_id)
 
-#### `000054_create_performance_checkins.up.sql`
+#### `hr/000041_create_performance_checkins.up.sql`
 - **table `performance_checkins`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `goal_id` UUID — NOT NULL REFERENCES performance_goals(id) ON DELETE CASCADE
   - `key_result_id` UUID — REFERENCES performance_key_results(id) ON DELETE CASCADE
   - `from_progress` NUMERIC(5,2) — NOT NULL CHECK (from_progress >= 0 AND from_progress <= 100)
@@ -1734,10 +1844,10 @@ Total routes registered by module route files: **144** (plus `GET /health`).
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - index `idx_performance_checkins_goal` on `performance_checkins` (goal_id)
 
-#### `000055_create_performance_reviews.up.sql`
+#### `hr/000042_create_performance_reviews.up.sql`
 - **table `performance_reviews`**
   - `id` UUID — PRIMARY KEY
-  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
   - `cycle_id` UUID — NOT NULL REFERENCES performance_cycles(id) ON DELETE CASCADE
   - `employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
   - `reviewer_employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
@@ -1756,7 +1866,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - UNIQUE index `uq_performance_reviews_assignment` on `performance_reviews` (cycle_id, employee_id, reviewer_employee_id, type)
 - index `idx_performance_reviews_reviewer` on `performance_reviews` (tenant_id, reviewer_employee_id)
 
-#### `000056_create_performance_events_outbox.up.sql`
+#### `hr/000043_create_performance_events_outbox.up.sql`
 - **table `performance_events_outbox`**
   - `id` UUID — PRIMARY KEY
   - `tenant_id` UUID — NOT NULL
@@ -1779,7 +1889,7 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 ### Shared infrastructure
 
 
-#### `internal/shared/cache/redis.go` (115 lines)
+#### `internal/shared/cache/redis.go` (120 lines)
 - **type** `RedisClient struct` — RedisClient wraps the go-redis client.
 - **func** `NewRedisClient(host string, port int, password string, db int) (*RedisClient, error)` — NewRedisClient initializes and connects to Redis server.
 - **func** `(r *RedisClient) Get(ctx context.Context, key string) (string, bool, error)` — Get retrieves a string value from Redis by key. Returns empty and false if not found.
@@ -1791,8 +1901,9 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - **func** `(r *RedisClient) IncrWithExpire(ctx context.Context, key string, window time.Duration) (int64, error)` — IncrWithExpire atomically increments key; the TTL is set only when the key is created (fixed window).
 - **func** `(r *RedisClient) Decr(ctx context.Context, key string) error` — Decr atomically decrements key, never going below zero.
 - **func** `(r *RedisClient) TTL(ctx context.Context, key string) (time.Duration, error)` — TTL returns the remaining time-to-live of key (negative when absent / no expiry).
+- **func** `(r *RedisClient) Ping(ctx context.Context) error` — Ping checks the connection (readiness probes).
 
-#### `internal/shared/config/config.go` (88 lines)
+#### `internal/shared/config/config.go` (93 lines)
 - **type** `Config struct` — Config holds all configurations of the application.
 - **type** `PlatformConfig struct` — PlatformConfig holds platform-operator (super admin) settings.
 - **type** `ServerConfig struct` — ServerConfig holds server configuration details.
@@ -1812,8 +1923,12 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 #### `internal/shared/database/database.go` (35 lines)
 - **func** `NewDatabase(cfg *config.DatabaseConfig) (*gorm.DB, error)` — NewDatabase initializes a GORM PostgreSQL connection with a configured connection pool.
 
-#### `internal/shared/database/migrate.go` (68 lines)
-- **func** `RunMigrations(ctx context.Context, db *gorm.DB, fsys fs.FS) ([]string, error)` — RunMigrations applies, in order and each inside its own transaction, every *.up.sql file of fsys that has not been applied yet, recording versions in schema_migrations. A Postgres advisory lock serialises concurrent starters. It returns the versions applied by this call.
+#### `internal/shared/database/migrate.go` (112 lines)
+- **type** `MigrationSet struct` — MigrationSet is one service's migrations, applied into its own schema.
+- **func** `RunMigrationSets(ctx context.Context, db *gorm.DB, sets []MigrationSet) ([]string, error)` — RunMigrationSets applies every set in order. Within a set each pending *.up.sql runs in its own transaction with search_path set to the set's schema, and is recorded in <schema>.schema_migrations. It returns "schema/version" for every migration applied by this call.
+- **func** `runSet(ctx context.Context, db *gorm.DB, set MigrationSet) ([]string, error)`
+- **func** `appliedVersions(tx *gorm.DB, table string) (map[string]bool, error)`
+- **func** `applyFile(tx *gorm.DB, set MigrationSet, name, table, version string) error`
 
 #### `internal/shared/database/tx.go` (29 lines)
 - **func** `BeginTx(ctx context.Context, db *gorm.DB) *gorm.DB` — BeginTx starts a request-scoped transaction. A nil db (unit tests with mocked services) yields a nil tx, which services treat the same way they treat the nil db they were previously handed.
@@ -1827,11 +1942,48 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - **func** `(e *AppError) Error() string`
 - **type** `ValidationErrorDetail struct` — ValidationErrorDetail provides details on a specific field validation failure.
 
+#### `internal/shared/idempotency/middleware.go` (150 lines)
+- **type** `Scoper func(c *gin.Context) (scope string, ok bool)` — Scoper returns who is calling (e.g. "tenant:user" from a verified token); ok=false skips idempotency handling.
+- **func** `Middleware(store Store, scope Scoper, retention time.Duration) gin.HandlerFunc` — Middleware handles Idempotency-Key on POST/PUT/PATCH/DELETE requests that carry one.
+- **func** `isWrite(method string) bool`
+- **func** `abort(c *gin.Context, status int, code, msg string)`
+- **func** `handle(c *gin.Context, store Store, who, key string, retention time.Duration)`
+- **func** `replay(c *gin.Context, store Store, existing *Record, requestHash string, now time.Time)` — replay answers a repeated key: same payload gives the stored outcome; a different payload or a request still running gives 409.
+- **func** `run(c *gin.Context, store Store, id uuid.UUID)` — run executes the handler, capturing its response; server errors release the key so the client can retry.
+- **func** `hash(method, path string, body []byte) string`
+- **type** `capture struct` — capture tees the response body.
+- **func** `(w *capture) Write(b []byte) (int, error)`
+- **func** `(w *capture) WriteString(s string) (int, error)`
+- **func** `RunPurger(ctx context.Context, store Store, interval time.Duration)` — RunPurger deletes expired records every interval until ctx is cancelled.
+
+#### `internal/shared/idempotency/store.go` (87 lines)
+_Package:_ Package idempotency makes retried commands safe (docs/ARCHITECTURE.md §3.6): a client sends Idempotency-Key with a write; the first request claims the key, later requests with the same key and payload replay the stored outcome, and a reused key with a different payload is rejected. The claim is a database unique constraint, never Redis.
+- **type** `Record struct` — Record is one claimed key.
+- **func** `(Record) TableName() string { return "idempotency_records" }` — TableName maps to idempotency_records (migration 000060).
+- **type** `Store interface` — Store persists claims and outcomes.
+- **method** `Store.Claim(ctx context.Context, r *Record) (existing *Record, claimed bool, err error)` — Claim inserts r; when the key already exists it returns the existing record and claimed=false.
+- **method** `Store.Complete(ctx context.Context, id uuid.UUID, status int, body []byte, contentType string) error`
+- **method** `Store.Release(ctx context.Context, id uuid.UUID) error`
+- **method** `Store.PurgeExpired(ctx context.Context, now time.Time) (int64, error)`
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore returns the database-backed store.
+- **func** `(s gormStore) Claim(ctx context.Context, r *Record) (*Record, bool, error)`
+- **func** `(s gormStore) Complete(ctx context.Context, id uuid.UUID, status int, body []byte, contentType string) error`
+- **func** `(s gormStore) Release(ctx context.Context, id uuid.UUID) error`
+- **func** `(s gormStore) PurgeExpired(ctx context.Context, now time.Time) (int64, error)`
+
 #### `internal/shared/logger/logger.go` (37 lines)
 - **type** `Logger struct` — Logger is a wrapper around zerolog.Logger
 - **func** `NewLogger(env string) *Logger` — NewLogger initializes and returns a structured logger.
 
-#### `internal/shared/middleware/cors.go` (70 lines)
+#### `internal/shared/middleware/correlation.go` (44 lines)
+- **type** `correlationKey struct{}`
+- **func** `WithCorrelationID(ctx context.Context, id uuid.UUID) context.Context` — WithCorrelationID returns ctx carrying the request's correlation ID.
+- **func** `CorrelationIDFrom(ctx context.Context) (uuid.UUID, bool)` — CorrelationIDFrom returns the correlation ID carried by ctx, if any.
+- **func** `CorrelationOrNew(ctx context.Context) uuid.UUID` — CorrelationOrNew returns the ctx correlation ID or a fresh one (system-initiated work).
+- **func** `incomingCorrelation(values ...string) uuid.UUID` — incomingCorrelation accepts a caller-supplied ID only when it is a valid UUID; anything else is replaced.
+
+#### `internal/shared/middleware/cors.go` (74 lines)
 - **func** `CORS(allowedOrigins []string) gin.HandlerFunc` — CORS handles Cross-Origin Resource Sharing. allowedOrigins is an explicit allow-list; a single "*" entry allows any origin (development only; credentials are then NOT allowed, per the CORS spec). An empty list disables CORS headers. Tenant subdomain origins can be allowed with a "*.example.com" wildcard entry.
 
 #### `internal/shared/middleware/hardening.go` (39 lines)
@@ -1847,9 +1999,31 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 - **func** `FailureRateLimiter(store RateLimitStore, limit int, window time.Duration) gin.HandlerFunc` — FailureRateLimiter is like RateLimiter but only FAILED attempts (HTTP >= 400) consume the budget: a successful request refunds its slot. Use it for credential endpoints so legitimate users are not locked out by their own successful logins while brute-force (failed) attempts are still throttled.
 - **func** `rateLimiter(store RateLimitStore, limit int, window time.Duration, failuresOnly bool) gin.HandlerFunc`
 
-#### `internal/shared/middleware/request_logger.go` (61 lines)
+#### `internal/shared/middleware/request_logger.go` (63 lines)
 - **func** `RequestLogger(log *logger.Logger) gin.HandlerFunc` — RequestLogger outputs details of each incoming HTTP request.
 - **func** `fmtString(v interface{}) string`
+
+#### `internal/shared/outbox/outbox.go` (82 lines)
+_Package:_ Package outbox is the transactional outbox shared by every service (docs/ARCHITECTURE.md §3.7): an event row is written in the same transaction as the business change and a relay publishes it after commit, retrying while the broker is unavailable. Delivery is at least once; consumers deduplicate by event_id.
+- **type** `Row struct` — Row is one stored event. Payload is the full JSON envelope sent to the broker.
+- **type** `Message struct` — Message is what a service emits.
+- **type** `Store interface` — Store reads and writes one outbox table.
+- **method** `Store.Add(ctx context.Context, tx *gorm.DB, m Message) error`
+- **method** `Store.Pending(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]Row, error)`
+- **method** `Store.MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
+- **method** `Store.RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
+- **type** `store struct{ table string }`
+- **func** `NewStore(table string) Store { return store{table: table} }` — NewStore returns a Store over the given table (each service owns its own outbox table).
+- **func** `(s store) Add(ctx context.Context, tx *gorm.DB, m Message) error`
+- **func** `(s store) Pending(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]Row, error)`
+- **func** `(s store) MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
+- **func** `(s store) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
+
+#### `internal/shared/outbox/relay.go` (79 lines)
+- **type** `Relay struct` — Relay publishes committed outbox rows.
+- **func** `(r *Relay) defaults()`
+- **func** `(r *Relay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
+- **func** `(r *Relay) Run(ctx context.Context)` — Run relays until ctx is cancelled.
 
 #### `internal/shared/queue/publisher.go` (25 lines)
 - **type** `EventPublisher interface` — EventPublisher defines the contract to dispatch events to message brokers.
@@ -1879,29 +2053,41 @@ Total routes registered by module route files: **144** (plus `GET /health`).
 ### Application wiring (internal/app)
 
 
-#### `internal/app/app.go` (131 lines)
+#### `internal/app/app.go` (129 lines)
 _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go and the integration tests share it so the tested router is exactly the production router.
 - **type** `Options struct` — Options carries the infrastructure handles and runtime policy the engine needs.
 - **func** `ValidateConfig(cfg *config.Config) error` — ValidateConfig rejects configurations that are unsafe to run.
 - **func** `Build(o Options) (*gin.Engine, error)` — Build migrates the schema, seeds the permission catalogue and returns the fully wired engine.
 
-#### `internal/app/time_modules.go` (91 lines)
-- **type** `peopleModules struct` — peopleModules are the people-operations modules built on Modules 0–2: Attendance (3), Leave (4), Payroll (5), Recruitment (6).
-- **type** `coreModules struct` — coreModules are the Modules 0–2 the people modules consume.
-- **type** `seeder interface` — seeder is a module that seeds its own permissions (D3-10).
-- **method** `seeder.SeedPermissions(ctx context.Context) error`
-- **func** `buildPeopleModules(o Options, core coreModules) (*peopleModules, error)` — buildPeopleModules wires Modules 3–6: schema (AutoMigrate only in legacy mode; SQL migrations 000026–000050 otherwise), module-owned permission seeds and the optional outbox relays.
-- **func** `(m *peopleModules) prepare(o Options) error` — prepare migrates (legacy mode only), seeds permissions and starts the relays.
-- **func** `registerPeopleRoutes(v1 *gin.RouterGroup, o Options, id *identity.Module, m *peopleModules)` — registerPeopleRoutes mounts Modules 3–6 behind Module 0 tenant/auth/RBAC middleware.
+#### `internal/app/health.go` (58 lines)
+- **type** `pinger func(ctx context.Context) error` — pinger is a dependency the service needs to serve traffic.
+- **func** `registerHealth(router *gin.Engine, db *gorm.DB, redis *cache.RedisClient)` — registerHealth mounts liveness and readiness (docs/ARCHITECTURE.md §3.10). Liveness only says the process serves HTTP; readiness checks Postgres and Redis. RabbitMQ is deliberately not required: the outbox holds events while the broker is down.
+- **func** `ready(c *gin.Context, checks map[string]pinger)`
+
+#### `internal/app/identity.go` (43 lines)
+- **func** `startIdentityBackground(o Options, id *identity.Module, store idempotency.Store)` — startIdentityBackground runs M0's outbox relay and the idempotency purger while background work is enabled.
+- **func** `registerDevMailbox(v1 *gin.RouterGroup, o Options, id *identity.Module)` — registerDevMailbox exposes one-time secrets (reset and invitation tokens) to developers and the test console in development and test only, behind the platform key: GET /api/v1/dev/mailbox?tenant_id=…&email=…
 
 ### M0 Identity & Access
 
 
-#### `internal/identity/module.go` (212 lines)
+#### `internal/identity/module.go` (328 lines)
 - **type** `Module struct` — Module encapsulates the Module 0 Identity and Access Management domain.
 - **func** `NewModule(` — NewModule constructs a Module container injecting database and message queue handles.
 - **func** `(m *Module) SetPlatformAdminKey(key string) { m.platformAdminKey = key }` — SetPlatformAdminKey configures the platform operator key guarding /tenants routes (empty = routes disabled).
-- **func** `(m *Module) SeedPermissions() error` — SeedPermissions idempotently inserts the global permission catalogue (see models.DefaultPermissions).
+- **func** `(m *Module) SeedPermissions() error` — SeedPermissions registers M0's own permission catalogue (models.IdentityCatalogue).
+- **func** `(m *Module) RegisterCatalogue(ctx context.Context, defs []access.PermissionDef) error` — RegisterCatalogue registers another service's permission definitions and their predefined-role defaults.
+- **func** `(m *Module) SyncRoleTemplates(ctx context.Context) error { return m.catalogue.SyncAllTenants(ctx) }` — SyncRoleTemplates provisions predefined roles in every tenant; call it once all catalogues are registered.
+- **func** `(m *Module) RunEventRelay(ctx context.Context) { m.relay.Run(ctx) }` — RunEventRelay publishes committed identity events until ctx is cancelled.
+- **func** `(m *Module) EnableDevMailbox() *services.DevMailbox` — EnableDevMailbox keeps one-time secrets (reset and invitation tokens) in memory for development tooling. Never call it outside development.
+- **type** `secretRouter struct{ m *Module }` — secretRouter delivers secrets to the dev mailbox when enabled; production delivery arrives with M10 Notifications.
+- **func** `(r secretRouter) Deliver(ctx context.Context, msg services.SecretMessage) error`
+- **func** `(m *Module) CallerScope(c *gin.Context) (string, bool)` — CallerScope identifies the caller of a request for Idempotency-Key scoping: "platform" for a valid platform key, "tenant:user" for a valid access token, otherwise not scoped.
+- **func** `(m *Module) RegisterWellKnown(router gin.IRoutes)` — RegisterWellKnown mounts the public JWKS at the server root (/.well-known/jwks.json) so any service can verify access tokens without sharing a secret (M0 plan B4).
+- **func** `(m *Module) SetAutomaticRoleSource(src services.AutomaticRoleSource) { m.automatic.SetSource(src) }` — SetAutomaticRoleSource installs the HR-backed source of the automatic employee/manager roles.
+- **func** `(m *Module) RunAutomaticRoleSync(ctx context.Context, interval time.Duration)` — RunAutomaticRoleSync reconciles automatic roles in every tenant each interval until ctx is cancelled.
+- **func** `(m *Module) syncUserOnLogin(ctx context.Context, tenantID, userID uuid.UUID)` — syncUserOnLogin refreshes the user's automatic roles at login; failures only delay the sync to the next sweep.
+- **func** `(m *Module) Authorizer() middleware.Authorizer { return m.resolver }` — Authorizer exposes access resolution to the permission middleware of dependent modules.
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists all domain entity models for migrations.
 - **func** `(m *Module) RegisterRoutes(router *gin.RouterGroup)` — RegisterRoutes hooks endpoint paths to controller handlers.
 - **func** `(m *Module) UserService() services.UserService { return m.userSvc }` — UserService exposes the user domain service to dependent modules (Module 1+).
@@ -1911,19 +2097,86 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(m *Module) TenantResolver() gin.HandlerFunc` — TenantResolver builds the subdomain tenant-resolution middleware for dependent modules.
 - **func** `(m *Module) AuthMiddleware() gin.HandlerFunc` — AuthMiddleware builds the JWT authentication middleware for dependent modules.
 
+#### `internal/identity/access/catalogue.go` (106 lines)
+- **type** `Template struct` — Template describes a predefined role seeded into every tenant.
+- **func** `TemplateByKey(key string) (Template, bool)` — TemplateByKey finds a template.
+- **type** `PermissionDef struct` — PermissionDef is one catalogue entry a service registers with M0, including the scope each predefined role receives by default.
+- **func** `(d PermissionDef) Key() string { return Key(d.Resource, d.Action) }` — Key returns "resource:action".
+- **func** `ValidateDefs(defs []PermissionDef) error` — ValidateDefs checks names, unknown templates and invalid scopes, and duplicate keys.
+- **func** `DefaultGrants(defs []PermissionDef, templateKey string) []Grant` — DefaultGrants returns the grants a template receives from defs (its own, not inherited).
+
+#### `internal/identity/access/resolve.go` (212 lines)
+- **type** `AssignmentSource string` — AssignmentSource says how a user came to hold a role.
+- **type** `SourceKind string` — SourceKind explains where an effective permission comes from.
+- **type** `RoleNode struct` — RoleNode is one tenant role with its own grants and optional parent.
+- **type** `Assignment struct` — Assignment is a role held by the user.
+- **type** `UserGrant struct` — UserGrant is a grant given to one user, optionally until ExpiresAt.
+- **type** `Input struct` — Input is everything needed to resolve one user's effective access.
+- **type** `Source struct` — Source is one reason a permission is held.
+- **type** `Entry struct` — Entry is one effective permission: the widest scope held, why, and whether a block removes it.
+- **type** `Effective map[string]*Entry` — Effective maps permission keys to entries.
+- **func** `(e Effective) ScopeFor(permission string) Scope` — ScopeFor returns the widest unblocked scope for a permission key (ScopeNone when not held).
+- **func** `(e Effective) Missing(want []Grant) []Grant` — Missing returns the wanted grants that e does not cover.
+- **func** `(e Effective) Permissions() []string` — Permissions lists the held (unblocked) permission keys, sorted.
+- **func** `(e Effective) add(permission string, src Source)`
+- **func** `Resolve(in Input) (Effective, error)` — Resolve computes effective access: assigned roles and their ancestors, unexpired user grants, minus blocks.
+- **func** `ancestry(byID map[uuid.UUID]*RoleNode, id uuid.UUID) ([]*RoleNode, error)` — ancestry returns the role followed by its ancestors; unknown roles yield an empty chain.
+- **func** `next(byID map[uuid.UUID]*RoleNode, r *RoleNode) (*RoleNode, bool)`
+- **func** `CheckParent(roles []RoleNode, role, parent uuid.UUID) error` — CheckParent validates making parent the parent of role: no cycle, chain within MaxRoleDepth.
+
+#### `internal/identity/access/scope.go` (64 lines)
+_Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md §17): scopes, grants, role inheritance and the resolution of a user's effective access. It has no I/O; services feed it rows and cache its result.
+- **type** `Scope string` — Scope is how far a granted permission reaches.
+- **func** `(s Scope) Valid() bool { return ranks[s] > 0 }` — Valid reports whether s is a known, non-empty scope.
+- **func** `ParseScope(raw string) (Scope, error)` — ParseScope validates a scope; empty means tenant (the meaning of legacy grants without a scope).
+- **func** `Covers(held, want Scope) bool` — Covers reports whether holding scope held is enough for scope want.
+- **func** `Wider(a, b Scope) Scope` — Wider returns the scope with the larger reach.
+- **func** `Key(resource, action string) string { return resource + ":" + action }` — Key formats a permission key "resource:action".
+- **type** `Grant struct` — Grant is a permission key held at a scope.
+
+#### `internal/identity/controllers/access_controller.go` (180 lines)
+- **type** `AccessController struct` — AccessController serves per-user grants and blocks, explain-access and automatic-role sync (docs/ARCHITECTURE.md §17).
+- **func** `NewAccessController(db *gorm.DB, svc services.AccessService, automatic services.AutomaticRoles) *AccessController` — NewAccessController creates an AccessController.
+- **func** `target(c *gin.Context) (uuid.UUID, uuid.UUID, bool)` — target reads the tenant from context and the user from :id.
+- **func** `permissionParam(c *gin.Context) (uuid.UUID, bool)`
+- **func** `bindValid(c *gin.Context, req interface{}) bool`
+- **func** `(ctrl *AccessController) Explain(c *gin.Context)` — Explain returns a user's effective access with sources (GET /users/:id/access).
+- **func** `(ctrl *AccessController) ExplainMe(c *gin.Context)` — ExplainMe returns the caller's own effective access with sources (GET /auth/me/access).
+- **func** `respond(c *gin.Context, status int, res interface{}, err error)`
+- **func** `(ctrl *AccessController) ListGrants(c *gin.Context)` — ListGrants lists a user's individual grants (GET /users/:id/grants).
+- **func** `(ctrl *AccessController) Grant(c *gin.Context)` — Grant gives a user a permission at a scope (POST /users/:id/grants).
+- **func** `(ctrl *AccessController) RevokeGrant(c *gin.Context)` — RevokeGrant removes an individual grant (DELETE /users/:id/grants/:permission_id).
+- **func** `(ctrl *AccessController) ListBlocks(c *gin.Context)` — ListBlocks lists a user's blocks (GET /users/:id/blocks).
+- **func** `(ctrl *AccessController) Block(c *gin.Context)` — Block removes a permission from a user whatever their roles grant (POST /users/:id/blocks).
+- **func** `(ctrl *AccessController) Unblock(c *gin.Context)` — Unblock lifts a block (DELETE /users/:id/blocks/:permission_id).
+- **func** `(ctrl *AccessController) SyncAutomaticRoles(c *gin.Context)` — SyncAutomaticRoles reconciles the tenant's automatic employee/manager roles now (POST /access/automatic-roles/sync).
+
 #### `internal/identity/controllers/audit_controller.go` (38 lines)
 - **type** `AuditController struct` — AuditController exposes the read-only audit trail of a tenant.
 - **func** `NewAuditController(db *gorm.DB, auditSvc services.AuditService) *AuditController` — NewAuditController creates an AuditController.
 - **func** `(ctrl *AuditController) List(c *gin.Context)` — List handles GET /audit-logs.
 
-#### `internal/identity/controllers/auth_controller.go` (143 lines)
+#### `internal/identity/controllers/auth_controller.go` (160 lines)
 - **type** `AuthController struct`
+- **func** `(ctrl *AuthController) OnLogin(hook func(ctx context.Context, tenantID, userID uuid.UUID))` — OnLogin registers a best-effort hook run after every successful login (e.g. automatic-role sync).
 - **func** `NewAuthController(db *gorm.DB, authSvc services.AuthService) *AuthController` — NewAuthController creates an AuthController instance.
 - **func** `(ctrl *AuthController) Login(c *gin.Context)`
+- **func** `(ctrl *AuthController) afterLogin(ctx context.Context, res *dto.LoginResponse)`
 - **func** `(ctrl *AuthController) Logout(c *gin.Context)`
 - **func** `(ctrl *AuthController) Refresh(c *gin.Context)`
 - **func** `(ctrl *AuthController) ForgotPassword(c *gin.Context)`
 - **func** `(ctrl *AuthController) ResetPassword(c *gin.Context)`
+
+#### `internal/identity/controllers/invitation_controller.go` (108 lines)
+- **type** `InvitationController struct` — InvitationController serves the invitation lifecycle (M0 plan B3).
+- **func** `NewInvitationController(db *gorm.DB, users services.UserService, invites services.InvitationService) *InvitationController` — NewInvitationController creates an InvitationController.
+- **func** `tenantOf(c *gin.Context) (uuid.UUID, bool)`
+- **func** `(ctrl *InvitationController) Create(c *gin.Context)` — Create invites a user: the account is created as invited and the token is sent to them (POST /invitations).
+- **func** `(ctrl *InvitationController) List(c *gin.Context)` — List shows the tenant's invitations; ?status=pending limits to open ones (GET /invitations).
+- **func** `(ctrl *InvitationController) withID(c *gin.Context) (uuid.UUID, uuid.UUID, bool)`
+- **func** `(ctrl *InvitationController) Resend(c *gin.Context)` — Resend issues a fresh token and revokes the old one (POST /invitations/:id/resend).
+- **func** `(ctrl *InvitationController) Revoke(c *gin.Context)` — Revoke cancels an open invitation (POST /invitations/:id/revoke).
+- **func** `(ctrl *InvitationController) Accept(c *gin.Context)` — Accept sets the password with the invitation token and activates the account (POST /auth/accept-invitation).
 
 #### `internal/identity/controllers/permission_controller.go` (35 lines)
 - **type** `PermissionController struct`
@@ -1941,7 +2194,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `respondBindError(c *gin.Context, err error)` — respondBindError converts a request-binding failure into field-level validation details.
 - **func** `reqCtx(c *gin.Context) context.Context` — reqCtx returns the request context enriched with the authenticated caller (user id + JWT roles) so services can enforce no-privilege-escalation rules on grants.
 
-#### `internal/identity/controllers/role_controller.go` (306 lines)
+#### `internal/identity/controllers/role_controller.go` (329 lines)
 - **type** `RoleController struct`
 - **func** `NewRoleController(db *gorm.DB, roleSvc services.RoleService) *RoleController` — NewRoleController creates a RoleController.
 - **func** `(ctrl *RoleController) Create(c *gin.Context)`
@@ -1954,8 +2207,9 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *RoleController) RemovePermission(c *gin.Context)` — RemovePermission detaches a permission from a role (DELETE /roles/:id/permissions/:permission_id).
 - **func** `(ctrl *RoleController) RemoveRoleFromUser(c *gin.Context)` — RemoveRoleFromUser detaches a role from a user (DELETE /users/:id/roles/:role_id).
 - **func** `(ctrl *RoleController) Me(c *gin.Context)` — Me returns the caller's roles and effective permissions (GET /auth/me).
+- **func** `(ctrl *RoleController) Clone(c *gin.Context)` — Clone copies a role's grants and parent into a new custom role (POST /roles/:id/clone).
 
-#### `internal/identity/controllers/tenant_controller.go` (145 lines)
+#### `internal/identity/controllers/tenant_controller.go` (146 lines)
 - **type** `TenantController struct`
 - **func** `NewTenantController(db *gorm.DB, tenantSvc services.TenantService) *TenantController` — NewTenantController returns a TenantController instance.
 - **func** `(ctrl *TenantController) Create(c *gin.Context)`
@@ -1965,7 +2219,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *TenantController) Activate(c *gin.Context)`
 - **func** `(ctrl *TenantController) Suspend(c *gin.Context)`
 
-#### `internal/identity/controllers/user_controller.go` (194 lines)
+#### `internal/identity/controllers/user_controller.go` (195 lines)
 - **type** `UserController struct`
 - **func** `NewUserController(db *gorm.DB, userSvc services.UserService) *UserController` — NewUserController creates a UserController.
 - **func** `(ctrl *UserController) Create(c *gin.Context)`
@@ -1975,11 +2229,21 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *UserController) Deactivate(c *gin.Context)`
 - **func** `(ctrl *UserController) Activate(c *gin.Context)` — Activate re-enables a deactivated user (POST /users/:id/activate).
 
-#### `internal/identity/dto/audit_dto.go` (24 lines)
+#### `internal/identity/dto/access_dto.go` (70 lines)
+- **type** `UserGrantRequest struct` — UserGrantRequest grants one permission to one user at a scope, optionally until expires_at.
+- **type** `UserBlockRequest struct` — UserBlockRequest removes one permission from one user whatever their roles grant.
+- **type** `UserGrantResponse struct` — UserGrantResponse is a stored per-user grant.
+- **type** `UserBlockResponse struct` — UserBlockResponse is a stored per-user block.
+- **type** `AccessSource struct` — AccessSource explains one reason a permission is held.
+- **type** `ExplainedPermission struct` — ExplainedPermission is one effective permission with its scope, sources and whether a block removes it.
+- **type** `ExplainAccessResponse struct` — ExplainAccessResponse shows a user's effective access and where every permission comes from.
+- **type** `AutomaticRoleSyncResponse struct` — AutomaticRoleSyncResponse reports an automatic-role reconciliation.
+
+#### `internal/identity/dto/audit_dto.go` (26 lines)
 - **type** `AuditLogResponse struct` — AuditLogResponse is a read-only view of an audit record.
 - **type** `AuditLogListResponse struct` — AuditLogListResponse holds paginated audit records.
 
-#### `internal/identity/dto/auth_dto.go` (64 lines)
+#### `internal/identity/dto/auth_dto.go` (66 lines)
 - **type** `LoginRequest struct` — LoginRequest contains payload for user authentication.
 - **type** `UserLoginSummary struct` — UserLoginSummary maps basic user profile inside a login response.
 - **type** `RoleSummary struct` — RoleSummary maps roles in user details response.
@@ -1989,6 +2253,11 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **type** `ForgotPasswordRequest struct` — ForgotPasswordRequest triggers reset email generation.
 - **type** `ResetPasswordRequest struct` — ResetPasswordRequest consumes reset token to update password.
 - **type** `MessageResponse struct` — MessageResponse is a generic success feedback envelope.
+
+#### `internal/identity/dto/invitation_dto.go` (28 lines)
+- **type** `InvitationResponse struct` — InvitationResponse describes an invitation (never its token).
+- **type** `InviteResponse struct` — InviteResponse is the result of inviting a user: the invited account and its open invitation.
+- **type** `AcceptInvitationRequest struct` — AcceptInvitationRequest sets the invited user's password using the token from the invitation.
 
 #### `internal/identity/dto/pagination_dto.go` (31 lines)
 - **type** `PaginationRequest struct` — PaginationRequest holds paging query parameters.
@@ -2000,15 +2269,18 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **type** `PermissionResponse struct` — PermissionResponse represents authorization permission records.
 - **type** `PermissionListResponse struct` — PermissionListResponse holds paginated PermissionResponses.
 
-#### `internal/identity/dto/role_dto.go` (58 lines)
-- **type** `CreateRoleRequest struct` — CreateRoleRequest contains payload to create a new role.
-- **type** `UpdateRoleRequest struct` — UpdateRoleRequest is a partial payload to update role metadata.
+#### `internal/identity/dto/role_dto.go` (88 lines)
+- **type** `GrantInput struct` — GrantInput is a permission granted at a scope (docs/ARCHITECTURE.md §17); an empty scope means tenant.
+- **type** `CreateRoleRequest struct` — CreateRoleRequest contains payload to create a new role. permission_ids are granted at tenant scope; grants carry explicit scopes. parent_role_id makes the role inherit every grant of the parent.
+- **type** `UpdateRoleRequest struct` — UpdateRoleRequest is a partial payload to update role metadata. parent_role_id "" removes the parent.
+- **type** `CloneRoleRequest struct` — CloneRoleRequest names the copy of a role.
 - **type** `AssignRoleRequest struct` — AssignRoleRequest holds roles to assign to a user.
-- **type** `AssignPermissionsRequest struct` — AssignPermissionsRequest holds permissions to assign to a role.
+- **type** `AssignPermissionsRequest struct` — AssignPermissionsRequest holds permissions to assign to a role (at least one of permission_ids or grants). Assigning a permission the role already holds changes its scope.
 - **type** `PermissionSummary struct` — PermissionSummary maps minimal permission metadata inside nested responses.
 - **type** `RoleResponse struct` — RoleResponse represents the serialization structure for role output.
 - **type** `RoleListResponse struct` — RoleListResponse holds paginated RoleResponses.
 - **type** `AccessResponse struct` — AccessResponse describes what the authenticated caller may do (roles + effective permissions).
+- **type** `ScopedGrant struct` — ScopedGrant is a held permission and its scope.
 
 #### `internal/identity/dto/session_dto.go` (14 lines)
 - **type** `SessionResponse struct` — SessionResponse represents serializable details of an active session.
@@ -2027,9 +2299,10 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **type** `UserResponse struct` — UserResponse represents user profile output payload.
 - **type** `UserListResponse struct` — UserListResponse holds a paginated array of UserResponses.
 
-#### `internal/identity/events/events.go` (164 lines)
+#### `internal/identity/events/events.go` (176 lines)
 - **type** `Event struct` — Event is the generic envelope for publishing domain events.
 - **func** `NewEvent(eventType string, routingKey string, tenantID uuid.UUID, correlationID uuid.UUID, payload interface{}) Event` — NewEvent wraps a domain payload inside the standard event envelope.
+- **type** `UserActivatedPayload struct` — UserActivatedPayload reports an invited user who accepted the invitation.
 - **type** `TenantCreatedPayload struct`
 - **type** `TenantActivatedPayload struct`
 - **type** `TenantSuspendedPayload struct`
@@ -2049,22 +2322,34 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 #### `internal/identity/middleware/auth.go` (108 lines)
 - **func** `Authenticate(db *gorm.DB, tokenSvc services.TokenService, sessionSvc services.SessionService) gin.HandlerFunc` — Authenticate verifies the Bearer access token and active session.
 
-#### `internal/identity/middleware/platform.go` (44 lines)
+#### `internal/identity/middleware/platform.go` (53 lines)
 - **func** `PlatformAdmin(key string) gin.HandlerFunc` — PlatformAdmin guards platform-level (cross-tenant) routes such as tenant provisioning. It fails closed: with no configured key every request is refused (503), and a wrong/missing key is 401/403.
+- **func** `PlatformKeyValid(got, key string) bool` — PlatformKeyValid compares a presented platform key with the configured one in constant time.
 
-#### `internal/identity/middleware/rbac.go` (110 lines)
+#### `internal/identity/middleware/rbac.go` (104 lines)
+- **type** `Authorizer interface` — Authorizer answers which scope a user holds for resource:action (docs/ARCHITECTURE.md §17); services.AccessResolver implements it.
+- **method** `Authorizer.ScopeFor(ctx context.Context, tenantID, userID uuid.UUID, resource, action string) (access.Scope, error)`
 - **type** `permissionDecision struct` — permissionDecision is the outcome of evaluating resource:action for the authenticated caller.
 - **func** `denied(status int, code, msg string) permissionDecision`
-- **func** `evaluatePermission(` — evaluatePermission resolves whether the caller (identified by the context set by TenantResolver/Authenticate) holds resource:action. The tenant_admin system role bypasses permission checks.
-- **func** `RequirePermission(` — RequirePermission limits access to requests with a specific resource-action pair.
-- **func** `PermissionFlag(` — PermissionFlag never blocks: it evaluates resource:action and stores the boolean result in the gin context under key, so handlers can vary behaviour (e.g. unmasked PII) on a finer permission than the route requires.
+- **func** `evaluateScope(c *gin.Context, authz Authorizer, resource, action string) permissionDecision` — evaluateScope resolves the caller's widest scope for resource:action. The tenant_admin system role (from the verified token) holds every permission at tenant scope.
+- **func** `forbidden() permissionDecision`
+- **func** `abort(c *gin.Context, d permissionDecision)`
+- **func** `RequirePermission(authz Authorizer, resource, action string) gin.HandlerFunc` — RequirePermission admits callers holding resource:action at tenant scope. Routes written before scoped access assume tenant-wide reach, so a narrower grant must never pass them.
+- **func** `RequireScopedPermission(authz Authorizer, resource, action string, minScope access.Scope) gin.HandlerFunc` — RequireScopedPermission admits callers holding resource:action at minScope or wider and stores the caller's scope under ScopeKey; the owning service must then limit the data to that scope.
+- **func** `PermissionFlag(authz Authorizer, resource, action, key string) gin.HandlerFunc` — PermissionFlag never blocks: it stores under key whether the caller holds resource:action at tenant scope, so handlers can vary behaviour (e.g. unmasked PII) on a finer permission than the route requires.
+- **func** `ScopeFrom(c *gin.Context) access.Scope` — ScopeFrom returns the scope a scoped route stored for the caller (ScopeNone when absent).
 
 #### `internal/identity/middleware/tenant.go` (84 lines)
 - **func** `TenantResolver(db *gorm.DB, tenantRepo repositories.TenantRepository) gin.HandlerFunc` — TenantResolver parses Host subdomains and binds tenant context to requests.
 
-#### `internal/identity/models/audit_log.go` (31 lines)
+#### `internal/identity/models/audit_log.go` (33 lines)
 - **type** `AuditLog struct` — AuditLog represents an immutable append-only record of system actions.
 - **func** `(al *AuditLog) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
+
+#### `internal/identity/models/invitation.go` (35 lines)
+- **type** `Invitation struct` — Invitation lets an invited user activate their account with a single-use token (only its hash is stored).
+- **func** `(i *Invitation) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID.
+- **func** `(i *Invitation) Pending(now time.Time) bool` — Pending reports whether the invitation can still be accepted at now.
 
 #### `internal/identity/models/mfa_config.go` (29 lines)
 - **type** `MFAConfig struct` — MFAConfig represents a multi-factor authentication setup for a user.
@@ -2074,21 +2359,21 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **type** `PasswordResetToken struct` — PasswordResetToken represents a verification token generated for password reset requests.
 - **func** `(pr *PasswordResetToken) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
-#### `internal/identity/models/permission.go` (26 lines)
+#### `internal/identity/models/permission.go` (28 lines)
 - **type** `Permission struct` — Permission represents a global capability definition.
 - **func** `(p *Permission) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
-#### `internal/identity/models/permission_catalog.go` (31 lines)
-- **type** `PermissionSeed struct` — PermissionSeed is one row of the global permission catalogue.
+#### `internal/identity/models/permission_catalog.go` (42 lines)
+- **func** `tenantWide(templates ...string) map[string]access.Scope`
 
 #### `internal/identity/models/refresh_token.go` (32 lines)
 - **type** `RefreshToken struct` — RefreshToken represents a refresh token used for JWT renewal.
 - **func** `(rt *RefreshToken) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
-#### `internal/identity/models/role.go` (19 lines)
+#### `internal/identity/models/role.go` (25 lines)
 - **type** `Role struct` — Role represents a Role-Based Access Control role scoped to a tenant.
 
-#### `internal/identity/models/role_permission.go` (30 lines)
+#### `internal/identity/models/role_permission.go` (31 lines)
 - **type** `RolePermission struct` — RolePermission represents the association of permissions to roles scoped to a tenant.
 - **func** `(rp *RolePermission) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
@@ -2096,7 +2381,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **type** `Session struct` — Session represents an active login session.
 - **func** `(s *Session) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
-#### `internal/identity/models/tenant.go` (22 lines)
+#### `internal/identity/models/tenant.go` (24 lines)
 - **type** `Tenant struct` — Tenant represents an isolated customer organization.
 
 #### `internal/identity/models/tenant_settings.go` (26 lines)
@@ -2106,9 +2391,50 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 #### `internal/identity/models/user.go` (28 lines)
 - **type** `User struct` — User represents a user identity within a tenant.
 
-#### `internal/identity/models/user_role.go` (35 lines)
+#### `internal/identity/models/user_permission.go` (52 lines)
+- **type** `UserPermissionGrant struct` — UserPermissionGrant gives one user a permission at a scope, optionally until ExpiresAt (docs/ARCHITECTURE.md §17).
+- **func** `(g *UserPermissionGrant) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID.
+- **type** `UserPermissionBlock struct` — UserPermissionBlock removes a permission from one user whatever their roles grant; blocks always win.
+- **func** `(b *UserPermissionBlock) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID.
+
+#### `internal/identity/models/user_role.go` (36 lines)
 - **type** `UserRole struct` — UserRole represents a many-to-many relationship between users and roles scoped to a tenant.
 - **func** `(ur *UserRole) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
+
+#### `internal/identity/repositories/access_repository.go` (153 lines)
+- **type** `AccessRepository interface` — AccessRepository persists the access-model rows beyond plain role/permission CRUD (docs/ARCHITECTURE.md §17).
+- **method** `AccessRepository.AccessVersion(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (int64, error)`
+- **method** `AccessRepository.TenantRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]models.Role, error)`
+- **method** `AccessRepository.RoleByTemplateKey(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, key string) (*models.Role, error)`
+- **method** `AccessRepository.SetRolePermissionScope(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID, scope string) error`
+- **method** `AccessRepository.UserGrants(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserPermissionGrant, error)`
+- **method** `AccessRepository.UpsertUserGrant(ctx context.Context, tx *gorm.DB, g *models.UserPermissionGrant) error`
+- **method** `AccessRepository.DeleteUserGrant(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) (bool, error)`
+- **method** `AccessRepository.UserBlocks(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserPermissionBlock, error)`
+- **method** `AccessRepository.UpsertUserBlock(ctx context.Context, tx *gorm.DB, b *models.UserPermissionBlock) error`
+- **method** `AccessRepository.DeleteUserBlock(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) (bool, error)`
+- **method** `AccessRepository.AutomaticAssignments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]models.UserRole, error)`
+- **method** `AccessRepository.UpsertPermission(ctx context.Context, db *gorm.DB, p *models.Permission) error` — UpsertPermission inserts a catalogue entry or refreshes its description, module and sensitivity.
+- **method** `AccessRepository.AllPermissions(ctx context.Context, db *gorm.DB) ([]models.Permission, error)`
+- **method** `AccessRepository.TenantIDs(ctx context.Context, db *gorm.DB, activeOnly bool) ([]uuid.UUID, error)`
+- **type** `accessRepository struct{}`
+- **func** `NewAccessRepository() AccessRepository { return &accessRepository{} }` — NewAccessRepository returns an AccessRepository.
+- **func** `bumpAccessVersion(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) error` — bumpAccessVersion invalidates cached effective access for the tenant; every access write calls it in its tx.
+- **func** `(r *accessRepository) AccessVersion(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (int64, error)`
+- **func** `(r *accessRepository) TenantRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]models.Role, error)`
+- **func** `(r *accessRepository) RoleByTemplateKey(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, key string) (*models.Role, error)`
+- **func** `(r *accessRepository) SetRolePermissionScope(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID, scope string) error`
+- **func** `(r *accessRepository) UserGrants(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserPermissionGrant, error)`
+- **func** `(r *accessRepository) UpsertUserGrant(ctx context.Context, tx *gorm.DB, g *models.UserPermissionGrant) error`
+- **func** `(r *accessRepository) DeleteUserGrant(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) (bool, error)`
+- **func** `(r *accessRepository) UserBlocks(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserPermissionBlock, error)`
+- **func** `(r *accessRepository) UpsertUserBlock(ctx context.Context, tx *gorm.DB, b *models.UserPermissionBlock) error`
+- **func** `(r *accessRepository) DeleteUserBlock(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) (bool, error)`
+- **func** `(r *accessRepository) AutomaticAssignments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]models.UserRole, error)`
+- **func** `(r *accessRepository) UpsertPermission(ctx context.Context, db *gorm.DB, p *models.Permission) error`
+- **func** `(r *accessRepository) AllPermissions(ctx context.Context, db *gorm.DB) ([]models.Permission, error)`
+- **func** `(r *accessRepository) TenantIDs(ctx context.Context, db *gorm.DB, activeOnly bool) ([]uuid.UUID, error)`
+- **func** `deleteAccessRow(ctx context.Context, tx *gorm.DB, model interface{}, tenantID, userID, permissionID uuid.UUID) (bool, error)`
 
 #### `internal/identity/repositories/audit_log_repository.go` (39 lines)
 - **type** `auditLogRepository struct{}`
@@ -2183,6 +2509,26 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **method** `AuditLogRepository.Create(ctx context.Context, tx *gorm.DB, log *models.AuditLog) error`
 - **method** `AuditLogRepository.FindByTenantID(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) ([]models.AuditLog, int64, error)`
 
+#### `internal/identity/repositories/invitation_repository.go` (75 lines)
+- **type** `InvitationRepository interface` — InvitationRepository persists user invitations.
+- **method** `InvitationRepository.Create(ctx context.Context, tx *gorm.DB, inv *models.Invitation) error`
+- **method** `InvitationRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Invitation, error)`
+- **method** `InvitationRepository.FindByTokenHash(ctx context.Context, db *gorm.DB, hash string) (*models.Invitation, error)`
+- **method** `InvitationRepository.LatestForUser(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*models.Invitation, error)`
+- **method** `InvitationRepository.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, pendingOnly bool, now time.Time) ([]models.Invitation, error)`
+- **method** `InvitationRepository.MarkAccepted(ctx context.Context, tx *gorm.DB, id uuid.UUID, at time.Time) error`
+- **method** `InvitationRepository.RevokeOpenForUser(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, at time.Time) error`
+- **type** `invitationRepository struct{}`
+- **func** `NewInvitationRepository() InvitationRepository { return invitationRepository{} }` — NewInvitationRepository returns an InvitationRepository.
+- **func** `(invitationRepository) Create(ctx context.Context, tx *gorm.DB, inv *models.Invitation) error`
+- **func** `firstInvitation(q *gorm.DB) (*models.Invitation, error)`
+- **func** `(invitationRepository) FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Invitation, error)`
+- **func** `(invitationRepository) FindByTokenHash(ctx context.Context, db *gorm.DB, hash string) (*models.Invitation, error)`
+- **func** `(invitationRepository) LatestForUser(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*models.Invitation, error)`
+- **func** `(invitationRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, pendingOnly bool, now time.Time) ([]models.Invitation, error)`
+- **func** `(invitationRepository) MarkAccepted(ctx context.Context, tx *gorm.DB, id uuid.UUID, at time.Time) error`
+- **func** `(invitationRepository) RevokeOpenForUser(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, at time.Time) error`
+
 #### `internal/identity/repositories/mfa_config_repository.go` (40 lines)
 - **type** `mfaConfigRepository struct{}`
 - **func** `NewMFAConfigRepository() MFAConfigRepository` — NewMFAConfigRepository returns a MFAConfigRepository.
@@ -2205,10 +2551,10 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *permissionRepository) FindAll(ctx context.Context, db *gorm.DB, page, perPage int) ([]models.Permission, int64, error)`
 - **func** `(r *permissionRepository) FindByIDs(ctx context.Context, db *gorm.DB, ids []uuid.UUID) ([]models.Permission, error)`
 
-#### `internal/identity/repositories/role_assignment_repository.go` (109 lines)
+#### `internal/identity/repositories/role_assignment_repository.go` (138 lines)
 - **type** `userRoleRepository struct{}`
 - **func** `NewUserRoleRepository() UserRoleRepository` — NewUserRoleRepository returns a UserRoleRepository.
-- **func** `(r *userRoleRepository) Create(ctx context.Context, tx *gorm.DB, ur *models.UserRole) error`
+- **func** `(r *userRoleRepository) Create(ctx context.Context, tx *gorm.DB, ur *models.UserRole) error` — Create assigns a role; the source defaults to manual.
 - **func** `(r *userRoleRepository) FindByUserID(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]models.UserRole, error)`
 - **func** `(r *userRoleRepository) FindByUserIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, userIDs []uuid.UUID) ([]models.UserRole, error)`
 - **func** `(r *userRoleRepository) CountByRoleID(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) (int64, error)`
@@ -2222,7 +2568,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *rolePermissionRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error`
 - **func** `(r *rolePermissionRepository) DeleteByRoleID(ctx context.Context, tx *gorm.DB, tenantID, roleID uuid.UUID) error`
 
-#### `internal/identity/repositories/role_repository.go` (71 lines)
+#### `internal/identity/repositories/role_repository.go` (80 lines)
 - **type** `roleRepository struct{}`
 - **func** `NewRoleRepository() RoleRepository` — NewRoleRepository returns a RoleRepository.
 - **func** `(r *roleRepository) Create(ctx context.Context, tx *gorm.DB, role *models.Role) error`
@@ -2274,10 +2620,62 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *models.User) error`
 - **func** `(r *userRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 
-#### `internal/identity/routes/routes.go` (171 lines)
+#### `internal/identity/routes/routes.go` (228 lines)
 - **func** `RegisterRoutes(` — RegisterRoutes sets up routing groups, initializes middlewares, and binds controller paths.
 
-#### `internal/identity/services/audit_service.go` (110 lines)
+#### `internal/identity/services/access_explain.go` (71 lines)
+- **func** `(s *accessService) Explain(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.ExplainAccessResponse, error)` — Explain lists every permission the user holds or is blocked from, with scope and the role or grant behind it.
+- **func** `(s *accessService) catalogueMeta(ctx context.Context, db *gorm.DB) (map[string]models.Permission, error)`
+- **func** `explained(e *access.Entry, p models.Permission) dto.ExplainedPermission`
+
+#### `internal/identity/services/access_resolver.go` (212 lines)
+- **type** `AccessCache interface` — AccessCache stores resolved access sets; implementations must treat errors as misses.
+- **method** `AccessCache.Get(ctx context.Context, key string) (string, bool, error)`
+- **method** `AccessCache.Set(ctx context.Context, key string, value string, ttl time.Duration) error`
+- **type** `AccessResolver interface` — AccessResolver computes a user's effective access (docs/ARCHITECTURE.md §17).
+- **method** `AccessResolver.Effective(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (access.Effective, error)` — Effective resolves through db (pass the transaction when deciding inside one; it bypasses the cache).
+- **method** `AccessResolver.ScopeFor(ctx context.Context, tenantID, userID uuid.UUID, resource, action string) (access.Scope, error)` — ScopeFor returns the widest scope held for resource:action, using the cache.
+- **method** `AccessResolver.RoleGrants(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roleIDs []uuid.UUID) (access.Effective, error)` — RoleGrants resolves what holding roleIDs (with their ancestors) grants, for escalation checks.
+- **type** `AccessResolverDeps struct` — AccessResolverDeps are the resolver's collaborators.
+- **type** `accessResolver struct{ d AccessResolverDeps }`
+- **func** `NewAccessResolver(d AccessResolverDeps) AccessResolver` — NewAccessResolver builds an AccessResolver.
+- **func** `(r *accessResolver) ScopeFor(ctx context.Context, tenantID, userID uuid.UUID, resource, action string) (access.Scope, error)`
+- **func** `(r *accessResolver) cached(ctx context.Context, tenantID, userID uuid.UUID) (access.Effective, error)`
+- **func** `(r *accessResolver) Effective(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (access.Effective, error)`
+- **func** `(r *accessResolver) resolve(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (access.Effective, time.Duration, error)` — resolve loads the rows, resolves them, and returns how long the result stays valid (earliest grant expiry).
+- **func** `(r *accessResolver) input(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (access.Input, error)`
+- **func** `roleIDsOf(urs []models.UserRole) []uuid.UUID`
+- **func** `(r *accessResolver) RoleGrants(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roleIDs []uuid.UUID) (access.Effective, error)`
+- **func** `(r *accessResolver) roleNodes(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, fallback []uuid.UUID) ([]access.RoleNode, error)` — roleNodes loads every live role of the tenant with its own grants (two queries). Without an access repository only the given roles are known (no inheritance).
+- **func** `grantOf(p *models.Permission, scope string) access.Grant`
+
+#### `internal/identity/services/access_service.go` (247 lines)
+- **type** `AccessService interface` — AccessService manages per-user grants and blocks and explains effective access (docs/ARCHITECTURE.md §17).
+- **method** `AccessService.ListGrants(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]dto.UserGrantResponse, error)`
+- **method** `AccessService.Grant(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.UserGrantRequest) (*dto.UserGrantResponse, error)`
+- **method** `AccessService.RevokeGrant(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) error`
+- **method** `AccessService.ListBlocks(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]dto.UserBlockResponse, error)`
+- **method** `AccessService.Block(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.UserBlockRequest) (*dto.UserBlockResponse, error)`
+- **method** `AccessService.Unblock(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) error`
+- **method** `AccessService.Explain(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.ExplainAccessResponse, error)`
+- **type** `AccessServiceDeps struct` — AccessServiceDeps are the access service's collaborators.
+- **type** `accessService struct{ d AccessServiceDeps }`
+- **func** `NewAccessService(d AccessServiceDeps) AccessService` — NewAccessService builds an AccessService.
+- **func** `(s *accessService) ensureUser(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) error`
+- **func** `(s *accessService) permission(ctx context.Context, db *gorm.DB, raw string) (*models.Permission, error)`
+- **func** `callerID(ctx context.Context) *uuid.UUID`
+- **func** `(s *accessService) Grant(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.UserGrantRequest) (*dto.UserGrantResponse, error)`
+- **func** `(s *accessService) audit(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, action string, userID uuid.UUID, detail map[string]string)`
+- **func** `(s *accessService) RevokeGrant(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) error`
+- **func** `(s *accessService) ListGrants(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]dto.UserGrantResponse, error)`
+- **func** `(s *accessService) grantResponse(g models.UserPermissionGrant) *dto.UserGrantResponse`
+- **func** `(s *accessService) Block(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.UserBlockRequest) (*dto.UserBlockResponse, error)`
+- **func** `(s *accessService) ensureNotTenantAdmin(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error` — ensureNotTenantAdmin rejects blocks on tenant_admin holders: they bypass permission checks, so a block would silently do nothing.
+- **func** `(s *accessService) Unblock(ctx context.Context, tx *gorm.DB, tenantID, userID, permissionID uuid.UUID) error`
+- **func** `(s *accessService) ListBlocks(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) ([]dto.UserBlockResponse, error)`
+- **func** `blockResponse(b models.UserPermissionBlock) *dto.UserBlockResponse`
+
+#### `internal/identity/services/audit_service.go` (118 lines)
 - **type** `AuditService interface` — AuditService defines the interface to write immutable security logs.
 - **method** `AuditService.Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
 - **method** `AuditService.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.AuditLogListResponse, error)`
@@ -2286,7 +2684,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *auditService) Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
 - **func** `(s *auditService) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.AuditLogListResponse, error)` — List returns the tenant's audit trail, newest first.
 
-#### `internal/identity/services/auth_service.go` (487 lines)
+#### `internal/identity/services/auth_service.go` (515 lines)
 - **type** `AuthService interface` — AuthService handles identity validation use cases.
 - **method** `AuthService.Login(ctx context.Context, tx *gorm.DB, req dto.LoginRequest, ipAddress, userAgent string, correlationID uuid.UUID) (*dto.LoginResponse, error)`
 - **method** `AuthService.Logout(ctx context.Context, tx *gorm.DB, tenantID, userID, sessionID uuid.UUID, correlationID uuid.UUID) error`
@@ -2301,17 +2699,90 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *authService) ForgotPassword(ctx context.Context, tx *gorm.DB, req dto.ForgotPasswordRequest, correlationID uuid.UUID) error`
 - **func** `(s *authService) ResetPassword(ctx context.Context, tx *gorm.DB, req dto.ResetPasswordRequest, correlationID uuid.UUID) error`
 - **func** `dummyPasswordHash() []byte` — dummyPasswordHash lazily builds a bcrypt (cost 12, same as real hashes) hash used to equalise login timing.
+- **type** `AuthOption func(*authService)` — AuthOption customises an AuthService.
+- **func** `WithAuthEvents(sink EventSink) AuthOption { return func(s *authService) { s.sink = sink } }` — WithAuthEvents records auth events through sink (the transactional outbox in production).
+- **func** `WithSecretDelivery(d SecretDelivery) AuthOption { return func(s *authService) { s.secrets = d } }` — WithSecretDelivery sends one-time secrets (password-reset links) to users; without it nothing is sent.
 
-#### `internal/identity/services/grants.go` (117 lines)
+#### `internal/identity/services/automatic_roles.go` (206 lines)
+- **type** `AutomaticRoleSource interface` — AutomaticRoleSource reports, from HR data, who qualifies for the automatic roles: employees (an active employee record) and managers (at least one active direct report). M0 keeps no copy of the org chart.
+- **method** `AutomaticRoleSource.Members(ctx context.Context, tenantID uuid.UUID) (employees, managers []uuid.UUID, err error)`
+- **method** `AutomaticRoleSource.MemberOf(ctx context.Context, tenantID, userID uuid.UUID) (employee, manager bool, err error)`
+- **type** `AutomaticRoles interface` — AutomaticRoles keeps the automatic employee and manager role assignments in line with HR data.
+- **method** `AutomaticRoles.SetSource(src AutomaticRoleSource)` — SetSource installs the HR-backed source; until then syncing is a no-op.
+- **method** `AutomaticRoles.SyncTenant(ctx context.Context, tenantID uuid.UUID) (added, removed int, err error)`
+- **method** `AutomaticRoles.SyncUser(ctx context.Context, tenantID, userID uuid.UUID) error`
+- **method** `AutomaticRoles.Run(ctx context.Context, interval time.Duration)` — Run sweeps every tenant each interval until ctx is cancelled.
+- **type** `AutomaticRolesDeps struct` — AutomaticRolesDeps are the reconciler's collaborators.
+- **type** `automaticRoles struct`
+- **func** `NewAutomaticRoles(d AutomaticRolesDeps) AutomaticRoles` — NewAutomaticRoles builds the reconciler.
+- **func** `(a *automaticRoles) SetSource(src AutomaticRoleSource) { a.src = src }`
+- **func** `(a *automaticRoles) templateRoles(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) (employee, manager uuid.UUID, err error)` — templateRoles returns the tenant's automatic role IDs, provisioning predefined roles if missing.
+- **func** `(a *automaticRoles) SyncTenant(ctx context.Context, tenantID uuid.UUID) (added, removed int, err error)`
+- **func** `(a *automaticRoles) reconcile(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, want map[[2]uuid.UUID]bool, current []models.UserRole, autoRoles map[uuid.UUID]bool) (int, int, error)` — reconcile adds wanted automatic assignments and removes stale ones among the automatic roles.
+- **func** `(a *automaticRoles) SyncUser(ctx context.Context, tenantID, userID uuid.UUID) error`
+- **func** `(a *automaticRoles) Run(ctx context.Context, interval time.Duration)`
+- **func** `(a *automaticRoles) sweep(ctx context.Context)`
+- **func** `(a *automaticRoles) warn(err error, tenantID uuid.UUID)`
+
+#### `internal/identity/services/catalogue.go` (191 lines)
+- **type** `Transactor func(ctx context.Context, fn func(tx *gorm.DB) error) error` — Transactor runs fn in one database transaction.
+- **func** `dbTransactor(db *gorm.DB) Transactor`
+- **type** `Catalogue interface` — Catalogue registers the permission catalogue and keeps every tenant's predefined roles in sync (docs/ARCHITECTURE.md §17).
+- **method** `Catalogue.Register(ctx context.Context, defs []access.PermissionDef) error` — Register validates and upserts permission definitions and remembers their predefined-role defaults.
+- **method** `Catalogue.ProvisionTenant(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) error` — ProvisionTenant creates missing predefined roles and adds default grants to roles still template-managed.
+- **method** `Catalogue.SyncAllTenants(ctx context.Context) error` — SyncAllTenants provisions every tenant (boot).
+- **type** `CatalogueDeps struct` — CatalogueDeps are the catalogue's collaborators.
+- **type** `catalogue struct`
+- **func** `NewCatalogue(d CatalogueDeps) Catalogue` — NewCatalogue builds a Catalogue.
+- **func** `(c *catalogue) Register(ctx context.Context, defs []access.PermissionDef) error`
+- **func** `(c *catalogue) registered() []access.PermissionDef`
+- **func** `(c *catalogue) SyncAllTenants(ctx context.Context) error`
+- **func** `(c *catalogue) ProvisionTenant(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) error`
+- **func** `(c *catalogue) createTemplateRole(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, tpl access.Template, byKey map[string]*models.Role, names map[string]bool) (*models.Role, error)`
+- **func** `(c *catalogue) syncDefaults(ctx context.Context, tx *gorm.DB, role *models.Role, want []access.Grant, permIDs map[string]uuid.UUID) error` — syncDefaults adds missing default grants and resets drifted scopes on a template-managed role.
+- **func** `(c *catalogue) permissionIDs(ctx context.Context, db *gorm.DB) (map[string]uuid.UUID, error)`
+
+#### `internal/identity/services/event_sink.go` (36 lines)
+- **type** `EventSink interface` — EventSink records an identity event. The production sink writes it to the outbox inside the caller's transaction, so the event exists if and only if the change committed (docs/ARCHITECTURE.md §3.7).
+- **method** `EventSink.Emit(ctx context.Context, tx *gorm.DB, evt events.Event) error`
+- **type** `outboxSink struct{ store outbox.Store }`
+- **func** `NewOutboxSink(store outbox.Store) EventSink { return outboxSink{store: store} }` — NewOutboxSink returns the transactional sink over the identity outbox table.
+- **func** `(s outboxSink) Emit(ctx context.Context, tx *gorm.DB, evt events.Event) error`
+- **type** `publisherSink struct{ pub queue.EventPublisher }` — publisherSink publishes directly, best effort; used only where no outbox is wired (unit tests, tools).
+- **func** `(s publisherSink) Emit(ctx context.Context, _ *gorm.DB, evt events.Event) error`
+
+#### `internal/identity/services/grants.go` (106 lines)
 - **type** `Caller struct` — Caller identifies the authenticated principal performing a request. Controllers attach it to the request context so services can enforce "no privilege escalation": nobody may hand out access they do not hold themselves.
 - **func** `(c Caller) IsTenantAdmin() bool` — IsTenantAdmin reports whether the caller holds the all-powerful tenant_admin system role.
 - **type** `callerKey struct{}`
 - **func** `WithCaller(ctx context.Context, c Caller) context.Context` — WithCaller returns a context carrying the authenticated caller.
 - **func** `CallerFrom(ctx context.Context) (Caller, bool)` — CallerFrom extracts the caller; ok is false for system-initiated (internal) operations, which are not restricted.
 - **func** `forbiddenGrant(msg string) error`
-- **func** `callerPermissionIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, caller Caller, urRepo repositories.UserRoleRepository, rpRepo repositories.RolePermissionRepository) (map[uuid.UUID]bool, error)` — callerPermissionIDs resolves the permission ids the caller currently holds through their roles.
-- **func** `ensureCanGrantPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, permIDs []uuid.UUID, urRepo repositories.UserRoleRepository, rpRepo repositories.RolePermissionRepository) error` — ensureCanGrantPermissions refuses to let a non-admin caller attach permissions they do not hold themselves.
-- **func** `ensureCanAssignRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roles []*models.Role, urRepo repositories.UserRoleRepository, rpRepo repositories.RolePermissionRepository) error` — ensureCanAssignRoles refuses to let a non-admin caller assign tenant_admin, or any role carrying permissions the caller does not hold (otherwise users:update would be a path to full privilege).
+- **func** `restricted(ctx context.Context) (Caller, bool)` — restricted reports whether the escalation rules apply: a real caller who is not tenant_admin.
+- **func** `ensureCanGrant(ctx context.Context, db *gorm.DB, r AccessResolver, tenantID uuid.UUID, want []access.Grant) error` — ensureCanGrant refuses to let a non-admin caller hand out any grant wider than one they hold themselves (docs/ARCHITECTURE.md §17.2).
+- **func** `ensureCanAssignRoles(ctx context.Context, db *gorm.DB, r AccessResolver, tenantID uuid.UUID, roles []*models.Role) error` — ensureCanAssignRoles refuses to let a non-admin caller assign tenant_admin, or any role (with its inherited grants) reaching further than the caller's own access.
+- **func** `ensureCanGrantRoles(ctx context.Context, db *gorm.DB, r AccessResolver, tenantID uuid.UUID, roleIDs []uuid.UUID) error` — ensureCanGrantRoles checks the effective grants of roleIDs (e.g. a new parent) against the caller.
+
+#### `internal/identity/services/invitation_service.go` (197 lines)
+- **type** `InvitationService interface` — InvitationService issues, lists, resends, revokes and accepts user invitations (M0 plan B3).
+- **method** `InvitationService.Issue(ctx context.Context, tx *gorm.DB, user *models.User) (*models.Invitation, error)`
+- **method** `InvitationService.Latest(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.InvitationResponse, error)`
+- **method** `InvitationService.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, pendingOnly bool) ([]dto.InvitationResponse, error)`
+- **method** `InvitationService.Resend(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*dto.InvitationResponse, error)`
+- **method** `InvitationService.Revoke(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
+- **method** `InvitationService.Accept(ctx context.Context, tx *gorm.DB, req dto.AcceptInvitationRequest, correlationID uuid.UUID) error`
+- **type** `InvitationDeps struct` — InvitationDeps are the invitation service's collaborators.
+- **type** `invitationService struct{ d InvitationDeps }`
+- **func** `NewInvitationService(d InvitationDeps) InvitationService` — NewInvitationService builds an InvitationService.
+- **func** `(s *invitationService) Issue(ctx context.Context, tx *gorm.DB, user *models.User) (*models.Invitation, error)` — Issue revokes any open invitation of the user, stores a new hashed token and delivers the raw token.
+- **func** `(s *invitationService) respond(inv *models.Invitation) *dto.InvitationResponse`
+- **func** `(s *invitationService) Latest(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.InvitationResponse, error)`
+- **func** `(s *invitationService) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, pendingOnly bool) ([]dto.InvitationResponse, error)`
+- **func** `(s *invitationService) openInvitation(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Invitation, *models.User, error)` — openInvitation loads an invitation that has not been accepted and whose user is still invited.
+- **func** `(s *invitationService) Resend(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*dto.InvitationResponse, error)`
+- **func** `(s *invitationService) Revoke(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
+- **func** `idString(id *uuid.UUID) string`
+- **func** `(s *invitationService) Accept(ctx context.Context, tx *gorm.DB, req dto.AcceptInvitationRequest, correlationID uuid.UUID) error` — Accept sets the password and activates the invited user; the token is single use.
 
 #### `internal/identity/services/permission_service.go` (55 lines)
 - **type** `PermissionService interface` — PermissionService lists global privilege mappings.
@@ -2320,33 +2791,65 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `NewPermissionService(permRepo repositories.PermissionRepository) PermissionService` — NewPermissionService creates a new PermissionService.
 - **func** `(s *permissionService) ListPermissions(ctx context.Context, db *gorm.DB, page, perPage int) (*dto.PermissionListResponse, error)`
 
-#### `internal/identity/services/role_service.go` (560 lines)
-- **type** `RoleService interface` — RoleService manages RBAC roles and privilege definitions.
+#### `internal/identity/services/role_assign.go` (165 lines)
+- **func** `(s *roleService) rolesForAssignment(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, raw []string) ([]*models.Role, error)`
+- **func** `(s *roleService) AssignRolesToUser(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.AssignRoleRequest, correlationID uuid.UUID) error`
+- **func** `(s *roleService) RemoveRoleFromUser(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error`
+- **func** `(s *roleService) assignment(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) (*models.UserRole, error)`
+- **func** `(s *roleService) GetMyAccess(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.AccessResponse, error)`
+
+#### `internal/identity/services/role_grants.go` (236 lines)
+- **type** `grantSpec struct` — grantSpec is a validated permission + scope to store on a role.
+- **func** `grantsOf(specs []grantSpec) []access.Grant`
+- **func** `validationError(msg string) error`
+- **func** `(s *roleService) parseGrants(ctx context.Context, db *gorm.DB, ids []string, grants []dto.GrantInput) ([]grantSpec, error)` — parseGrants merges legacy permission_ids (tenant scope) and scoped grants, rejects conflicting duplicates, and verifies every permission exists.
+- **func** `(s *roleService) lookupGrants(ctx context.Context, db *gorm.DB, order []uuid.UUID, scopes map[uuid.UUID]access.Scope) ([]grantSpec, error)`
+- **func** `(s *roleService) applyGrants(ctx context.Context, tx *gorm.DB, role *models.Role, specs []grantSpec) ([]uuid.UUID, error)` — applyGrants adds new grants and changes the scope of existing ones; it returns the permissions changed.
+- **func** `(s *roleService) applyParent(ctx context.Context, tx *gorm.DB, role *models.Role, raw *string) error` — applyParent validates and sets (or with "" clears) the role's parent: same tenant, no cycle, depth limit, and the caller must already hold everything the parent grants.
+- **func** `(s *roleService) checkParent(ctx context.Context, tx *gorm.DB, role *models.Role, parentID uuid.UUID) error`
+- **func** `(s *roleService) CloneRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.CloneRoleRequest) (*dto.RoleResponse, error)`
+- **func** `(s *roleService) loadPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roles ...*models.Role) error` — loadPermissions attaches each role's permissions (one batched query).
+- **func** `mapRoleToResponse(r *models.Role) *dto.RoleResponse`
+
+#### `internal/identity/services/role_service.go` (316 lines)
+- **type** `RoleService interface` — RoleService manages RBAC roles: grants with scopes, inheritance, predefined and automatic roles (docs/ARCHITECTURE.md §17).
 - **method** `RoleService.CreateRole(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateRoleRequest) (*dto.RoleResponse, error)`
 - **method** `RoleService.GetRoleByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.RoleResponse, error)`
 - **method** `RoleService.ListRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.RoleListResponse, error)`
 - **method** `RoleService.UpdateRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.UpdateRoleRequest) (*dto.RoleResponse, error)`
 - **method** `RoleService.DeleteRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
+- **method** `RoleService.CloneRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.CloneRoleRequest) (*dto.RoleResponse, error)`
 - **method** `RoleService.AssignPermissions(ctx context.Context, tx *gorm.DB, tenantID, roleID uuid.UUID, req dto.AssignPermissionsRequest, correlationID uuid.UUID) error`
 - **method** `RoleService.AssignRolesToUser(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.AssignRoleRequest, correlationID uuid.UUID) error`
 - **method** `RoleService.RemovePermission(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error`
 - **method** `RoleService.RemoveRoleFromUser(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error`
 - **method** `RoleService.GetMyAccess(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.AccessResponse, error)`
 - **type** `roleService struct`
+- **type** `RoleOption func(*roleService)` — RoleOption customises a RoleService.
+- **func** `WithRoleEvents(sink EventSink) RoleOption { return func(s *roleService) { s.sink = sink } }` — WithRoleEvents records role events through sink (the transactional outbox in production).
+- **func** `WithAccessModel(repo repositories.AccessRepository, resolver AccessResolver) RoleOption` — WithAccessModel enables inheritance, scope changes and full access resolution for escalation checks.
 - **func** `NewRoleService(` — NewRoleService creates a new RoleService.
-- **func** `(s *roleService) parsePermissionIDs(ctx context.Context, db *gorm.DB, raw []string) ([]uuid.UUID, error)` — parsePermissionIDs parses, de-duplicates and verifies that every permission exists (global table).
-- **func** `(s *roleService) loadPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roles ...*models.Role) error` — loadPermissions attaches each role's permissions (one batched query).
+- **func** `(s *roleService) findRole(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Role, error)`
 - **func** `(s *roleService) CreateRole(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateRoleRequest) (*dto.RoleResponse, error)`
+- **func** `(s *roleService) ensureNameFree(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, name string, self *uuid.UUID) error` — ensureNameFree refuses a name another role uses; self is the role being renamed (nil on create).
+- **func** `(s *roleService) respond(ctx context.Context, db *gorm.DB, role *models.Role) (*dto.RoleResponse, error)`
 - **func** `(s *roleService) GetRoleByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.RoleResponse, error)`
 - **func** `(s *roleService) ListRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) (*dto.RoleListResponse, error)`
 - **func** `(s *roleService) UpdateRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.UpdateRoleRequest) (*dto.RoleResponse, error)`
 - **func** `(s *roleService) DeleteRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
+- **func** `(s *roleService) ensureNoChildren(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) error` — ensureNoChildren refuses to delete a role other roles inherit from (their access would change silently).
 - **func** `(s *roleService) AssignPermissions(ctx context.Context, tx *gorm.DB, tenantID, roleID uuid.UUID, req dto.AssignPermissionsRequest, correlationID uuid.UUID) error`
-- **func** `(s *roleService) AssignRolesToUser(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.AssignRoleRequest, correlationID uuid.UUID) error`
-- **func** `mapRoleToResponse(r *models.Role) *dto.RoleResponse`
+- **func** `(s *roleService) markEdited(ctx context.Context, tx *gorm.DB, role *models.Role) error` — markEdited takes a predefined role out of template management after a tenant edit (never overwritten again).
 - **func** `(s *roleService) RemovePermission(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error`
-- **func** `(s *roleService) RemoveRoleFromUser(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) error`
-- **func** `(s *roleService) GetMyAccess(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.AccessResponse, error)`
+
+#### `internal/identity/services/secrets.go` (71 lines)
+- **type** `SecretMessage struct` — SecretMessage is a one-time secret for one user. It never enters events, audit rows or logs.
+- **type** `SecretDelivery interface` — SecretDelivery sends one-time secrets (email in production via M10 Notifications; the dev mailbox in development).
+- **method** `SecretDelivery.Deliver(ctx context.Context, m SecretMessage) error`
+- **type** `DevMailbox struct` — DevMailbox keeps the latest secrets in memory so developers and the test console can complete reset and invitation flows without email. It must never be enabled outside development.
+- **func** `NewDevMailbox() *DevMailbox { return &DevMailbox{} }` — NewDevMailbox returns an empty mailbox.
+- **func** `(d *DevMailbox) Deliver(_ context.Context, m SecretMessage) error` — Deliver stores the message, dropping the oldest when full.
+- **func** `(d *DevMailbox) For(tenantID uuid.UUID, email string) []SecretMessage` — For returns the messages for an email address in a tenant, newest first.
 
 #### `internal/identity/services/session_service.go` (108 lines)
 - **type** `SessionService interface` — SessionService manages user HTTP session mappings.
@@ -2361,7 +2864,17 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *sessionService) RevokeSession(ctx context.Context, tx *gorm.DB, sessionID uuid.UUID) error`
 - **func** `(s *sessionService) RevokeAllForUser(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error`
 
-#### `internal/identity/services/tenant_service.go` (344 lines)
+#### `internal/identity/services/signing_keys.go` (97 lines)
+- **type** `signingKeys struct` — signingKeys holds the Ed25519 key access tokens are signed with and its key id.
+- **func** `ParseSigningKey(raw string) (ed25519.PrivateKey, error)` — ParseSigningKey decodes a base64 (std or URL) Ed25519 seed of 32 bytes.
+- **func** `loadSigningKeys(cfg *config.JWTConfig) signingKeys` — loadSigningKeys uses the configured seed, or derives one from the JWT secret (development; production requires an explicit key, enforced by app.ValidateConfig). An invalid configured key falls back to the derived one only because configuration validation rejects it before this is reached.
+- **func** `(k signingKeys) verificationKey(cfg *config.JWTConfig) jwt.Keyfunc` — verificationKey picks the key for a token: EdDSA tokens must carry our key id; HS256 tokens are accepted only while the legacy window is open.
+- **type** `JWK struct` — JWK is one public key in a JSON Web Key Set.
+- **type** `JWKSet struct` — JWKSet is the document served at /.well-known/jwks.json.
+- **func** `(s *tokenService) JWKS() JWKSet` — JWKS returns the public verification keys.
+- **func** `KeySetOf(ts TokenService) (JWKSet, bool)` — KeySetOf returns the JWKS of a token service that signs with published keys.
+
+#### `internal/identity/services/tenant_service.go` (370 lines)
 - **type** `TenantService interface` — TenantService handles tenant lifecycle orchestrations.
 - **method** `TenantService.CreateTenant(ctx context.Context, tx *gorm.DB, req dto.CreateTenantRequest, correlationID uuid.UUID) (*dto.TenantResponse, error)`
 - **method** `TenantService.GetTenantByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*dto.TenantResponse, error)`
@@ -2371,6 +2884,9 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **method** `TenantService.ActivateTenant(ctx context.Context, tx *gorm.DB, id uuid.UUID, correlationID uuid.UUID) (*dto.TenantResponse, error)`
 - **method** `TenantService.SuspendTenant(ctx context.Context, tx *gorm.DB, id uuid.UUID, correlationID uuid.UUID) (*dto.TenantResponse, error)`
 - **type** `tenantService struct`
+- **type** `RoleProvisioner func(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) error` — RoleProvisioner creates a new tenant's predefined roles inside the tenant-creation transaction.
+- **func** `WithTenantEvents(sink EventSink) TenantOption { return func(s *tenantService) { s.sink = sink } }` — WithTenantEvents records tenant events through sink (the transactional outbox in production).
+- **func** `WithRoleProvisioner(p RoleProvisioner) TenantOption` — WithRoleProvisioner provisions predefined roles (docs/ARCHITECTURE.md §17) for every new tenant.
 - **type** `TenantOption func(*tenantService)` — TenantOption customises a TenantService.
 - **func** `WithAdminProvisioning(userRepo repositories.UserRepository, userRoleRepo repositories.UserRoleRepository) TenantOption` — WithAdminProvisioning enables creating the first tenant_admin user together with a tenant.
 - **func** `NewTenantService(` — NewTenantService creates a new TenantService.
@@ -2384,7 +2900,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `mapTenantToResponse(t *models.Tenant) *dto.TenantResponse`
 - **func** `pointerString(s string) *string`
 
-#### `internal/identity/services/token_service.go` (120 lines)
+#### `internal/identity/services/token_service.go` (118 lines)
 - **type** `UserClaims struct` — UserClaims defines the payload structures inside access token JWTs.
 - **type** `TokenService interface` — TokenService manages secure token lifecycle operations.
 - **method** `TokenService.GenerateAccessToken(userID, tenantID, email string, roles []string, sessionID string) (string, time.Time, error)`
@@ -2393,14 +2909,14 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **method** `TokenService.HashOpaqueToken(token string) string`
 - **method** `TokenService.RefreshTokenTTL() time.Duration` — RefreshTokenTTL is the configured lifetime of refresh tokens.
 - **type** `tokenService struct`
-- **func** `NewTokenService(cfg *config.JWTConfig) TokenService` — NewTokenService creates a new TokenService.
+- **func** `NewTokenService(cfg *config.JWTConfig) TokenService` — NewTokenService creates a new TokenService. Access tokens are signed with Ed25519 (EdDSA) under a key id published at /.well-known/jwks.json, so any service can verify them without sharing a secret (M0 plan B4).
 - **func** `(s *tokenService) GenerateAccessToken(userID, tenantID, email string, roles []string, sessionID string) (string, time.Time, error)`
 - **func** `(s *tokenService) ValidateAccessToken(tokenStr string) (*UserClaims, error)`
 - **func** `(s *tokenService) GenerateOpaqueToken() (string, string, error)` — GenerateOpaqueToken yields a cryptographically secure random token and its SHA-256 hash.
 - **func** `(s *tokenService) HashOpaqueToken(token string) string` — HashOpaqueToken takes raw base64 string and computes SHA-256 hex string.
 - **func** `(s *tokenService) RefreshTokenTTL() time.Duration` — RefreshTokenTTL returns the configured refresh token lifetime (days -> duration; defaults to 7 days).
 
-#### `internal/identity/services/user_service.go` (499 lines)
+#### `internal/identity/services/user_service.go` (498 lines)
 - **type** `UserService interface` — UserService manages tenant user profiles and statuses.
 - **method** `UserService.CreateUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateUserRequest, correlationID uuid.UUID) (*dto.UserResponse, error)`
 - **method** `UserService.InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.InviteUserRequest, correlationID uuid.UUID) (*dto.UserResponse, error)`
@@ -2410,7 +2926,10 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **method** `UserService.DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, correlationID uuid.UUID) error`
 - **method** `UserService.ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*dto.UserResponse, error)`
 - **type** `UserOption func(*userService)` — UserOption customises a UserService.
-- **func** `WithRolePermissions(rp repositories.RolePermissionRepository) UserOption` — WithRolePermissions enables the no-privilege-escalation check when users are created with roles.
+- **func** `WithRolePermissions(rp repositories.RolePermissionRepository) UserOption` — WithRolePermissions enables the no-privilege-escalation check (flat roles) when users are created with roles.
+- **func** `WithInvitations(inv InvitationService) UserOption` — WithInvitations issues an invitation (token delivered to the user) whenever a user is invited.
+- **func** `WithUserEvents(sink EventSink) UserOption { return func(s *userService) { s.sink = sink } }` — WithUserEvents records user events through sink (the transactional outbox in production).
+- **func** `WithAccessResolver(r AccessResolver) UserOption` — WithAccessResolver enables the scoped, inheritance-aware no-privilege-escalation check (docs/ARCHITECTURE.md §17).
 - **type** `userService struct`
 - **type** `UserDeactivationConverger interface` — UserDeactivationConverger converges dependent state when a user is deactivated (Module 1 org mappings, Module 2 employee profile). Registered at boot by internal/app after the modules are wired.
 - **method** `UserDeactivationConverger.DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, correlationID uuid.UUID) error`
@@ -2435,26 +2954,29 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 ### M1 HR / Organization
 
 
-#### `internal/organization/module.go` (195 lines)
+#### `internal/hr/organization/access_facts.go` (26 lines)
+- **func** `(m *Module) ManagerUserIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)` — ManagerUserIDs lists the users of the tenant who currently have at least one active direct report (automatic Manager role, docs/ARCHITECTURE.md §17).
+- **func** `(m *Module) HasDirectReports(ctx context.Context, tenantID, userID uuid.UUID) (bool, error)` — HasDirectReports reports whether the user manages at least one active mapping in the tenant.
+
+#### `internal/hr/organization/catalogue.go` (16 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Organization's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
+
+#### `internal/hr/organization/module.go` (149 lines)
 - **type** `Module struct` — Module encapsulates the Module 1 Organization domain.
-- **type** `userAdapter struct` — userAdapter adapts Module 0 UserService reads to the org userChecker shape (Module 0 returns full profiles; org needs existence + status only).
-- **func** `(a *userAdapter) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityDTO.UserResponse, error)` — GetByID resolves a user within a tenant for org validation (FR-M001).
-- **type** `auditAdapter struct` — auditAdapter funnels org audits through Module 0 AuditService.
-- **func** `(a *auditAdapter) Log(ctx context.Context, tx *gorm.DB, tenantID, userID, action, resource, resourceID string, metadata interface{}, ip, userAgent string) error` — Log records an org mutation via Module 0 audit transport.
 - **func** `NewModule(` — NewModule wires the organization module on shared handles plus Module 0 services.
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists org entity models for migrations.
 - **func** `(m *Module) Consumer() services.EventConsumer { return m.consumer }` — Consumer exposes the identity-event consumer for broker subscription wiring.
 - **func** `(m *Module) ChartInvalidator() services.ChartInvalidator` — ChartInvalidator exposes org-chart cache invalidation.
 - **type** `convergeAndInvalidate struct` — convergeAndInvalidate wraps the FR-M005 user-deactivation hook so the cached org chart is dropped too.
 - **func** `(c convergeAndInvalidate) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, correlationID uuid.UUID) error`
-- **func** `(m *Module) UserDeactivationConverger() identityServices.UserDeactivationConverger` — UserDeactivationConverger is the FR-M005 hook (mappings converge + chart cache invalidated).
+- **func** `(m *Module) UserDeactivationConverger() identityport.DeactivationHook` — UserDeactivationConverger is the FR-M005 hook (mappings converge + chart cache invalidated).
 - **func** `(m *Module) MappingService() services.MappingService { return m.mappingSvc }` — MappingService exposes the mapping domain service for cross-module convergence (FR-M005 hook registered in cmd/main.go).
 - **func** `(m *Module) DepartmentService() services.DepartmentService { return m.deptSvc }` — DepartmentService exposes read access to departments for dependent modules (Module 6 D6-03).
 - **func** `(m *Module) DesignationService() services.DesignationService { return m.desigSvc }` — DesignationService exposes read access to designations for dependent modules (Module 6 D6-03).
-- **func** `(m *Module) RegisterRoutes(` — RegisterRoutes hooks org endpoint groups onto the API router. The identity module owns tenantResolver/authMiddleware construction; org reuses them.
+- **func** `(m *Module) RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes hooks org endpoint groups onto the API router. The identity module owns tenantResolver/authMiddleware construction; org reuses them.
 - **func** `OrgEvents() []string` — OrgEvents returns produced event type documentation for consumers.
 
-#### `internal/organization/controllers/department_controller.go` (154 lines)
+#### `internal/hr/organization/controllers/department_controller.go` (154 lines)
 - **type** `DepartmentController struct` — DepartmentController handles department endpoints.
 - **func** `NewDepartmentController(db *gorm.DB, svc services.DepartmentService) *DepartmentController` — NewDepartmentController returns a DepartmentController.
 - **func** `tenantIDOf(c *gin.Context) (uuid.UUID, bool)`
@@ -2464,7 +2986,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *DepartmentController) Update(c *gin.Context)` — Update handles PATCH /departments/:id.
 - **func** `(ctrl *DepartmentController) Deactivate(c *gin.Context)` — Deactivate handles POST /departments/:id/deactivate?force=. FR-D007.
 
-#### `internal/organization/controllers/designation_controller.go` (143 lines)
+#### `internal/hr/organization/controllers/designation_controller.go` (143 lines)
 - **type** `DesignationController struct` — DesignationController handles designation endpoints.
 - **func** `NewDesignationController(db *gorm.DB, svc services.DesignationService) *DesignationController` — NewDesignationController returns a DesignationController.
 - **func** `(ctrl *DesignationController) Create(c *gin.Context)` — Create handles POST /designations.
@@ -2473,9 +2995,9 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *DesignationController) Update(c *gin.Context)` — Update handles PATCH /designations/:id.
 - **func** `(ctrl *DesignationController) Deactivate(c *gin.Context)` — Deactivate handles POST /designations/:id/deactivate. FR-DG004.
 
-#### `internal/organization/controllers/errors.go` (7 lines)
+#### `internal/hr/organization/controllers/errors.go` (7 lines)
 
-#### `internal/organization/controllers/mapping_controller.go` (149 lines)
+#### `internal/hr/organization/controllers/mapping_controller.go` (149 lines)
 - **type** `MappingController struct` — MappingController handles user→org mapping endpoints.
 - **func** `NewMappingController(db *gorm.DB, svc services.MappingService) *MappingController` — NewMappingController returns a MappingController.
 - **func** `(ctrl *MappingController) Create(c *gin.Context)` — Create handles POST /mappings.
@@ -2484,13 +3006,13 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *MappingController) Update(c *gin.Context)` — Update handles PATCH /mappings/:id.
 - **func** `(ctrl *MappingController) Deactivate(c *gin.Context)` — Deactivate handles POST /mappings/:id/deactivate.
 
-#### `internal/organization/controllers/org_chart_controller.go` (59 lines)
+#### `internal/hr/organization/controllers/org_chart_controller.go` (59 lines)
 - **type** `OrgChartController struct` — OrgChartController serves the org-chart read model.
 - **func** `NewOrgChartController(db *gorm.DB, svc services.OrgChartService) *OrgChartController` — NewOrgChartController returns an OrgChartController.
 - **func** `(ctrl *OrgChartController) Chart(c *gin.Context)` — Chart handles GET /org-chart.
 - **func** `(ctrl *OrgChartController) UserChain(c *gin.Context)` — UserChain handles GET /org-chart/chain?user_id=.
 
-#### `internal/organization/controllers/response.go` (66 lines)
+#### `internal/hr/organization/controllers/response.go` (66 lines)
 - **type** `successEnvelope struct`
 - **type** `errorEnvelope struct`
 - **type** `errorDetail struct`
@@ -2500,7 +3022,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `respondBadRequest(c *gin.Context, msg string)` — respondBadRequest returns a 400 in the standard error envelope.
 - **func** `respondBindError(c *gin.Context, err error)` — respondBindError converts a request-binding failure into field-level validation details.
 
-#### `internal/organization/controllers/team_controller.go` (152 lines)
+#### `internal/hr/organization/controllers/team_controller.go` (152 lines)
 - **type** `TeamController struct` — TeamController handles team endpoints.
 - **func** `NewTeamController(db *gorm.DB, svc services.TeamService) *TeamController` — NewTeamController returns a TeamController.
 - **func** `(ctrl *TeamController) Create(c *gin.Context)` — Create handles POST /teams.
@@ -2509,44 +3031,44 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *TeamController) Update(c *gin.Context)` — Update handles PATCH /teams/:id.
 - **func** `(ctrl *TeamController) Deactivate(c *gin.Context)` — Deactivate handles POST /teams/:id/deactivate. FR-T006.
 
-#### `internal/organization/dto/deactivate_dto.go` (7 lines)
+#### `internal/hr/organization/dto/deactivate_dto.go` (7 lines)
 - **type** `DeactivateRequest struct` — DeactivateRequest carries an optional reason for lifecycle deactivation (departments, teams, designations). Departments also accept ?force=true.
 
-#### `internal/organization/dto/department_dto.go` (39 lines)
+#### `internal/hr/organization/dto/department_dto.go` (39 lines)
 - **type** `CreateDepartmentRequest struct` — CreateDepartmentRequest creates a department. FR-D001.
 - **type** `UpdateDepartmentRequest struct` — UpdateDepartmentRequest patches a department; code is immutable and ignored. FR-D005.
 - **type** `DepartmentResponse struct` — DepartmentResponse serializes a department with hierarchy position.
 - **type** `DepartmentListResponse struct` — DepartmentListResponse is a paginated department list.
 
-#### `internal/organization/dto/designation_dto.go` (37 lines)
+#### `internal/hr/organization/dto/designation_dto.go` (37 lines)
 - **type** `CreateDesignationRequest struct` — CreateDesignationRequest creates a job title/level. FR-DG001.
 - **type** `UpdateDesignationRequest struct` — UpdateDesignationRequest patches a designation; code is immutable and ignored.
 - **type** `DesignationResponse struct` — DesignationResponse serializes a designation.
 - **type** `DesignationListResponse struct` — DesignationListResponse is a paginated designation list.
 
-#### `internal/organization/dto/mapping_dto.go` (48 lines)
+#### `internal/hr/organization/dto/mapping_dto.go` (48 lines)
 - **type** `CreateMappingRequest struct` — CreateMappingRequest maps a user into org structure. FR-M001.
 - **type** `UpdateMappingRequest struct` — UpdateMappingRequest patches a mapping (reassignment, primary swap, manager change).
 - **type** `DeactivateMappingRequest struct` — DeactivateMappingRequest deactivates with a reason (append-only, FR-M007).
 - **type** `MappingResponse struct` — MappingResponse serializes a user→org mapping (IDs only, no PII).
 - **type** `MappingListResponse struct` — MappingListResponse is a paginated mapping list.
 
-#### `internal/organization/dto/org_chart_dto.go` (27 lines)
+#### `internal/hr/organization/dto/org_chart_dto.go` (27 lines)
 - **type** `OrgChartNode struct` — OrgChartNode is one department node with nested children, teams, and headcount. FR-O001.
 - **type** `OrgChartResponse struct` — OrgChartResponse is the tenant forest (roots only at top level).
 - **type** `UserChainResponse struct` — UserChainResponse is a user's chain to root plus direct reports. FR-O002.
 
-#### `internal/organization/dto/pagination_dto.go` (24 lines)
+#### `internal/hr/organization/dto/pagination_dto.go` (24 lines)
 - **type** `PaginationMeta struct` — PaginationMeta mirrors the identity pagination envelope for org list responses.
 - **func** `NewPaginationMeta(page, perPage int, total int64) PaginationMeta` — NewPaginationMeta builds pagination metadata from a total count.
 
-#### `internal/organization/dto/team_dto.go` (41 lines)
+#### `internal/hr/organization/dto/team_dto.go` (41 lines)
 - **type** `CreateTeamRequest struct` — CreateTeamRequest creates a team inside a department. FR-T001.
 - **type** `UpdateTeamRequest struct` — UpdateTeamRequest patches a team; code is immutable and ignored. FR-T005.
 - **type** `TeamResponse struct` — TeamResponse serializes a team with member count.
 - **type** `TeamListResponse struct` — TeamListResponse is a paginated team list.
 
-#### `internal/organization/events/events.go` (98 lines)
+#### `internal/hr/organization/events/events.go` (101 lines)
 - **type** `ConsumedUserPayload struct` — ConsumedUserPayload is the identity user lifecycle payload consumed by org.
 - **type** `ConsumedTenantPayload struct` — ConsumedTenantPayload is the identity tenant lifecycle payload consumed by org.
 - **type** `Event struct` — Event is the standard envelope (mirrors identity events).
@@ -2555,28 +3077,28 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **type** `TeamPayload struct` — TeamPayload carries team lifecycle data.
 - **type** `MappingPayload struct` — MappingPayload carries mapping lifecycle data.
 
-#### `internal/organization/models/department.go` (30 lines)
+#### `internal/hr/organization/models/department.go` (30 lines)
 - **type** `Department struct` — Department represents a company department scoped to a tenant. FR-D001..FR-D008.
 - **func** `(d *Department) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
 
-#### `internal/organization/models/designation.go` (26 lines)
+#### `internal/hr/organization/models/designation.go` (26 lines)
 - **type** `Designation struct` — Designation represents a job title/level scoped to a tenant. FR-DG001..FR-DG004.
 - **func** `(d *Designation) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
 
-#### `internal/organization/models/mapping.go` (43 lines)
+#### `internal/hr/organization/models/mapping.go` (43 lines)
 - **type** `Mapping struct` — Mapping links a user to org structure. Append-only: deactivate, never hard delete. FR-M001..FR-M007.
 - **func** `(m *Mapping) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
 
-#### `internal/organization/models/outbox.go` (33 lines)
+#### `internal/hr/organization/models/outbox.go` (33 lines)
 - **type** `OrgEventOutbox struct` — OrgEventOutbox buffers produced events when the broker is down; a retry worker republishes them later. Guarantees queue downtime never blocks the API (FR-E005).
 - **func** `(OrgEventOutbox) TableName() string { return "org_events_outbox" }` — TableName maps to the org_events_outbox table (migration 000017).
 - **func** `(o *OrgEventOutbox) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
 
-#### `internal/organization/models/team.go` (27 lines)
+#### `internal/hr/organization/models/team.go` (27 lines)
 - **type** `Team struct` — Team represents a team inside a department, scoped to a tenant. FR-T001..FR-T007.
 - **func** `(t *Team) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
 
-#### `internal/organization/repositories/department_repository.go` (82 lines)
+#### `internal/hr/organization/repositories/department_repository.go` (82 lines)
 - **type** `departmentRepository struct{}`
 - **func** `NewDepartmentRepository() DepartmentRepository` — NewDepartmentRepository returns a DepartmentRepository.
 - **func** `(r *departmentRepository) Create(ctx context.Context, tx *gorm.DB, dept *models.Department) error`
@@ -2588,7 +3110,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *departmentRepository) Update(ctx context.Context, tx *gorm.DB, dept *models.Department) error`
 - **func** `(r *departmentRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 
-#### `internal/organization/repositories/designation_repository.go` (70 lines)
+#### `internal/hr/organization/repositories/designation_repository.go` (70 lines)
 - **type** `designationRepository struct{}`
 - **func** `NewDesignationRepository() DesignationRepository` — NewDesignationRepository returns a DesignationRepository.
 - **func** `(r *designationRepository) Create(ctx context.Context, tx *gorm.DB, d *models.Designation) error`
@@ -2598,7 +3120,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *designationRepository) Update(ctx context.Context, tx *gorm.DB, d *models.Designation) error`
 - **func** `(r *designationRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 
-#### `internal/organization/repositories/interfaces.go` (56 lines)
+#### `internal/hr/organization/repositories/interfaces.go` (56 lines)
 - **type** `DepartmentRepository interface` — DepartmentRepository handles CRUD for departments scoped by tenant.
 - **method** `DepartmentRepository.Create(ctx context.Context, tx *gorm.DB, dept *models.Department) error`
 - **method** `DepartmentRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Department, error)`
@@ -2635,7 +3157,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **method** `MappingRepository.CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error)`
 - **method** `MappingRepository.Update(ctx context.Context, tx *gorm.DB, m *models.Mapping) error`
 
-#### `internal/organization/repositories/mapping_repository.go` (95 lines)
+#### `internal/hr/organization/repositories/mapping_repository.go` (95 lines)
 - **type** `mappingRepository struct{}`
 - **func** `NewMappingRepository() MappingRepository` — NewMappingRepository returns a MappingRepository.
 - **func** `(r *mappingRepository) Create(ctx context.Context, tx *gorm.DB, m *models.Mapping) error`
@@ -2649,7 +3171,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *mappingRepository) CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error)`
 - **func** `(r *mappingRepository) Update(ctx context.Context, tx *gorm.DB, m *models.Mapping) error`
 
-#### `internal/organization/repositories/team_repository.go` (80 lines)
+#### `internal/hr/organization/repositories/team_repository.go` (80 lines)
 - **type** `teamRepository struct{}`
 - **func** `NewTeamRepository() TeamRepository` — NewTeamRepository returns a TeamRepository.
 - **func** `(r *teamRepository) Create(ctx context.Context, tx *gorm.DB, team *models.Team) error`
@@ -2660,11 +3182,12 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *teamRepository) Update(ctx context.Context, tx *gorm.DB, team *models.Team) error`
 - **func** `(r *teamRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 
-#### `internal/organization/routes/routes.go` (102 lines)
-- **func** `RegisterRoutes(` — RegisterRoutes wires organization endpoint groups with Module 0 middleware (tenantResolver + authMiddleware built from the identity module; rate limiting reuses Module 0 middleware on the same Gin engine).
+#### `internal/hr/organization/routes/routes.go` (93 lines)
+- **type** `Controllers struct` — RegisterRoutes wires organization endpoint groups with Module 0 middleware (tenantResolver + authMiddleware built from the identity module; rate limiting reuses Module 0 middleware on the same Gin engine). Controllers groups the organization HTTP handlers.
+- **func** `RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP, c Controllers, chartInv services.ChartInvalidator)`
 - **func** `chartInvalidation(inv services.ChartInvalidator) gin.HandlerFunc` — chartInvalidation drops the tenant's cached org chart after every successful org write (departments, teams, mappings), so GET /org-chart is read-your-writes consistent.
 
-#### `internal/organization/services/department_service.go` (235 lines)
+#### `internal/hr/organization/services/department_service.go` (235 lines)
 - **type** `DepartmentService interface` — DepartmentService handles department lifecycle and hierarchy moves.
 - **method** `DepartmentService.CreateDepartment(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateDepartmentRequest, correlationID uuid.UUID) (*dto.DepartmentResponse, error)`
 - **method** `DepartmentService.GetDepartment(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.DepartmentResponse, error)`
@@ -2680,7 +3203,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *departmentService) assertMoveAcyclic(ctx context.Context, db *gorm.DB, tenantID, movingID uuid.UUID, newParent *uuid.UUID) error` — assertMoveAcyclic rejects moves that would cycle through the moving node.
 - **func** `(s *departmentService) DeactivateDepartment(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, force bool, reason *string) (*dto.DepartmentResponse, error)`
 
-#### `internal/organization/services/designation_service.go` (144 lines)
+#### `internal/hr/organization/services/designation_service.go` (144 lines)
 - **type** `DesignationService interface` — DesignationService handles job title/level lifecycle.
 - **method** `DesignationService.CreateDesignation(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateDesignationRequest, correlationID uuid.UUID) (*dto.DesignationResponse, error)`
 - **method** `DesignationService.GetDesignation(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.DesignationResponse, error)`
@@ -2696,16 +3219,16 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *designationService) UpdateDesignation(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.UpdateDesignationRequest) (*dto.DesignationResponse, error)`
 - **func** `(s *designationService) DeactivateDesignation(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, reason *string) (*dto.DesignationResponse, error)`
 
-#### `internal/organization/services/event_consumer.go` (45 lines)
+#### `internal/hr/organization/services/event_consumer.go` (45 lines)
 - **type** `EventConsumer interface` — EventConsumer handles identity domain events consumed by Module 1 (FR-E001..FR-E004).
 - **method** `EventConsumer.HandleIdentityEvent(ctx context.Context, db *gorm.DB, routingKey string, payload json.RawMessage, correlationID uuid.UUID) error` — Handlers are idempotent: redelivery must converge to the same state (C7).
 - **type** `eventConsumer struct`
 - **func** `NewEventConsumer(mappingSvc MappingService) EventConsumer` — NewEventConsumer creates the consumer over org services.
 - **func** `(c *eventConsumer) HandleIdentityEvent(ctx context.Context, db *gorm.DB, routingKey string, payload json.RawMessage, correlationID uuid.UUID) error`
 
-#### `internal/organization/services/helpers.go` (136 lines)
+#### `internal/hr/organization/services/helpers.go` (136 lines)
 - **type** `userChecker interface` — userChecker validates user existence/activity through Module 0 (injected, mocked in tests).
-- **method** `userChecker.GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityDTO.UserResponse, error)`
+- **method** `userChecker.GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityport.User, error)`
 - **type** `auditLogger interface` — auditLogger records org mutations through Module 0 audit transport.
 - **method** `auditLogger.Log(ctx context.Context, tx *gorm.DB, tenantID, userID, action, resource, resourceID string, metadata interface{}, ip, userAgent string) error`
 - **func** `parseUUID(s *string) (*uuid.UUID, error)` — parseUUID parses a UUID string pointer, returning nil when unset.
@@ -2715,7 +3238,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `mapDeptToResponse(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, deptRepo repositories.DepartmentRepository, d *models.Department) (*dto.DepartmentResponse, error)`
 - **func** `publishOrOutbox(ctx context.Context, tx *gorm.DB, publisher queue.EventPublisher, exchange string, evt events.Event)` — publishOrOutbox publishes an org event; on broker failure the event lands in the outbox table for later retry, so queue downtime never blocks the API (FR-E005). A nil tx (unit tests without a database) skips the outbox write.
 
-#### `internal/organization/services/mapping_service.go` (326 lines)
+#### `internal/hr/organization/services/mapping_service.go` (326 lines)
 - **type** `MappingService interface` — MappingService handles user→org mappings with hierarchy guards.
 - **method** `MappingService.CreateMapping(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateMappingRequest, correlationID uuid.UUID) (*dto.MappingResponse, error)`
 - **method** `MappingService.GetMapping(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.MappingResponse, error)`
@@ -2736,7 +3259,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *mappingService) DeactivateMapping(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.DeactivateMappingRequest) (*dto.MappingResponse, error)`
 - **func** `(s *mappingService) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, correlationID uuid.UUID) error` — DeactivateUserMappings converges org state on identity UserDeactivated. FR-M005.
 
-#### `internal/organization/services/org_chart_service.go` (230 lines)
+#### `internal/hr/organization/services/org_chart_service.go` (230 lines)
 - **type** `OrgChartService interface` — OrgChartService builds the tenant forest, user chains, and headcounts. FR-O001..FR-O004.
 - **method** `OrgChartService.GetChart(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, maxDepth int, includeInactive bool) (*dto.OrgChartResponse, error)`
 - **method** `OrgChartService.GetUserChain(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.UserChainResponse, error)`
@@ -2754,7 +3277,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *orgChartService) buildNode(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, dept *models.Department, depth, maxDepth int, includeInactive bool) (*dto.OrgChartNode, error)`
 - **func** `(s *orgChartService) GetUserChain(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.UserChainResponse, error)`
 
-#### `internal/organization/services/team_service.go` (241 lines)
+#### `internal/hr/organization/services/team_service.go` (241 lines)
 - **type** `TeamService interface` — TeamService handles team lifecycle and moves.
 - **method** `TeamService.CreateTeam(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateTeamRequest, correlationID uuid.UUID) (*dto.TeamResponse, error)`
 - **method** `TeamService.GetTeam(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.TeamResponse, error)`
@@ -2771,32 +3294,48 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *teamService) UpdateTeam(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.UpdateTeamRequest) (*dto.TeamResponse, error)`
 - **func** `(s *teamService) DeactivateTeam(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, reason *string) (*dto.TeamResponse, error)`
 
-#### `internal/organization/validators/validators.go` (29 lines)
+#### `internal/hr/organization/validators/validators.go` (29 lines)
 - **func** `ValidateOrgCode(code string) bool` — ValidateOrgCode checks an org code against the slug-like format.
 - **func** `IsReservedOrgCode(code string) bool` — IsReservedOrgCode checks platform-reserved org codes.
 
 ### M1 HR / Employee
 
 
-#### `internal/employee/module.go` (146 lines)
+#### `internal/hr/employee/access_facts.go` (28 lines)
+- **func** `(m *Module) EmployedUserIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)` — EmployedUserIDs lists the users of the tenant with a current employee record.
+- **func** `(m *Module) IsEmployed(ctx context.Context, tenantID, userID uuid.UUID) (bool, error)` — IsEmployed reports whether the user has a current employee record in the tenant.
+
+#### `internal/hr/employee/catalogue.go` (24 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Employee's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
+
+#### `internal/hr/employee/module.go` (130 lines)
 - **type** `Module struct` — Module encapsulates the Module 2 Employee domain.
 - **func** `NewModule(`
 - **func** `(m *Module) RegisterModels() []interface{}`
-- **func** `(m *Module) RegisterRoutes(`
+- **func** `(m *Module) RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the employee endpoints behind the M0 guards provided by idp.
 - **func** `(m *Module) EmployeeService() services.EmployeeService`
+- **func** `(m *Module) Directory() api.Directory { return m.empSvc }` — Directory is the employee directory published to the other HR contexts (employee/api).
 - **func** `(m *Module) EventConsumer() services.EventConsumer`
 - **type** `userDeactivationConverger struct{ svc services.EmployeeService }` — userDeactivationConverger adapts the employee service to the Module 0 deactivation hook (FR-EV001, synchronous).
 - **func** `(c userDeactivationConverger) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, _ uuid.UUID) error`
-- **func** `(m *Module) UserDeactivationConverger() identityServices.UserDeactivationConverger` — UserDeactivationConverger returns the hook that keeps employee profiles in step with Module 0 user deactivation.
+- **func** `(m *Module) UserDeactivationConverger() identityport.DeactivationHook` — UserDeactivationConverger returns the hook that keeps employee profiles in step with Module 0 user deactivation.
 
-#### `internal/employee/controllers/document_controller.go` (99 lines)
+#### `internal/hr/employee/api/api.go` (19 lines)
+_Package:_ Package api is what HR/Employee publishes to the other HR contexts: the employee directory. Other contexts depend on this package and on employee/dto only, never on employee services, repositories or models (import-boundary test in internal/hr).
+- **type** `Directory interface` — Directory reads and creates employee records.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dto.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*dto.EmployeeResponse, error)`
+- **method** `Directory.List(ctx context.Context, tenantID uuid.UUID, filter dto.EmployeeFilter) ([]dto.EmployeeResponse, int64, error)`
+- **method** `Directory.CreateEmployee(ctx context.Context, tenantID uuid.UUID, req dto.CreateEmployeeRequest) (*dto.EmployeeResponse, error)`
+
+#### `internal/hr/employee/controllers/document_controller.go` (99 lines)
 - **type** `DocumentController struct`
 - **func** `NewDocumentController(svc services.EmployeeDocumentService) *DocumentController`
 - **func** `(ctrl *DocumentController) Upload(c *gin.Context)`
 - **func** `(ctrl *DocumentController) List(c *gin.Context)`
 - **func** `(ctrl *DocumentController) Verify(c *gin.Context)`
 
-#### `internal/employee/controllers/employee_controller.go` (224 lines)
+#### `internal/hr/employee/controllers/employee_controller.go` (224 lines)
 - **type** `EmployeeController struct`
 - **func** `NewEmployeeController(svc services.EmployeeService) *EmployeeController`
 - **func** `(ctrl *EmployeeController) Create(c *gin.Context)`
@@ -2808,7 +3347,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(ctrl *EmployeeController) TransitionStatus(c *gin.Context)`
 - **func** `(ctrl *EmployeeController) Deactivate(c *gin.Context)`
 
-#### `internal/employee/controllers/response.go` (93 lines)
+#### `internal/hr/employee/controllers/response.go` (93 lines)
 - **type** `successEnvelope struct`
 - **type** `errorEnvelope struct`
 - **type** `errorDetail struct`
@@ -2820,22 +3359,22 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `respondBindError(c *gin.Context, err error)` — respondBindError converts a request-binding failure into field-level validation details.
 - **func** `respondValidationError(c *gin.Context, details []sharedErrors.ValidationErrorDetail)` — respondValidationError returns field-level validation details.
 
-#### `internal/employee/controllers/statutory_controller.go` (78 lines)
+#### `internal/hr/employee/controllers/statutory_controller.go` (78 lines)
 - **type** `StatutoryController struct`
 - **func** `NewStatutoryController(svc services.EmployeeStatutoryService) *StatutoryController`
 - **func** `(ctrl *StatutoryController) Get(c *gin.Context)`
 - **func** `(ctrl *StatutoryController) Upsert(c *gin.Context)`
 
-#### `internal/employee/controllers/timeline_controller.go` (39 lines)
+#### `internal/hr/employee/controllers/timeline_controller.go` (39 lines)
 - **type** `TimelineController struct`
 - **func** `NewTimelineController(svc services.EmployeeTimelineService) *TimelineController`
 - **func** `(ctrl *TimelineController) List(c *gin.Context)`
 
-#### `internal/employee/dto/document_dto.go` (28 lines)
+#### `internal/hr/employee/dto/document_dto.go` (28 lines)
 - **type** `UploadDocumentRequest struct`
 - **type** `DocumentResponse struct`
 
-#### `internal/employee/dto/employee_dto.go` (104 lines)
+#### `internal/hr/employee/dto/employee_dto.go` (104 lines)
 - **type** `CreateEmployeeRequest struct`
 - **type** `UpdateEmployeeRequest struct`
 - **type** `UpdateSelfContactRequest struct`
@@ -2845,46 +3384,46 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **type** `EmploymentDetail struct`
 - **type** `EmployeeContact struct`
 
-#### `internal/employee/dto/statutory_dto.go` (21 lines)
+#### `internal/hr/employee/dto/statutory_dto.go` (21 lines)
 - **type** `UpdateStatutoryRequest struct`
 - **type** `StatutoryResponse struct`
 
-#### `internal/employee/dto/timeline_dto.go` (17 lines)
+#### `internal/hr/employee/dto/timeline_dto.go` (17 lines)
 - **type** `TimelineResponse struct`
 
-#### `internal/employee/events/events.go` (42 lines)
+#### `internal/hr/employee/events/events.go` (45 lines)
 - **type** `EventEnvelope struct`
 - **func** `NewEventEnvelope(eventType, routingKey string, tenantID uuid.UUID, payload interface{}) EventEnvelope`
 
-#### `internal/employee/models/contact.go` (22 lines)
+#### `internal/hr/employee/models/contact.go` (22 lines)
 - **type** `EmployeeContact struct` — EmployeeContact stores personal contact details and emergency contacts.
 - **func** `(EmployeeContact) TableName() string`
 
-#### `internal/employee/models/document.go` (25 lines)
+#### `internal/hr/employee/models/document.go` (25 lines)
 - **type** `EmployeeDocument struct` — EmployeeDocument holds metadata and verification state of employee documents.
 - **func** `(EmployeeDocument) TableName() string`
 
-#### `internal/employee/models/employment.go` (26 lines)
+#### `internal/hr/employee/models/employment.go` (26 lines)
 - **type** `EmploymentDetail struct` — EmploymentDetail tracks employment contracts, lifecycle dates, and notice periods.
 - **func** `(EmploymentDetail) TableName() string`
 
-#### `internal/employee/models/outbox.go` (25 lines)
+#### `internal/hr/employee/models/outbox.go` (25 lines)
 - **type** `EmployeeEventsOutbox struct` — EmployeeEventsOutbox provides durable outbox persistence for domain events.
 - **func** `(EmployeeEventsOutbox) TableName() string`
 
-#### `internal/employee/models/profile.go` (36 lines)
+#### `internal/hr/employee/models/profile.go` (36 lines)
 - **type** `EmployeeProfile struct` — EmployeeProfile represents the core operational profile of an employee.
 - **func** `(EmployeeProfile) TableName() string`
 
-#### `internal/employee/models/statutory.go` (21 lines)
+#### `internal/hr/employee/models/statutory.go` (21 lines)
 - **type** `EmployeeStatutory struct` — EmployeeStatutory stores sensitive tax identifiers and banking coordinates.
 - **func** `(EmployeeStatutory) TableName() string`
 
-#### `internal/employee/models/timeline.go` (22 lines)
+#### `internal/hr/employee/models/timeline.go` (22 lines)
 - **type** `EmployeeTimeline struct` — EmployeeTimeline records chronological career, status, and org transitions.
 - **func** `(EmployeeTimeline) TableName() string`
 
-#### `internal/employee/repositories/document_repository.go` (60 lines)
+#### `internal/hr/employee/repositories/document_repository.go` (60 lines)
 - **type** `employeeDocumentRepository struct`
 - **func** `NewEmployeeDocumentRepository(db *gorm.DB) EmployeeDocumentRepository`
 - **func** `(r *employeeDocumentRepository) Create(ctx context.Context, tx *gorm.DB, doc *models.EmployeeDocument) error`
@@ -2892,7 +3431,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *employeeDocumentRepository) ListByProfileID(ctx context.Context, tenantID, profileID uuid.UUID) ([]models.EmployeeDocument, error)`
 - **func** `(r *employeeDocumentRepository) Update(ctx context.Context, tx *gorm.DB, doc *models.EmployeeDocument) error`
 
-#### `internal/employee/repositories/interfaces.go` (40 lines)
+#### `internal/hr/employee/repositories/interfaces.go` (40 lines)
 - **type** `EmployeeProfileRepository interface`
 - **method** `EmployeeProfileRepository.Create(ctx context.Context, tx *gorm.DB, profile *models.EmployeeProfile) error`
 - **method** `EmployeeProfileRepository.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*models.EmployeeProfile, error)`
@@ -2916,7 +3455,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **method** `EmployeeTimelineRepository.Create(ctx context.Context, tx *gorm.DB, timeline *models.EmployeeTimeline) error`
 - **method** `EmployeeTimelineRepository.ListByProfileID(ctx context.Context, tenantID, profileID uuid.UUID) ([]models.EmployeeTimeline, error)`
 
-#### `internal/employee/repositories/profile_repository.go` (152 lines)
+#### `internal/hr/employee/repositories/profile_repository.go` (152 lines)
 - **type** `employeeProfileRepository struct`
 - **func** `NewEmployeeProfileRepository(db *gorm.DB) EmployeeProfileRepository`
 - **func** `(r *employeeProfileRepository) WithTx(tx *gorm.DB) EmployeeProfileRepository`
@@ -2930,22 +3469,23 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(r *employeeProfileRepository) UpdateContact(ctx context.Context, tx *gorm.DB, contact *models.EmployeeContact) error`
 - **func** `(r *employeeProfileRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 
-#### `internal/employee/repositories/statutory_repository.go` (46 lines)
+#### `internal/hr/employee/repositories/statutory_repository.go` (46 lines)
 - **type** `employeeStatutoryRepository struct`
 - **func** `NewEmployeeStatutoryRepository(db *gorm.DB) EmployeeStatutoryRepository`
 - **func** `(r *employeeStatutoryRepository) GetByProfileID(ctx context.Context, tenantID, profileID uuid.UUID) (*models.EmployeeStatutory, error)`
 - **func** `(r *employeeStatutoryRepository) Upsert(ctx context.Context, tx *gorm.DB, statutory *models.EmployeeStatutory) error`
 
-#### `internal/employee/repositories/timeline_repository.go` (37 lines)
+#### `internal/hr/employee/repositories/timeline_repository.go` (37 lines)
 - **type** `employeeTimelineRepository struct`
 - **func** `NewEmployeeTimelineRepository(db *gorm.DB) EmployeeTimelineRepository`
 - **func** `(r *employeeTimelineRepository) Create(ctx context.Context, tx *gorm.DB, timeline *models.EmployeeTimeline) error`
 - **func** `(r *employeeTimelineRepository) ListByProfileID(ctx context.Context, tenantID, profileID uuid.UUID) ([]models.EmployeeTimeline, error)`
 
-#### `internal/employee/routes/routes.go` (74 lines)
-- **func** `RegisterRoutes(` — RegisterRoutes wires employee endpoint groups with Module 0 middleware and RBAC.
+#### `internal/hr/employee/routes/routes.go` (66 lines)
+- **type** `Controllers struct` — RegisterRoutes wires employee endpoint groups with Module 0 middleware and RBAC. Controllers groups the employee HTTP handlers.
+- **func** `RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP, c Controllers)`
 
-#### `internal/employee/services/document_service.go` (121 lines)
+#### `internal/hr/employee/services/document_service.go` (121 lines)
 - **type** `EmployeeDocumentService interface`
 - **method** `EmployeeDocumentService.Upload(ctx context.Context, tenantID, profileID uuid.UUID, req dto.UploadDocumentRequest) (*dto.DocumentResponse, error)`
 - **method** `EmployeeDocumentService.List(ctx context.Context, tenantID, profileID uuid.UUID) ([]dto.DocumentResponse, error)`
@@ -2957,7 +3497,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *employeeDocumentService) Verify(ctx context.Context, tenantID, profileID, docID, verifierID uuid.UUID) (*dto.DocumentResponse, error)`
 - **func** `toDocumentResponse(d *models.EmployeeDocument) *dto.DocumentResponse`
 
-#### `internal/employee/services/employee_service.go` (560 lines)
+#### `internal/hr/employee/services/employee_service.go` (560 lines)
 - **type** `EmployeeService interface`
 - **method** `EmployeeService.CreateEmployee(ctx context.Context, tenantID uuid.UUID, req dto.CreateEmployeeRequest) (*dto.EmployeeResponse, error)`
 - **method** `EmployeeService.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dto.EmployeeResponse, error)`
@@ -2982,14 +3522,14 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `applyStatusEffects(d *models.EmploymentDetail, req dto.TransitionStatusRequest, oldStatus, newStatus string, now time.Time) string` — applyStatusEffects applies the lifecycle side effects of a status change to the employment details and returns the timeline event type: FR-ED003 (confirmation), FR-ED004 (notice: resignation + tentative exit date from the notice period) and FR-ED005 (final exit stamps the exit date). detail may be nil.
 - **func** `(s *employeeService) ConvergeUserDeactivation(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID) error`
 
-#### `internal/employee/services/event_consumer.go` (52 lines)
+#### `internal/hr/employee/services/event_consumer.go` (52 lines)
 - **type** `EventConsumer interface`
 - **method** `EventConsumer.HandleUserDeactivated(ctx context.Context, tenantID, userID uuid.UUID) error`
 - **type** `eventConsumer struct`
 - **func** `NewEventConsumer(empSvc EmployeeService, logger *zerolog.Logger) EventConsumer`
 - **func** `(c *eventConsumer) HandleUserDeactivated(ctx context.Context, tenantID, userID uuid.UUID) error`
 
-#### `internal/employee/services/statutory_service.go` (102 lines)
+#### `internal/hr/employee/services/statutory_service.go` (102 lines)
 - **type** `EmployeeStatutoryService interface`
 - **method** `EmployeeStatutoryService.GetByProfileID(ctx context.Context, tenantID, profileID uuid.UUID, sensitive bool) (*dto.StatutoryResponse, error)`
 - **method** `EmployeeStatutoryService.Upsert(ctx context.Context, tenantID, profileID uuid.UUID, req dto.UpdateStatutoryRequest) (*dto.StatutoryResponse, error)`
@@ -2999,7 +3539,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *employeeStatutoryService) Upsert(ctx context.Context, tenantID, profileID uuid.UUID, req dto.UpdateStatutoryRequest) (*dto.StatutoryResponse, error)`
 - **func** `maskString(s string) string`
 
-#### `internal/employee/services/timeline_service.go` (66 lines)
+#### `internal/hr/employee/services/timeline_service.go` (66 lines)
 - **type** `EmployeeTimelineService interface`
 - **method** `EmployeeTimelineService.List(ctx context.Context, tenantID, profileID uuid.UUID) ([]dto.TimelineResponse, error)`
 - **type** `employeeTimelineService struct`
@@ -3007,7 +3547,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(s *employeeTimelineService) List(ctx context.Context, tenantID, profileID uuid.UUID) ([]dto.TimelineResponse, error)`
 - **func** `toTimelineResponse(t *models.EmployeeTimeline) *dto.TimelineResponse`
 
-#### `internal/employee/validators/validators.go` (97 lines)
+#### `internal/hr/employee/validators/validators.go` (97 lines)
 - **func** `ValidateEmployeeCode(code string) error`
 - **func** `ValidateStatus(status string) error`
 - **func** `ValidateEmploymentType(empType string) error`
@@ -3017,22 +3557,24 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 ### M1 HR / Attendance
 
 
-#### `internal/attendance/module.go` (141 lines)
+#### `internal/hr/attendance/catalogue.go` (19 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Attendance's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
+
+#### `internal/hr/attendance/module.go` (116 lines)
 _Package:_ Package attendance wires Module 3 (Attendance, Shifts & Time Tracking) into the application.
 - **type** `Module struct` — Module is the Module 3 DI container.
-- **func** `NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeServices.EmployeeService, audit identityServices.AuditService) *Module` — NewModule wires repositories, services and controllers over Module 0 audit and Module 2 employees.
+- **func** `NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeAPI.Directory, audit identityport.Auditor) *Module` — NewModule wires repositories, services and controllers over Module 0 audit and Module 2 employees.
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists Module 3 models for AutoMigrate (dev path; SQL 000026–000031 in prod — A3-06).
-- **func** `(m *Module) SeedPermissions(ctx context.Context) error` — SeedPermissions idempotently inserts attendance:read|manage|approve (D3-10, connections C7).
 - **type** `RouteDeps struct` — RouteDeps is the Module 0 + shared infrastructure the routes need (connections C4).
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts Module 3 under rg using Module 0 tenant/auth/RBAC middleware.
 - **func** `(m *Module) LeaveSync() services.LeaveSync { return m.leaveSync }` — LeaveSync exposes contract C10 for Module 4 (D3-17).
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay; cmd/main.go runs it until shutdown.
-- **type** `employeeDirectory struct` — employeeDirectory adapts Module 2 EmployeeService to services.EmployeeDirectory (connections C2).
+- **type** `employeeDirectory struct` — employeeDirectory adapts the HR/Employee directory to services.EmployeeDirectory (connections C2).
 - **func** `(d employeeDirectory) GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **func** `(d employeeDirectory) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **func** `(d employeeDirectory) CountWorking(ctx context.Context, tenantID uuid.UUID) (int64, error)` — CountWorking sums Module 2 list totals for the statuses allowed to work (AT-002, AT-020).
 
-#### `internal/attendance/calc/time.go` (118 lines)
+#### `internal/hr/attendance/calc/time.go` (118 lines)
 _Package:_ Package calc holds Module 3's pure time math (spec AT-005..AT-010). No I/O, no dependencies.
 - **type** `ShiftSpec struct` — ShiftSpec is the subset of a shift needed for attendance math. Location nil means UTC.
 - **func** `ParseHHMM(s string) (int, error)` — ParseHHMM converts "HH:MM" to minutes from midnight.
@@ -3046,7 +3588,7 @@ _Package:_ Package calc holds Module 3's pure time math (spec AT-005..AT-010). N
 - **func** `AttendanceDate(at time.Time, s *ShiftSpec) time.Time` — AttendanceDate returns the day an IN at `at` belongs to, as UTC midnight (AT-005). Night shifts own early-morning punches up to end+4h, clamped so they never pass the shift start.
 - **func** `ShiftStart(date time.Time, s *ShiftSpec) time.Time` — ShiftStart is the shift's start instant on the given attendance date.
 
-#### `internal/attendance/calc/totals.go` (121 lines)
+#### `internal/hr/attendance/calc/totals.go` (121 lines)
 - **type** `Punch struct` — Punch is one non-superseded IN/OUT instant.
 - **type** `Totals struct` — Totals is the computed state of one attendance record (FR-AR002).
 - **func** `sorted(punches []Punch) []Punch`
@@ -3055,7 +3597,7 @@ _Package:_ Package calc holds Module 3's pure time math (spec AT-005..AT-010). N
 - **func** `lateMinutes(firstIn *time.Time, s *ShiftSpec, date time.Time) int` — lateMinutes is AT-007: minutes past shift start + grace; 0 without a shift.
 - **func** `status(t Totals, s *ShiftSpec) string` — status is AT-010: open session → present; else by full/half-day thresholds.
 
-#### `internal/attendance/controllers/attendance_controller.go` (110 lines)
+#### `internal/hr/attendance/controllers/attendance_controller.go` (110 lines)
 - **type** `AttendanceController struct` — AttendanceController serves punches and attendance reads (A1–A3, A7–A9).
 - **func** `NewAttendanceController(p services.PunchService, q services.QueryService) *AttendanceController` — NewAttendanceController builds an AttendanceController.
 - **func** `(ctl *AttendanceController) Punch(c *gin.Context)` — Punch handles POST /attendance/punch (A1).
@@ -3065,7 +3607,7 @@ _Package:_ Package calc holds Module 3's pure time math (spec AT-005..AT-010). N
 - **func** `(ctl *AttendanceController) Detail(c *gin.Context)` — Detail handles GET /attendance/records/:id (A8).
 - **func** `(ctl *AttendanceController) Summary(c *gin.Context)` — Summary handles GET /attendance/summary (A9).
 
-#### `internal/attendance/controllers/regularization_controller.go` (101 lines)
+#### `internal/hr/attendance/controllers/regularization_controller.go` (101 lines)
 - **type** `RegularizationController struct` — RegularizationController serves correction requests (A4–A6, A10–A12).
 - **func** `NewRegularizationController(s services.RegularizationService) *RegularizationController` — NewRegularizationController builds a RegularizationController.
 - **func** `(ctl *RegularizationController) Create(c *gin.Context)` — Create handles POST /attendance/regularizations (A4).
@@ -3077,7 +3619,7 @@ _Package:_ Package calc holds Module 3's pure time math (spec AT-005..AT-010). N
 - **func** `(ctl *RegularizationController) Approve(c *gin.Context) { ctl.act(c, ctl.svc.Approve, true) }` — Approve handles POST /attendance/regularizations/:id/approve (A11).
 - **func** `(ctl *RegularizationController) Reject(c *gin.Context) { ctl.act(c, ctl.svc.Reject, true) }` — Reject handles POST /attendance/regularizations/:id/reject (A12).
 
-#### `internal/attendance/controllers/respond.go` (106 lines)
+#### `internal/hr/attendance/controllers/respond.go` (106 lines)
 _Package:_ Package controllers is Module 3's thin HTTP edge: parse → validate → service → envelope.
 - **type** `errorBody struct`
 - **func** `ok(c *gin.Context, status int, data interface{})`
@@ -3089,7 +3631,7 @@ _Package:_ Package controllers is Module 3's thin HTTP edge: parse → validate 
 - **func** `pathID(c *gin.Context, name string) (uuid.UUID, bool)` — pathID parses a :param UUID; malformed ids are 400.
 - **func** `page(c *gin.Context) dto.Page`
 
-#### `internal/attendance/controllers/shift_controller.go` (137 lines)
+#### `internal/hr/attendance/controllers/shift_controller.go` (137 lines)
 - **type** `ShiftController struct` — ShiftController serves shifts and assignments (S1–S7).
 - **func** `NewShiftController(s services.ShiftService, a services.AssignmentService) *ShiftController` — NewShiftController builds a ShiftController.
 - **func** `(ctl *ShiftController) Create(c *gin.Context)` — Create handles POST /shifts (S1).
@@ -3100,7 +3642,7 @@ _Package:_ Package controllers is Module 3's thin HTTP edge: parse → validate 
 - **func** `(ctl *ShiftController) Assign(c *gin.Context)` — Assign handles POST /shifts/:id/assignments (S6).
 - **func** `(ctl *ShiftController) ListAssignments(c *gin.Context)` — ListAssignments handles GET /shift-assignments?employee_id= (S7).
 
-#### `internal/attendance/dto/dto.go` (212 lines)
+#### `internal/hr/attendance/dto/dto.go` (212 lines)
 _Package:_ Package dto holds Module 3 request/response shapes (specification.md §5). Requests ≠ responses.
 - **type** `PunchRequest struct` — PunchRequest is A1. No time field exists: punch time is the server clock (AT-001).
 - **type** `CreateShiftRequest struct` — CreateShiftRequest is S1 (FR-SH001).
@@ -3123,7 +3665,7 @@ _Package:_ Package dto holds Module 3 request/response shapes (specification.md 
 - **func** `(p Page) Offset() int { return (p.Page - 1) * p.PerPage }` — Offset is the SQL offset for this page.
 - **func** `(p Page) Meta(total int64) PageMeta` — Meta builds list metadata for a total count.
 
-#### `internal/attendance/events/events.go` (74 lines)
+#### `internal/hr/attendance/events/events.go` (76 lines)
 _Package:_ Package events defines Module 3 produced events (FR-EV001). Payloads carry no IP/device/coordinates (FR-EV003).
 - **type** `Envelope struct` — Envelope is the standard JAAS event envelope.
 - **type** `Source struct` — Source identifies who and when an event came from; OccurredAt comes from the service clock.
@@ -3131,7 +3673,7 @@ _Package:_ Package events defines Module 3 produced events (FR-EV001). Payloads 
 - **type** `PunchPayload struct` — PunchPayload is published for attendance.punch.in/out.
 - **type** `RegularizationPayload struct` — RegularizationPayload is published for attendance.regularization.*.
 
-#### `internal/attendance/models/attendance.go` (117 lines)
+#### `internal/hr/attendance/models/attendance.go` (117 lines)
 - **type** `AttendanceRecord struct` — AttendanceRecord is one employee's computed day (FR-AR001/FR-AR002). Never deleted (AT-019).
 - **func** `(r *AttendanceRecord) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
 - **type** `AttendancePunch struct` — AttendancePunch is an immutable IN/OUT event; corrections supersede, never delete (AT-017, AT-019).
@@ -3143,15 +3685,15 @@ _Package:_ Package events defines Module 3 produced events (FR-EV001). Payloads 
 - **func** `(OutboxEvent) TableName() string { return "attendance_events_outbox" }` — TableName maps to attendance_events_outbox (migration 000031).
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
 
-#### `internal/attendance/models/constants.go` (40 lines)
+#### `internal/hr/attendance/models/constants.go` (40 lines)
 _Package:_ Package models holds Module 3 attendance persistence models (specification.md §8).
 
-#### `internal/attendance/models/shift.go` (48 lines)
+#### `internal/hr/attendance/models/shift.go` (48 lines)
 - **type** `Shift struct` — Shift is a tenant work-time template; times are minutes from midnight in Timezone (D3-03). FR-SH001. Integer fields carry no GORM default so an explicit 0 (e.g. zero grace) is stored as 0.
 - **type** `ShiftAssignment struct` — ShiftAssignment binds an employee to a shift for an inclusive date range (AT-011). FR-SA001.
 - **func** `(a *ShiftAssignment) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
 
-#### `internal/attendance/repositories/interfaces.go` (98 lines)
+#### `internal/hr/attendance/repositories/interfaces.go` (98 lines)
 _Package:_ Package repositories is Module 3 data access: tenant_id on every scoped query, `db`/`tx` passed per call.
 - **type** `ShiftRepository interface` — ShiftRepository persists shifts (FR-SH).
 - **method** `ShiftRepository.Create(ctx context.Context, tx *gorm.DB, s *models.Shift) error`
@@ -3199,7 +3741,7 @@ _Package:_ Package repositories is Module 3 data access: tenant_id on every scop
 - **method** `OutboxRepository.FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
 - **func** `day(t time.Time) string { return t.Format("2006-01-02") }` — day renders a calendar date for `?::date` comparisons (session-timezone independent).
 
-#### `internal/attendance/repositories/punch_repository.go` (140 lines)
+#### `internal/hr/attendance/repositories/punch_repository.go` (140 lines)
 - **type** `punchRepository struct{}`
 - **func** `NewPunchRepository() PunchRepository { return &punchRepository{} }` — NewPunchRepository returns a PunchRepository.
 - **func** `(r *punchRepository) Create(ctx context.Context, tx *gorm.DB, p *models.AttendancePunch) error`
@@ -3222,7 +3764,7 @@ _Package:_ Package repositories is Module 3 data access: tenant_id on every scop
 - **func** `(r *outboxRepository) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
 - **func** `(r *outboxRepository) FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
 
-#### `internal/attendance/repositories/record_repository.go` (118 lines)
+#### `internal/hr/attendance/repositories/record_repository.go` (118 lines)
 - **type** `recordRepository struct{}`
 - **func** `NewRecordRepository() RecordRepository { return &recordRepository{} }` — NewRecordRepository returns a RecordRepository.
 - **func** `(r *recordRepository) LockEmployee(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID) error` — LockEmployee takes a transaction-scoped advisory lock keyed on tenant+employee (AT-022, D3-09).
@@ -3236,7 +3778,7 @@ _Package:_ Package repositories is Module 3 data access: tenant_id on every scop
 - **func** `(r *recordRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f RecordFilter, page dto.Page) ([]models.AttendanceRecord, int64, error)`
 - **func** `(r *recordRepository) CountByStatus(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, date time.Time) (StatusCounts, error)` — CountByStatus aggregates one tenant-date in a single query (NFR-P003).
 
-#### `internal/attendance/repositories/shift_repository.go` (128 lines)
+#### `internal/hr/attendance/repositories/shift_repository.go` (128 lines)
 - **type** `shiftRepository struct{}`
 - **func** `NewShiftRepository() ShiftRepository { return &shiftRepository{} }` — NewShiftRepository returns a ShiftRepository.
 - **func** `(r *shiftRepository) Create(ctx context.Context, tx *gorm.DB, s *models.Shift) error`
@@ -3255,13 +3797,13 @@ _Package:_ Package repositories is Module 3 data access: tenant_id on every scop
 - **func** `(r *assignmentRepository) CountCoveringFrom(ctx context.Context, db *gorm.DB, tenantID, shiftID uuid.UUID, date time.Time) (int64, error)`
 - **func** `(r *assignmentRepository) ListByEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, page dto.Page) ([]models.ShiftAssignment, int64, error)`
 
-#### `internal/attendance/routes/routes.go` (60 lines)
+#### `internal/hr/attendance/routes/routes.go` (60 lines)
 _Package:_ Package routes mounts Module 3 endpoints (specification.md §5) behind Module 0 middleware.
 - **type** `Middleware struct` — Middleware is the Module 0 / shared middleware Module 3 depends on (connections C4).
 - **type** `Controllers struct` — Controllers groups Module 3 handlers.
 - **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl Controllers)` — RegisterRoutes mounts all 19 Module 3 routes; self endpoints need only authentication (NFR-SEC002).
 
-#### `internal/attendance/services/assignment_service.go` (125 lines)
+#### `internal/hr/attendance/services/assignment_service.go` (125 lines)
 - **type** `AssignmentService interface` — AssignmentService binds employees to shifts (FR-SA001..FR-SA003).
 - **method** `AssignmentService.Assign(ctx context.Context, a Actor, shiftID uuid.UUID, req dto.AssignShiftRequest) (*dto.AssignmentResponse, error)`
 - **method** `AssignmentService.List(ctx context.Context, tenantID uuid.UUID, employeeID string, page dto.Page) ([]dto.AssignmentResponse, dto.PageMeta, error)`
@@ -3272,11 +3814,11 @@ _Package:_ Package routes mounts Module 3 endpoints (specification.md §5) behin
 - **func** `(s *assignmentService) closeOrReject(ctx context.Context, tx *gorm.DB, next *models.ShiftAssignment) error` — closeOrReject auto-closes one earlier open-ended assignment; any other overlap is a conflict.
 - **func** `(s *assignmentService) List(ctx context.Context, tenantID uuid.UUID, employeeID string, page dto.Page) ([]dto.AssignmentResponse, dto.PageMeta, error)`
 
-#### `internal/attendance/services/errors.go` (36 lines)
+#### `internal/hr/attendance/services/errors.go` (36 lines)
 - **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
 - **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
 
-#### `internal/attendance/services/helpers.go` (153 lines)
+#### `internal/hr/attendance/services/helpers.go` (153 lines)
 - **type** `base struct{ Deps }` — base carries Deps plus helpers shared by all services.
 - **func** `utcDay(t time.Time) time.Time` — utcDay truncates an instant to its UTC calendar date.
 - **func** `(b base) employeeFor(ctx context.Context, a Actor, requireWorking bool) (*employeeDTO.EmployeeResponse, error)` — employeeFor resolves the caller's employee profile (AT-002); requireWorking enforces status.
@@ -3290,7 +3832,7 @@ _Package:_ Package routes mounts Module 3 endpoints (specification.md §5) behin
 - **func** `(b base) afterCommit(ctx context.Context, a Actor, e auditEntry, row *models.OutboxEvent)` — afterCommit audits and publishes best-effort; failures never surface (D3-06, D3-07).
 - **func** `parseUUIDField(field, raw string) (uuid.UUID, error)`
 
-#### `internal/attendance/services/leave_sync.go` (81 lines)
+#### `internal/hr/attendance/services/leave_sync.go` (81 lines)
 - **type** `LeaveSync interface` — LeaveSync is Module 3's contract C10 for Module 4: it marks or clears `on_leave` day records on the caller's transaction, under the Module 3 per-employee lock (AT-022, D3-17).
 - **method** `LeaveSync.MarkLeave(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, dates []time.Time) error`
 - **method** `LeaveSync.ClearLeave(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, dates []time.Time) error`
@@ -3301,7 +3843,7 @@ _Package:_ Package routes mounts Module 3 endpoints (specification.md §5) behin
 - **func** `(s *leaveSync) ClearLeave(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, dates []time.Time) error` — ClearLeave removes leave-only records and recomputes any other record still marked on_leave.
 - **func** `(s *leaveSync) clearOne(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, d time.Time) error`
 
-#### `internal/attendance/services/mappers.go` (64 lines)
+#### `internal/hr/attendance/services/mappers.go` (64 lines)
 - **func** `uuidStr(id *uuid.UUID) *string`
 - **func** `mapShift(s *models.Shift) *dto.ShiftResponse`
 - **func** `mapAssignment(a *models.ShiftAssignment) dto.AssignmentResponse`
@@ -3309,13 +3851,13 @@ _Package:_ Package routes mounts Module 3 endpoints (specification.md §5) behin
 - **func** `mapPunch(p *models.AttendancePunch) dto.PunchResponse` — mapPunch never copies IPAddress (security.md AS-T7).
 - **func** `mapRegularization(g *models.Regularization) dto.RegularizationResponse`
 
-#### `internal/attendance/services/outbox_relay.go` (59 lines)
+#### `internal/hr/attendance/services/outbox_relay.go` (59 lines)
 - **type** `OutboxRelay struct` — OutboxRelay republishes outbox rows the request path could not publish (D3-06).
 - **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the module dependencies.
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled (started by cmd/main.go, stopped on shutdown).
 
-#### `internal/attendance/services/ports.go` (75 lines)
+#### `internal/hr/attendance/services/ports.go` (75 lines)
 _Package:_ Package services holds Module 3 business rules (specification.md AT-001..AT-022).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is Module 3's view of Module 2 (connections C2).
 - **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
@@ -3335,7 +3877,7 @@ _Package:_ Package services holds Module 3 business rules (specification.md AT-0
 - **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
 
-#### `internal/attendance/services/punch_service.go` (150 lines)
+#### `internal/hr/attendance/services/punch_service.go` (150 lines)
 - **type** `PunchService interface` — PunchService records self-service IN/OUT punches (FR-PU001, AT-001..AT-006, AT-022).
 - **method** `PunchService.Punch(ctx context.Context, a Actor, req dto.PunchRequest) (*dto.PunchResult, error)`
 - **type** `punchService struct{ base }`
@@ -3348,7 +3890,7 @@ _Package:_ Package services holds Module 3 business rules (specification.md AT-0
 - **func** `routingFor(punchType string) string`
 - **func** `punchPayload(p *models.AttendancePunch, r *models.AttendanceRecord) events.PunchPayload` — punchPayload whitelists event fields (FR-EV003: no IP/device/coordinates).
 
-#### `internal/attendance/services/query_service.go` (177 lines)
+#### `internal/hr/attendance/services/query_service.go` (177 lines)
 - **type** `RecordQuery struct` — RecordQuery holds raw admin filters (A7); validated by the service.
 - **type** `QueryService interface` — QueryService serves attendance reads (FR-AR003..FR-AR005).
 - **method** `QueryService.Today(ctx context.Context, a Actor) (*dto.TodayResponse, error)`
@@ -3364,14 +3906,14 @@ _Package:_ Package services holds Module 3 business rules (specification.md AT-0
 - **func** `(s *queryService) Detail(ctx context.Context, tenantID, id uuid.UUID) (*dto.RecordDetailResponse, error)`
 - **func** `(s *queryService) Summary(ctx context.Context, tenantID uuid.UUID, date string) (*dto.SummaryResponse, error)` — Summary computes AT-020 from one aggregate query plus the Module 2 workforce count.
 
-#### `internal/attendance/services/regularization_review.go` (123 lines)
+#### `internal/hr/attendance/services/regularization_review.go` (123 lines)
 - **func** `(s *regularizationService) Approve(ctx context.Context, a Actor, id uuid.UUID, req dto.ReviewRequest) (*dto.RegularizationResponse, error)` — Approve applies the requested window to the record in one transaction (AT-016, AT-017).
 - **func** `(s *regularizationService) applyToRecord(ctx context.Context, tx *gorm.DB, g *models.Regularization) error` — applyToRecord supersedes existing punches and inserts the requested in/out (AT-017, AT-019).
 - **func** `(s *regularizationService) Reject(ctx context.Context, a Actor, id uuid.UUID, req dto.ReviewRequest) (*dto.RegularizationResponse, error)` — Reject closes a pending request with a mandatory comment (AT-016).
 - **func** `(s *regularizationService) markReviewed(g *models.Regularization, a Actor, status string, comment *string)`
 - **func** `regPayload(g *models.Regularization) events.RegularizationPayload`
 
-#### `internal/attendance/services/regularization_service.go` (201 lines)
+#### `internal/hr/attendance/services/regularization_service.go` (201 lines)
 - **type** `RegularizationService interface` — RegularizationService handles timesheet corrections (FR-RG001..FR-RG003, AT-014..AT-018).
 - **method** `RegularizationService.Create(ctx context.Context, a Actor, req dto.CreateRegularizationRequest) (*dto.RegularizationResponse, error)`
 - **method** `RegularizationService.ListMine(ctx context.Context, a Actor, status string, page dto.Page) ([]dto.RegularizationResponse, dto.PageMeta, error)`
@@ -3390,7 +3932,7 @@ _Package:_ Package services holds Module 3 business rules (specification.md AT-0
 - **func** `(s *regularizationService) Cancel(ctx context.Context, a Actor, id uuid.UUID) (*dto.RegularizationResponse, error)` — Cancel lets the requester withdraw a pending request; others get 404 (AT-018).
 - **func** `(s *regularizationService) guardSelfReview(ctx context.Context, a Actor, g *models.Regularization) error` — guardSelfReview blocks reviewers acting on their own request (AT-016).
 
-#### `internal/attendance/services/shift_service.go` (216 lines)
+#### `internal/hr/attendance/services/shift_service.go` (216 lines)
 - **type** `ShiftService interface` — ShiftService manages shift templates (FR-SH001..FR-SH006).
 - **method** `ShiftService.Create(ctx context.Context, a Actor, req dto.CreateShiftRequest) (*dto.ShiftResponse, error)`
 - **method** `ShiftService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.ShiftResponse, error)`
@@ -3408,7 +3950,7 @@ _Package:_ Package services holds Module 3 business rules (specification.md AT-0
 - **func** `(s *shiftService) Update(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateShiftRequest) (*dto.ShiftResponse, error)` — Update applies PATCH fields; code is immutable (FR-SH005); existing records are untouched (AT-021).
 - **func** `(s *shiftService) Deactivate(ctx context.Context, a Actor, id uuid.UUID) (*dto.ShiftResponse, error)` — Deactivate is blocked while assignments cover today (shift zone) or later (AT-012).
 
-#### `internal/attendance/validators/validators.go` (86 lines)
+#### `internal/hr/attendance/validators/validators.go` (86 lines)
 _Package:_ Package validators holds Module 3 field rules that struct tags cannot express (AT-013, spec §5).
 - **func** `ValidateShiftCode(code string) error` — ValidateShiftCode checks the optional shift code format (FR-SH001).
 - **func** `LoadTimezone(name string) (*time.Location, error)` — LoadTimezone resolves an IANA zone; empty means UTC. "Local" is rejected (server-dependent).
@@ -3419,24 +3961,26 @@ _Package:_ Package validators holds Module 3 field rules that struct tags cannot
 ### M1 HR / Leave
 
 
-#### `internal/leave/module.go` (108 lines)
+#### `internal/hr/leave/catalogue.go` (19 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Leave's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
+
+#### `internal/hr/leave/module.go` (84 lines)
 _Package:_ Package leave wires Module 4 (Leave & Absence Management) into the application.
 - **type** `Module struct` — Module is the Module 4 DI container.
 - **type** `Ports struct` — Ports are the cross-module collaborators Module 4 consumes (connections C2, C3, C8).
 - **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires repositories, services and controllers.
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists Module 4 models for AutoMigrate (dev path; SQL 000032–000037 in prod).
-- **func** `(m *Module) SeedPermissions(ctx context.Context) error` — SeedPermissions idempotently inserts leave:read|manage|approve (connections C7).
 - **type** `RouteDeps struct` — RouteDeps is the Module 0 infrastructure the routes need (connections C4).
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts Module 4 under rg using Module 0 tenant/auth/RBAC middleware.
 - **func** `(m *Module) UnpaidLeave() services.UnpaidLeave { return m.unpaid }` — UnpaidLeave exposes the read-only loss-of-pay port for Module 5 (D5-03).
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay; cmd/main.go runs it until shutdown.
 
-#### `internal/leave/calc/accrual.go` (50 lines)
+#### `internal/hr/leave/calc/accrual.go` (50 lines)
 - **type** `Policy struct` — Policy is the accrual part of a leave type.
 - **func** `Accrued(p Policy, joining *time.Time, year int, asOf time.Time) Days` — Accrued is the entitlement earned in leave year `year` as of asOf (FR-BL002): allowance × creditedMonths / 12 in hundredths. Annual credits every month from the joining month (or January) through December up front; monthly credits only through asOf's month. The cumulative formula makes month 12 land exactly on the allowance, so December absorbs the rounding remainder.
 - **func** `CarryForward(prevAvailable, limit Days) Days` — CarryForward is the opening balance moved into a new year: previous available clamped to [0, limit] (FR-BL003).
 
-#### `internal/leave/calc/count.go` (64 lines)
+#### `internal/hr/leave/calc/count.go` (64 lines)
 - **func** `DateOf(t time.Time) time.Time` — DateOf returns the UTC calendar date of t at midnight (A4-03).
 - **func** `IsWeekend(day time.Time) bool` — IsWeekend reports Saturday/Sunday — the fixed v1 weekly off (D4-05).
 - **func** `DaysBetween(a, b time.Time) int { return int(b.Sub(a).Hours() / 24) }` — DaysBetween counts whole days from a to b (dates at midnight UTC).
@@ -3444,21 +3988,13 @@ _Package:_ Package leave wires Module 4 (Leave & Absence Management) into the ap
 - **type** `Count struct` — Count is the priced range: Total leave days and the full working dates to mark in attendance.
 - **func** `CountDays(in CountInput) Count` — CountDays prices a range per LV-006: working days only, sandwich adds non-working days between the first and last working day, a half day is 0.50 and marks no attendance date (D4-09).
 
-#### `internal/leave/calc/days.go` (103 lines)
-_Package:_ Package calc is Module 4's pure leave arithmetic: day amounts, day counting, accrual, carry-forward.
-- **type** `Days int64` — Days is an amount of leave in hundredths of a day (1.5 days = 150); no floats in balances (D4-03, NFR-D002).
-- **func** `FromWhole(n int) Days { return Days(n) * 100 }` — FromWhole converts whole days to Days.
-- **func** `ParseDays(s string) (Days, error)` — ParseDays parses "1", "1.5", "-2.25"; more than 2 decimals or out of range is an error.
-- **func** `digits(s string) bool`
-- **func** `(d Days) String() string` — String renders two decimals, e.g. "1.50", "-0.05".
-- **func** `(d Days) Float() float64 { return float64(d) / 100 }` — Float returns the amount as float64 for display only — never for arithmetic.
-- **func** `(d Days) Value() (driver.Value, error) { return d.String(), nil }` — Value stores Days as an exact decimal string for NUMERIC(7,2).
-- **func** `(d *Days) Scan(src interface{}) error` — Scan reads NUMERIC (string/[]byte), float64 or int64 from the driver.
-- **func** `(d *Days) parseInto(s string) error`
-- **func** `(d Days) MarshalJSON() ([]byte, error) { return []byte(d.String()), nil }` — MarshalJSON emits a JSON number with 2 decimals.
-- **func** `(d *Days) UnmarshalJSON(b []byte) error` — UnmarshalJSON accepts a JSON number or numeric string with at most 2 decimals.
+#### `internal/hr/leave/calc/days.go` (14 lines)
+_Package:_ Package calc is HR/Leave's pure leave arithmetic: day counting, accrual, carry-forward. The Days amount type lives in the HR kernel; the aliases keep this package's API unchanged.
+- **type** `Days = kernel.Days` — Days is an amount of leave in hundredths of a day (kernel.Days).
+- **func** `FromWhole(n int) Days { return kernel.FromWhole(n) }` — FromWhole converts whole days to Days.
+- **func** `ParseDays(s string) (Days, error) { return kernel.ParseDays(s) }` — ParseDays parses a decimal day amount with at most two decimals.
 
-#### `internal/leave/controllers/balance_controller.go` (75 lines)
+#### `internal/hr/leave/controllers/balance_controller.go` (75 lines)
 - **type** `BalanceController struct{ svc services.BalanceService }` — BalanceController serves balances, adjustments and the ledger (B1–B4).
 - **func** `NewBalanceController(s services.BalanceService) *BalanceController` — NewBalanceController builds a BalanceController.
 - **func** `(ctl *BalanceController) Mine(c *gin.Context)` — Mine handles GET /leave/balances/me (B1); no employee id is accepted (NFR-SEC002).
@@ -3466,7 +4002,7 @@ _Package:_ Package calc is Module 4's pure leave arithmetic: day amounts, day co
 - **func** `(ctl *BalanceController) Adjust(c *gin.Context)` — Adjust handles POST /leave/balances/adjust (B3).
 - **func** `(ctl *BalanceController) Ledger(c *gin.Context)` — Ledger handles GET /leave/ledger?employee_id=&leave_type_id= (B4).
 
-#### `internal/leave/controllers/policy_controller.go` (151 lines)
+#### `internal/hr/leave/controllers/policy_controller.go` (151 lines)
 - **type** `PolicyController struct` — PolicyController serves leave types and holidays (L1–L5, H1–H3).
 - **func** `NewPolicyController(t services.TypeService, h services.HolidayService) *PolicyController` — NewPolicyController builds a PolicyController.
 - **func** `(ctl *PolicyController) CreateType(c *gin.Context)` — CreateType handles POST /leave/types (L1).
@@ -3478,7 +4014,7 @@ _Package:_ Package calc is Module 4's pure leave arithmetic: day amounts, day co
 - **func** `(ctl *PolicyController) ListHolidays(c *gin.Context)` — ListHolidays handles GET /leave/holidays?year= (H2).
 - **func** `(ctl *PolicyController) DeleteHoliday(c *gin.Context)` — DeleteHoliday handles DELETE /leave/holidays/:id (H3).
 
-#### `internal/leave/controllers/request_controller.go` (133 lines)
+#### `internal/hr/leave/controllers/request_controller.go` (133 lines)
 - **type** `RequestController struct{ svc services.RequestService }` — RequestController serves the leave request lifecycle (R1–R8).
 - **func** `NewRequestController(s services.RequestService) *RequestController` — NewRequestController builds a RequestController.
 - **func** `(ctl *RequestController) Preview(c *gin.Context)` — Preview handles POST /leave/requests/preview (R1).
@@ -3492,7 +4028,7 @@ _Package:_ Package calc is Module 4's pure leave arithmetic: day amounts, day co
 - **func** `(ctl *RequestController) Approve(c *gin.Context) { ctl.act(c, ctl.svc.Approve, true) }` — Approve handles POST /leave/requests/:id/approve (R7).
 - **func** `(ctl *RequestController) Reject(c *gin.Context) { ctl.act(c, ctl.svc.Reject, true) }` — Reject handles POST /leave/requests/:id/reject (R8).
 
-#### `internal/leave/controllers/respond.go` (106 lines)
+#### `internal/hr/leave/controllers/respond.go` (106 lines)
 _Package:_ Package controllers is Module 4's thin HTTP edge: parse → validate → service → envelope.
 - **type** `errorBody struct`
 - **func** `ok(c *gin.Context, status int, data interface{})`
@@ -3504,7 +4040,7 @@ _Package:_ Package controllers is Module 4's thin HTTP edge: parse → validate 
 - **func** `pathID(c *gin.Context, name string) (uuid.UUID, bool)` — pathID parses a :param UUID; malformed ids are 400.
 - **func** `page(c *gin.Context) dto.Page`
 
-#### `internal/leave/dto/requests.go` (62 lines)
+#### `internal/hr/leave/dto/requests.go` (62 lines)
 _Package:_ Package dto holds Module 4 request/response shapes (specification.md §5); never GORM models.
 - **type** `CreateLeaveTypeRequest struct` — CreateLeaveTypeRequest is L1. Day amounts are JSON numbers with ≤ 2 decimals; ranges checked in validators.
 - **type** `UpdateLeaveTypeRequest struct` — UpdateLeaveTypeRequest is L4: pointer fields, code immutable; max_consecutive_days 0 clears the limit.
@@ -3513,7 +4049,7 @@ _Package:_ Package dto holds Module 4 request/response shapes (specification.md 
 - **type** `ApplyLeaveRequest struct` — ApplyLeaveRequest is R1/R2. No employee field exists: the employee is the caller (NFR-SEC002).
 - **type** `ReviewRequest struct` — ReviewRequest is R7/R8; reject requires a comment (LV-010, enforced in service).
 
-#### `internal/leave/dto/responses.go` (139 lines)
+#### `internal/hr/leave/dto/responses.go` (139 lines)
 - **type** `LeaveTypeResponse struct` — LeaveTypeResponse serializes a leave type.
 - **type** `HolidayResponse struct` — HolidayResponse serializes a holiday.
 - **type** `BalanceResponse struct` — BalanceResponse serializes one balance projection.
@@ -3526,7 +4062,7 @@ _Package:_ Package dto holds Module 4 request/response shapes (specification.md 
 - **func** `(p Page) Offset() int { return (p.Page - 1) * p.PerPage }` — Offset is the SQL offset for this page.
 - **func** `(p Page) Meta(total int64) PageMeta` — Meta builds list metadata for a total count.
 
-#### `internal/leave/events/events.go` (73 lines)
+#### `internal/hr/leave/events/events.go` (75 lines)
 _Package:_ Package events defines Module 4 event types and the shared envelope (FR-EV001).
 - **type** `Envelope struct` — Envelope is the platform event envelope (same shape as Module 3).
 - **type** `Source struct` — Source identifies who and when an event came from.
@@ -3534,7 +4070,7 @@ _Package:_ Package events defines Module 4 event types and the shared envelope (
 - **type** `RequestPayload struct` — RequestPayload is published for leave.applied|approved|rejected|cancelled; no reason/comment (FR-EV003).
 - **type** `AccruedPayload struct` — AccruedPayload is published for leave.accrued.
 
-#### `internal/leave/models/models.go` (182 lines)
+#### `internal/hr/leave/models/models.go` (182 lines)
 _Package:_ Package models holds Module 4 (Leave) persistence models; migrations 000032–000037 are the SQL twin.
 - **type** `LeaveType struct` — LeaveType is a tenant leave policy (FR-LT001). Integer fields carry no GORM default so explicit 0 is stored.
 - **func** `(LeaveType) TableName() string { return "leave_types" }` — TableName maps to leave_types (migration 000032).
@@ -3557,7 +4093,7 @@ _Package:_ Package models holds Module 4 (Leave) persistence models; migrations 
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
-#### `internal/leave/repositories/balance_repository.go` (65 lines)
+#### `internal/hr/leave/repositories/balance_repository.go` (65 lines)
 - **type** `balanceRepository struct{}`
 - **func** `NewBalanceRepository() BalanceRepository { return &balanceRepository{} }` — NewBalanceRepository builds a BalanceRepository.
 - **func** `(r *balanceRepository) LockEmployee(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID) error` — LockEmployee takes a tx-scoped advisory lock namespaced away from Module 3's attendance lock (LV-014).
@@ -3569,7 +4105,7 @@ _Package:_ Package models holds Module 4 (Leave) persistence models; migrations 
 - **func** `(r *ledgerRepository) Create(ctx context.Context, tx *gorm.DB, e *models.LedgerEntry) error`
 - **func** `(r *ledgerRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f LedgerFilter, page dto.Page) ([]models.LedgerEntry, int64, error)`
 
-#### `internal/leave/repositories/interfaces.go` (113 lines)
+#### `internal/hr/leave/repositories/interfaces.go` (113 lines)
 _Package:_ Package repositories is Module 4 data access: tenant_id on every scoped query, `db`/`tx` passed per call.
 - **type** `TypeRepository interface` — TypeRepository persists leave types (FR-LT).
 - **method** `TypeRepository.Create(ctx context.Context, tx *gorm.DB, t *models.LeaveType) error`
@@ -3610,7 +4146,7 @@ _Package:_ Package repositories is Module 4 data access: tenant_id on every scop
 - **func** `first[T any](q *gorm.DB) (*T, error)` — first runs a single-row query and maps "not found" to (nil, nil).
 - **func** `paged[T any](q *gorm.DB, order string, page dto.Page) ([]T, int64, error)` — paged counts then fetches one page of q.
 
-#### `internal/leave/repositories/request_repository.go` (80 lines)
+#### `internal/hr/leave/repositories/request_repository.go` (80 lines)
 - **type** `requestRepository struct{}`
 - **func** `NewRequestRepository() RequestRepository { return &requestRepository{} }` — NewRequestRepository builds a RequestRepository.
 - **func** `(r *requestRepository) Create(ctx context.Context, tx *gorm.DB, req *models.Request) error`
@@ -3625,7 +4161,7 @@ _Package:_ Package repositories is Module 4 data access: tenant_id on every scop
 - **func** `(r *outboxRepository) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
 - **func** `(r *outboxRepository) FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
 
-#### `internal/leave/repositories/type_repository.go` (75 lines)
+#### `internal/hr/leave/repositories/type_repository.go` (75 lines)
 - **type** `typeRepository struct{}`
 - **func** `NewTypeRepository() TypeRepository { return &typeRepository{} }` — NewTypeRepository builds a TypeRepository.
 - **func** `(r *typeRepository) Create(ctx context.Context, tx *gorm.DB, t *models.LeaveType) error`
@@ -3642,13 +4178,13 @@ _Package:_ Package repositories is Module 4 data access: tenant_id on every scop
 - **func** `(r *holidayRepository) FindByDate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, date time.Time) (*models.Holiday, error)`
 - **func** `(r *holidayRepository) ListRange(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, from, to time.Time) ([]models.Holiday, error)`
 
-#### `internal/leave/routes/routes.go` (59 lines)
+#### `internal/hr/leave/routes/routes.go` (59 lines)
 _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behind Module 0 middleware.
 - **type** `Middleware struct` — Middleware is the Module 0 middleware Module 4 depends on (connections C4).
 - **type** `Controllers struct` — Controllers groups Module 4 handlers.
 - **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl Controllers)` — RegisterRoutes mounts all 20 Module 4 operations; self endpoints and type/holiday reads need authentication only.
 
-#### `internal/leave/services/balance_service.go` (137 lines)
+#### `internal/hr/leave/services/balance_service.go` (137 lines)
 - **type** `LedgerQuery struct` — LedgerQuery is B4's filter; employee_id is required.
 - **type** `BalanceService interface` — BalanceService serves balances, HR adjustments and the ledger (FR-BL001..BL005).
 - **method** `BalanceService.Mine(ctx context.Context, a Actor) ([]dto.BalanceResponse, error)`
@@ -3663,11 +4199,11 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **func** `(s *balanceService) Adjust(ctx context.Context, a Actor, req dto.AdjustBalanceRequest) (*dto.BalanceResponse, error)` — Adjust applies an HR correction as an `adjustment` ledger row (FR-BL004, LV-017).
 - **func** `(s *balanceService) Ledger(ctx context.Context, tenantID uuid.UUID, q LedgerQuery, page dto.Page) ([]dto.LedgerEntryResponse, dto.PageMeta, error)`
 
-#### `internal/leave/services/errors.go` (40 lines)
+#### `internal/hr/leave/services/errors.go` (40 lines)
 - **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
 - **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
 
-#### `internal/leave/services/helpers.go` (120 lines)
+#### `internal/hr/leave/services/helpers.go` (120 lines)
 - **type** `base struct{ Deps }` — base carries Deps plus helpers shared by all services.
 - **func** `(b base) today() time.Time { return calc.DateOf(b.Now()) }`
 - **func** `(b base) employeeFor(ctx context.Context, a Actor, requireWorking bool) (*employeeDTO.EmployeeResponse, error)` — employeeFor resolves the caller's profile (LV-001); requireWorking enforces status.
@@ -3681,7 +4217,7 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **func** `parseUUIDField(field, raw string) (uuid.UUID, error)`
 - **func** `keyFor(tenantID, employeeID uuid.UUID, typ *models.LeaveType, year int) repositories.BalanceKey` — keyFor builds the balance key for an employee/type/year.
 
-#### `internal/leave/services/holiday_service.go` (87 lines)
+#### `internal/hr/leave/services/holiday_service.go` (87 lines)
 - **type** `HolidayService interface` — HolidayService manages the tenant holiday calendar (FR-HD001..HD003).
 - **method** `HolidayService.Create(ctx context.Context, a Actor, req dto.CreateHolidayRequest) (*dto.HolidayResponse, error)`
 - **method** `HolidayService.List(ctx context.Context, tenantID uuid.UUID, year string) ([]dto.HolidayResponse, error)`
@@ -3692,14 +4228,14 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **func** `(s *holidayService) List(ctx context.Context, tenantID uuid.UUID, year string) ([]dto.HolidayResponse, error)` — List returns one year's holidays (default: current year).
 - **func** `(s *holidayService) Delete(ctx context.Context, a Actor, id uuid.UUID) (*dto.HolidayResponse, error)` — Delete soft-deletes a holiday; existing requests keep their snapshot (LV-012).
 
-#### `internal/leave/services/ledger.go` (88 lines)
+#### `internal/hr/leave/services/ledger.go` (88 lines)
 - **type** `movement struct` — movement is one balance change; it always becomes exactly one ledger row (LV-013).
 - **func** `(b base) move(ctx context.Context, tx *gorm.DB, bal *models.Balance, m movement) error` — move applies a movement to the projection column for its kind and appends the ledger row (architecture §4).
 - **type** `entitlement struct` — entitlement is the employee-side input to balance materialization.
 - **func** `(b base) ensure(ctx context.Context, tx *gorm.DB, a Actor, typ *models.LeaveType, e entitlement) (*models.Balance, error)` — ensure materializes the balance lazily (FR-BL001..003, D4-06): carry-forward once on creation, then accrual top-up to the policy target as of today. Caller must hold the employee lock (LV-014).
 - **func** `(b base) carryForward(ctx context.Context, tx *gorm.DB, bal *models.Balance, typ *models.LeaveType) error`
 
-#### `internal/leave/services/mappers.go` (53 lines)
+#### `internal/hr/leave/services/mappers.go` (53 lines)
 - **func** `mapType(t *models.LeaveType) dto.LeaveTypeResponse`
 - **func** `mapHoliday(h *models.Holiday) dto.HolidayResponse`
 - **func** `mapBalance(b *models.Balance, t *models.LeaveType) dto.BalanceResponse`
@@ -3708,13 +4244,13 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **func** `requestPayload(r *models.Request, t *models.LeaveType) events.RequestPayload` — requestPayload whitelists event fields (FR-EV003: no reason/comment).
 - **func** `requestMeta(r *models.Request) map[string]string` — requestMeta is the audit metadata for request actions: ids, dates and days only (LS-T6).
 
-#### `internal/leave/services/outbox_relay.go` (59 lines)
+#### `internal/hr/leave/services/outbox_relay.go` (59 lines)
 - **type** `OutboxRelay struct` — OutboxRelay republishes outbox rows the request path could not publish (FR-EV002).
 - **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the module dependencies.
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled (started by cmd/main.go, stopped on shutdown).
 
-#### `internal/leave/services/ports.go` (80 lines)
+#### `internal/hr/leave/services/ports.go` (80 lines)
 _Package:_ Package services holds Module 4 business rules (specification.md LV-001..LV-017).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is Module 4's view of Module 2 (connections C2).
 - **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
@@ -3736,7 +4272,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
 
-#### `internal/leave/services/request_query.go` (97 lines)
+#### `internal/hr/leave/services/request_query.go` (97 lines)
 - **func** `(s *requestService) ListMine(ctx context.Context, a Actor, status string, page dto.Page) ([]dto.LeaveRequestResponse, dto.PageMeta, error)` — ListMine lists the caller's own requests (R3); the employee comes from the JWT only (NFR-SEC002).
 - **func** `(s *requestService) List(ctx context.Context, tenantID uuid.UUID, q RequestQuery, page dto.Page) ([]dto.LeaveRequestResponse, dto.PageMeta, error)` — List lists tenant requests with filters (R5).
 - **func** `(s *requestService) Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.LeaveRequestResponse, error)` — Get returns one request (R6); foreign ids → 404.
@@ -3744,7 +4280,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `(s *requestService) typeCodes(ctx context.Context, tenantID uuid.UUID) (map[uuid.UUID]string, error)` — typeCodes maps type id → code in one query (no N+1, NFR-P002).
 - **func** `requestFilter(q RequestQuery) (repositories.RequestFilter, error)`
 
-#### `internal/leave/services/request_review.go` (186 lines)
+#### `internal/hr/leave/services/request_review.go` (186 lines)
 - **type** `transition struct` — transition is one locked state change of a request; apply mutates balance/attendance and the request.
 - **func** `(s *requestService) run(ctx context.Context, a Actor, tr transition) (*dto.LeaveRequestResponse, error)` — run loads, locks and re-reads the request, applies the transition and writes the outbox row (LV-014).
 - **func** `(s *requestService) lockedRequest(ctx context.Context, tx *gorm.DB, a Actor, tr transition) (*models.Request, error)`
@@ -3757,7 +4293,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `(s *requestService) leaveDates(ctx context.Context, tx *gorm.DB, r *models.Request) ([]time.Time, error)` — leaveDates are the full working days of a request for attendance (LV-015); half days mark nothing (D4-09).
 - **func** `(s *requestService) review(r *models.Request, a Actor, status string, comment *string)`
 
-#### `internal/leave/services/request_service.go` (223 lines)
+#### `internal/hr/leave/services/request_service.go` (223 lines)
 - **type** `RequestQuery struct` — RequestQuery is R5's filter.
 - **type** `RequestService interface` — RequestService runs the leave request lifecycle (FR-LR001..LR006).
 - **method** `RequestService.Preview(ctx context.Context, a Actor, req dto.ApplyLeaveRequest) (*dto.PreviewResponse, error)`
@@ -3781,7 +4317,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `(b base) blockingHolidays(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, from, to time.Time) ([]time.Time, error)` — blockingHolidays returns non-optional holiday dates in range (optional ones are working days, D4-05).
 - **func** `(s *requestService) checkOverlap(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, q *quote) error` — checkOverlap applies LV-008: opposite halves of the same single day may coexist.
 
-#### `internal/leave/services/type_service.go` (215 lines)
+#### `internal/hr/leave/services/type_service.go` (215 lines)
 - **type** `TypeService interface` — TypeService manages leave types (FR-LT001..LT004).
 - **method** `TypeService.Create(ctx context.Context, a Actor, req dto.CreateLeaveTypeRequest) (*dto.LeaveTypeResponse, error)`
 - **method** `TypeService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.LeaveTypeResponse, error)`
@@ -3805,7 +4341,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `setStr(dst *string, p *string)`
 - **func** `setBool(dst *bool, p *bool)`
 
-#### `internal/leave/services/unpaid_leave.go` (76 lines)
+#### `internal/hr/leave/services/unpaid_leave.go` (76 lines)
 - **type** `UnpaidLeave interface` — UnpaidLeave is Module 4's read-only contract for Module 5 payroll (connections C3 of Module 5, D5-03): approved leave of unpaid types (is_paid = false), clipped to [from, to].
 - **method** `UnpaidLeave.UnpaidDays(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (calc.Days, error)`
 - **type** `unpaidLeave struct{ base }`
@@ -3815,7 +4351,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `(u *unpaidLeave) typeFlags(ctx context.Context, tenantID, typeID uuid.UUID) (bool, bool, error)` — typeFlags returns (is_paid, sandwich_rule) for a type.
 - **func** `(u *unpaidLeave) clippedDays(ctx context.Context, r models.Request, p period, sandwich bool) (calc.Days, error)`
 
-#### `internal/leave/validators/validators.go` (95 lines)
+#### `internal/hr/leave/validators/validators.go` (95 lines)
 _Package:_ Package validators holds Module 4 field rules that struct tags cannot express (FR-LT001, LV-003..LV-005, LV-017).
 - **func** `NormalizeTypeCode(code string) (string, error)` — NormalizeTypeCode upper-cases and checks a leave type code (FR-LT001).
 - **func** `ValidateAllowance(d calc.Days) error` — ValidateAllowance checks an allowance/carry-forward amount in [0, 365].
@@ -3828,18 +4364,20 @@ _Package:_ Package validators holds Module 4 field rules that struct tags cannot
 ### M1 HR / Payroll
 
 
-#### `internal/payroll/module.go` (94 lines)
+#### `internal/hr/payroll/catalogue.go` (19 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Payroll's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
+
+#### `internal/hr/payroll/module.go` (71 lines)
 _Package:_ Package payroll wires Module 5 (Payroll & Statutory Compliance) into the application.
 - **type** `Module struct` — Module is the Module 5 DI container.
 - **type** `Ports struct` — Ports are the cross-module collaborators Module 5 consumes (connections C2–C4).
 - **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires repositories, services and controllers.
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists Module 5 models for legacy AutoMigrate (SQL 000038–000044 is the authority).
-- **func** `(m *Module) SeedPermissions(ctx context.Context) error` — SeedPermissions idempotently inserts payroll:read|manage|approve (connections C7).
 - **type** `RouteDeps struct` — RouteDeps is the Module 0 infrastructure the routes need.
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts Module 5 under rg.
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
 
-#### `internal/payroll/calc/compute.go` (95 lines)
+#### `internal/hr/payroll/calc/compute.go` (95 lines)
 - **type** `Input struct` — Input is everything needed to compute one payslip; PayableHundredths is payable days × 100 (half days allowed).
 - **type** `Result struct` — Result is a computed payslip; Capped reports that deductions were trimmed to gross (PY-009).
 - **func** `Compute(in Input) (Result, error)` — Compute runs the PY-001..PY-009 pipeline: breakdown → proration → statutory → net with cap.
@@ -3847,27 +4385,15 @@ _Package:_ Package payroll wires Module 5 (Payroll & Statutory Compliance) into 
 - **func** `statutory(s StructureSpec, b statutoryBase) []Line` — statutory returns the enabled, non-zero statutory deduction lines in fixed order PF, ESI, PT, TDS.
 - **func** `(r *Result) capDeductions()` — capDeductions trims deduction lines from the last one backwards so deductions never exceed gross (PY-009).
 
-#### `internal/payroll/calc/money.go` (142 lines)
-_Package:_ Package calc is Module 5's pure payroll arithmetic: money, structure breakdown, proration and Indian statutory deductions. No I/O; every rule is golden-tested.
-- **type** `Money int64` — Money is an exact 2-decimal amount in hundredths: rupees as paise, or a percentage as basis points (D5-02).
-- **func** `Rupees(n int64) Money { return Money(n * 100) }` — Rupees converts whole rupees to Money.
-- **func** `ParseMoney(s string) (Money, error)` — ParseMoney parses "1", "41666.67", "-2.5"; more than 2 decimals is an error.
-- **func** `digits(s string) bool`
-- **func** `(m Money) String() string` — String renders two decimals.
-- **func** `(m Money) Percent(p Money) Money { return divRound(int64(m)*int64(p), 10000) }` — Percent returns m × p where p is a percentage in hundredths (40.00% = 4000), rounded half away from zero.
-- **func** `(m Money) Prorate(num, den int64) Money` — Prorate returns m × num / den rounded half away from zero; den 0 yields 0 (PY-002).
-- **func** `(m Money) RoundRupee() Money { return divRound(int64(m), 100) * 100 }` — RoundRupee rounds to the nearest rupee, half away from zero (PF, PT, TDS).
-- **func** `(m Money) CeilRupee() Money { return Money((int64(m) + 99) / 100 * 100) }` — CeilRupee rounds a non-negative amount up to the next rupee (ESI, PY-006).
-- **func** `Min(a, b Money) Money` — Min returns the smaller amount.
-- **func** `divRound(n, d int64) Money`
-- **func** `abs(v int64) int64`
-- **func** `(m Money) Value() (driver.Value, error) { return m.String(), nil }` — Value stores Money as an exact decimal string.
-- **func** `(m *Money) Scan(src interface{}) error` — Scan reads NUMERIC (string/[]byte), float64 or int64.
-- **func** `(m *Money) parse(s string) error`
-- **func** `(m Money) MarshalJSON() ([]byte, error) { return []byte(m.String()), nil }` — MarshalJSON emits a JSON number with 2 decimals.
-- **func** `(m *Money) UnmarshalJSON(b []byte) error { return m.parse(strings.Trim(string(b), `"`)) }` — UnmarshalJSON accepts a JSON number or numeric string with at most 2 decimals.
+#### `internal/hr/payroll/calc/money.go` (20 lines)
+_Package:_ Package calc is HR/Payroll's pure payroll arithmetic: structure breakdown, proration and Indian statutory deductions. No I/O; every rule is golden-tested. The Money amount type lives in the HR kernel; the aliases keep this package's API unchanged.
+- **type** `Money = kernel.Money` — Money is an exact 2-decimal amount in hundredths (kernel.Money).
+- **func** `Rupees(n int64) Money { return kernel.Rupees(n) }` — Rupees converts whole rupees to Money.
+- **func** `ParseMoney(s string) (Money, error) { return kernel.ParseMoney(s) }` — ParseMoney parses a decimal amount with at most two decimals.
+- **func** `Min(a, b Money) Money { return kernel.Min(a, b) }` — Min returns the smaller amount.
+- **func** `divRound(n, d int64) Money { return kernel.DivRound(n, d) }`
 
-#### `internal/payroll/calc/statutory.go` (77 lines)
+#### `internal/hr/payroll/calc/statutory.go` (77 lines)
 - **type** `slab struct` — slab is an upper bound (exclusive of the next) and its rate in hundredths of a percent.
 - **func** `PF(earnedBasic Money) Money { return Min(earnedBasic, pfWageCeiling).Percent(pfRate).RoundRupee() }` — PF is the employee contribution: 12% of earned basic capped at the wage ceiling, to the rupee (PY-005).
 - **func** `ESI(fullGross, earnedGross Money) Money` — ESI is 0.75% of earned gross, rounded up to the rupee, when full-month gross is within the ceiling (PY-006). Computed exactly (paise × 75 / 10000, ceiling to rupee) so round-then-ceil never under-collects.
@@ -3875,11 +4401,10 @@ _Package:_ Package calc is Module 5's pure payroll arithmetic: money, structure 
 - **func** `AnnualTax(taxable Money) Money` — AnnualTax is new-regime income tax on annual taxable income with the 87A rebate and 4% cess, to the rupee (PY-008).
 - **func** `MonthlyTDS(fullMonthTaxable Money) Money` — MonthlyTDS projects full-month taxable earnings over 12 months (PY-008).
 
-#### `internal/payroll/calc/structure.go` (156 lines)
+#### `internal/hr/payroll/calc/structure.go` (155 lines)
 - **type** `ComponentSpec struct` — ComponentSpec is one structure line; Value is rupees (fixed) or a percentage in hundredths (percent_*).
 - **type** `StructureSpec struct` — StructureSpec is a structure plus its statutory switches.
 - **type** `Line struct` — Line is a computed payslip line.
-- **func** `(m Money) Monthly() Money { return divRound(int64(m), 12) }` — Monthly returns annual / 12 rounded to paise.
 - **func** `DaysInMonth(year, month int) int` — DaysInMonth returns the calendar days of a month.
 - **func** `ValidateStructure(s StructureSpec) error` — ValidateStructure enforces FR-ST002; every failure wraps ErrInvalidStructure.
 - **func** `validateComponent(c ComponentSpec) error`
@@ -3887,7 +4412,7 @@ _Package:_ Package calc is Module 5's pure payroll arithmetic: money, structure 
 - **func** `Breakdown(s StructureSpec, monthlyCTC Money) ([]Line, error)` — Breakdown computes full-month amounts in component order (PY-001); balance takes CTC minus other earnings.
 - **func** `componentAmount(c ComponentSpec, monthlyCTC, basic Money) Money`
 
-#### `internal/payroll/controllers/respond.go` (132 lines)
+#### `internal/hr/payroll/controllers/respond.go` (132 lines)
 _Package:_ Package controllers is Module 5's thin HTTP edge: parse → validate → service → envelope.
 - **type** `errorBody struct`
 - **func** `ok(c *gin.Context, status int, data interface{})`
@@ -3902,7 +4427,7 @@ _Package:_ Package controllers is Module 5's thin HTTP edge: parse → validate 
 - **func** `respondList(c *gin.Context, data interface{}, meta dto.PageMeta, err error)` — respondList writes a paginated list or the mapped error.
 - **func** `pathIDIf(c *gin.Context, actorOK bool) (uuid.UUID, bool)` — pathIDIf parses :id only when the actor resolved (the actor failure already wrote 401).
 
-#### `internal/payroll/controllers/run_controller.go` (135 lines)
+#### `internal/hr/payroll/controllers/run_controller.go` (135 lines)
 - **type** `RunController struct` — RunController serves payroll runs and payslips (P10–P20).
 - **func** `NewRunController(r services.RunService, p services.PayslipService) *RunController` — NewRunController builds a RunController.
 - **func** `(ctl *RunController) CreateRun(c *gin.Context)` — CreateRun handles POST /payroll/runs (P10).
@@ -3919,7 +4444,7 @@ _Package:_ Package controllers is Module 5's thin HTTP edge: parse → validate 
 - **func** `(ctl *RunController) MyPayslips(c *gin.Context)` — MyPayslips handles GET /payroll/payslips/me (P19); finalized only.
 - **func** `(ctl *RunController) MyPayslip(c *gin.Context)` — MyPayslip handles GET /payroll/payslips/me/:id (P20).
 
-#### `internal/payroll/controllers/setup_controller.go` (117 lines)
+#### `internal/hr/payroll/controllers/setup_controller.go` (117 lines)
 - **type** `SetupController struct` — SetupController serves salary structures and CTC assignments (P1–P9).
 - **func** `NewSetupController(s services.StructureService, a services.AssignmentService) *SetupController` — NewSetupController builds a SetupController.
 - **func** `(ctl *SetupController) CreateStructure(c *gin.Context)` — CreateStructure handles POST /payroll/structures (P1).
@@ -3932,7 +4457,7 @@ _Package:_ Package controllers is Module 5's thin HTTP edge: parse → validate 
 - **func** `(ctl *SetupController) MyAssignment(c *gin.Context)` — MyAssignment handles GET /payroll/assignments/me (P8); the employee comes from the JWT only.
 - **func** `(ctl *SetupController) Preview(c *gin.Context)` — Preview handles POST /payroll/assignments/preview (P9).
 
-#### `internal/payroll/dto/dto.go` (207 lines)
+#### `internal/hr/payroll/dto/dto.go` (207 lines)
 _Package:_ Package dto holds Module 5 request/response shapes (specification.md §5); never GORM models.
 - **type** `ComponentRequest struct` — ComponentRequest is one structure line (FR-ST001); Value is rupees (fixed) or a percent (percent_*).
 - **type** `CreateStructureRequest struct` — CreateStructureRequest is P1; statutory flags default to true.
@@ -3954,14 +4479,14 @@ _Package:_ Package dto holds Module 5 request/response shapes (specification.md 
 - **func** `(p Page) Offset() int { return (p.Page - 1) * p.PerPage }` — Offset is the SQL offset.
 - **func** `(p Page) Meta(total int64) PageMeta` — Meta builds list metadata.
 
-#### `internal/payroll/events/events.go` (58 lines)
+#### `internal/hr/payroll/events/events.go` (60 lines)
 _Package:_ Package events defines Module 5 event types and the shared envelope (FR-EV001).
 - **type** `Envelope struct` — Envelope is the platform event envelope (same shape as Modules 3/4).
 - **type** `Source struct` — Source identifies who and when an event came from.
 - **func** `New(routingKey string, src Source, payload interface{}) Envelope` — New wraps a payload in the envelope.
 - **type** `RunPayload struct` — RunPayload carries run identity, period, counts and totals only — never per-employee amounts (FR-EV002).
 
-#### `internal/payroll/models/models.go` (191 lines)
+#### `internal/hr/payroll/models/models.go` (191 lines)
 _Package:_ Package models holds Module 5 (Payroll) persistence models; migrations 000038–000044 are the SQL twin.
 - **type** `Structure struct` — Structure is a salary template with statutory switches (FR-ST001).
 - **func** `(Structure) TableName() string { return "payroll_structures" }` — TableName maps to payroll_structures (migration 000038).
@@ -3986,7 +4511,7 @@ _Package:_ Package models holds Module 5 (Payroll) persistence models; migration
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
-#### `internal/payroll/repositories/interfaces.go` (92 lines)
+#### `internal/hr/payroll/repositories/interfaces.go` (92 lines)
 _Package:_ Package repositories is Module 5 data access: tenant_id on every scoped query, `db`/`tx` passed per call.
 - **type** `StructureRepository interface` — StructureRepository persists structures and their immutable components (FR-ST).
 - **method** `StructureRepository.Create(ctx context.Context, tx *gorm.DB, s *models.Structure, comps []models.Component) error`
@@ -4026,7 +4551,7 @@ _Package:_ Package repositories is Module 5 data access: tenant_id on every scop
 - **func** `first[T any](q *gorm.DB) (*T, error)`
 - **func** `paged[T any](q *gorm.DB, order string, page dto.Page) ([]T, int64, error)`
 
-#### `internal/payroll/repositories/run_repository.go` (113 lines)
+#### `internal/hr/payroll/repositories/run_repository.go` (113 lines)
 - **type** `runRepository struct{}`
 - **func** `NewRunRepository() RunRepository { return &runRepository{} }` — NewRunRepository builds a RunRepository.
 - **func** `(r *runRepository) Create(ctx context.Context, tx *gorm.DB, run *models.Run) error`
@@ -4051,7 +4576,7 @@ _Package:_ Package repositories is Module 5 data access: tenant_id on every scop
 - **func** `(r *outboxRepository) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
 - **func** `(r *outboxRepository) FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
 
-#### `internal/payroll/repositories/structure_repository.go` (89 lines)
+#### `internal/hr/payroll/repositories/structure_repository.go` (89 lines)
 - **type** `structureRepository struct{}`
 - **func** `NewStructureRepository() StructureRepository { return &structureRepository{} }` — NewStructureRepository builds a StructureRepository.
 - **func** `(r *structureRepository) Create(ctx context.Context, tx *gorm.DB, s *models.Structure, comps []models.Component) error`
@@ -4069,13 +4594,13 @@ _Package:_ Package repositories is Module 5 data access: tenant_id on every scop
 - **func** `(r *assignmentRepository) ListByEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, page dto.Page) ([]models.Assignment, int64, error)`
 - **func** `(r *assignmentRepository) EligibleFor(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, p Period) ([]models.Assignment, error)`
 
-#### `internal/payroll/routes/routes.go` (56 lines)
+#### `internal/hr/payroll/routes/routes.go` (56 lines)
 _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behind Module 0 middleware.
 - **type** `Middleware struct` — Middleware is the Module 0 middleware Module 5 depends on.
 - **type** `Controllers struct` — Controllers groups Module 5 handlers.
 - **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl Controllers)` — RegisterRoutes mounts all 20 Module 5 operations; self endpoints need authentication only (PY-013).
 
-#### `internal/payroll/services/assignment_service.go` (148 lines)
+#### `internal/hr/payroll/services/assignment_service.go` (148 lines)
 - **type** `AssignmentService interface` — AssignmentService manages CTC assignments (FR-AS001..AS003).
 - **method** `AssignmentService.Assign(ctx context.Context, a Actor, req dto.AssignRequest) (*dto.AssignmentResponse, error)`
 - **method** `AssignmentService.List(ctx context.Context, tenantID uuid.UUID, employeeID string, page dto.Page) ([]dto.AssignmentResponse, dto.PageMeta, error)`
@@ -4090,7 +4615,7 @@ _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behin
 - **func** `(s *assignmentService) Preview(ctx context.Context, tenantID uuid.UUID, req dto.PreviewRequest) (*dto.BreakdownResponse, error)` — Preview prices a CTC on a structure without saving (P9).
 - **func** `(s *assignmentService) breakdown(ctx context.Context, tenantID, structureID uuid.UUID, ctc calc.Money) (*dto.BreakdownResponse, error)`
 
-#### `internal/payroll/services/calculate.go` (160 lines)
+#### `internal/hr/payroll/services/calculate.go` (160 lines)
 - **type** `monthPeriod struct` — period is the run month as dates.
 - **func** `periodOf(run *models.Run) monthPeriod`
 - **func** `(s *runService) calculate(ctx context.Context, tx *gorm.DB, a Actor, run *models.Run) error` — calculate replaces the run's payslips (PY-011) and stores totals and warnings.
@@ -4102,11 +4627,11 @@ _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behin
 - **type** `slipFigures struct`
 - **func** `buildPayslip(run *models.Run, as models.Assignment, emp *employeeDTO.EmployeeResponse, f slipFigures) *models.Payslip`
 
-#### `internal/payroll/services/errors.go` (31 lines)
+#### `internal/hr/payroll/services/errors.go` (31 lines)
 - **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
 - **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
 
-#### `internal/payroll/services/helpers.go` (107 lines)
+#### `internal/hr/payroll/services/helpers.go` (107 lines)
 - **type** `base struct{ Deps }` — base carries Deps plus helpers shared by all services.
 - **func** `(b base) today() time.Time`
 - **func** `(b base) employeeFor(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — employeeFor resolves the caller's own profile (self endpoints, NFR-SEC002).
@@ -4120,7 +4645,7 @@ _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behin
 - **func** `parseUUIDField(field, raw string) (uuid.UUID, error)`
 - **func** `orNotFound(err error) error`
 
-#### `internal/payroll/services/mappers.go` (65 lines)
+#### `internal/hr/payroll/services/mappers.go` (65 lines)
 - **func** `mapStructure(s *models.Structure, comps []models.Component) dto.StructureResponse`
 - **func** `mapAssignment(a *models.Assignment) dto.AssignmentResponse`
 - **func** `mapBreakdown(monthlyCTC calc.Money, r calc.Result) dto.BreakdownResponse`
@@ -4128,13 +4653,13 @@ _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behin
 - **func** `mapPayslip(p *models.Payslip, run *models.Run) dto.PayslipResponse`
 - **func** `runPayload(r *models.Run) events.RunPayload`
 
-#### `internal/payroll/services/outbox_relay.go` (59 lines)
+#### `internal/hr/payroll/services/outbox_relay.go` (59 lines)
 - **type** `OutboxRelay struct` — OutboxRelay republishes outbox rows the request path could not publish (FR-EV002).
 - **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the module dependencies.
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled (started by cmd/main.go, stopped on shutdown).
 
-#### `internal/payroll/services/payslip_service.go` (129 lines)
+#### `internal/hr/payroll/services/payslip_service.go` (129 lines)
 - **type** `PayslipService interface` — PayslipService serves payslips and the payout export (FR-PS, FR-RN005, PY-013).
 - **method** `PayslipService.ByRun(ctx context.Context, tenantID, runID uuid.UUID, page dto.Page) ([]dto.PayslipResponse, dto.PageMeta, error)`
 - **method** `PayslipService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.PayslipResponse, error)`
@@ -4150,13 +4675,13 @@ _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behin
 - **func** `(s *payslipService) MineOne(ctx context.Context, a Actor, id uuid.UUID) (*dto.PayslipResponse, error)` — MineOne returns one of the caller's finalized payslips; anything else is 404 (PS-T1, PS-T2).
 - **func** `(s *payslipService) PayoutCSV(ctx context.Context, tenantID, runID uuid.UUID) ([]byte, error)` — PayoutCSV exports employee_code, employee_name, net_pay for a finalized run (FR-RN005, PS-T8).
 
-#### `internal/payroll/services/ports.go` (76 lines)
+#### `internal/hr/payroll/services/ports.go` (76 lines)
 _Package:_ Package services holds Module 5 business rules (specification.md PY-001..PY-015).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is Module 5's view of Module 2 (connections C2).
 - **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **method** `EmployeeDirectory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **type** `LeaveLOP interface` — LeaveLOP is Module 5's view of Module 4 `services.UnpaidLeave` (connections C3, D5-03).
-- **method** `LeaveLOP.UnpaidDays(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (leavecalc.Days, error)`
+- **method** `LeaveLOP.UnpaidDays(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (kernel.Days, error)`
 - **type** `AuditLogger interface` — AuditLogger is Module 5's view of the Module 0 AuditService.
 - **method** `AuditLogger.Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
 - **type** `TxRunner interface` — TxRunner opens database transactions.
@@ -4171,7 +4696,7 @@ _Package:_ Package services holds Module 5 business rules (specification.md PY-0
 - **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
 
-#### `internal/payroll/services/run_service.go` (162 lines)
+#### `internal/hr/payroll/services/run_service.go` (162 lines)
 - **type** `RunService interface` — RunService runs the monthly payroll lifecycle (FR-RN001..RN006, PY-010..PY-012).
 - **method** `RunService.Create(ctx context.Context, a Actor, req dto.CreateRunRequest) (*dto.RunResponse, error)`
 - **method** `RunService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.RunResponse, error)`
@@ -4192,7 +4717,7 @@ _Package:_ Package services holds Module 5 business rules (specification.md PY-0
 - **func** `periodMeta(r *models.Run) map[string]string`
 - **func** `contains(list []string, v string) bool`
 
-#### `internal/payroll/services/structure_service.go` (166 lines)
+#### `internal/hr/payroll/services/structure_service.go` (166 lines)
 - **type** `StructureService interface` — StructureService manages salary structures (FR-ST001..ST003).
 - **method** `StructureService.Create(ctx context.Context, a Actor, req dto.CreateStructureRequest) (*dto.StructureResponse, error)`
 - **method** `StructureService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.StructureResponse, error)`
@@ -4212,7 +4737,7 @@ _Package:_ Package services holds Module 5 business rules (specification.md PY-0
 - **func** `setBool(dst *bool, p *bool)`
 - **func** `isOverflow(err error) error` — isOverflow maps the calc overflow to the API error.
 
-#### `internal/payroll/validators/validators.go` (57 lines)
+#### `internal/hr/payroll/validators/validators.go` (57 lines)
 _Package:_ Package validators holds Module 5 field rules that struct tags cannot express.
 - **func** `ParseDate(s string) (time.Time, error)` — ParseDate parses a YYYY-MM-DD date as UTC midnight.
 - **func** `ValidateCTC(ctc calc.Money) error` — ValidateCTC enforces the CTC range.
@@ -4222,7 +4747,10 @@ _Package:_ Package validators holds Module 5 field rules that struct tags cannot
 ### M1 HR / Recruitment
 
 
-#### `internal/recruitment/module.go` (135 lines)
+#### `internal/hr/recruitment/catalogue.go` (19 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Recruitment's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
+
+#### `internal/hr/recruitment/module.go` (113 lines)
 _Package:_ Package recruitment wires Module 6 (Recruitment & Applicant Tracking) into the application.
 - **type** `Module struct` — Module is the Module 6 DI container.
 - **type** `DepartmentReader interface` — DepartmentReader is the Module 1 department lookup Module 6 needs (D6-03).
@@ -4236,12 +4764,11 @@ _Package:_ Package recruitment wires Module 6 (Recruitment & Applicant Tracking)
 - **func** `(o orgDirectory) DesignationExists(ctx context.Context, tenantID, id uuid.UUID) (bool, error)`
 - **func** `exists(err error) (bool, error)`
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists Module 6 models for legacy AutoMigrate (SQL 000045–000050 is the authority).
-- **func** `(m *Module) SeedPermissions(ctx context.Context) error` — SeedPermissions idempotently inserts recruitment:read|manage|hire (connections C7).
 - **type** `RouteDeps struct` — RouteDeps is the Module 0 infrastructure the routes need.
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts Module 6 under rg.
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
 
-#### `internal/recruitment/controllers/controllers.go` (163 lines)
+#### `internal/hr/recruitment/controllers/controllers.go` (163 lines)
 - **type** `JobService interface` — JobService is the R1–R5 surface the edge needs.
 - **method** `JobService.Create(ctx context.Context, a services.Actor, req dto.CreateJobRequest) (*dto.JobResponse, error)`
 - **method** `JobService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.JobResponse, error)`
@@ -4278,7 +4805,7 @@ _Package:_ Package recruitment wires Module 6 (Recruitment & Applicant Tracking)
 - **func** `(ctl *Controller) UpdateJob(c *gin.Context)` — UpdateJob handles PATCH /recruitment/jobs/:id (R4).
 - **func** `(ctl *Controller) SetJobStatus(c *gin.Context)` — SetJobStatus handles POST /recruitment/jobs/:id/status (R5).
 
-#### `internal/recruitment/controllers/pipeline_controller.go` (187 lines)
+#### `internal/hr/recruitment/controllers/pipeline_controller.go` (187 lines)
 - **func** `(ctl *Controller) CreateCandidate(c *gin.Context)` — CreateCandidate handles POST /recruitment/candidates (R6).
 - **func** `(ctl *Controller) ListCandidates(c *gin.Context)` — ListCandidates handles GET /recruitment/candidates (R7).
 - **func** `(ctl *Controller) GetCandidate(c *gin.Context)` — GetCandidate handles GET /recruitment/candidates/:id (R8).
@@ -4295,7 +4822,7 @@ _Package:_ Package recruitment wires Module 6 (Recruitment & Applicant Tracking)
 - **func** `(ctl *Controller) DecideOffer(c *gin.Context)` — DecideOffer handles POST /recruitment/offers/:id/decision (R19).
 - **func** `(ctl *Controller) WithdrawOffer(c *gin.Context)` — WithdrawOffer handles POST /recruitment/offers/:id/withdraw (R20).
 
-#### `internal/recruitment/controllers/respond.go` (132 lines)
+#### `internal/hr/recruitment/controllers/respond.go` (132 lines)
 _Package:_ Package controllers is Module 6's thin HTTP edge: parse → validate → service → envelope.
 - **type** `errorBody struct`
 - **func** `ok(c *gin.Context, status int, data interface{})`
@@ -4310,7 +4837,7 @@ _Package:_ Package controllers is Module 6's thin HTTP edge: parse → validate 
 - **func** `respondList(c *gin.Context, data interface{}, meta dto.PageMeta, err error)` — respondList writes a paginated list or the mapped error.
 - **func** `pathIDIf(c *gin.Context, actorOK bool) (uuid.UUID, bool)` — pathIDIf parses :id only when the actor resolved (the actor failure already wrote 401).
 
-#### `internal/recruitment/dto/dto.go` (224 lines)
+#### `internal/hr/recruitment/dto/dto.go` (224 lines)
 _Package:_ Package dto holds Module 6 request/response shapes (specification.md §5); never GORM models.
 - **type** `CreateJobRequest struct` — CreateJobRequest is R1.
 - **type** `UpdateJobRequest struct` — UpdateJobRequest is R4 (pointer fields).
@@ -4335,14 +4862,14 @@ _Package:_ Package dto holds Module 6 request/response shapes (specification.md 
 - **func** `(p Page) Offset() int { return (p.Page - 1) * p.PerPage }` — Offset is the SQL offset.
 - **func** `(p Page) Meta(total int64) PageMeta` — Meta builds list metadata.
 
-#### `internal/recruitment/events/events.go` (55 lines)
+#### `internal/hr/recruitment/events/events.go` (57 lines)
 _Package:_ Package events defines Module 6 event types and the shared envelope (FR-EV001).
 - **type** `Envelope struct` — Envelope is the platform event envelope (same shape as Modules 3–5).
 - **type** `Source struct` — Source identifies who and when an event came from.
 - **func** `New(routingKey string, src Source, payload interface{}) Envelope` — New wraps a payload in the envelope.
 - **type** `Payload struct` — Payload carries ids and stages only — never candidate PII, CTC or feedback (FR-EV002, RC-011).
 
-#### `internal/recruitment/models/models.go` (167 lines)
+#### `internal/hr/recruitment/models/models.go` (167 lines)
 _Package:_ Package models holds Module 6 (Recruitment) persistence models; migrations 000045–000050 are the SQL twin.
 - **type** `Job struct` — Job is a job opening (FR-JB001).
 - **func** `(Job) TableName() string { return "recruitment_jobs" }` — TableName maps to recruitment_jobs (migration 000045).
@@ -4364,7 +4891,7 @@ _Package:_ Package models holds Module 6 (Recruitment) persistence models; migra
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
-#### `internal/recruitment/pipeline/pipeline.go` (63 lines)
+#### `internal/hr/recruitment/pipeline/pipeline.go` (63 lines)
 _Package:_ Package pipeline is Module 6's pure state machines: candidate stages (RC-002) and job statuses (FR-JB003).
 - **func** `CanMove(from, to string) bool { return contains(manualMoves[from], to) }` — CanMove reports whether a recruiter may move a candidate from → to.
 - **func** `CanTransitionJob(from, to string) bool { return contains(jobMoves[from], to) }` — CanTransitionJob reports whether a job may change status from → to.
@@ -4373,7 +4900,7 @@ _Package:_ Package pipeline is Module 6's pure state machines: candidate stages 
 - **func** `Editable(status string) bool { return status != JobClosed && status != JobFilled }` — Editable reports whether a job's details may still change (FR-JB002).
 - **func** `contains(list []string, v string) bool`
 
-#### `internal/recruitment/repositories/interfaces.go` (95 lines)
+#### `internal/hr/recruitment/repositories/interfaces.go` (95 lines)
 _Package:_ Package repositories is Module 6 data access: tenant_id on every scoped query, `db`/`tx` passed per call.
 - **type** `JobFilter struct` — JobFilter narrows job lists (R2).
 - **type** `JobRepository interface` — JobRepository persists job openings (FR-JB).
@@ -4412,7 +4939,7 @@ _Package:_ Package repositories is Module 6 data access: tenant_id on every scop
 - **func** `first[T any](q *gorm.DB) (*T, error)`
 - **func** `paged[T any](q *gorm.DB, order string, page dto.Page) ([]T, int64, error)`
 
-#### `internal/recruitment/repositories/repositories.go` (149 lines)
+#### `internal/hr/recruitment/repositories/repositories.go` (149 lines)
 - **type** `jobRepository struct{}`
 - **func** `NewJobRepository() JobRepository { return &jobRepository{} }` — NewJobRepository builds a JobRepository.
 - **func** `(r *jobRepository) Create(ctx context.Context, tx *gorm.DB, j *models.Job) error`
@@ -4451,12 +4978,12 @@ _Package:_ Package repositories is Module 6 data access: tenant_id on every scop
 - **func** `(r *outboxRepository) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
 - **func** `(r *outboxRepository) FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
 
-#### `internal/recruitment/routes/routes.go` (50 lines)
+#### `internal/hr/recruitment/routes/routes.go` (50 lines)
 _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behind Module 0 middleware.
 - **type** `Middleware struct` — Middleware is the Module 0 middleware Module 6 depends on.
 - **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Controller)` — RegisterRoutes mounts all 20 Module 6 operations; interviewer self endpoints need authentication only (NFR-SEC002).
 
-#### `internal/recruitment/services/candidate_service.go` (190 lines)
+#### `internal/hr/recruitment/services/candidate_service.go` (190 lines)
 - **type** `CandidateService struct{ base }` — CandidateService owns candidates and their pipeline (FR-CD).
 - **func** `NewCandidateService(d Deps) *CandidateService { return &CandidateService{base{d}} }` — NewCandidateService builds a CandidateService.
 - **func** `(s *CandidateService) Create(ctx context.Context, a Actor, req dto.CreateCandidateRequest) (*dto.CandidateResponse, error)` — Create is R6: a candidate on an open job, stage applied + first stage event (RC-001, RC-003).
@@ -4469,11 +4996,11 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `(s *CandidateService) closeOpenOffer(ctx context.Context, tx *gorm.DB, c *models.Candidate) error` — closeOpenOffer withdraws an open offer when a candidate leaves the pipeline from `offer` (RC-006 frees the slot).
 - **func** `applyCandidatePatch(c *models.Candidate, req dto.UpdateCandidateRequest)`
 
-#### `internal/recruitment/services/errors.go` (31 lines)
+#### `internal/hr/recruitment/services/errors.go` (31 lines)
 - **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
 - **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
 
-#### `internal/recruitment/services/helpers.go` (112 lines)
+#### `internal/hr/recruitment/services/helpers.go` (112 lines)
 - **type** `base struct{ Deps }` — base carries Deps plus helpers shared by all services.
 - **func** `(b base) today() time.Time`
 - **func** `(b base) employeeFor(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — employeeFor resolves the caller's own employee profile (interviewer self endpoints, NFR-SEC002).
@@ -4488,7 +5015,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `orNotFound(err error) error`
 - **func** `strPtr(s string) *string { return &s }`
 
-#### `internal/recruitment/services/hire_service.go` (147 lines)
+#### `internal/hr/recruitment/services/hire_service.go` (145 lines)
 - **type** `HireService struct{ base }` — HireService runs the three-step idempotent hire saga (FR-HR001, D6-04, RC-007/008/010).
 - **func** `NewHireService(d Deps) *HireService { return &HireService{base{d}} }` — NewHireService builds a HireService.
 - **type** `hirePlan struct` — hirePlan is what step 1 resolves for steps 2 and 3.
@@ -4498,7 +5025,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `(s *HireService) ensureEmployee(ctx context.Context, tenantID uuid.UUID, plan *hirePlan, req dto.HireRequest) (*employeeDTO.EmployeeResponse, error)` — ensureEmployee is step 2: reuse the user's profile if a previous attempt created it, else create one in Module 2.
 - **func** `(s *HireService) complete(ctx context.Context, a Actor, candidateID, employeeID uuid.UUID) (*models.Job, *models.OutboxEvent, error)` — complete is step 3: candidate hired, job count (+ filled), stage event and outbox in one transaction.
 
-#### `internal/recruitment/services/interview_service.go` (147 lines)
+#### `internal/hr/recruitment/services/interview_service.go` (147 lines)
 - **type** `InterviewService struct{ base }` — InterviewService owns interviews and interviewer self-service (FR-IV).
 - **func** `NewInterviewService(d Deps) *InterviewService { return &InterviewService{base{d}} }` — NewInterviewService builds an InterviewService.
 - **func** `(s *InterviewService) Schedule(ctx context.Context, a Actor, req dto.ScheduleInterviewRequest) (*dto.InterviewResponse, error)` — Schedule is R12 (RC-004; interviewer must be a working employee, A6-01).
@@ -4509,7 +5036,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `(s *InterviewService) Cancel(ctx context.Context, a Actor, id uuid.UUID) (*dto.InterviewResponse, error)` — Cancel is R16.
 - **func** `(s *InterviewService) transition(ctx context.Context, tenantID, id uuid.UUID, owner *uuid.UUID, fn func(*models.Interview)) (*models.Interview, error)` — transition loads a scheduled interview (owned by owner when set; others 404), applies fn and saves it in one transaction.
 
-#### `internal/recruitment/services/job_service.go` (184 lines)
+#### `internal/hr/recruitment/services/job_service.go` (184 lines)
 - **type** `JobService struct{ base }` — JobService owns job openings (FR-JB).
 - **func** `NewJobService(d Deps) *JobService { return &JobService{base{d}} }` — NewJobService builds a JobService.
 - **func** `(s *JobService) Create(ctx context.Context, a Actor, req dto.CreateJobRequest) (*dto.JobResponse, error)` — Create is R1: a draft job with Module 1 references validated.
@@ -4524,7 +5051,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `applyJobPatch(j *models.Job, req dto.UpdateJobRequest, dept, desig *uuid.UUID)`
 - **func** `setIf[T any](dst *T, src *T)`
 
-#### `internal/recruitment/services/mappers.go` (47 lines)
+#### `internal/hr/recruitment/services/mappers.go` (47 lines)
 - **func** `mapJob(j *models.Job) dto.JobResponse`
 - **func** `mapCandidate(c *models.Candidate) dto.CandidateResponse`
 - **func** `mapEvent(e *models.StageEvent) dto.StageEventResponse`
@@ -4532,7 +5059,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `mapOffer(o *models.Offer) dto.OfferResponse`
 - **func** `mapList[M any, R any](rows []M, fn func(*M) R) []R`
 
-#### `internal/recruitment/services/offer_service.go` (138 lines)
+#### `internal/hr/recruitment/services/offer_service.go` (138 lines)
 - **type** `OfferService struct{ base }` — OfferService owns offers (FR-OF).
 - **func** `NewOfferService(d Deps) *OfferService { return &OfferService{base{d}} }` — NewOfferService builds an OfferService.
 - **func** `(s *OfferService) Create(ctx context.Context, a Actor, req dto.CreateOfferRequest) (*dto.OfferResponse, error)` — Create is R17: one open offer per candidate (RC-006); an interview-stage candidate moves to offer.
@@ -4543,20 +5070,20 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `(s *OfferService) Withdraw(ctx context.Context, a Actor, id uuid.UUID) (*dto.OfferResponse, error)` — Withdraw is R20.
 - **func** `(s *OfferService) close(ctx context.Context, a Actor, id uuid.UUID, to string) (*dto.OfferResponse, error)`
 
-#### `internal/recruitment/services/outbox_relay.go` (59 lines)
+#### `internal/hr/recruitment/services/outbox_relay.go` (59 lines)
 - **type** `OutboxRelay struct` — OutboxRelay republishes outbox rows the request path could not publish.
 - **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the module dependencies.
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled.
 
-#### `internal/recruitment/services/ports.go` (84 lines)
+#### `internal/hr/recruitment/services/ports.go` (84 lines)
 _Package:_ Package services holds Module 6 business rules (specification.md RC-001..RC-011).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is Module 6's view of Module 2 (connections C5).
 - **method** `EmployeeDirectory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **method** `EmployeeDirectory.CreateEmployee(ctx context.Context, tenantID uuid.UUID, req employeeDTO.CreateEmployeeRequest) (*employeeDTO.EmployeeResponse, error)`
-- **type** `UserInviter interface` — UserInviter is Module 6's view of Module 0 UserService.InviteUser (connections C2, D6-02).
-- **method** `UserInviter.InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req identityDTO.InviteUserRequest, correlationID uuid.UUID) (*identityDTO.UserResponse, error)`
+- **type** `UserInviter interface` — UserInviter is HR/Recruitment's view of M0 user invitation (connections C2, D6-02); identityport.Users satisfies it.
+- **method** `UserInviter.InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in identityport.Invite, correlationID uuid.UUID) (*identityport.User, error)`
 - **type** `OrgDirectory interface` — OrgDirectory answers whether Module 1 references exist (connections C4, D6-03).
 - **method** `OrgDirectory.DepartmentExists(ctx context.Context, tenantID, id uuid.UUID) (bool, error)`
 - **method** `OrgDirectory.DesignationExists(ctx context.Context, tenantID, id uuid.UUID) (bool, error)`
@@ -4574,18 +5101,18 @@ _Package:_ Package services holds Module 6 business rules (specification.md RC-0
 - **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
 
-#### `internal/recruitment/validators/validators.go` (63 lines)
+#### `internal/hr/recruitment/validators/validators.go` (63 lines)
 _Package:_ Package validators holds Module 6 field rules that struct tags cannot express.
 - **func** `ParseDate(s string) (time.Time, error)` — ParseDate parses a YYYY-MM-DD date as UTC midnight.
 - **func** `ParseFutureDate(s string, today time.Time) (time.Time, error)` — ParseFutureDate parses a date that must be today or later (FR-OF001 joining date).
 - **func** `FutureInstant(at, now time.Time) error` — FutureInstant enforces RC-004 (scheduled_at after now).
-- **func** `ValidateCTC(m calc.Money) error` — ValidateCTC checks an offered/expected CTC.
+- **func** `ValidateCTC(m kernel.Money) error` — ValidateCTC checks an offered/expected CTC.
 - **func** `NormalizeEmail(s string) string { return strings.ToLower(strings.TrimSpace(s)) }` — NormalizeEmail lower-cases and trims an email for the per-job uniqueness check (FR-CD001).
 
 ### M1 HR / Performance (in progress)
 
 
-#### `internal/performance/lifecycle/lifecycle.go` (51 lines)
+#### `internal/hr/performance/lifecycle/lifecycle.go` (51 lines)
 _Package:_ Package lifecycle is Module 7's pure state machines: appraisal cycles (PM-002) and goals (FR-GL004).
 - **func** `CanTransitionCycle(from, to string) bool { n, ok := cycleNext[from]; return ok && n == to }` — CanTransitionCycle reports the only forward step allowed from → to.
 - **func** `CanTransitionGoal(from, to string) bool` — CanTransitionGoal reports a legal goal status change.
@@ -4595,7 +5122,7 @@ _Package:_ Package lifecycle is Module 7's pure state machines: appraisal cycles
 - **func** `CheckInsOpen(s string) bool { return s == CycleActive || s == CycleReview }` — CheckInsOpen: progress check-ins in active or review (PM-007).
 - **func** `ReviewsOpen(s string) bool { return s == CycleReview }` — ReviewsOpen: reviewers are assigned and reviews submitted only in review (PM-011, PM-012).
 
-#### `internal/performance/models/models.go` (211 lines)
+#### `internal/hr/performance/models/models.go` (211 lines)
 _Package:_ Package models holds Module 7 (Performance) persistence models; migrations 000051–000056 are the SQL twin.
 - **type** `Criteria []string` — Criteria is a cycle's ordered rating criteria, stored as a JSON array (PM-001).
 - **func** `(c Criteria) Value() (driver.Value, error) { return marshalJSON(c) }` — Value encodes the criteria as JSON.
@@ -4626,7 +5153,7 @@ _Package:_ Package models holds Module 7 (Performance) persistence models; migra
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
-#### `internal/performance/score/score.go` (179 lines)
+#### `internal/hr/performance/score/score.go` (179 lines)
 _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredths fixed point, key-result and goal progress, weighted goal score, review overall score and 9-box bands. No floats are used for any stored or compared value.
 - **type** `Fixed int64` — Fixed is a decimal with exactly two fractional digits, stored as hundredths (12.5 = 1250).
 - **func** `FromInt(n int) Fixed { return Fixed(n) * 100 }` — FromInt converts a whole number.
@@ -4646,7 +5173,7 @@ _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredth
 - **func** `Overall(ratings []int) Fixed` — Overall is PM-012: the mean of integer ratings as a 2-decimal score; empty → 0.
 - **func** `Band(overall Fixed) string` — Band maps an overall score to its 9-box performance band: < 2.50 low, < 3.50 medium, else high.
 
-#### `internal/performance/validators/validators.go` (148 lines)
+#### `internal/hr/performance/validators/validators.go` (148 lines)
 _Package:_ Package validators holds Module 7 field rules that struct tags cannot express.
 - **func** `Criteria(in []string) ([]string, error)` — Criteria normalizes PM-001: trimmed, 1–50 characters, unique ignoring case, at most 10, order kept; empty → defaults.
 - **func** `DateRange(start, end string) (time.Time, time.Time, error)` — DateRange parses start/end dates (UTC midnight) and checks end ≥ start.
@@ -4660,19 +5187,25 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 ## D. Test inventory
 
 
-### Shared infrastructure — 17 test functions in 10 files
+### Shared infrastructure — 21 test functions in 13 files
 - `internal/shared/config/config_test.go`: TestLoadConfig, TestLoadConfig_EnvOverrides
 - `internal/shared/database/base_test.go`: TestBaseModel_BeforeCreate
 - `internal/shared/database/tx_test.go`: TestBeginTxNilDB, TestFinishNilTx
 - `internal/shared/errors/db_test.go`: TestNormalize
 - `internal/shared/errors/errors_test.go`: TestAppError_Error
+- `internal/shared/idempotency/middleware_test.go`: TestReplaySameKeySamePayload, TestInProgressExpiredAndServerErrors
+- `internal/shared/middleware/correlation_test.go`: TestCorrelationIDIsValidatedEchoedAndPropagated
 - `internal/shared/middleware/cors_test.go`: TestCORS
 - `internal/shared/middleware/hardening_test.go`: TestBodyLimit, TestSecurityHeaders
 - `internal/shared/middleware/rate_limiter_test.go`: TestRateLimiter_BlocksAfterLimitWithRetryAfter, TestFailureRateLimiter_SuccessRefundsSlot, TestRateLimiter_FailsOpenOnStoreError
+- `internal/shared/outbox/relay_test.go`: TestRelayPublishesAndRecordsFailures
 - `internal/shared/utils/pagination_test.go`: TestNormalizePagination, TestParsePaginationToleratesJunk, TestBindErrorDetails
 - `internal/shared/utils/validator_test.go`: TestValidateStruct
 
-### M0 Identity & Access — 86 test functions in 29 files
+### M0 Identity & Access — 111 test functions in 34 files
+- `internal/identity/access/access_test.go`: TestScopeOrderAndValidity, TestResolveInheritanceAndWidestScope, TestResolveUserGrantsExpiryAndBlocks, TestResolveRejectsCyclesAndDeepChains, TestCheckParent, TestCoversAll, TestParseScopeAndCheckParentEdges
+- `internal/identity/access/catalogue_test.go`: TestTemplatesAreOrderedAndChained, TestValidateDefsAndDefaults
+- `internal/identity/controllers/access_admin_controller_test.go`: TestAccessControllerRoutes, TestAccessControllerErrorsAndMissingContext
 - `internal/identity/controllers/access_controller_test.go`: TestUserController_ActivateAndSelfDeactivationGuard, TestRoleController_RemoveAndMe, TestRoleController_ServiceErrorsMapToEnvelope, TestAuditController_List
 - `internal/identity/controllers/auth_controller_test.go`: TestAuthController_Login, TestAuthController_Logout, TestAuthController_Refresh, TestAuthController_ForgotPassword, TestAuthController_ResetPassword
 - `internal/identity/controllers/mocks_test.go`: (helpers only)
@@ -4685,158 +5218,161 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `internal/identity/middleware/auth_test.go`: TestAuthenticate
 - `internal/identity/middleware/mocks_test.go`: (helpers only)
 - `internal/identity/middleware/platform_test.go`: TestPlatformAdmin
-- `internal/identity/middleware/rbac_test.go`: TestRequirePermission
+- `internal/identity/middleware/rbac_test.go`: TestRequirePermissionNeedsTenantScope, TestRequireScopedPermission, TestTenantAdminBypassAndFailures, TestPermissionFlag
 - `internal/identity/middleware/tenant_test.go`: TestTenantResolver
 - `internal/identity/models/models_test.go`: TestGORMModels_Parsing, TestGORMModels_AuditLog_NoSoftDelete, TestGORMModels_BaseHook
-- `internal/identity/models/permission_catalog_test.go`: TestDefaultPermissionsUniqueAndComplete
+- `internal/identity/models/permission_catalog_test.go`: TestIdentityCatalogueValidAndComplete
+- `internal/identity/services/access_fakes_test.go`: (helpers only)
+- `internal/identity/services/access_model_test.go`: TestResolverCachesByAccessVersion, TestResolverCorruptCacheAndRoleGrants, TestCatalogueRegisterAndProvision, TestAutomaticRolesReconcile, TestAutomaticRolesProvisionAndRun, TestAccessServiceGrantsAndBlocks, TestAccessServiceExplainAndErrors, TestRoleServiceScopesParentsAndClone, TestRoleServicePredefinedAndAutomaticGuards, TestTenantCreationProvisionsPredefinedRoles
 - `internal/identity/services/audit_service_test.go`: TestAuditService_Log
 - `internal/identity/services/auth_service_test.go`: TestAuthService_Login, TestAuthService_Logout, TestAuthService_RefreshAfterLogoutIsPlain401NotReuse, TestAuthService_RefreshToken, TestAuthService_ForgotPassword, TestAuthService_ResetPassword
 - `internal/identity/services/fault_injection_test.go`: TestFaults_RoleService, TestRoleService_BusinessRules, TestFaults_UserService, TestUserService_BusinessRules, TestFaults_TenantService, TestFaults_AuthService, TestAuthService_RulesAndTimingPath
-- `internal/identity/services/grants_test.go`: TestCallerContext, TestEnsureCanGrantPermissions, TestEnsureCanAssignRoles, TestServicesEnforceGrantRules
+- `internal/identity/services/grants_test.go`: TestCallerContext, TestEnsureCanGrant, TestEnsureCanAssignRoles, TestServicesEnforceGrantRules
 - `internal/identity/services/misc_services_test.go`: TestAuditService_List, TestTokenService_RefreshTTLAndValidation, TestUserDeactivationConvergerHook, TestSessionServiceTTL
 - `internal/identity/services/mocks_test.go`: (helpers only)
 - `internal/identity/services/permission_service_test.go`: TestPermissionService_ListPermissions
 - `internal/identity/services/role_service_test.go`: TestRoleService_CreateRole, TestRoleService_GetRoleByID, TestRoleService_ListRoles, TestRoleService_UpdateRole, TestRoleService_DeleteRole, TestRoleService_AssignPermissions, TestRoleService_AssignRolesToUser
 - `internal/identity/services/session_service_test.go`: TestSessionService_CreateSession, TestSessionService_ValidateSession, TestSessionService_RevokeSession, TestSessionService_RevokeAllForUser
 - `internal/identity/services/tenant_service_test.go`: TestTenantService_CreateTenant, TestTenantService_GetTenant, TestTenantService_ListTenants, TestTenantService_UpdateTenant, TestTenantService_ActivateSuspendTenant
-- `internal/identity/services/token_service_test.go`: TestTokenService_AccessToken, TestTokenService_OpaqueToken
+- `internal/identity/services/token_service_test.go`: TestTokenService_AccessToken, TestTokenService_OpaqueToken, TestEdDSASigningJWKSAndLegacyWindow
 - `internal/identity/services/user_service_test.go`: TestUserService_CreateUser, TestUserService_InviteUser, TestUserService_GetByID, TestUserService_ListUsers, TestUserService_UpdateUser, TestUserService_DeactivateUser
 - `internal/identity/validators/validators_test.go`: TestValidateSlug, TestIsReservedSlug
 
 ### M1 HR / Organization — 66 test functions in 22 files
-- `internal/organization/controllers/department_controller_test.go`: TestDepartmentController_Create, TestDepartmentController_CreateBadBody, TestDepartmentController_GetByID, TestDepartmentController_List, TestDepartmentController_MissingTenant, TestDepartmentController_Deactivate
-- `internal/organization/controllers/designation_controller_test.go`: TestDesignationController_CRUD
-- `internal/organization/controllers/mapping_controller_test.go`: TestMappingController_CreateAndList, TestMappingController_UpdateAndDeactivate
-- `internal/organization/controllers/org_chart_controller_test.go`: TestOrgChartController_ChartAndChain
-- `internal/organization/controllers/stubs_test.go`: (helpers only)
-- `internal/organization/controllers/team_controller_test.go`: TestTeamController_CreateAndGet, TestTeamController_ListAndDeactivate
-- `internal/organization/controllers/update_paths_test.go`: TestDepartmentController_UpdateAndErrors, TestTeamController_UpdateAndDeactivateErrors, TestDesignationController_UpdatePath, TestControllers_ValidationEnvelope, TestRespondErrorFallback
-- `internal/organization/events/events_test.go`: TestNewEvent_Envelope
-- `internal/organization/models/models_test.go`: TestOrgModels_Parsing, TestOrgModels_Mapping_AppendOnly, TestOrgModels_UUIDHook
-- `internal/organization/routes/routes_test.go`: TestChartInvalidation
-- `internal/organization/services/coverage_branches_test.go`: TestMappingService_UpdateRefsAndBadInput, TestMappingService_DeactivateUserRepoError, TestOrgChart_IncludeInactiveAndErrors
-- `internal/organization/services/department_service_test.go`: TestDepartmentService_CreateDepartment, TestDepartmentService_MoveCycle, TestDepartmentService_DeactivateGuard, TestDepartmentService_GetListUpdate, TestDepartmentService_UpdateUnknownParent
-- `internal/organization/services/designation_service_test.go`: TestDesignationService_CreateAndDuplicate, TestDesignationService_UpdateAndDeactivate, TestDesignationService_CaseInsensitiveTitleRepo, TestDesignationService_GetListHappyUpdate
-- `internal/organization/services/errorpaths_test.go`: TestServiceErrorPropagation
-- `internal/organization/services/event_consumer_test.go`: TestEventConsumer_UserDeactivatedConverges, TestEventConsumer_NoopHandlers, TestEventConsumer_UnknownKeyAndBadPayload
-- `internal/organization/services/fault_injection_test.go`: TestFaults_Departments, TestFaults_Teams, TestFaults_Designations, TestFaults_MappingsAndChart, TestTeamMoveMakesMappingsFollow
-- `internal/organization/services/helpers_test.go`: TestPublishOrOutbox_BrokerDown, TestPublishOrOutbox_SuccessSkipsOutbox
-- `internal/organization/services/hierarchy_test.go`: TestHierarchyDepthCap, TestHierarchyMoveValidation, TestDeactivateWithActiveMappingsGuard, TestUpdateRepoErrorPropagation
-- `internal/organization/services/mapping_service_test.go`: TestMappingService_CreateAndPrimaryGuard, TestMappingService_CRUDAndPrimarySwap, TestMappingService_ManagerCycle, TestMappingService_ManagerSelfAndMissing, TestMappingService_DeactivateUserConverges
-- `internal/organization/services/org_chart_service_test.go`: TestOrgChart_EmptyTenant, TestOrgChart_ForestBuild, TestOrgChart_UserChain, TestOrgChart_InvalidateChartDropsOnlyThatTenant, TestOrgChart_InvalidateChartNilCache, TestOrgChart_CacheHitAndSet, TestDepartmentService_ForceCascadeDeactivatesChildren
-- `internal/organization/services/team_service_test.go`: TestTeamService_CreateTeam, TestTeamService_MoveAndDeactivate, TestTeamService_GetListRenameConflict
-- `internal/organization/validators/validators_test.go`: TestValidateOrgCode, TestIsReservedOrgCode
+- `internal/hr/organization/controllers/department_controller_test.go`: TestDepartmentController_Create, TestDepartmentController_CreateBadBody, TestDepartmentController_GetByID, TestDepartmentController_List, TestDepartmentController_MissingTenant, TestDepartmentController_Deactivate
+- `internal/hr/organization/controllers/designation_controller_test.go`: TestDesignationController_CRUD
+- `internal/hr/organization/controllers/mapping_controller_test.go`: TestMappingController_CreateAndList, TestMappingController_UpdateAndDeactivate
+- `internal/hr/organization/controllers/org_chart_controller_test.go`: TestOrgChartController_ChartAndChain
+- `internal/hr/organization/controllers/stubs_test.go`: (helpers only)
+- `internal/hr/organization/controllers/team_controller_test.go`: TestTeamController_CreateAndGet, TestTeamController_ListAndDeactivate
+- `internal/hr/organization/controllers/update_paths_test.go`: TestDepartmentController_UpdateAndErrors, TestTeamController_UpdateAndDeactivateErrors, TestDesignationController_UpdatePath, TestControllers_ValidationEnvelope, TestRespondErrorFallback
+- `internal/hr/organization/events/events_test.go`: TestNewEvent_Envelope
+- `internal/hr/organization/models/models_test.go`: TestOrgModels_Parsing, TestOrgModels_Mapping_AppendOnly, TestOrgModels_UUIDHook
+- `internal/hr/organization/routes/routes_test.go`: TestChartInvalidation
+- `internal/hr/organization/services/coverage_branches_test.go`: TestMappingService_UpdateRefsAndBadInput, TestMappingService_DeactivateUserRepoError, TestOrgChart_IncludeInactiveAndErrors
+- `internal/hr/organization/services/department_service_test.go`: TestDepartmentService_CreateDepartment, TestDepartmentService_MoveCycle, TestDepartmentService_DeactivateGuard, TestDepartmentService_GetListUpdate, TestDepartmentService_UpdateUnknownParent
+- `internal/hr/organization/services/designation_service_test.go`: TestDesignationService_CreateAndDuplicate, TestDesignationService_UpdateAndDeactivate, TestDesignationService_CaseInsensitiveTitleRepo, TestDesignationService_GetListHappyUpdate
+- `internal/hr/organization/services/errorpaths_test.go`: TestServiceErrorPropagation
+- `internal/hr/organization/services/event_consumer_test.go`: TestEventConsumer_UserDeactivatedConverges, TestEventConsumer_NoopHandlers, TestEventConsumer_UnknownKeyAndBadPayload
+- `internal/hr/organization/services/fault_injection_test.go`: TestFaults_Departments, TestFaults_Teams, TestFaults_Designations, TestFaults_MappingsAndChart, TestTeamMoveMakesMappingsFollow
+- `internal/hr/organization/services/helpers_test.go`: TestPublishOrOutbox_BrokerDown, TestPublishOrOutbox_SuccessSkipsOutbox
+- `internal/hr/organization/services/hierarchy_test.go`: TestHierarchyDepthCap, TestHierarchyMoveValidation, TestDeactivateWithActiveMappingsGuard, TestUpdateRepoErrorPropagation
+- `internal/hr/organization/services/mapping_service_test.go`: TestMappingService_CreateAndPrimaryGuard, TestMappingService_CRUDAndPrimarySwap, TestMappingService_ManagerCycle, TestMappingService_ManagerSelfAndMissing, TestMappingService_DeactivateUserConverges
+- `internal/hr/organization/services/org_chart_service_test.go`: TestOrgChart_EmptyTenant, TestOrgChart_ForestBuild, TestOrgChart_UserChain, TestOrgChart_InvalidateChartDropsOnlyThatTenant, TestOrgChart_InvalidateChartNilCache, TestOrgChart_CacheHitAndSet, TestDepartmentService_ForceCascadeDeactivatesChildren
+- `internal/hr/organization/services/team_service_test.go`: TestTeamService_CreateTeam, TestTeamService_MoveAndDeactivate, TestTeamService_GetListRenameConflict
+- `internal/hr/organization/validators/validators_test.go`: TestValidateOrgCode, TestIsReservedOrgCode
 
 ### M1 HR / Employee — 23 test functions in 17 files
-- `internal/employee/controllers/document_controller_test.go`: TestDocumentController_Endpoints
-- `internal/employee/controllers/employee_controller_test.go`: TestEmployeeController_Endpoints
-- `internal/employee/controllers/statutory_controller_test.go`: TestStatutoryController_Endpoints
-- `internal/employee/controllers/stubs_test.go`: (helpers only)
-- `internal/employee/controllers/timeline_controller_test.go`: TestTimelineController_List
-- `internal/employee/events/events_test.go`: TestNewEventEnvelope
-- `internal/employee/models/models_test.go`: TestEmployeeModelsInstantiation
-- `internal/employee/services/coverage_branches_test.go`: TestEmployeeServiceEdgeCasesAndBranches, TestStatutoryAndDocumentAndTimelineEdgeCases
-- `internal/employee/services/document_service_test.go`: TestEmployeeDocumentService
-- `internal/employee/services/employee_service_test.go`: TestEmployeeServiceLifecycle
-- `internal/employee/services/event_consumer_test.go`: TestEventConsumerHandleUserDeactivated
-- `internal/employee/services/fault_injection_test.go`: TestFaults_EmployeeService, TestEmployeeService_BusinessRules, TestFaults_StatutoryDocumentsTimeline, TestEventConsumer_ConvergenceRules
-- `internal/employee/services/status_effects_test.go`: TestApplyStatusEffects
-- `internal/employee/services/statutory_service_test.go`: TestEmployeeStatutoryService
-- `internal/employee/services/stubs_test.go`: (helpers only)
-- `internal/employee/services/timeline_service_test.go`: TestEmployeeTimelineService
-- `internal/employee/validators/validators_test.go`: TestValidateEmployeeCode, TestValidateStatus, TestValidateEmploymentType, TestValidateTransitionMatrix, TestValidateEmergencyContacts
+- `internal/hr/employee/controllers/document_controller_test.go`: TestDocumentController_Endpoints
+- `internal/hr/employee/controllers/employee_controller_test.go`: TestEmployeeController_Endpoints
+- `internal/hr/employee/controllers/statutory_controller_test.go`: TestStatutoryController_Endpoints
+- `internal/hr/employee/controllers/stubs_test.go`: (helpers only)
+- `internal/hr/employee/controllers/timeline_controller_test.go`: TestTimelineController_List
+- `internal/hr/employee/events/events_test.go`: TestNewEventEnvelope
+- `internal/hr/employee/models/models_test.go`: TestEmployeeModelsInstantiation
+- `internal/hr/employee/services/coverage_branches_test.go`: TestEmployeeServiceEdgeCasesAndBranches, TestStatutoryAndDocumentAndTimelineEdgeCases
+- `internal/hr/employee/services/document_service_test.go`: TestEmployeeDocumentService
+- `internal/hr/employee/services/employee_service_test.go`: TestEmployeeServiceLifecycle
+- `internal/hr/employee/services/event_consumer_test.go`: TestEventConsumerHandleUserDeactivated
+- `internal/hr/employee/services/fault_injection_test.go`: TestFaults_EmployeeService, TestEmployeeService_BusinessRules, TestFaults_StatutoryDocumentsTimeline, TestEventConsumer_ConvergenceRules
+- `internal/hr/employee/services/status_effects_test.go`: TestApplyStatusEffects
+- `internal/hr/employee/services/statutory_service_test.go`: TestEmployeeStatutoryService
+- `internal/hr/employee/services/stubs_test.go`: (helpers only)
+- `internal/hr/employee/services/timeline_service_test.go`: TestEmployeeTimelineService
+- `internal/hr/employee/validators/validators_test.go`: TestValidateEmployeeCode, TestValidateStatus, TestValidateEmploymentType, TestValidateTransitionMatrix, TestValidateEmergencyContacts
 
 ### M1 HR / Attendance — 74 test functions in 20 files
-- `internal/attendance/calc/calc_golden_test.go`: TestGolden_G4_Totals, TestGolden_G4_FirstLast, TestGolden_G5_NightShift, TestGolden_G5_TimeZoneLateness
-- `internal/attendance/calc/calc_test.go`: TestParseAndFormatHHMM, TestShiftShape, TestThresholdDefaults, TestAttendanceDateNoShiftIsUTC, TestAttendanceDateWindowClampedByShiftStart, TestOpenSessionStart
-- `internal/attendance/controllers/controllers_test.go`: TestEndpoints_HappyPathsAndStatusCodes, TestEndpoints_ServiceErrorsMapToEnvelope, TestEndpoints_ValidationEnvelope, TestEndpoints_G13_PaginationClamp, TestEndpoints_RequireActorContext, TestEndpoints_SelfEndpointsIgnoreClientIDs, TestSnake, TestFail_NormalizesPersistenceErrors
-- `internal/attendance/controllers/stub_test.go`: (helpers only)
-- `internal/attendance/dto/dto_test.go`: TestParsePage_G13, TestPageOffsetAndMeta
-- `internal/attendance/events/events_test.go`: TestNewEnvelope, TestPayloadsCarryNoLocationOrNetworkData
-- `internal/attendance/models/models_test.go`: TestAttendanceModels_TableNames, TestAttendanceModels_Indexes, TestAttendanceModels_PendingIndexIsPartial, TestAttendanceModels_IndexParityWithSQL, TestAttendanceModels_IntegerColumns, TestAttendanceModels_AppendOnly, TestAttendanceModels_BeforeCreateGeneratesIDs
-- `internal/attendance/routes/routes_test.go`: TestRoutes_ContractMatchesSpec, TestRoutes_SelfEndpointsHaveNoPermissionGuard
-- `internal/attendance/services/assignment_golden_test.go`: TestGolden_G10_AssignmentOverlap, TestAssignmentService_Validation, TestAssignmentService_List
-- `internal/attendance/services/fakes_more_test.go`: (helpers only)
-- `internal/attendance/services/fakes_test.go`: (helpers only)
-- `internal/attendance/services/harness_test.go`: (helpers only)
-- `internal/attendance/services/leave_sync_test.go`: TestLeaveSync_MarkAndClear, TestLeaveSync_ClearRecomputesForeignRecords, TestLeaveSync_Errors, TestLeaveSync_MarkExistingUnpunched
-- `internal/attendance/services/outbox_golden_test.go`: TestGolden_G12_RelayDrainsOutbox, TestRelay_SkipsExhaustedRowsAndPropagatesFetchErrors, TestRelay_RunStopsOnContextCancel
-- `internal/attendance/services/punch_golden_test.go`: TestGolden_G2_PunchAlternation, TestGolden_G3_ServerClockOnly, TestGolden_G11_PunchAudit, TestGolden_G12_OutboxAtomicAndPrivate, TestPunch_EmployeeRules, TestPunch_DebounceAndExpiry, TestPunch_NightShiftThroughService, TestPunch_PersistsLocationButNeverReturnsIP
-- `internal/attendance/services/query_service_test.go`: TestQuery_TodayStates, TestQuery_MineRange, TestQuery_AdminListAndDetail, TestQuery_Summary
-- `internal/attendance/services/regularization_golden_test.go`: TestGolden_G6_RegularizationLifecycle, TestGolden_G6_RegularizationCreatesMissingRecord, TestGolden_G7_SelfApprovalForbidden, TestGolden_G8_OnePendingPerDate, TestRegularization_CreateValidation, TestRegularization_RejectCancelList, TestRegularization_ApproveRollsBackOnFailure
-- `internal/attendance/services/resolve_day_test.go`: TestResolveDay_DateMovesForwardWithShiftZone, TestResolveDay_MovedOntoUnassignedDayFallsBack, TestResolveDay_RepoErrorsPropagate, TestPunch_MobileSource, TestReview_DirectoryFailureFailsClosed
-- `internal/attendance/services/shift_service_test.go`: TestShiftService_CreateDefaultsAndDerivedFields, TestShiftService_CreateValidation, TestShiftService_GetListUpdate, TestShiftService_DeactivateGuard
-- `internal/attendance/validators/validators_test.go`: TestValidateShiftCode, TestLoadTimezone, TestParseDate, TestDateRange, TestThresholdPair
+- `internal/hr/attendance/calc/calc_golden_test.go`: TestGolden_G4_Totals, TestGolden_G4_FirstLast, TestGolden_G5_NightShift, TestGolden_G5_TimeZoneLateness
+- `internal/hr/attendance/calc/calc_test.go`: TestParseAndFormatHHMM, TestShiftShape, TestThresholdDefaults, TestAttendanceDateNoShiftIsUTC, TestAttendanceDateWindowClampedByShiftStart, TestOpenSessionStart
+- `internal/hr/attendance/controllers/controllers_test.go`: TestEndpoints_HappyPathsAndStatusCodes, TestEndpoints_ServiceErrorsMapToEnvelope, TestEndpoints_ValidationEnvelope, TestEndpoints_G13_PaginationClamp, TestEndpoints_RequireActorContext, TestEndpoints_SelfEndpointsIgnoreClientIDs, TestSnake, TestFail_NormalizesPersistenceErrors
+- `internal/hr/attendance/controllers/stub_test.go`: (helpers only)
+- `internal/hr/attendance/dto/dto_test.go`: TestParsePage_G13, TestPageOffsetAndMeta
+- `internal/hr/attendance/events/events_test.go`: TestNewEnvelope, TestPayloadsCarryNoLocationOrNetworkData
+- `internal/hr/attendance/models/models_test.go`: TestAttendanceModels_TableNames, TestAttendanceModels_Indexes, TestAttendanceModels_PendingIndexIsPartial, TestAttendanceModels_IndexParityWithSQL, TestAttendanceModels_IntegerColumns, TestAttendanceModels_AppendOnly, TestAttendanceModels_BeforeCreateGeneratesIDs
+- `internal/hr/attendance/routes/routes_test.go`: TestRoutes_ContractMatchesSpec, TestRoutes_SelfEndpointsHaveNoPermissionGuard
+- `internal/hr/attendance/services/assignment_golden_test.go`: TestGolden_G10_AssignmentOverlap, TestAssignmentService_Validation, TestAssignmentService_List
+- `internal/hr/attendance/services/fakes_more_test.go`: (helpers only)
+- `internal/hr/attendance/services/fakes_test.go`: (helpers only)
+- `internal/hr/attendance/services/harness_test.go`: (helpers only)
+- `internal/hr/attendance/services/leave_sync_test.go`: TestLeaveSync_MarkAndClear, TestLeaveSync_ClearRecomputesForeignRecords, TestLeaveSync_Errors, TestLeaveSync_MarkExistingUnpunched
+- `internal/hr/attendance/services/outbox_golden_test.go`: TestGolden_G12_RelayDrainsOutbox, TestRelay_SkipsExhaustedRowsAndPropagatesFetchErrors, TestRelay_RunStopsOnContextCancel
+- `internal/hr/attendance/services/punch_golden_test.go`: TestGolden_G2_PunchAlternation, TestGolden_G3_ServerClockOnly, TestGolden_G11_PunchAudit, TestGolden_G12_OutboxAtomicAndPrivate, TestPunch_EmployeeRules, TestPunch_DebounceAndExpiry, TestPunch_NightShiftThroughService, TestPunch_PersistsLocationButNeverReturnsIP
+- `internal/hr/attendance/services/query_service_test.go`: TestQuery_TodayStates, TestQuery_MineRange, TestQuery_AdminListAndDetail, TestQuery_Summary
+- `internal/hr/attendance/services/regularization_golden_test.go`: TestGolden_G6_RegularizationLifecycle, TestGolden_G6_RegularizationCreatesMissingRecord, TestGolden_G7_SelfApprovalForbidden, TestGolden_G8_OnePendingPerDate, TestRegularization_CreateValidation, TestRegularization_RejectCancelList, TestRegularization_ApproveRollsBackOnFailure
+- `internal/hr/attendance/services/resolve_day_test.go`: TestResolveDay_DateMovesForwardWithShiftZone, TestResolveDay_MovedOntoUnassignedDayFallsBack, TestResolveDay_RepoErrorsPropagate, TestPunch_MobileSource, TestReview_DirectoryFailureFailsClosed
+- `internal/hr/attendance/services/shift_service_test.go`: TestShiftService_CreateDefaultsAndDerivedFields, TestShiftService_CreateValidation, TestShiftService_GetListUpdate, TestShiftService_DeactivateGuard
+- `internal/hr/attendance/validators/validators_test.go`: TestValidateShiftCode, TestLoadTimezone, TestParseDate, TestDateRange, TestThresholdPair
 
-### M1 HR / Leave — 52 test functions in 17 files
-- `internal/leave/calc/calc_golden_test.go`: TestGolden_G2_CountDays, TestGolden_G3_Accrual, TestGolden_G4_CarryForward, TestDateHelpers
-- `internal/leave/calc/days_test.go`: TestParseDays, TestDays_StringAndFloat, TestDays_SQLValueScan, TestDays_JSON
-- `internal/leave/controllers/controllers_test.go`: TestEndpoints_HappyPaths, TestEndpoints_ErrorsAndAuth, TestEndpoints_Validation, TestEndpoints_G15_Pagination, TestEndpoints_SelfIgnoresClientIdentity, TestFail_NormalizesPersistenceErrors
-- `internal/leave/controllers/stub_test.go`: (helpers only)
-- `internal/leave/dto/dto_test.go`: TestParsePage_G15, TestPage_OffsetAndMeta
-- `internal/leave/events/events_test.go`: TestNew_Envelope, TestPayloads_NoFreeText
-- `internal/leave/models/models_test.go`: TestLeaveModels_TableNames, TestLeaveModels_Indexes, TestLeaveModels_ColumnTypes, TestLeaveModels_DeletionPolicy, TestLeaveModels_BeforeCreateGeneratesIDs, TestBalance_Available
-- `internal/leave/routes/routes_test.go`: TestRoutes_ContractMatchesSpec, TestRoutes_OpenToAuthenticated
-- `internal/leave/services/admin_services_test.go`: TestTypeService_Lifecycle, TestHolidayService, TestBalanceService
-- `internal/leave/services/fakes_more_test.go`: (helpers only)
-- `internal/leave/services/fakes_test.go`: (helpers only)
-- `internal/leave/services/harness_test.go`: (helpers only)
-- `internal/leave/services/query_relay_test.go`: TestRequestQueries, TestOutboxRelay, TestTxRunner_DB, TestFaultInjection, TestAttendanceSyncFailureRollsBack
-- `internal/leave/services/request_golden_test.go`: TestGolden_G5_ApplyReserves, TestGolden_G6_InsufficientBalance, TestGolden_G7_Overlap, TestGolden_G8_ApproveMarksAttendance, TestGolden_G10_SelfApproval, TestGolden_G11_AuditPrivacy, TestGolden_G13_CancelApprovedFuture
-- `internal/leave/services/request_rules_test.go`: TestApply_Rules, TestApply_EmployeeChecks, TestPreview_CalendarAndSandwich, TestReview_States, TestApprove_HalfDayNoAttendance
-- `internal/leave/services/unpaid_leave_test.go`: TestUnpaidLeave_UnpaidDays
-- `internal/leave/validators/validators_test.go`: TestNormalizeTypeCode, TestAmounts, TestParseDateAndYear, TestGenderApplies, TestNoticeOK
+### M1 HR / Leave — 48 test functions in 16 files
+- `internal/hr/leave/calc/calc_golden_test.go`: TestGolden_G2_CountDays, TestGolden_G3_Accrual, TestGolden_G4_CarryForward, TestDateHelpers
+- `internal/hr/leave/controllers/controllers_test.go`: TestEndpoints_HappyPaths, TestEndpoints_ErrorsAndAuth, TestEndpoints_Validation, TestEndpoints_G15_Pagination, TestEndpoints_SelfIgnoresClientIdentity, TestFail_NormalizesPersistenceErrors
+- `internal/hr/leave/controllers/stub_test.go`: (helpers only)
+- `internal/hr/leave/dto/dto_test.go`: TestParsePage_G15, TestPage_OffsetAndMeta
+- `internal/hr/leave/events/events_test.go`: TestNew_Envelope, TestPayloads_NoFreeText
+- `internal/hr/leave/models/models_test.go`: TestLeaveModels_TableNames, TestLeaveModels_Indexes, TestLeaveModels_ColumnTypes, TestLeaveModels_DeletionPolicy, TestLeaveModels_BeforeCreateGeneratesIDs, TestBalance_Available
+- `internal/hr/leave/routes/routes_test.go`: TestRoutes_ContractMatchesSpec, TestRoutes_OpenToAuthenticated
+- `internal/hr/leave/services/admin_services_test.go`: TestTypeService_Lifecycle, TestHolidayService, TestBalanceService
+- `internal/hr/leave/services/fakes_more_test.go`: (helpers only)
+- `internal/hr/leave/services/fakes_test.go`: (helpers only)
+- `internal/hr/leave/services/harness_test.go`: (helpers only)
+- `internal/hr/leave/services/query_relay_test.go`: TestRequestQueries, TestOutboxRelay, TestTxRunner_DB, TestFaultInjection, TestAttendanceSyncFailureRollsBack
+- `internal/hr/leave/services/request_golden_test.go`: TestGolden_G5_ApplyReserves, TestGolden_G6_InsufficientBalance, TestGolden_G7_Overlap, TestGolden_G8_ApproveMarksAttendance, TestGolden_G10_SelfApproval, TestGolden_G11_AuditPrivacy, TestGolden_G13_CancelApprovedFuture
+- `internal/hr/leave/services/request_rules_test.go`: TestApply_Rules, TestApply_EmployeeChecks, TestPreview_CalendarAndSandwich, TestReview_States, TestApprove_HalfDayNoAttendance
+- `internal/hr/leave/services/unpaid_leave_test.go`: TestUnpaidLeave_UnpaidDays
+- `internal/hr/leave/validators/validators_test.go`: TestNormalizeTypeCode, TestAmounts, TestParseDateAndYear, TestGenderApplies, TestNoticeOK
 
-### M1 HR / Payroll — 40 test functions in 15 files
-- `internal/payroll/calc/calc_golden_test.go`: TestGolden_G2_Breakdown, TestGolden_G3_Overflow, TestGolden_G4_Proration, TestGolden_G5_PF, TestGolden_G6_ESI, TestGolden_G7_PT, TestGolden_G8_TDS, TestGolden_G9_NetCap, TestCompute_FullPayslip, TestCompute_OverflowAndInterleavedCap
-- `internal/payroll/calc/money_test.go`: TestParseMoney, TestMoney_StringSQLJSON, TestMoney_Arithmetic
-- `internal/payroll/calc/structure_test.go`: TestValidateStructure, TestMonthlyAndDaysInMonth
-- `internal/payroll/controllers/controllers_test.go`: TestEndpoints, TestEndpoints_ErrorsAuthValidation, TestEndpoints_G16
-- `internal/payroll/dto/dto_test.go`: TestParsePage_G16
-- `internal/payroll/events/events_test.go`: TestNewAndPayload
-- `internal/payroll/models/models_test.go`: TestPayrollModels_TableNames, TestPayrollModels_Indexes, TestPayrollModels_ColumnTypes, TestPayrollModels_DeletionAndIDs
-- `internal/payroll/routes/routes_test.go`: TestRoutes_Contract
-- `internal/payroll/services/admin_test.go`: TestStructureService, TestAssignmentService, TestRunCreateAndQueries
-- `internal/payroll/services/fakes_more_test.go`: (helpers only)
-- `internal/payroll/services/fakes_test.go`: (helpers only)
-- `internal/payroll/services/harness_test.go`: (helpers only)
-- `internal/payroll/services/payslip_test.go`: TestPayslipQueriesAndCSV, TestCalculateWarnings, TestCalculateSkipsOutsideWindow, TestPayrollFaultInjection, TestOutboxRelayAndRunner
-- `internal/payroll/services/run_golden_test.go`: TestGolden_Calculate, TestGolden_G11_G12_StateMachine, TestGolden_G15_Recalculate, TestGolden_SelfVisibilityAndPrivacy
-- `internal/payroll/validators/validators_test.go`: TestParseDateAndCTC, TestValidatePeriod, TestCSVSafe
+### M1 HR / Payroll — 37 test functions in 14 files
+- `internal/hr/payroll/calc/calc_golden_test.go`: TestGolden_G2_Breakdown, TestGolden_G3_Overflow, TestGolden_G4_Proration, TestGolden_G5_PF, TestGolden_G6_ESI, TestGolden_G7_PT, TestGolden_G8_TDS, TestGolden_G9_NetCap, TestCompute_FullPayslip, TestCompute_OverflowAndInterleavedCap
+- `internal/hr/payroll/calc/structure_test.go`: TestValidateStructure, TestMonthlyAndDaysInMonth
+- `internal/hr/payroll/controllers/controllers_test.go`: TestEndpoints, TestEndpoints_ErrorsAuthValidation, TestEndpoints_G16
+- `internal/hr/payroll/dto/dto_test.go`: TestParsePage_G16
+- `internal/hr/payroll/events/events_test.go`: TestNewAndPayload
+- `internal/hr/payroll/models/models_test.go`: TestPayrollModels_TableNames, TestPayrollModels_Indexes, TestPayrollModels_ColumnTypes, TestPayrollModels_DeletionAndIDs
+- `internal/hr/payroll/routes/routes_test.go`: TestRoutes_Contract
+- `internal/hr/payroll/services/admin_test.go`: TestStructureService, TestAssignmentService, TestRunCreateAndQueries
+- `internal/hr/payroll/services/fakes_more_test.go`: (helpers only)
+- `internal/hr/payroll/services/fakes_test.go`: (helpers only)
+- `internal/hr/payroll/services/harness_test.go`: (helpers only)
+- `internal/hr/payroll/services/payslip_test.go`: TestPayslipQueriesAndCSV, TestCalculateWarnings, TestCalculateSkipsOutsideWindow, TestPayrollFaultInjection, TestOutboxRelayAndRunner
+- `internal/hr/payroll/services/run_golden_test.go`: TestGolden_Calculate, TestGolden_G11_G12_StateMachine, TestGolden_G15_Recalculate, TestGolden_SelfVisibilityAndPrivacy
+- `internal/hr/payroll/validators/validators_test.go`: TestParseDateAndCTC, TestValidatePeriod, TestCSVSafe
 
 ### M1 HR / Recruitment — 29 test functions in 13 files
-- `internal/recruitment/module_test.go`: TestOrgDirectory
-- `internal/recruitment/controllers/controllers_test.go`: TestControllers_HappyPathAndAuth, TestControllers_ServiceErrorsAndBadInput, TestControllers_QueryFilters
-- `internal/recruitment/dto/dto_test.go`: TestParsePage_G14
-- `internal/recruitment/events/events_test.go`: TestNewEnvelope
-- `internal/recruitment/models/models_test.go`: TestRecruitmentModels_TablesAndIndexes, TestRecruitmentModels_ColumnTypesAndIDs
-- `internal/recruitment/pipeline/pipeline_test.go`: TestGolden_G2_StageGraph, TestGolden_G3_JobStatusGraph
-- `internal/recruitment/routes/routes_test.go`: TestRoutes_Contract
-- `internal/recruitment/services/admin_test.go`: TestJobs_UpdateListAndOrgRefs, TestCandidates_ListUpdateAndOfferExit, TestInterviews_ListCancelAndLookups, TestOffers_ValidationWithdrawAndExpiry, TestHire_PortFailures, TestOutboxRelay, TestHelpers
-- `internal/recruitment/services/failures_test.go`: TestRepositoryFailures
-- `internal/recruitment/services/fakes_test.go`: (helpers only)
-- `internal/recruitment/services/golden_test.go`: TestGolden_G4_ClosedJob, TestGolden_G5_DuplicateEmail, TestGolden_G6_StageHistory, TestGolden_G7_InterviewGate, TestGolden_G8_FeedbackOwnership, TestGolden_G9_OneOpenOffer, TestGolden_G10_Hire, TestGolden_G11_HireIdempotency, TestGolden_G12_NoPIIInEventsOrAudit
-- `internal/recruitment/services/harness_test.go`: (helpers only)
-- `internal/recruitment/validators/validators_test.go`: TestValidators
+- `internal/hr/recruitment/module_test.go`: TestOrgDirectory
+- `internal/hr/recruitment/controllers/controllers_test.go`: TestControllers_HappyPathAndAuth, TestControllers_ServiceErrorsAndBadInput, TestControllers_QueryFilters
+- `internal/hr/recruitment/dto/dto_test.go`: TestParsePage_G14
+- `internal/hr/recruitment/events/events_test.go`: TestNewEnvelope
+- `internal/hr/recruitment/models/models_test.go`: TestRecruitmentModels_TablesAndIndexes, TestRecruitmentModels_ColumnTypesAndIDs
+- `internal/hr/recruitment/pipeline/pipeline_test.go`: TestGolden_G2_StageGraph, TestGolden_G3_JobStatusGraph
+- `internal/hr/recruitment/routes/routes_test.go`: TestRoutes_Contract
+- `internal/hr/recruitment/services/admin_test.go`: TestJobs_UpdateListAndOrgRefs, TestCandidates_ListUpdateAndOfferExit, TestInterviews_ListCancelAndLookups, TestOffers_ValidationWithdrawAndExpiry, TestHire_PortFailures, TestOutboxRelay, TestHelpers
+- `internal/hr/recruitment/services/failures_test.go`: TestRepositoryFailures
+- `internal/hr/recruitment/services/fakes_test.go`: (helpers only)
+- `internal/hr/recruitment/services/golden_test.go`: TestGolden_G4_ClosedJob, TestGolden_G5_DuplicateEmail, TestGolden_G6_StageHistory, TestGolden_G7_InterviewGate, TestGolden_G8_FeedbackOwnership, TestGolden_G9_OneOpenOffer, TestGolden_G10_Hire, TestGolden_G11_HireIdempotency, TestGolden_G12_NoPIIInEventsOrAudit
+- `internal/hr/recruitment/services/harness_test.go`: (helpers only)
+- `internal/hr/recruitment/validators/validators_test.go`: TestValidators
 
 ### M1 HR / Performance (in progress) — 10 test functions in 4 files
-- `internal/performance/lifecycle/lifecycle_test.go`: TestGolden_G2_CycleGraph, TestGolden_G2_GoalGraph
-- `internal/performance/models/models_test.go`: TestPerformanceModels_TablesAndIndexes, TestPerformanceModels_ColumnTypes, TestPerformanceModels_JSONColumnsAndIDs
-- `internal/performance/score/score_test.go`: TestParseAndCodec, TestGolden_G3_ScoreMath
-- `internal/performance/validators/validators_test.go`: TestCriteria_PM001, TestDatesWeightsProgressKR, TestRatings_PM012
+- `internal/hr/performance/lifecycle/lifecycle_test.go`: TestGolden_G2_CycleGraph, TestGolden_G2_GoalGraph
+- `internal/hr/performance/models/models_test.go`: TestPerformanceModels_TablesAndIndexes, TestPerformanceModels_ColumnTypes, TestPerformanceModels_JSONColumnsAndIDs
+- `internal/hr/performance/score/score_test.go`: TestParseAndCodec, TestGolden_G3_ScoreMath
+- `internal/hr/performance/validators/validators_test.go`: TestCriteria_PM001, TestDatesWeightsProgressKR, TestRatings_PM012
 
 ### Integration suite (`backend/tests/integration`)
+- `access_test.go`: TestAccessPredefinedRoles, TestAccessScopesInheritanceAndCycles, TestAccessUserGrantsAndBlocks, TestAccessAntiEscalation, TestAccessAutomaticRoles, TestAccessTenantIsolation
 - `attendance_test.go`: TestAttendancePunchFlow, TestAttendanceRegularization, TestAttendanceRBAC, TestAttendanceIsolation, TestAttendanceConcurrentPunches, TestAttendancePagination
 - `employee_test.go`: TestEmployeeLifecycle, TestEmployeeStatusStateMachine, TestEmployeeStatutoryAndPIIMasking, TestEmployeeDocuments, TestEmployeeSelfService, TestEmployeeRBACTiers, TestUserDeactivationConvergesEmployee
 - `golden_test.go`: TestGoldenM1_TeamMoveKeepsMappingsConsistent, TestGoldenM1_AuditOnEveryOrgWrite, TestGoldenNoSecretLeakage, TestGoldenM2_EmployeeForForeignTenantUser, TestGoldenM2_AtomicOnboarding, TestGoldenM1_RejectedHierarchyChangeLeavesNoTrace
 - `harness_test.go`: TestMain
 - `identity_test.go`: TestTenantRoutesRequirePlatformKey, TestTenantLifecycle, TestTenantAdminProvisioningIsAtomic, TestPlatformRoutesDisabledWithoutKeyIsCoveredByMiddlewareUnit, TestAuthLoginErrors, TestLoginRateLimitCountsFailuresOnly, TestRefreshRotationReuseAndLogout, TestAccessTokenValidation, TestForgotAndResetPassword, TestAuthMe, TestUserLifecycle, TestDeactivatedUserSessionsAreRevoked, TestAssignAndRemoveRoles, TestRolesAndPermissions, TestRBACEnforcement, TestAuditTrail, TestPaginationIsClampedEverywhere, TestErrorEnvelopeIsUniform, TestCORSHeaders, TestTenantIsolation
+- `invitation_test.go`: TestInvitationLifecycle, TestInvitationRevokeAndEscalation
 - `leave_test.go`: TestLeaveLifecycle, TestLeaveOverlapAndPagination, TestLeaveRBACAndSelfApproval, TestLeaveIsolation, TestLeaveConcurrency
 - `org_test.go`: TestDepartmentLifecycleAndHierarchy, TestDepartmentDepthLimit, TestTeamLifecycle, TestDesignationLifecycle, TestMappingRulesAndUserDeactivationConvergence, TestOrgChartIsReadYourWritesConsistent, TestOrgChartUserChain, TestOrgRBAC
 - `payroll_test.go`: TestPayrollLifecycle, TestPayrollRBACAndIsolation
 - `perf_test.go`: TestPerformanceBudgets
+- `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
-- `schema_test.go`: TestMigrationsAreIdempotentAndComplete, TestBusinessCodesAreTenantScoped
+- `schema_test.go`: TestMigrationsAreIdempotentAndComplete, TestSchemasAreOwnedAndIsolated, TestBusinessCodesAreTenantScoped
 - `security_test.go`: TestSecurityHeadersAndBodyLimit, TestInjectionAttemptsAreInert, TestPrivilegeEscalationIsBlocked
 - `smoke_test.go`: TestHealth
 - `time_helpers_test.go`: (helpers only)
@@ -5299,6 +5835,10 @@ No broker consumer exists, so user deactivation converges org mappings and emplo
 ### 2026-10-06 — hardening pass (branch `fix/module-0-2-hardening`)
 Verification-console findings fixed and pinned by tests; full list in the hardening report in `docs/modules/m0-identity-access/testing.md`. Highlights: logout + refresh revocation, platform-key protected tenant routes, admin bootstrap, permission seed, non-escalating grants, audit read API, `/auth/me`, activate/unassign endpoints, atomic transactions, standard error envelope, atomic rate limiter, SQL migration runner.
 Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pass; coverage 86.5 % (services 93-97 %); migrations up/down/up clean.
+2026-10-20 — Access model adopted (owner-approved; `docs/ARCHITECTURE.md` §17, `plan.md` §3 B0): scoped grants,
+role inheritance, predefined and automatic roles, per-user grants with expiry and blocks (blocks win), access
+version for cache invalidation, explain-access API. Legacy `RequirePermission` requires tenant scope so no existing
+route widens; scoped routes opt in through `RequireScopedPermission`.
 
 ### m1-hr-management/contexts/organization  _(from specification.md)_
 

@@ -1394,9 +1394,9 @@ backend. The console is how the owner verifies each module by hand without waiti
 | Restructure phase | Section 8 phase | Scope | Status |
 |---|---|---|---|
 | A — architecture and docs | 0 | this file, module bundles, document cleanup, M0 gap analysis | done; approved by owner 2026-10-20 |
-| B — M0 alignment | 1–2 | access model (§17) and gaps listed in `docs/modules/m0-identity-access/plan.md` | current |
-| C — HR service boundary | 3 | section 12 "Target" column for M1, shared idempotency/outbox/inbox | later |
-| D — test console | 2 (shell) | console covering M0 and every built HR context | later |
+| B — M0 alignment | 1–2 | access model (§17) and gaps listed in `docs/modules/m0-identity-access/plan.md` | done 2026-10-20 |
+| C — HR service boundary | 3 | section 12 "Target" column for M1, shared idempotency/outbox | done 2026-10-20 (inbox arrives with the first consumer) |
+| D — test console | 2 (shell) | console covering M0 and every built HR context | current |
 | E — complete HR | 3 | finish `performance`, then `core`, `onboarding`, `compensation`, `learning`, `benefits` | later |
 | Afterwards | 4–7 | M7 Approvals and M8 Documents, then M2–M6 and M9–M12 | later |
 
