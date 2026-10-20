@@ -58,3 +58,30 @@ func TestIdentityEventsGoThroughTheOutbox(t *testing.T) {
 	login(t, tc.slug, tc.adminEmail, newPw)
 	expectErr(t, call(t, "GET", "/dev/mailbox", query("tenant_id", tc.id, "email", tc.adminEmail)), 401, "", "mailbox needs the platform key")
 }
+
+func TestIdempotencyKeyReplaysAndRejectsReuse(t *testing.T) {
+	tc := newTenant(t)
+	name := "idem-" + uniq()
+	first := tc.do(t, "POST", "/roles", body(map[string]any{"name": name}), header("Idempotency-Key", "k-"+name))
+	expect(t, first, 201, "first create")
+	again := tc.do(t, "POST", "/roles", body(map[string]any{"name": name}), header("Idempotency-Key", "k-"+name))
+	expect(t, again, 201, "replayed create")
+	if again.Header.Get("Idempotent-Replayed") != "true" || again.str("data.id") != first.str("data.id") {
+		t.Fatalf("replay returns the original outcome: %s", again.Raw)
+	}
+	if n := sqlStr(t, "SELECT count(*) FROM roles WHERE tenant_id = ? AND name = ?", tc.id, name); n != "1" {
+		t.Fatalf("executed once: %s roles", n)
+	}
+	expectErr(t, tc.do(t, "POST", "/roles", body(map[string]any{"name": name + "x"}), header("Idempotency-Key", "k-"+name)), 409, "IDEMPOTENCY_KEY_REUSED", "same key, different payload")
+	// a failed request (4xx) is replayed as the same failure, not re-executed
+	dup := tc.do(t, "POST", "/roles", body(map[string]any{"name": name}), header("Idempotency-Key", "dup-"+name))
+	expectErr(t, dup, 409, "CONFLICT", "duplicate name")
+	// tenant creation through the platform key is keyed too
+	b := map[string]any{"name": "Idem " + name, "slug": "i" + uniq()}
+	p1 := call(t, "POST", "/tenants", platform(), body(b), header("Idempotency-Key", "t-"+name))
+	p2 := call(t, "POST", "/tenants", platform(), body(b), header("Idempotency-Key", "t-"+name))
+	expect(t, p1, 201, "tenant")
+	if p2.Status != 201 || p2.str("data.id") != p1.str("data.id") {
+		t.Fatalf("tenant replay: %s", p2.Raw)
+	}
+}

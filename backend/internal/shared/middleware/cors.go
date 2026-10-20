@@ -7,7 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const corsAllowedHeaders = "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Request-ID, X-Platform-Key"
+const corsAllowedHeaders = "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Request-ID, X-Correlation-ID, Idempotency-Key, X-Platform-Key"
+
+// corsExposedHeaders lets browsers read the correlation id and the idempotent-replay marker.
+const corsExposedHeaders = "X-Correlation-ID, X-Request-ID, Idempotent-Replayed"
 
 // CORS handles Cross-Origin Resource Sharing. allowedOrigins is an explicit allow-list; a single "*" entry allows any
 // origin (development only; credentials are then NOT allowed, per the CORS spec). An empty list disables CORS headers.
@@ -56,6 +59,7 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 			}
 			if h.Get("Access-Control-Allow-Origin") != "" {
 				h.Set("Access-Control-Allow-Headers", corsAllowedHeaders)
+				h.Set("Access-Control-Expose-Headers", corsExposedHeaders)
 				h.Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 				h.Set("Access-Control-Max-Age", "600")
 			}

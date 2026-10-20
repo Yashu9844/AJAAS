@@ -42,3 +42,12 @@ func PlatformAdmin(key string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// PlatformKeyValid compares a presented platform key with the configured one in constant time.
+func PlatformKeyValid(got, key string) bool {
+	if got == "" || key == "" {
+		return false
+	}
+	have, want := sha256.Sum256([]byte(got)), sha256.Sum256([]byte(key))
+	return subtle.ConstantTimeCompare(have[:], want[:]) == 1
+}

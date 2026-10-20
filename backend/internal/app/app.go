@@ -15,6 +15,7 @@ import (
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
 	"github.com/jaas/jaas/internal/shared/database"
+	"github.com/jaas/jaas/internal/shared/idempotency"
 	"github.com/jaas/jaas/internal/shared/logger"
 	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"github.com/jaas/jaas/internal/shared/queue"
@@ -106,7 +107,8 @@ func Build(o Options) (*gin.Engine, error) {
 		return nil, err
 	}
 	wireAutomaticRoles(o, identityModule, employeeModule, orgModule)
-	startIdentityBackground(o, identityModule)
+	idemStore := idempotency.NewStore(o.DB)
+	startIdentityBackground(o, identityModule, idemStore)
 
 	if cfg.Server.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -120,6 +122,7 @@ func Build(o Options) (*gin.Engine, error) {
 	router.Use(sharedMiddleware.SecurityHeaders(), sharedMiddleware.BodyLimit(sharedMiddleware.DefaultMaxBodyBytes))
 	router.Use(sharedMiddleware.RequestLogger(log))
 	router.Use(sharedMiddleware.CORS(o.CORSOrigins))
+	router.Use(idempotency.Middleware(idemStore, identityModule.CallerScope, idempotency.DefaultRetention))
 
 	v1 := router.Group("/api/v1")
 	registerDevMailbox(v1, o, identityModule)

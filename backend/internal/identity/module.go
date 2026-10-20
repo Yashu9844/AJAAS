@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -200,6 +201,23 @@ func (r secretRouter) Deliver(ctx context.Context, msg services.SecretMessage) e
 		return r.m.mailbox.Deliver(ctx, msg)
 	}
 	return nil
+}
+
+// CallerScope identifies the caller of a request for Idempotency-Key scoping: "platform" for a valid platform key,
+// "tenant:user" for a valid access token, otherwise not scoped.
+func (m *Module) CallerScope(c *gin.Context) (string, bool) {
+	if m.platformAdminKey != "" && middleware.PlatformKeyValid(c.GetHeader("X-Platform-Key"), m.platformAdminKey) {
+		return "platform", true
+	}
+	raw := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+	if raw == "" || raw == c.GetHeader("Authorization") {
+		return "", false
+	}
+	claims, err := m.tokenSvc.ValidateAccessToken(raw)
+	if err != nil {
+		return "", false
+	}
+	return claims.TenantID + ":" + claims.Subject, true
 }
 
 // SetAutomaticRoleSource installs the HR-backed source of the automatic employee/manager roles.

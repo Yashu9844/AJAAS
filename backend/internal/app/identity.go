@@ -2,17 +2,23 @@ package app
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/identity"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
+	"github.com/jaas/jaas/internal/shared/idempotency"
 )
 
-// startIdentityBackground runs M0's outbox relay while background work is enabled.
-func startIdentityBackground(o Options, id *identity.Module) {
+// idempotencyPurge is how often expired Idempotency-Key records are deleted.
+const idempotencyPurge = time.Hour
+
+// startIdentityBackground runs M0's outbox relay and the idempotency purger while background work is enabled.
+func startIdentityBackground(o Options, id *identity.Module, store idempotency.Store) {
 	if o.Background != nil {
 		go id.RunEventRelay(o.Background)
+		go idempotency.RunPurger(o.Background, store, idempotencyPurge)
 	}
 }
 
