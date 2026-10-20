@@ -7,12 +7,12 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 
 | Context | Backend | Test console | Notes |
 |---|---|---|---|
-| organization | done (22 ops) | page exists (2026-10-07 console) | |
-| employee | done (14 ops) | page exists | |
-| attendance | done (19 ops) | missing | |
-| leave | done (20 ops) | missing | |
-| payroll | done (20 ops) | missing | |
-| recruitment | done (20 ops) | missing | last-seat concurrent hire can orphan a profile (documented, untested) |
+| organization | done (22 ops) | `/dev-test/hr/organization` | |
+| employee | done (14 ops) | `/dev-test/hr/employee` | |
+| attendance | done (19 ops) | `/dev-test/hr/attendance`, 3 scenarios | |
+| leave | done (20 ops) | `/dev-test/hr/leave`, 2 scenarios | |
+| payroll | done (20 ops) | `/dev-test/hr/payroll`, 2 scenarios | |
+| recruitment | done (20 ops) | `/dev-test/hr/recruitment`, 1 scenario | last-seat concurrent hire can orphan a profile (documented, untested) |
 | performance | P3 of 9: models, migrations 000051–000056, score + lifecycle engines, validators | missing | 22 ops designed |
 | core, onboarding, compensation, learning, benefits | not started | — | requirements in `specification.md` §4–8 |
 
@@ -25,8 +25,8 @@ Exactly one phase is CURRENT. Phases with a human gate stop for the owner's GO b
 | A | Architecture + docs restructure (this bundle, `docs/ARCHITECTURE.md`, document cleanup) | DONE — approved 2026-10-20 | done |
 | B | M0 alignment incl. access model (M0 `plan.md` §3–4) | DONE 2026-10-20 | GO given 2026-10-20 |
 | C | HR service boundary (§3 below) | DONE 2026-10-20 | GO given 2026-10-20 |
-| D | Test console for M0 + all built HR contexts | CURRENT | — |
-| E | Complete HR (§4 below) | LATER | per-context design gate |
+| D | Test console for M0 + all built HR contexts | DONE 2026-10-20 (32/32 scenarios, `docs/TEST_CONSOLE.md`) | — |
+| E | Complete HR (§4 below) | CURRENT | per-context design gate |
 
 ## 3. Phase C — HR service boundary (steps)
 

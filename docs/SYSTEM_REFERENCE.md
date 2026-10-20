@@ -60,7 +60,7 @@
   - RabbitMQ (`amqp`, with a no-op fallback);
   - Viper config, zerolog, validator v10, golang-jwt v5, bcrypt.
 - **Infra:** `docker-compose.yml` runs Postgres, Redis and RabbitMQ (`ajaas-postgres-1`, `ajaas-redis-1`, `ajaas-rabbitmq-1`).
-- **Frontend:** Next.js 16 / React 19. Only `src/app/dev-test/module-{0,1,2}` test pages exist; all other module folders are `.gitkeep` placeholders. Frontends for HR/Attendance, HR/Leave, HR/Payroll, HR/Recruitment, HR/Performance are blocked on the identity shell.
+- **Frontend:** Next.js 16 / React 19. Only the test console exists (`src/app/dev-test/identity` and `src/app/dev-test/hr/<context>` for organization, employee, attendance, leave, payroll and recruitment; `docs/TEST_CONSOLE.md`); all other module folders are `.gitkeep` placeholders. Product UIs are blocked on the identity shell.
 
 ### 2.2 Layering (identical in every module)
 ```

@@ -57,7 +57,7 @@ func (r *roleRepository) FindAll(ctx context.Context, db *gorm.DB, tenantID uuid
 	}
 
 	offset := (page - 1) * perPage
-	err := query.Offset(offset).Limit(perPage).Find(&roles).Error
+	err := query.Order("created_at DESC, id").Offset(offset).Limit(perPage).Find(&roles).Error
 	if err != nil {
 		return nil, 0, err
 	}

@@ -4,10 +4,21 @@ A browser console for verifying every shipped backend feature by hand, against t
 product UI. Standard and rules: `docs/ARCHITECTURE.md` §14. It is a verification tool, not product UI, and must be
 excluded from production builds.
 
-**Status (2026-10-20):** pages exist for M0 and the HR `organization` and `employee` contexts
-(`frontend/src/app/dev-test/module-{0,1,2}`, code in `frontend/src/modules/devtest/`, about 3,000 lines). Restructure
-Phase D renames the pages to canonical names and adds every other built HR context; from then on each feature ships
-its page in the same phase as its backend (delivery phase P8, `docs/ENGINEERING.md` §3).
+**Status (2026-10-20, restructure Phase D):** pages exist at canonical routes for M0 and every built HR context:
+
+| Route | Page | Operations | Scenarios |
+|---|---|---|---|
+| `/dev-test/identity` | M0 Identity & Access | hand-written (`specs.ts`) | `scenarios0.ts`, `scenariosAccess.ts` |
+| `/dev-test/hr/organization` | HR Organization | hand-written | `scenarios1.ts` |
+| `/dev-test/hr/employee` | HR Employee | hand-written | `scenarios2.ts` |
+| `/dev-test/hr/attendance` | HR Attendance & Time | generated (19) | `scenariosHr.ts` `S_ATTENDANCE` |
+| `/dev-test/hr/leave` | HR Leave & Absence | generated (20) | `S_LEAVE` |
+| `/dev-test/hr/payroll` | HR Payroll | generated (20) | `S_PAYROLL` |
+| `/dev-test/hr/recruitment` | HR Recruitment | generated (20) | `S_RECRUITMENT` |
+
+From now on each feature ships its page in the same phase as its backend (delivery phase P8, `docs/ENGINEERING.md` §3).
+Last full run (2026-10-20, fresh `jaas_console` DB, headless): **32/32 scenarios passed** (A-only scenarios; the
+two-tenant `AB` scenarios run in the browser).
 
 ## 1. Run it
 
@@ -45,9 +56,11 @@ fresh one.
 - For exact-grant RBAC checks create a role holding exactly one permission (`POST /api/v1/roles`
   `{name, permission_ids}`; ids from `GET /api/v1/permissions`) and a user with that role. A plain member with no
   roles is the negative case.
-- HR contexts need an employee profile for the acting user (`POST /api/v1/employees`; otherwise
-  `EMPLOYEE_NOT_FOUND`).
-- Only failed logins count against the login rate limit; if a run trips it, wait out the window or flush the dev Redis.
+- HR contexts need an employee profile for the acting user (`POST /api/v1/hr/employees`; otherwise
+  `EMPLOYEE_NOT_FOUND`). The HR scenarios create their own users and profiles.
+- Only failed logins count against the login rate limit (10 per 15 min per IP). The M0 negative scenarios fail logins on
+  purpose, so back-to-back full runs trip it: wait out the window or clear the dev keys
+  (`docker exec ajaas-redis-1 sh -c "redis-cli --scan --pattern 'ratelimit:*' | xargs -r redis-cli del"`).
 - CORS: in development with `CORS_ALLOWED_ORIGINS` unset every origin is allowed; set it to
   `http://localhost:3000` to test the real allow-list. Do not use `credentials: 'include'`.
 
@@ -67,17 +80,38 @@ total_pages}`); errors `{"error": {"code", "message", "details"}}`; foreign-tena
 ## 4. Code layout and how to add a page
 
 ```text
-frontend/src/app/dev-test/            route pages (one per module/context)
+frontend/src/app/dev-test/            route pages: identity/, hr/<context>/
 frontend/src/modules/devtest/
   api.ts        fetch wrapper (tenant host, token, platform key, raw exchange capture)
   auth.tsx      session panel        store.ts   console state (sessions, results)
   runner.ts     scenario runner      types.ts   CallSpec, Exchange, Session, results
-  specs.ts      endpoint specs (operation forms) per resource
-  scenarios*.ts scripted scenarios per module/context
-  components.tsx, shell.tsx, modules.tsx, devtest.css
+  specs.ts      hand-written operation specs (M0, organization, employee)
+  generated/hrSpecs.ts  operation specs generated from backend/api/swagger.yaml — never edit by hand
+  scenarios*.ts scripted scenarios (scenariosHr.ts holds the HR context goldens)
+  hrPages.tsx   generic HR context page (endpoints / scenarios / checklist tabs)
+  components.tsx, shell.tsx (nav + overview checklists), modules.tsx (M0/organization/employee pages), devtest.css
 ```
 
-To add a context: add its endpoint specs to `specs.ts` (or a new `specs-<context>.ts`), its scenarios to
-`scenarios-<context>.ts`, a section in `modules.tsx`, and a route page under `app/dev-test/<context>/`. Sensors:
-`npx tsc --noEmit`, `npm run lint`, `npm run build`. Then run every scenario against the live backend and record the
-result in the context's `testing.md`.
+To add an HR context:
+
+1. Document its endpoints in `backend/api/swagger.yaml` under `/hr/<context>/...`.
+2. Add the context to `CONTEXTS` in `scripts/gen_console_specs.py` and run `python scripts/gen_console_specs.py .`.
+3. Add its scenarios to `scenariosHr.ts` (or `scenariosHr<Context>.ts`), ported from the context's golden integration
+   tests: each creates its own users (`member`, `limited` helpers) and asserts status and body at every step.
+4. Export a page from `hrPages.tsx`, add `app/dev-test/hr/<context>/page.tsx`, a NAV entry and an overview checklist in
+   `shell.tsx`, and the scenario list in `scripts/console-headless.mjs`.
+
+Sensors: `npx tsc --noEmit`, `npx eslint src/modules/devtest src/app/dev-test`, `npx next build`. Then run every
+scenario against the live backend and record the result in the context's `testing.md`.
+
+## 5. Headless run
+
+The same scenario code runs without a browser (useful in CI or when no browser is available):
+
+```bash
+node scripts/console-headless.mjs <tenant-slug> <admin-email> <admin-password> [key-filter]   # e.g. filter "hr."
+```
+
+It transpiles the console's scenario modules with the project's TypeScript, routes `<slug>.localhost` to 127.0.0.1
+with the right `Host` header, signs session A in as the given tenant admin and prints PASS/FAIL per scenario with the
+failing steps. Exit code 1 when any scenario fails.

@@ -126,7 +126,7 @@ export interface ScenarioCtx {
 
 export interface Scenario {
   key: string;
-  module: 0 | 1 | 2;
+  module: 0 | 1 | 2 | "attendance" | "leave" | "payroll" | "recruitment" | "performance" | "core" | "onboarding" | "compensation" | "learning" | "benefits";
   title: string;
   description: string;
   needs: "none" | "A" | "AB";

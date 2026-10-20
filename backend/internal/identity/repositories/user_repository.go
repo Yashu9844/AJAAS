@@ -54,7 +54,8 @@ func (r *userRepository) FindAll(ctx context.Context, db *gorm.DB, tenantID uuid
 	}
 
 	offset := (page - 1) * perPage
-	err := query.Offset(offset).Limit(perPage).Find(&users).Error
+	// A stable order keeps pages disjoint and complete (newest first, id as tie-breaker).
+	err := query.Order("created_at DESC, id").Offset(offset).Limit(perPage).Find(&users).Error
 	if err != nil {
 		return nil, 0, err
 	}

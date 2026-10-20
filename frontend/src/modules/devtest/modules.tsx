@@ -57,7 +57,7 @@ function RbacViewer() {
 export function Module0() {
   return (
     <div>
-      <h2>Module 0 — Tenant / Identity / RBAC</h2>
+      <h2>M0 — Identity & Access</h2>
       <Tabs
         tabs={[
           {
@@ -107,7 +107,7 @@ export function Module0() {
 export function Module1() {
   return (
     <div>
-      <h2>Module 1 — Organization</h2>
+      <h2>M1 HR — Organization</h2>
       <p className="dt-note">All routes are tenant-host + JWT + RBAC (organization:read for GET, organization:update for writes).</p>
       <Tabs
         tabs={[
@@ -127,8 +127,8 @@ export function Module1() {
 export function Module2() {
   return (
     <div>
-      <h2>Module 2 — Employee</h2>
-      <p className="dt-note">An employee profile is attached to an existing Module 0 user (user_id). Create a user first (Module 0 → Users) — its id is captured automatically.</p>
+      <h2>M1 HR — Employee</h2>
+      <p className="dt-note">An employee profile is attached to an existing Module 0 user (user_id). Create a user first (M0 Identity → Users) — its id is captured automatically.</p>
       <Tabs
         tabs={[
           { id: "emp", label: "Employees", body: <OpGroup title="Employee profiles" ops={M2_EMP} /> },

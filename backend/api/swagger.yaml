@@ -2023,7 +2023,7 @@ paths:
         '201': {description: Assigned, content: {application/json: {schema: {$ref: '#/components/schemas/AssignmentEnvelope'}}}}
         '409': {description: ASSIGNMENT_OVERLAP | SHIFT_INACTIVE}
 
-  /shift-assignments:
+  /hr/shift-assignments:
     get:
       summary: List an employee's shift assignments (attendance:read)
       tags: [Shifts]

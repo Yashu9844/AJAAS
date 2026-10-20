@@ -42,7 +42,7 @@ func (r *permissionRepository) FindAll(ctx context.Context, db *gorm.DB, page, p
 	}
 
 	offset := (page - 1) * perPage
-	err := query.Offset(offset).Limit(perPage).Find(&perms).Error
+	err := query.Order("resource, action").Offset(offset).Limit(perPage).Find(&perms).Error
 	if err != nil {
 		return nil, 0, err
 	}

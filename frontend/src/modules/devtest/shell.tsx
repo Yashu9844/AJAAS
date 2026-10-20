@@ -4,13 +4,18 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AuthPanel, Badge, Checklist, ExchangeView } from "./components";
 import { clearHistory, clearResults, setConfig, setPlatformKey, useDevStore } from "./store";
+import { HR_CHECKLISTS } from "./hrPages";
 import { CHECKLIST } from "./specs";
 
 const NAV = [
   { href: "/dev-test", label: "Overview / Checklist" },
-  { href: "/dev-test/module-0", label: "Module 0 — Tenant / Identity / RBAC" },
-  { href: "/dev-test/module-1", label: "Module 1 — Organization" },
-  { href: "/dev-test/module-2", label: "Module 2 — Employee" },
+  { href: "/dev-test/identity", label: "M0 — Identity & Access" },
+  { href: "/dev-test/hr/organization", label: "M1 HR — Organization" },
+  { href: "/dev-test/hr/employee", label: "M1 HR — Employee" },
+  { href: "/dev-test/hr/attendance", label: "M1 HR — Attendance & Time" },
+  { href: "/dev-test/hr/leave", label: "M1 HR — Leave & Absence" },
+  { href: "/dev-test/hr/payroll", label: "M1 HR — Payroll" },
+  { href: "/dev-test/hr/recruitment", label: "M1 HR — Recruitment" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -109,9 +114,13 @@ export function Overview() {
         🟢 PASS only when every mapped op/scenario actually produced the expected status and body. 🔴 FAIL if any did not. ⚪ NOT TESTED until run. A 200 alone is never enough.
       </p>
       <div className="dt-grid">
-        <Checklist title="MODULE 0 — Tenant / Identity / RBAC" items={CHECKLIST[0]} />
-        <Checklist title="MODULE 1 — Organization" items={CHECKLIST[1]} />
-        <Checklist title="MODULE 2 — Employee" items={CHECKLIST[2]} />
+        <Checklist title="M0 — Identity & Access" items={CHECKLIST[0]} />
+        <Checklist title="M1 HR — Organization" items={CHECKLIST[1]} />
+        <Checklist title="M1 HR — Employee" items={CHECKLIST[2]} />
+        <Checklist title="M1 HR — Attendance & Time" items={HR_CHECKLISTS.attendance} />
+        <Checklist title="M1 HR — Leave & Absence" items={HR_CHECKLISTS.leave} />
+        <Checklist title="M1 HR — Payroll" items={HR_CHECKLISTS.payroll} />
+        <Checklist title="M1 HR — Recruitment" items={HR_CHECKLISTS.recruitment} />
       </div>
       <h3>How to start</h3>
       <ol className="dt-note">

@@ -5,8 +5,8 @@ Updated 2026-10-20.
 ## 1. Status
 
 Backend complete and hardened (partner branch `fix/module-0-2-hardening`, merged to `main`): 29 routes, 13 tables,
-8 goldens (G0-1 … G0-8) green in `backend/tests/integration`. Console page exists (`/dev-test/module-0`, to be renamed
-in Phase D).
+8 goldens (G0-1 … G0-8) green in `backend/tests/integration`. Console page `/dev-test/identity` (10 scenarios incl. access model,
+all passing 2026-10-20).
 
 ## 2. Does M0 need changes for the new architecture? — Yes
 
