@@ -259,3 +259,90 @@ export const S_RECRUITMENT: Scenario[] = [
     },
   },
 ];
+
+const perfRatings = (...s: number[]) => ["Quality", "Delivery", "Collaboration", "Ownership"].map((criterion, i) => ({ criterion, score: s[i] }));
+
+export const S_PERFORMANCE: Scenario[] = [
+  {
+    key: "hr.perf.flow",
+    module: "performance",
+    title: "Cycle → goals/OKRs → reviews → 9-box → completion (G4–G11)",
+    description:
+      "Alice reports to a fresh manager through an org mapping; Bob is a colleague. Runs a cycle: weight cap, key-result progress, manager access and colleague denial, review launch (idempotent), peer assignment, submissions, the 9-box, completion and anonymous peer visibility.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const mgr = await member(r, A, uid, "pmg");
+      const alice = await member(r, A, uid, "pal");
+      const bob = await member(r, A, uid, "pbo");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Perf ${uid}`, code: `PF${uid}`.toUpperCase() }), 201);
+      await r.call("Alice reports to the manager", tn(A, "POST", "/hr/mappings", { user_id: alice.userId, department_id: str(d, "data.id"), is_primary: true, manager_user_id: mgr.userId }), 201);
+      const cy = await r.call("Create cycle (default criteria)", tn(A, "POST", "/hr/performance/cycles", { title: `FY26 ${uid}`, start_date: "2026-01-01", end_date: "2026-06-30" }), 201, (e) =>
+        list(e, "data.criteria").length === 4 ? null : "4 default criteria expected",
+      );
+      const cid = str(cy, "data.id");
+      await r.call("Activate", tn(A, "POST", `/hr/performance/cycles/${cid}/activate`), 200);
+      const goal = (S: Session, weight: number | string) => tn(S, "POST", "/hr/performance/goals", { cycle_id: cid, title: `Goal ${weight}`, weight });
+      const g1 = await r.call("Alice: goal weight 60", goal(alice.S, 60), 201);
+      await r.call("Alice: goal weight 40", goal(alice.S, 40), 201);
+      await r.call("Weight 0.01 more → 409 WEIGHT_EXCEEDED", goal(alice.S, "0.01"), 409);
+      const gid = str(g1, "data.id");
+      const kr = await r.call("Key result 0 → 10", tn(alice.S, "POST", `/hr/performance/goals/${gid}/key-results`, { title: "Ship features", start_value: 0, target_value: 10 }), 201);
+      const krID = String(list(kr, "data.key_results")[0]?.id ?? "");
+      await r.call("Key-result check-in 5 → goal 50%", tn(alice.S, "POST", `/hr/performance/goals/${gid}/check-ins`, { key_result_id: krID, value: 5, note: "half way" }), 201, (e) =>
+        num(e, "data.progress") === 50 ? null : "progress should be 50",
+      );
+      await r.call("Direct progress on a KR goal → 409 HAS_KEY_RESULTS", tn(alice.S, "POST", `/hr/performance/goals/${gid}/check-ins`, { progress: 90 }), 409);
+      await r.call("Manager edits the report's goal", tn(mgr.S, "PATCH", `/hr/performance/goals/${gid}`, { title: "Ship v2" }), 200);
+      await r.call("Colleague reads the goal → 404", tn(bob.S, "GET", `/hr/performance/goals/${gid}`), 404);
+      await r.call("Manager lists the report's goals", tn(mgr.S, "GET", "/hr/performance/goals", undefined, { employee_id: alice.empId }), 200, (e) => (list(e).length === 2 ? null : "two goals expected"));
+      await r.call("Launch reviews: 1 self + 1 manager", tn(A, "POST", `/hr/performance/cycles/${cid}/launch-reviews`), 200, (e) =>
+        num(e, "data.self_reviews_created") === 1 && num(e, "data.manager_reviews_created") === 1 ? null : "counts mismatch",
+      );
+      await r.call("Launch again creates nothing", tn(A, "POST", `/hr/performance/cycles/${cid}/launch-reviews`), 200, (e) =>
+        num(e, "data.self_reviews_created") + num(e, "data.manager_reviews_created") === 0 ? null : "not idempotent",
+      );
+      const peer = await r.call("Assign Bob as peer", tn(A, "POST", "/hr/performance/reviews", { cycle_id: cid, employee_id: alice.empId, reviewer_employee_id: bob.empId, type: "peer" }), 201);
+      const assigned = async (S: Session, who: string) => {
+        const e = await r.call(`${who}: reviews to write`, tn(S, "GET", "/hr/performance/reviews/assigned", undefined, { status: "pending" }), 200, (x) => (list(x).length === 1 ? null : "one review expected"));
+        return String(list(e)[0]?.id ?? "");
+      };
+      const mrev = await assigned(mgr.S, "Manager");
+      const srev = await assigned(alice.S, "Alice");
+      await r.call("Manager review without potential → 400", tn(mgr.S, "POST", `/hr/performance/reviews/${mrev}/submit`, { ratings: perfRatings(4, 4, 3, 3) }), 400);
+      await r.call("Manager submits (overall 3.5, potential high)", tn(mgr.S, "POST", `/hr/performance/reviews/${mrev}/submit`, { ratings: perfRatings(4, 4, 3, 3), potential: "high" }), 200, (e) =>
+        num(e, "data.overall_score") === 3.5 ? null : "overall should be 3.5",
+      );
+      await r.call("Submitting again → 409 REVIEW_STATE", tn(mgr.S, "POST", `/hr/performance/reviews/${mrev}/submit`, { ratings: perfRatings(4, 4, 3, 3), potential: "high" }), 409);
+      await r.call("Alice submits her self review", tn(alice.S, "POST", `/hr/performance/reviews/${srev}/submit`, { ratings: perfRatings(5, 5, 5, 5) }), 200);
+      await r.call("Bob submits the peer review", tn(bob.S, "POST", `/hr/performance/reviews/${str(peer, "data.id")}/submit`, { ratings: perfRatings(3, 3, 3, 3) }), 200);
+      await r.call("Alice sees nothing before completion", tn(alice.S, "GET", "/hr/performance/reviews/me"), 200, (e) => (list(e).length === 0 ? null : "reviews visible too early"));
+      await r.call("9-box: Alice high/high, goal score 30", tn(A, "GET", `/hr/performance/cycles/${cid}/nine-box`), 200, (e) => {
+        const en = list(e, "data.entries").find((x) => x.employee_id === alice.empId);
+        return en && en.box === "high/high" && en.goal_score === 30 ? null : "9-box entry mismatch";
+      });
+      await r.call("Complete the cycle", tn(A, "POST", `/hr/performance/cycles/${cid}/complete`), 200);
+      await r.call("Alice sees 3 reviews; the peer is anonymous", tn(alice.S, "GET", "/hr/performance/reviews/me"), 200, (e) => {
+        const rows = list(e);
+        return rows.length === 3 && rows.every((x) => x.type !== "peer" || x.reviewer_employee_id === undefined) ? null : "visibility mismatch";
+      });
+      await r.call("Check-in after completion → 409 CYCLE_STATE", tn(alice.S, "POST", `/hr/performance/goals/${gid}/check-ins`, { key_result_id: krID, value: 6 }), 409);
+    },
+  },
+  {
+    key: "hr.perf.rbac",
+    module: "performance",
+    title: "RBAC: cycles readable by all, managed by performance:manage (G13)",
+    description: "A plain employee reads cycles but cannot create one or list all reviews; performance:read lists reviews but cannot create cycles.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const m = await member(r, A, uid, "prb");
+      await r.call("Employee lists cycles → 200", tn(m.S, "GET", "/hr/performance/cycles"), 200);
+      await r.call("Employee creates a cycle → 403", tn(m.S, "POST", "/hr/performance/cycles", { title: "x", start_date: "2026-01-01", end_date: "2026-02-01" }), 403);
+      await r.call("Employee lists all reviews → 403", tn(m.S, "GET", "/hr/performance/reviews"), 403);
+      await r.call("Employee: own goals → 200", tn(m.S, "GET", "/hr/performance/goals/me"), 200);
+      const reader = await limited(r, A, uid, "prr", [["performance", "read"]]);
+      await r.call("performance:read lists reviews", tn(reader, "GET", "/hr/performance/reviews"), 200);
+      await r.call("performance:read cannot create a cycle → 403", tn(reader, "POST", "/hr/performance/cycles", { title: "x", start_date: "2026-01-01", end_date: "2026-02-01" }), 403);
+    },
+  },
+];

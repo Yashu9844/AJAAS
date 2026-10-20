@@ -1,8 +1,8 @@
 "use client";
 import { Checklist, OpGroup, ScenarioCard } from "./components";
-import { HR_ATTENDANCE, HR_LEAVE, HR_PAYROLL, HR_RECRUITMENT } from "./generated/hrSpecs";
+import { HR_ATTENDANCE, HR_LEAVE, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
 import type { Scenario } from "./runner";
-import { S_ATTENDANCE, S_LEAVE, S_PAYROLL, S_RECRUITMENT } from "./scenariosHr";
+import { S_ATTENDANCE, S_LEAVE, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
 import { Tabs } from "./shell";
 import type { ChecklistItem, OpSpec } from "./types";
 
@@ -72,7 +72,20 @@ export const HR_CHECKLISTS: Record<string, ChecklistItem[]> = {
   leave: items(S_LEAVE),
   payroll: items(S_PAYROLL),
   recruitment: items(S_RECRUITMENT),
+  performance: items(S_PERFORMANCE),
 };
+
+export function HrPerformance() {
+  return (
+    <ContextPage
+      title="HR / Performance & OKRs"
+      intro="Appraisal cycles, goals with key results and check-ins, self/manager/peer reviews and the 9-box. Owners and their direct managers act on goals without a permission; performance:read | manage cover everyone."
+      ops={HR_PERFORMANCE}
+      scenarios={S_PERFORMANCE}
+      checklist={HR_CHECKLISTS.performance}
+    />
+  );
+}
 
 export function HrAttendance() {
   return (

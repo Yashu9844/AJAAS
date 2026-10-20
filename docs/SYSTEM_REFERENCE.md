@@ -32,21 +32,25 @@
 | 4 Leave | types, holidays, ledger-backed balances, requests, approvals | 20 | 6 (000032–000037) | `jaas.leave.events` | on `main`, backend closed |
 | 5 Payroll | structures, CTC assignments, runs (maker-checker), statutory, payslips, CSV | 20 | 7 (000038–000044) | `jaas.payroll.events` | on `main`, backend closed |
 | 6 Recruitment | jobs, candidates + stage history, interviews, offers, hire saga | 20 | 6 (000045–000050) | `jaas.recruitment.events` | on `main`, backend closed |
-| 7 Performance & OKRs | cycles, goals + key results + check-ins, reviews, 9-box | 22 (designed) | 6 (000051–000056) | `jaas.performance.events` | **in progress** (P3 of P9) |
+| 7 Performance & OKRs | cycles, goals + key results + check-ins, reviews, 9-box | 22 | 6 (hr 000038–000043) | `jaas.performance.events` | backend closed 2026-10-20 (branch `restructure_architecture`) |
 
 **Totals on `main`:**
 - 144 routes + `/health`;
 - 50 migrations (56 on the HR/Performance branch);
 - integration suite 63/63; all unit packages green.
 
+**Totals on `restructure_architecture` (2026-10-20):** 181 module routes (Part 2) + health/JWKS; migrations re-baselined
+into `migrations/identity` (18) and `migrations/hr` (43); full unit and integration suites green, including
+`TestSwaggerMatchesRoutes` (contract ↔ router) and `TestImportBoundaries`; test console 34/34 scenarios. Migration numbers
+in the table above are the pre-split ones.
+
 **Who built what:**
 - M0 Identity, HR/Organization, HR/Employee existed before this work and were hardened by the partner (`fix/module-0-2-hardening`, now in `main`).
-- HR/Attendance, HR/Leave, HR/Payroll, HR/Recruitment, the integration onto the hardened base, and HR/Performance so far were built in this workstream.
+- HR/Attendance, HR/Leave, HR/Payroll, HR/Recruitment, HR/Performance, the integration onto the hardened base and the architecture restructure were built in this workstream.
 
 **Module numbering** follows `docs/ARCHITECTURE.md`: M0 Identity & Access plus product modules M1–M12; the HR rows above are bounded contexts of M1 HR Management (`docs/modules/m1-hr-management/`). Meetings, Approvals and Notifications are M3, M7 and M10 (not started).
 
 **Working-tree state on this branch:**
-- `backend/internal/performance/validators/` is complete (100%) and committed (a928216).
 - Two untracked `.rar` files under `docs/modules/` are not from this workstream.
 
 ---
@@ -819,7 +823,34 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | POST | `/api/v1/hr/recruitment/offers/:id/decision` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.DecideOffer |
 | POST | `/api/v1/hr/recruitment/offers/:id/withdraw` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.WithdrawOffer |
 
-Total routes registered by module route files: **159** (plus `GET /health`).
+### M1 HR / Performance & OKRs — 22 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/hr/performance/cycles` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.CreateCycle |
+| GET | `/api/v1/hr/performance/cycles` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.ListCycles |
+| GET | `/api/v1/hr/performance/cycles/:id` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.GetCycle |
+| PATCH | `/api/v1/hr/performance/cycles/:id` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.UpdateCycle |
+| POST | `/api/v1/hr/performance/cycles/:id/activate` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.ActivateCycle |
+| POST | `/api/v1/hr/performance/cycles/:id/launch-reviews` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.LaunchReviews |
+| POST | `/api/v1/hr/performance/cycles/:id/complete` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.CompleteCycle |
+| GET | `/api/v1/hr/performance/cycles/:id/nine-box` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] read, ctl.NineBox |
+| POST | `/api/v1/hr/performance/goals` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.CreateGoal |
+| GET | `/api/v1/hr/performance/goals` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.ListGoals |
+| GET | `/api/v1/hr/performance/goals/me` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.MyGoals |
+| GET | `/api/v1/hr/performance/goals/:id` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.GetGoal |
+| PATCH | `/api/v1/hr/performance/goals/:id` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.UpdateGoal |
+| POST | `/api/v1/hr/performance/goals/:id/status` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.SetGoalStatus |
+| POST | `/api/v1/hr/performance/goals/:id/key-results` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.AddKeyResult |
+| POST | `/api/v1/hr/performance/goals/:id/check-ins` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.CheckIn |
+| POST | `/api/v1/hr/performance/reviews` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] manage, ctl.AssignReviewer |
+| GET | `/api/v1/hr/performance/reviews` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] read, ctl.ListReviews |
+| GET | `/api/v1/hr/performance/reviews/assigned` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.AssignedReviews |
+| GET | `/api/v1/hr/performance/reviews/me` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.MyReviews |
+| GET | `/api/v1/hr/performance/reviews/:id` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.GetReview |
+| POST | `/api/v1/hr/performance/reviews/:id/submit` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.SubmitReview |
+
+Total routes registered by module route files: **181** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -2610,7 +2641,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(r *tenantSettingsRepository) FindByTenantID(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]models.TenantSettings, error)`
 - **func** `(r *tenantSettingsRepository) FindByKey(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, key string) (*models.TenantSettings, error)`
 
-#### `internal/identity/repositories/user_repository.go` (71 lines)
+#### `internal/identity/repositories/user_repository.go` (72 lines)
 - **type** `userRepository struct{}`
 - **func** `NewUserRepository() UserRepository` — NewUserRepository returns a UserRepository.
 - **func** `(r *userRepository) Create(ctx context.Context, tx *gorm.DB, user *models.User) error`
@@ -2954,9 +2985,10 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 ### M1 HR / Organization
 
 
-#### `internal/hr/organization/access_facts.go` (26 lines)
+#### `internal/hr/organization/access_facts.go` (37 lines)
 - **func** `(m *Module) ManagerUserIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)` — ManagerUserIDs lists the users of the tenant who currently have at least one active direct report (automatic Manager role, docs/ARCHITECTURE.md §17).
 - **func** `(m *Module) HasDirectReports(ctx context.Context, tenantID, userID uuid.UUID) (bool, error)` — HasDirectReports reports whether the user manages at least one active mapping in the tenant.
+- **func** `(m *Module) DirectManager(ctx context.Context, tenantID, userID uuid.UUID) (*uuid.UUID, error)` — DirectManager returns the manager_user_id of the user's primary active mapping, or nil (HR/Performance D7-03).
 
 #### `internal/hr/organization/catalogue.go` (16 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Organization's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
@@ -5109,8 +5141,121 @@ _Package:_ Package validators holds Module 6 field rules that struct tags cannot
 - **func** `ValidateCTC(m kernel.Money) error` — ValidateCTC checks an offered/expected CTC.
 - **func** `NormalizeEmail(s string) string { return strings.ToLower(strings.TrimSpace(s)) }` — NormalizeEmail lower-cases and trims an email for the per-job uniqueness check (FR-CD001).
 
-### M1 HR / Performance (in progress)
+### M1 HR / Performance & OKRs
 
+
+#### `internal/hr/performance/catalogue.go` (17 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Performance's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). Self, manager and reviewer access needs no permission (PM-008).
+
+#### `internal/hr/performance/module.go` (66 lines)
+_Package:_ Package performance wires HR/Performance & OKRs (docs/modules/m1-hr-management/contexts/performance) into M1.
+- **type** `Module struct` — Module is the HR/Performance DI container.
+- **type** `Ports struct` — Ports are the collaborators HR/Performance consumes (design.md connections C2–C4).
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires repositories, services and the controller.
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists HR/Performance models for legacy AutoMigrate (the SQL migrations are the authority).
+- **type** `RouteDeps struct` — RouteDeps is the M0 infrastructure the routes need.
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts HR/Performance under rg.
+- **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
+
+#### `internal/hr/performance/controllers/controllers.go` (330 lines)
+- **type** `CycleService interface` — CycleService is the C1–C8 surface the edge needs.
+- **method** `CycleService.Create(ctx context.Context, a services.Actor, req dto.CreateCycleRequest) (*dto.CycleResponse, error)`
+- **method** `CycleService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.CycleResponse, error)`
+- **method** `CycleService.List(ctx context.Context, tenantID uuid.UUID, status string, page dto.Page) ([]dto.CycleResponse, dto.PageMeta, error)`
+- **method** `CycleService.Update(ctx context.Context, a services.Actor, id uuid.UUID, req dto.UpdateCycleRequest) (*dto.CycleResponse, error)`
+- **method** `CycleService.Activate(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.CycleResponse, error)`
+- **method** `CycleService.LaunchReviews(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.LaunchResponse, error)`
+- **method** `CycleService.Complete(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.CycleResponse, error)`
+- **method** `CycleService.NineBox(ctx context.Context, tenantID, id uuid.UUID) (*dto.NineBoxResponse, error)`
+- **type** `GoalService interface` — GoalService is the G1–G8 surface.
+- **method** `GoalService.Create(ctx context.Context, a services.Actor, req dto.CreateGoalRequest) (*dto.GoalResponse, error)`
+- **method** `GoalService.Get(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.GoalResponse, error)`
+- **method** `GoalService.List(ctx context.Context, a services.Actor, f repositories.GoalFilter, page dto.Page) ([]dto.GoalResponse, dto.PageMeta, error)`
+- **method** `GoalService.ListMine(ctx context.Context, a services.Actor, cycleID *uuid.UUID, page dto.Page) ([]dto.GoalResponse, dto.PageMeta, error)`
+- **method** `GoalService.Update(ctx context.Context, a services.Actor, id uuid.UUID, req dto.UpdateGoalRequest) (*dto.GoalResponse, error)`
+- **method** `GoalService.SetStatus(ctx context.Context, a services.Actor, id uuid.UUID, to string) (*dto.GoalResponse, error)`
+- **method** `GoalService.AddKeyResult(ctx context.Context, a services.Actor, id uuid.UUID, req dto.KeyResultRequest) (*dto.GoalResponse, error)`
+- **method** `GoalService.CheckIn(ctx context.Context, a services.Actor, id uuid.UUID, req dto.CheckInRequest) (*dto.GoalResponse, error)`
+- **type** `ReviewService interface` — ReviewService is the V1–V6 surface.
+- **method** `ReviewService.Assign(ctx context.Context, a services.Actor, req dto.AssignReviewerRequest) (*dto.ReviewResponse, error)`
+- **method** `ReviewService.List(ctx context.Context, tenantID uuid.UUID, f repositories.ReviewFilter, page dto.Page) ([]dto.ReviewResponse, dto.PageMeta, error)`
+- **method** `ReviewService.ListAssigned(ctx context.Context, a services.Actor, status string, page dto.Page) ([]dto.ReviewResponse, dto.PageMeta, error)`
+- **method** `ReviewService.ListMine(ctx context.Context, a services.Actor, cycleID *uuid.UUID) ([]dto.ReviewResponse, error)`
+- **method** `ReviewService.Get(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.ReviewResponse, error)`
+- **method** `ReviewService.Submit(ctx context.Context, a services.Actor, id uuid.UUID, req dto.SubmitReviewRequest) (*dto.ReviewResponse, error)`
+- **type** `Controller struct` — Controller serves all 22 HR/Performance operations.
+- **type** `Services struct` — Services bundles the controller's collaborators.
+- **func** `New(s Services) *Controller` — New builds the Controller.
+- **func** `queryUUID(c *gin.Context, name string) (*uuid.UUID, bool)` — queryUUID parses an optional UUID query parameter; malformed → 400.
+- **func** `(ctl *Controller) CreateCycle(c *gin.Context)`
+- **func** `(ctl *Controller) ListCycles(c *gin.Context)`
+- **func** `(ctl *Controller) GetCycle(c *gin.Context)`
+- **func** `(ctl *Controller) UpdateCycle(c *gin.Context)`
+- **func** `(ctl *Controller) ActivateCycle(c *gin.Context)`
+- **func** `(ctl *Controller) LaunchReviews(c *gin.Context)`
+- **func** `(ctl *Controller) CompleteCycle(c *gin.Context)`
+- **func** `(ctl *Controller) NineBox(c *gin.Context)`
+- **func** `(ctl *Controller) CreateGoal(c *gin.Context)`
+- **func** `(ctl *Controller) ListGoals(c *gin.Context)`
+- **func** `(ctl *Controller) MyGoals(c *gin.Context)`
+- **func** `(ctl *Controller) GetGoal(c *gin.Context)`
+- **func** `(ctl *Controller) UpdateGoal(c *gin.Context)`
+- **func** `(ctl *Controller) SetGoalStatus(c *gin.Context)`
+- **func** `(ctl *Controller) AddKeyResult(c *gin.Context)`
+- **func** `(ctl *Controller) CheckIn(c *gin.Context)`
+- **func** `(ctl *Controller) AssignReviewer(c *gin.Context)`
+- **func** `(ctl *Controller) ListReviews(c *gin.Context)`
+- **func** `(ctl *Controller) AssignedReviews(c *gin.Context)`
+- **func** `(ctl *Controller) MyReviews(c *gin.Context)`
+- **func** `(ctl *Controller) GetReview(c *gin.Context)`
+- **func** `(ctl *Controller) SubmitReview(c *gin.Context)`
+
+#### `internal/hr/performance/controllers/respond.go` (139 lines)
+_Package:_ Package controllers is HR/Performance's thin HTTP edge: parse → validate → service → envelope.
+- **type** `errorBody struct`
+- **func** `ok(c *gin.Context, status int, data interface{})`
+- **func** `okList(c *gin.Context, data interface{}, meta dto.PageMeta)`
+- **func** `fail(c *gin.Context, err error)` — fail maps AppErrors to their status after shared normalization (unique violation → 409, not found → 404); anything else is an opaque 500 (no internals leaked).
+- **func** `bindJSON(c *gin.Context, dst interface{}) bool` — bindJSON decodes and validates a body; failures become VALIDATION_ERROR with field details.
+- **func** `snake(s string) string`
+- **func** `actorFrom(c *gin.Context) (services.Actor, bool)` — actorFrom builds the caller from M0 middleware context only (NFR-SEC002).
+- **func** `pathID(c *gin.Context, name string) (uuid.UUID, bool)` — pathID parses a :param UUID; malformed ids are 400.
+- **func** `page(c *gin.Context) dto.Page`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)` — respond writes data or the mapped error.
+- **func** `respondList(c *gin.Context, data interface{}, meta dto.PageMeta, err error)` — respondList writes a paginated list or the mapped error.
+- **func** `pathIDIf(c *gin.Context, actorOK bool) (uuid.UUID, bool)` — pathIDIf parses :id only when the actor resolved (the actor failure already wrote 401).
+
+#### `internal/hr/performance/dto/dto.go` (214 lines)
+_Package:_ Package dto holds HR/Performance request and response shapes (specification.md §5).
+- **type** `CreateCycleRequest struct` — CreateCycleRequest is C1 (FR-CY001); criteria default when omitted.
+- **type** `UpdateCycleRequest struct` — UpdateCycleRequest is C4 (FR-CY002, draft only).
+- **type** `CycleResponse struct` — CycleResponse is a cycle.
+- **type** `LaunchResponse struct` — LaunchResponse is C6 (PM-010): the cycle plus how many reviews were created.
+- **type** `NineBoxEntry struct` — NineBoxEntry is one employee on the 9-box (PM-015); Box is "<performance>/<potential>" or "unrated".
+- **type** `NineBoxResponse struct` — NineBoxResponse is C8.
+- **type** `CreateGoalRequest struct` — CreateGoalRequest is G1 (FR-GL001); employee_id defaults to the caller's profile.
+- **type** `UpdateGoalRequest struct` — UpdateGoalRequest is G5 (FR-GL003).
+- **type** `GoalStatusRequest struct` — GoalStatusRequest is G6 (FR-GL004).
+- **type** `KeyResultRequest struct` — KeyResultRequest is G7 (FR-GL005).
+- **type** `CheckInRequest struct` — CheckInRequest is G8 (FR-GL006): progress for a goal without key results, key_result_id + value otherwise.
+- **type** `KeyResultResponse struct` — KeyResultResponse is a key result with its derived progress (PM-006).
+- **type** `CheckInResponse struct` — CheckInResponse is one progress update (PM-007).
+- **type** `GoalResponse struct` — GoalResponse is a goal; detail reads add key results and the newest check-ins.
+- **type** `AssignReviewerRequest struct` — AssignReviewerRequest is V1 (FR-RV001).
+- **type** `SubmitReviewRequest struct` — SubmitReviewRequest is V6 (FR-RV003).
+- **type** `ReviewResponse struct` — ReviewResponse is a review; reviewer_employee_id is omitted for peer reviews shown to the subject (PM-014).
+- **type** `PageMeta struct` — PageMeta is list metadata.
+- **type** `Page struct{ Page, PerPage int }` — Page is a clamped page request (G14).
+- **func** `ParsePage(pageStr, perPageStr string) Page` — ParsePage clamps raw query values (page ≥ 1 default 1, per_page 1–100 default 20).
+- **func** `(p Page) Offset() int { return (p.Page - 1) * p.PerPage }` — Offset is the SQL offset.
+- **func** `(p Page) Meta(total int64) PageMeta` — Meta builds list metadata.
+
+#### `internal/hr/performance/events/events.go` (59 lines)
+_Package:_ Package events defines HR/Performance event types and the shared envelope (FR-EV001).
+- **type** `Envelope struct` — Envelope is the platform event envelope (same shape as the other HR contexts).
+- **type** `Source struct` — Source identifies who and when an event came from.
+- **func** `New(routingKey string, src Source, payload interface{}) Envelope` — New wraps a payload in the envelope.
+- **type** `Payload struct` — Payload carries ids, statuses and progress only — never ratings, scores, potential or review text (FR-EV002, PM-017).
 
 #### `internal/hr/performance/lifecycle/lifecycle.go` (51 lines)
 _Package:_ Package lifecycle is Module 7's pure state machines: appraisal cycles (PM-002) and goals (FR-GL004).
@@ -5153,6 +5298,90 @@ _Package:_ Package models holds Module 7 (Performance) persistence models; migra
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
+#### `internal/hr/performance/repositories/interfaces.go` (104 lines)
+_Package:_ Package repositories is HR/Performance data access: tenant_id on every scoped query, `db`/`tx` passed per call.
+- **type** `CycleRepository interface` — CycleRepository persists appraisal cycles (FR-CY).
+- **method** `CycleRepository.Create(ctx context.Context, tx *gorm.DB, c *models.Cycle) error`
+- **method** `CycleRepository.Update(ctx context.Context, tx *gorm.DB, c *models.Cycle) error`
+- **method** `CycleRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Cycle, error)`
+- **method** `CycleRepository.LockByID(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Cycle, error)`
+- **method** `CycleRepository.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page dto.Page) ([]models.Cycle, int64, error)`
+- **type** `GoalFilter struct` — GoalFilter narrows goal lists (G2); EmployeeID nil means any owner.
+- **type** `GoalRepository interface` — GoalRepository persists goals, their key results and append-only check-ins (FR-GL, PM-007).
+- **method** `GoalRepository.Create(ctx context.Context, tx *gorm.DB, g *models.Goal) error`
+- **method** `GoalRepository.Update(ctx context.Context, tx *gorm.DB, g *models.Goal) error`
+- **method** `GoalRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Goal, error)`
+- **method** `GoalRepository.LockByID(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Goal, error)`
+- **method** `GoalRepository.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f GoalFilter, page dto.Page) ([]models.Goal, int64, error)`
+- **method** `GoalRepository.LockOwner(ctx context.Context, tx *gorm.DB, cycleID, employeeID uuid.UUID) error` — LockOwner takes the transaction-scoped advisory lock for (cycle, owner) that serializes the weight cap (PM-004).
+- **method** `GoalRepository.WeightSum(ctx context.Context, tx *gorm.DB, tenantID, cycleID, employeeID, exclude uuid.UUID) (score.Fixed, error)` — WeightSum sums the owner's non-cancelled goal weights in the cycle, excluding one goal (uuid.Nil: none).
+- **method** `GoalRepository.Open(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID) ([]models.Goal, error)` — Open lists the cycle's non-cancelled goals (launch reviews, 9-box goal scores).
+- **method** `GoalRepository.AddKeyResult(ctx context.Context, tx *gorm.DB, k *models.KeyResult) error`
+- **method** `GoalRepository.UpdateKeyResult(ctx context.Context, tx *gorm.DB, k *models.KeyResult) error`
+- **method** `GoalRepository.KeyResults(ctx context.Context, db *gorm.DB, tenantID, goalID uuid.UUID) ([]models.KeyResult, error)`
+- **method** `GoalRepository.AddCheckIn(ctx context.Context, tx *gorm.DB, c *models.CheckIn) error`
+- **method** `GoalRepository.CheckIns(ctx context.Context, db *gorm.DB, tenantID, goalID uuid.UUID, limit int) ([]models.CheckIn, error)` — CheckIns returns the goal's newest check-ins first, at most limit.
+- **type** `ReviewFilter struct` — ReviewFilter narrows review lists (V2–V4).
+- **type** `ReviewRepository interface` — ReviewRepository persists reviews (FR-RV).
+- **method** `ReviewRepository.Create(ctx context.Context, tx *gorm.DB, r *models.Review) error`
+- **method** `ReviewRepository.Update(ctx context.Context, tx *gorm.DB, r *models.Review) error`
+- **method** `ReviewRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Review, error)`
+- **method** `ReviewRepository.LockByID(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Review, error)`
+- **method** `ReviewRepository.Exists(ctx context.Context, tx *gorm.DB, tenantID, cycleID, employeeID, reviewerID uuid.UUID, typ string) (bool, error)` — Exists reports whether the (cycle, employee, reviewer, type) assignment exists (PM-010, PM-011).
+- **method** `ReviewRepository.List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ReviewFilter, page dto.Page) ([]models.Review, int64, error)`
+- **method** `ReviewRepository.ExpirePending(ctx context.Context, tx *gorm.DB, tenantID, cycleID uuid.UUID, at time.Time) (int64, error)` — ExpirePending marks the cycle's pending reviews expired (PM-013).
+- **type** `OutboxRepository interface` — OutboxRepository persists outbox rows; relay methods are cross-tenant by design.
+- **method** `OutboxRepository.Create(ctx context.Context, tx *gorm.DB, e *models.OutboxEvent) error`
+- **method** `OutboxRepository.MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
+- **method** `OutboxRepository.RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
+- **method** `OutboxRepository.FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
+- **func** `first[T any](q *gorm.DB) (*T, error)`
+- **func** `paged[T any](q *gorm.DB, order string, page dto.Page) ([]T, int64, error)`
+
+#### `internal/hr/performance/repositories/repositories.go` (176 lines)
+- **type** `cycleRepository struct{}`
+- **func** `NewCycleRepository() CycleRepository { return &cycleRepository{} }` — NewCycleRepository builds a CycleRepository.
+- **func** `(r *cycleRepository) Create(ctx context.Context, tx *gorm.DB, c *models.Cycle) error`
+- **func** `(r *cycleRepository) Update(ctx context.Context, tx *gorm.DB, c *models.Cycle) error`
+- **func** `(r *cycleRepository) FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Cycle, error)`
+- **func** `(r *cycleRepository) LockByID(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Cycle, error)`
+- **func** `(r *cycleRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page dto.Page) ([]models.Cycle, int64, error)`
+- **type** `goalRepository struct{}`
+- **func** `NewGoalRepository() GoalRepository { return &goalRepository{} }` — NewGoalRepository builds a GoalRepository.
+- **func** `(r *goalRepository) Create(ctx context.Context, tx *gorm.DB, g *models.Goal) error`
+- **func** `(r *goalRepository) Update(ctx context.Context, tx *gorm.DB, g *models.Goal) error`
+- **func** `(r *goalRepository) FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Goal, error)`
+- **func** `(r *goalRepository) LockByID(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Goal, error)`
+- **func** `(r *goalRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f GoalFilter, page dto.Page) ([]models.Goal, int64, error)`
+- **func** `(r *goalRepository) LockOwner(ctx context.Context, tx *gorm.DB, cycleID, employeeID uuid.UUID) error`
+- **func** `(r *goalRepository) WeightSum(ctx context.Context, tx *gorm.DB, tenantID, cycleID, employeeID, exclude uuid.UUID) (score.Fixed, error)`
+- **func** `(r *goalRepository) Open(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID) ([]models.Goal, error)`
+- **func** `(r *goalRepository) AddKeyResult(ctx context.Context, tx *gorm.DB, k *models.KeyResult) error`
+- **func** `(r *goalRepository) UpdateKeyResult(ctx context.Context, tx *gorm.DB, k *models.KeyResult) error`
+- **func** `(r *goalRepository) KeyResults(ctx context.Context, db *gorm.DB, tenantID, goalID uuid.UUID) ([]models.KeyResult, error)`
+- **func** `(r *goalRepository) AddCheckIn(ctx context.Context, tx *gorm.DB, c *models.CheckIn) error`
+- **func** `(r *goalRepository) CheckIns(ctx context.Context, db *gorm.DB, tenantID, goalID uuid.UUID, limit int) ([]models.CheckIn, error)`
+- **type** `reviewRepository struct{}`
+- **func** `NewReviewRepository() ReviewRepository { return &reviewRepository{} }` — NewReviewRepository builds a ReviewRepository.
+- **func** `(r *reviewRepository) Create(ctx context.Context, tx *gorm.DB, rv *models.Review) error`
+- **func** `(r *reviewRepository) Update(ctx context.Context, tx *gorm.DB, rv *models.Review) error`
+- **func** `(r *reviewRepository) FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Review, error)`
+- **func** `(r *reviewRepository) LockByID(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Review, error)`
+- **func** `(r *reviewRepository) Exists(ctx context.Context, tx *gorm.DB, tenantID, cycleID, employeeID, reviewerID uuid.UUID, typ string) (bool, error)`
+- **func** `(r *reviewRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ReviewFilter, page dto.Page) ([]models.Review, int64, error)`
+- **func** `(r *reviewRepository) ExpirePending(ctx context.Context, tx *gorm.DB, tenantID, cycleID uuid.UUID, at time.Time) (int64, error)`
+- **type** `outboxRepository struct{}`
+- **func** `NewOutboxRepository() OutboxRepository { return &outboxRepository{} }` — NewOutboxRepository builds an OutboxRepository.
+- **func** `(r *outboxRepository) Create(ctx context.Context, tx *gorm.DB, e *models.OutboxEvent) error`
+- **func** `(r *outboxRepository) MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
+- **func** `(r *outboxRepository) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
+- **func** `(r *outboxRepository) FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
+
+#### `internal/hr/performance/routes/routes.go` (54 lines)
+_Package:_ Package routes mounts HR/Performance endpoints (specification.md §5) behind M0 middleware.
+- **type** `Middleware struct` — Middleware is the M0 middleware HR/Performance depends on.
+- **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Controller)` — RegisterRoutes mounts all 22 operations. Self, manager and reviewer access is decided per request (PM-008, D7-05), so those routes only authenticate and carry the read/manage flags.
+
 #### `internal/hr/performance/score/score.go` (179 lines)
 _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredths fixed point, key-result and goal progress, weighted goal score, review overall score and 9-box bands. No floats are used for any stored or compared value.
 - **type** `Fixed int64` — Fixed is a decimal with exactly two fractional digits, stored as hundredths (12.5 = 1250).
@@ -5172,6 +5401,122 @@ _Package:_ Package score is Module 7's pure, exact arithmetic (D7-02): hundredth
 - **func** `WeightedScore(weights, progress []Fixed) Fixed` — WeightedScore is PM-009: Σ(weight × progress) / Σ weight, rounded; empty or zero weight → 0.
 - **func** `Overall(ratings []int) Fixed` — Overall is PM-012: the mean of integer ratings as a 2-decimal score; empty → 0.
 - **func** `Band(overall Fixed) string` — Band maps an overall score to its 9-box performance band: < 2.50 low, < 3.50 medium, else high.
+
+#### `internal/hr/performance/services/cycle_service.go` (349 lines)
+- **type** `CycleService struct{ base }` — CycleService implements FR-CY (C1–C8).
+- **func** `NewCycleService(d Deps) *CycleService { return &CycleService{base{d}} }` — NewCycleService builds the service.
+- **func** `(s *CycleService) Create(ctx context.Context, a Actor, req dto.CreateCycleRequest) (*dto.CycleResponse, error)` — Create is C1 (FR-CY001, PM-001).
+- **func** `(s *CycleService) Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.CycleResponse, error)` — Get is C3.
+- **func** `(s *CycleService) List(ctx context.Context, tenantID uuid.UUID, status string, page dto.Page) ([]dto.CycleResponse, dto.PageMeta, error)` — List is C2.
+- **func** `(s *CycleService) Update(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateCycleRequest) (*dto.CycleResponse, error)` — Update is C4: title, dates and criteria, draft only (FR-CY002, PM-001).
+- **func** `applyCycleUpdate(c *models.Cycle, req dto.UpdateCycleRequest) error`
+- **func** `(s *CycleService) Activate(ctx context.Context, a Actor, id uuid.UUID) (*dto.CycleResponse, error)` — Activate is C5: draft → active (FR-CY003).
+- **func** `(s *CycleService) Complete(ctx context.Context, a Actor, id uuid.UUID) (*dto.CycleResponse, error)` — Complete is C7: review → completed; pending reviews expire (FR-CY005, PM-013).
+- **func** `(s *CycleService) transition(ctx context.Context, a Actor, id uuid.UUID, to, event string, extra func(*gorm.DB, *models.Cycle) error) (*dto.CycleResponse, error)`
+- **func** `(s *CycleService) stamp(c *models.Cycle, status string)` — stamp moves the cycle to status and records when.
+- **func** `(s *CycleService) LaunchReviews(ctx context.Context, a Actor, id uuid.UUID) (*dto.LaunchResponse, error)` — LaunchReviews is C6 (FR-CY004, PM-010): active → review with a self review per goal owner and a manager review where the owner's manager has a profile. Idempotent per assignment: on a cycle already in review it only creates what is missing (EC-06: a second launch creates 0).
+- **func** `owners(goals []models.Goal) []uuid.UUID`
+- **func** `(s *CycleService) launchFor(ctx context.Context, tx *gorm.DB, c *models.Cycle, owner uuid.UUID, out *dto.LaunchResponse) error`
+- **func** `(s *CycleService) ensureReview(ctx context.Context, tx *gorm.DB, c *models.Cycle, employee, reviewer uuid.UUID, typ string) (bool, error)`
+- **func** `(s *CycleService) NineBox(ctx context.Context, tenantID, id uuid.UUID) (*dto.NineBoxResponse, error)` — NineBox is C8 (PM-015, D7-04): performance band from the latest submitted manager review × its potential, with the goal score (PM-009) alongside; cycles in review or completed only.
+- **func** `nineBox(cycleID uuid.UUID, goals []models.Goal, reviews []models.Review) *dto.NineBoxResponse`
+- **func** `(s *CycleService) lock(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Cycle, error)`
+
+#### `internal/hr/performance/services/errors.go` (30 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
+
+#### `internal/hr/performance/services/goal_service.go` (450 lines)
+- **type** `GoalService struct{ base }` — GoalService implements FR-GL (G1–G8).
+- **func** `NewGoalService(d Deps) *GoalService { return &GoalService{base{d}} }` — NewGoalService builds the service.
+- **func** `(s *GoalService) Create(ctx context.Context, a Actor, req dto.CreateGoalRequest) (*dto.GoalResponse, error)` — Create is G1 (FR-GL001, PM-003..PM-005, PM-008).
+- **type** `goalInput struct`
+- **func** `(s *GoalService) parseCreate(ctx context.Context, a Actor, req dto.CreateGoalRequest) (*goalInput, error)`
+- **func** `(s *GoalService) openCycle(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, open func(string) bool) error` — openCycle locks the cycle and checks that its status allows the action.
+- **func** `(s *GoalService) checkParent(ctx context.Context, tx *gorm.DB, tenantID, cycleID uuid.UUID, parent *uuid.UUID) error` — checkParent is PM-005: same tenant and cycle, not cancelled, chain depth ≤ 3.
+- **func** `(s *GoalService) checkWeight(ctx context.Context, tx *gorm.DB, g *models.Goal, weight score.Fixed) error` — checkWeight is PM-004 under the (cycle, owner) advisory lock.
+- **func** `(s *GoalService) Get(ctx context.Context, a Actor, id uuid.UUID) (*dto.GoalResponse, error)` — Get is G4 with key results and the newest check-ins (PM-008 read).
+- **func** `(s *GoalService) detail(ctx context.Context, g *models.Goal) (*dto.GoalResponse, error)`
+- **func** `(s *GoalService) List(ctx context.Context, a Actor, f repositories.GoalFilter, page dto.Page) ([]dto.GoalResponse, dto.PageMeta, error)` — List is G2: any filter with performance:read; otherwise own goals or a direct report's (D7-05).
+- **func** `(s *GoalService) ListMine(ctx context.Context, a Actor, cycleID *uuid.UUID, page dto.Page) ([]dto.GoalResponse, dto.PageMeta, error)` — ListMine is G3.
+- **func** `(s *GoalService) list(ctx context.Context, a Actor, f repositories.GoalFilter, page dto.Page) ([]dto.GoalResponse, dto.PageMeta, error)`
+- **func** `(s *GoalService) Update(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateGoalRequest) (*dto.GoalResponse, error)` — Update is G5: title, description, weight while the cycle allows goal changes (FR-GL003, PM-003, PM-004).
+- **func** `applyGoalUpdate(g *models.Goal, req dto.UpdateGoalRequest) error`
+- **func** `(s *GoalService) SetStatus(ctx context.Context, a Actor, id uuid.UUID, to string) (*dto.GoalResponse, error)` — SetStatus is G6 (FR-GL004).
+- **func** `(s *GoalService) AddKeyResult(ctx context.Context, a Actor, id uuid.UUID, req dto.KeyResultRequest) (*dto.GoalResponse, error)` — AddKeyResult is G7 (FR-GL005, PM-006, PM-007): the goal's progress becomes the mean of its key results.
+- **func** `(s *GoalService) CheckIn(ctx context.Context, a Actor, id uuid.UUID, req dto.CheckInRequest) (*dto.GoalResponse, error)` — CheckIn is G8 (FR-GL006, PM-006, PM-007).
+- **func** `(s *GoalService) applyCheckIn(ctx context.Context, tx *gorm.DB, a Actor, g *models.Goal, krID *uuid.UUID, req dto.CheckInRequest, note *string) (*models.OutboxEvent, error)`
+- **type** `progressChange struct` — progressChange describes what caused a progress update (recorded on the check-in).
+- **func** `(s *GoalService) recompute(ctx context.Context, tx *gorm.DB, a Actor, g *models.Goal, ch progressChange) (*models.OutboxEvent, error)` — recompute derives the goal's progress from all its key results (PM-006) and records the change.
+- **func** `(s *GoalService) recordProgress(ctx context.Context, tx *gorm.DB, a Actor, g *models.Goal, to score.Fixed, ch progressChange) (*models.OutboxEvent, error)` — recordProgress updates the goal and appends the check-in in the same transaction (PM-007, NFR-D001).
+- **func** `(s *GoalService) mutate(ctx context.Context, a Actor, id uuid.UUID, fn func(*gorm.DB, *models.Goal) (*models.OutboxEvent, error)) (*models.Goal, error)` — mutate locks the goal, applies PM-008 write access (denial → 404) and runs fn in one transaction; the audit row and event follow the commit.
+
+#### `internal/hr/performance/services/helpers.go` (181 lines)
+- **type** `base struct{ Deps }` — base carries Deps plus helpers shared by all services.
+- **func** `(b base) employeeFor(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — employeeFor resolves the caller's own employee profile (self endpoints, NFR-SEC002).
+- **func** `(b base) optionalSelf(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — optionalSelf is employeeFor where "no profile" is not an error (callers acting only through permissions).
+- **func** `(b base) employee(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)` — employee loads an employee of the tenant; unknown → EMPLOYEE_NOT_FOUND.
+- **func** `(b base) managerEmployee(ctx context.Context, tenantID uuid.UUID, emp *employeeDTO.EmployeeResponse) (*employeeDTO.EmployeeResponse, error)` — managerEmployee resolves an employee's direct manager's employee profile (D7-03); nil when there is none or the manager has no profile (A7-02).
+- **func** `(b base) managesEmployee(ctx context.Context, a Actor, employeeID uuid.UUID) (bool, error)` — managesEmployee reports whether the caller is the direct manager of the employee (PM-008).
+- **func** `(b base) canAccessEmployee(ctx context.Context, a Actor, employeeID uuid.UUID, write bool) (bool, error)` — canAccessEmployee is PM-008 for an owner: the permission flag, the owner themself, or the owner's manager. Denials are reported as false (callers answer 404, D7-05).
+- **func** `(b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, key string, payload events.Payload) (*models.OutboxEvent, error)` — writeOutbox stores the event inside the business transaction (FR-EV001).
+- **type** `auditEntry struct` — auditEntry is one audit row; metadata holds ids and statuses only (PM-017).
+- **func** `(b base) afterCommit(ctx context.Context, a Actor, e auditEntry, row *models.OutboxEvent)` — afterCommit writes the audit row and tries to publish the event; the relay retries what fails.
+- **func** `parseUUIDField(field, raw string) (uuid.UUID, error)`
+- **func** `parseOptionalUUID(field string, raw *string) (*uuid.UUID, error)`
+- **func** `text(field, s string, max int) (string, error)` — text trims s and checks 1..max characters.
+- **func** `optionalText(field string, s *string, max int) (*string, error)` — optionalText trims an optional field; blank → nil; longer than max → 400.
+- **func** `orNotFound(err error) error`
+- **func** `uuidPtr(id uuid.UUID) *uuid.UUID { return &id }`
+
+#### `internal/hr/performance/services/mappers.go` (64 lines)
+- **func** `cycleResponse(c *models.Cycle) dto.CycleResponse`
+- **func** `cycleResponses(rows []models.Cycle) []dto.CycleResponse`
+- **func** `goalResponse(g *models.Goal) dto.GoalResponse`
+- **func** `goalResponses(rows []models.Goal) []dto.GoalResponse`
+- **func** `keyResultResponse(k *models.KeyResult) dto.KeyResultResponse`
+- **func** `checkInResponse(c *models.CheckIn) dto.CheckInResponse`
+- **func** `reviewResponse(r *models.Review, anonymous bool) dto.ReviewResponse` — reviewResponse maps a review; anonymous hides the reviewer of peer reviews (PM-014).
+- **func** `reviewResponses(rows []models.Review, anonymous bool) []dto.ReviewResponse`
+
+#### `internal/hr/performance/services/outbox_relay.go` (59 lines)
+- **type** `OutboxRelay struct` — OutboxRelay republishes outbox rows the request path could not publish.
+- **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the module dependencies.
+- **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
+- **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled.
+
+#### `internal/hr/performance/services/ports.go` (77 lines)
+_Package:_ Package services holds HR/Performance business rules (specification.md PM-001..PM-017).
+- **type** `EmployeeDirectory interface` — EmployeeDirectory is HR/Performance's view of HR/Employee (connection C4); employee/api.Directory satisfies it.
+- **method** `EmployeeDirectory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `ManagerDirectory interface` — ManagerDirectory resolves a user's direct manager from HR/Organization (connection C3, D7-03): the manager_user_id of the user's primary active mapping, or nil.
+- **method** `ManagerDirectory.DirectManager(ctx context.Context, tenantID, userID uuid.UUID) (*uuid.UUID, error)`
+- **type** `AuditLogger interface` — AuditLogger is HR/Performance's view of the M0 audit trail.
+- **method** `AuditLogger.Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
+- **type** `TxRunner interface` — TxRunner opens database transactions.
+- **method** `TxRunner.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `TxRunner.DB() *gorm.DB`
+- **type** `Clock func() time.Time` — Clock returns the current instant.
+- **type** `Actor struct` — Actor is the authenticated caller from M0 middleware context only (NFR-SEC002). CanRead and CanManage are the performance:read / performance:manage flags resolved by the route (PermissionFlag).
+- **type** `Repos struct` — Repos bundles the context repositories.
+- **type** `Deps struct` — Deps is everything an HR/Performance service needs.
+- **type** `gormRunner struct{ db *gorm.DB }`
+- **func** `NewTxRunner(db *gorm.DB) TxRunner { return gormRunner{db: db} }` — NewTxRunner wraps a GORM handle as a TxRunner.
+- **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
+
+#### `internal/hr/performance/services/review_service.go` (231 lines)
+- **type** `ReviewService struct{ base }` — ReviewService implements FR-RV (V1–V6).
+- **func** `NewReviewService(d Deps) *ReviewService { return &ReviewService{base{d}} }` — NewReviewService builds the service.
+- **func** `(s *ReviewService) Assign(ctx context.Context, a Actor, req dto.AssignReviewerRequest) (*dto.ReviewResponse, error)` — Assign is V1 (FR-RV001, PM-011).
+- **func** `(s *ReviewService) List(ctx context.Context, tenantID uuid.UUID, f repositories.ReviewFilter, page dto.Page) ([]dto.ReviewResponse, dto.PageMeta, error)` — List is V2 (performance:read).
+- **func** `(s *ReviewService) ListAssigned(ctx context.Context, a Actor, status string, page dto.Page) ([]dto.ReviewResponse, dto.PageMeta, error)` — ListAssigned is V3: reviews the caller must write.
+- **func** `(s *ReviewService) ListMine(ctx context.Context, a Actor, cycleID *uuid.UUID) ([]dto.ReviewResponse, error)` — ListMine is V4 (PM-014): the caller's submitted reviews of completed cycles; peer reviewers stay anonymous.
+- **func** `(s *ReviewService) Get(ctx context.Context, a Actor, id uuid.UUID) (*dto.ReviewResponse, error)` — Get is V5: the reviewer or performance:read; anyone else 404.
+- **func** `(s *ReviewService) Submit(ctx context.Context, a Actor, id uuid.UUID, req dto.SubmitReviewRequest) (*dto.ReviewResponse, error)` — Submit is V6 (FR-RV003, PM-012): only the assigned reviewer, once, while the cycle is in review.
+- **func** `(s *ReviewService) fill(r *models.Review, criteria []string, req dto.SubmitReviewRequest) error` — fill validates ratings and potential against the cycle (PM-012) and marks the review submitted.
+- **func** `reviewStatus(s string) error`
 
 #### `internal/hr/performance/validators/validators.go` (148 lines)
 _Package:_ Package validators holds Module 7 field rules that struct tags cannot express.
@@ -5352,15 +5697,22 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `internal/hr/recruitment/services/harness_test.go`: (helpers only)
 - `internal/hr/recruitment/validators/validators_test.go`: TestValidators
 
-### M1 HR / Performance (in progress) — 10 test functions in 4 files
+### M1 HR / Performance & OKRs — 29 test functions in 10 files
+- `internal/hr/performance/controllers/controllers_test.go`: TestControllers_EveryOperation, TestControllers_Errors, TestControllers_BadInput
 - `internal/hr/performance/lifecycle/lifecycle_test.go`: TestGolden_G2_CycleGraph, TestGolden_G2_GoalGraph
 - `internal/hr/performance/models/models_test.go`: TestPerformanceModels_TablesAndIndexes, TestPerformanceModels_ColumnTypes, TestPerformanceModels_JSONColumnsAndIDs
 - `internal/hr/performance/score/score_test.go`: TestParseAndCodec, TestGolden_G3_ScoreMath
+- `internal/hr/performance/services/admin_test.go`: TestCycles_CRUDAndStateGraph, TestReviews_AssignAndLists, TestGoals_Validation, TestOutboxRelay
+- `internal/hr/performance/services/failures_test.go`: TestFailures_Propagate, TestFailures_Submit
+- `internal/hr/performance/services/fakes_test.go`: (helpers only)
+- `internal/hr/performance/services/golden_test.go`: TestGolden_G4_WeightCap, TestGolden_G5_KeyResultProgress, TestGolden_G6_Access, TestGolden_G7_CycleLocks, TestGolden_G8_LaunchReviews, TestGolden_G9_Submit, TestGolden_G10_SubjectVisibility, TestGolden_G11_NineBox, TestGolden_G12_Privacy, TestGolden_G15_Cascading
+- `internal/hr/performance/services/harness_test.go`: (helpers only)
 - `internal/hr/performance/validators/validators_test.go`: TestCriteria_PM001, TestDatesWeightsProgressKR, TestRatings_PM012
 
 ### Integration suite (`backend/tests/integration`)
 - `access_test.go`: TestAccessPredefinedRoles, TestAccessScopesInheritanceAndCycles, TestAccessUserGrantsAndBlocks, TestAccessAntiEscalation, TestAccessAutomaticRoles, TestAccessTenantIsolation
 - `attendance_test.go`: TestAttendancePunchFlow, TestAttendanceRegularization, TestAttendanceRBAC, TestAttendanceIsolation, TestAttendanceConcurrentPunches, TestAttendancePagination
+- `contract_test.go`: TestSwaggerMatchesRoutes
 - `employee_test.go`: TestEmployeeLifecycle, TestEmployeeStatusStateMachine, TestEmployeeStatutoryAndPIIMasking, TestEmployeeDocuments, TestEmployeeSelfService, TestEmployeeRBACTiers, TestUserDeactivationConvergesEmployee
 - `golden_test.go`: TestGoldenM1_TeamMoveKeepsMappingsConsistent, TestGoldenM1_AuditOnEveryOrgWrite, TestGoldenNoSecretLeakage, TestGoldenM2_EmployeeForForeignTenantUser, TestGoldenM2_AtomicOnboarding, TestGoldenM1_RejectedHierarchyChangeLeavesNoTrace
 - `harness_test.go`: TestMain
@@ -5370,6 +5722,7 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `org_test.go`: TestDepartmentLifecycleAndHierarchy, TestDepartmentDepthLimit, TestTeamLifecycle, TestDesignationLifecycle, TestMappingRulesAndUserDeactivationConvergence, TestOrgChartIsReadYourWritesConsistent, TestOrgChartUserChain, TestOrgRBAC
 - `payroll_test.go`: TestPayrollLifecycle, TestPayrollRBACAndIsolation
 - `perf_test.go`: TestPerformanceBudgets
+- `performance_test.go`: TestPerformanceLifecycle
 - `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
 - `schema_test.go`: TestMigrationsAreIdempotentAndComplete, TestSchemasAreOwnedAndIsolated, TestBusinessCodesAreTenantScoped
@@ -6412,7 +6765,7 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 - FR-CY001 Create `{title 1–150, start_date, end_date ≥ start, criteria? (1–10 distinct names 1–50 chars; default Quality, Delivery, Collaboration, Ownership)}` → `draft`.
 - FR-CY002 List (status filter) / get; update title, dates and criteria only in `draft`.
 - FR-CY003 Activate `draft → active` (event `performance.cycle_started`).
-- FR-CY004 Launch reviews `active → review`: creates self + manager reviews (PM-010).
+- FR-CY004 Launch reviews `active → review`: creates self + manager reviews (PM-010). On a cycle already in `review` it only creates missing reviews (EC-06, D7-07).
 - FR-CY005 Complete `review → completed`: pending reviews become `expired` (event `performance.cycle_completed`).
 - FR-CY006 9-box for a cycle in `review` or `completed` (PM-015).
 - FR-GL001 Create `{cycle_id, employee_id?, title 1–200, description?, weight 0.01–100, parent_goal_id?}`. `employee_id` defaults to the caller's own profile.
@@ -6462,6 +6815,12 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 - D7-04 (P1) The 9-box performance axis is the manager review's overall score; the goal score is reported alongside, not blended (blending formulas are a calibration feature, out of scope).
 - D7-05 (P1) Access denials on goals/reviews are 404, not 403, so existence is not disclosed (same as HR/Attendance, HR/Leave, HR/Payroll, HR/Recruitment self endpoints).
 - D7-06 (P1) Cycle list/get are open to any authenticated tenant user (needed to pick a cycle when setting goals); they contain no personal data.
+- D7-07 (P5) Launch reviews is idempotent on a cycle already in `review`: it creates only missing self/manager reviews
+  and does not change the status (EC-06 "a second launch creates 0"; PM-002 forbids every other repeat transition).
+- D7-08 (P5) HR/Performance reads the direct manager through its own `ManagerDirectory` port; the HR root passes
+  `organization.Module.DirectManager` (primary active mapping), so performance never imports HR/Organization (import-boundary test).
+- D7-09 (P6) A parent goal from another tenant is 404 (PM-016); a parent in another cycle or cancelled is 400.
 ##### Changelog
 2026-10-09 — P1 DONE: HR/Performance = Performance & OKRs (D7-01); design frozen; Notifications scaffold unnumbered.
 2026-10-09 — P2 DONE: models, migrations, score + lifecycle goldens.
+2026-10-20 — P3–P9 DONE: backend, unit + integration goldens, swagger, console page; context complete for its v1 scope.

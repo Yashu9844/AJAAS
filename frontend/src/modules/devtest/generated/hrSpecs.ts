@@ -2666,4 +2666,735 @@ export const HR_RECRUITMENT: OpSpec[] = [
   }
 ];
 
-export const HR_PERFORMANCE: OpSpec[] = [];
+export const HR_PERFORMANCE: OpSpec[] = [
+  {
+    "key": "hr.performance.post.hr.performance.cycles",
+    "label": "Create an appraisal cycle (performance:manage)",
+    "method": "POST",
+    "path": "/hr/performance/cycles",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "title",
+        "where": "body",
+        "required": true,
+        "placeholder": "FY26 H1"
+      },
+      {
+        "name": "start_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "criteria",
+        "where": "body",
+        "type": "list",
+        "placeholder": "Default Quality, Delivery, Collaboration, Ownership"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceCyclesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR (title, dates, criteria)"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.cycles",
+    "label": "List cycles (any authenticated employee, D7-06)",
+    "method": "GET",
+    "path": "/hr/performance/cycles",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "draft",
+          "active",
+          "review",
+          "completed"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.get.hr.performance.cycles.id",
+    "label": "Get a cycle (any authenticated employee)",
+    "method": "GET",
+    "path": "/hr/performance/cycles/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.performance.patch.hr.performance.cycles.id",
+    "label": "Update title, dates or criteria while draft (performance:manage)",
+    "method": "PATCH",
+    "path": "/hr/performance/cycles/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "start_date",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_date",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "criteria",
+        "where": "body",
+        "type": "list"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE (not draft)"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.cycles.id.activate",
+    "label": "Activate a draft cycle (performance:manage)",
+    "method": "POST",
+    "path": "/hr/performance/cycles/:id/activate",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE (not draft)"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.cycles.id.complete",
+    "label": "Complete a cycle in review; pending reviews expire (performance:manage)",
+    "method": "POST",
+    "path": "/hr/performance/cycles/:id/complete",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE (not in review)"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.cycles.id.launch.reviews",
+    "label": "Move active → review and create self + manager reviews; idempotent (performance:manage)",
+    "method": "POST",
+    "path": "/hr/performance/cycles/:id/launch-reviews",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE (draft or completed)"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.cycles.id.nine.box",
+    "label": "9-box talent matrix (performance:read)",
+    "method": "GET",
+    "path": "/hr/performance/cycles/:id/nine-box",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE (not review/completed)"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.goals",
+    "label": "Create a goal for yourself, a direct report, or anyone with performance:manage",
+    "method": "POST",
+    "path": "/hr/performance/goals",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "cycle_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "employee_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "weight",
+        "where": "body",
+        "type": "number",
+        "required": true,
+        "placeholder": "40"
+      },
+      {
+        "name": "parent_goal_id",
+        "where": "body",
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceGoalsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 404 NOT_FOUND / EMPLOYEE_NOT_FOUND; 409 CYCLE_STATE, WEIGHT_EXCEEDED, GOAL_DEPTH, EMPLOYEE_STATE"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.goals",
+    "label": "List goals (performance:read: any; otherwise own or a direct report)",
+    "method": "GET",
+    "path": "/hr/performance/goals",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "cycle_id",
+        "where": "query"
+      },
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "completed",
+          "cancelled"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND (not yours or a report)"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.goals.me",
+    "label": "My goals",
+    "method": "GET",
+    "path": "/hr/performance/goals/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "cycle_id",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.goals.id",
+    "label": "Get a goal with key results and the newest 50 check-ins (owner, manager, performance:read)",
+    "method": "GET",
+    "path": "/hr/performance/goals/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceGoalsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.performance.patch.hr.performance.goals.id",
+    "label": "Update title, description or weight (owner, manager, performance:manage)",
+    "method": "PATCH",
+    "path": "/hr/performance/goals/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceGoalsId"
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "weight",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE, GOAL_STATE, WEIGHT_EXCEEDED"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.goals.id.check.ins",
+    "label": "Record progress: progress (no key results) or key_result_id + value",
+    "method": "POST",
+    "path": "/hr/performance/goals/:id/check-ins",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceGoalsId"
+      },
+      {
+        "name": "progress",
+        "where": "body",
+        "type": "number",
+        "placeholder": "Goals without key results"
+      },
+      {
+        "name": "key_result_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "value",
+        "where": "body",
+        "type": "number",
+        "placeholder": "New current value of the key result"
+      },
+      {
+        "name": "note",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceGoalsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 409 CYCLE_STATE, GOAL_STATE, HAS_KEY_RESULTS"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.goals.id.key.results",
+    "label": "Add a key result; the goal progress becomes the mean of its key results",
+    "method": "POST",
+    "path": "/hr/performance/goals/:id/key-results",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceGoalsId"
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "unit",
+        "where": "body"
+      },
+      {
+        "name": "start_value",
+        "where": "body",
+        "type": "number",
+        "required": true,
+        "placeholder": "0"
+      },
+      {
+        "name": "target_value",
+        "where": "body",
+        "type": "number",
+        "required": true,
+        "placeholder": "10"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceGoalsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 409 CYCLE_STATE, GOAL_STATE"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.goals.id.status",
+    "label": "Complete, cancel (final) or reopen a goal",
+    "method": "POST",
+    "path": "/hr/performance/goals/:id/status",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceGoalsId"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "completed",
+          "cancelled",
+          "active"
+        ],
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE, GOAL_STATE"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.reviews",
+    "label": "Assign a peer or manager reviewer while the cycle is in review (performance:manage)",
+    "method": "POST",
+    "path": "/hr/performance/reviews",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "cycle_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "reviewer_employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "peer",
+          "manager"
+        ],
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "performanceReviewsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND; 409 CYCLE_STATE, EMPLOYEE_STATE, CONFLICT"
+  },
+  {
+    "key": "hr.performance.get.hr.performance.reviews",
+    "label": "List reviews (performance:read)",
+    "method": "GET",
+    "path": "/hr/performance/reviews",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "cycle_id",
+        "where": "query"
+      },
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "submitted",
+          "expired"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.get.hr.performance.reviews.assigned",
+    "label": "Reviews I must write",
+    "method": "GET",
+    "path": "/hr/performance/reviews/assigned",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "submitted",
+          "expired"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.get.hr.performance.reviews.me",
+    "label": "My submitted reviews of completed cycles; peer reviewers anonymous",
+    "method": "GET",
+    "path": "/hr/performance/reviews/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "cycle_id",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.performance.get.hr.performance.reviews.id",
+    "label": "Get a review (the reviewer or performance:read)",
+    "method": "GET",
+    "path": "/hr/performance/reviews/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceReviewsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.performance.post.hr.performance.reviews.id.submit",
+    "label": "Submit my review: every cycle criterion once (1–5); potential only for manager reviews",
+    "method": "POST",
+    "path": "/hr/performance/reviews/:id/submit",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "performanceReviewsId"
+      },
+      {
+        "name": "ratings",
+        "where": "body",
+        "type": "json",
+        "required": true
+      },
+      {
+        "name": "strengths",
+        "where": "body"
+      },
+      {
+        "name": "improvements",
+        "where": "body"
+      },
+      {
+        "name": "potential",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "low",
+          "medium",
+          "high"
+        ],
+        "placeholder": "Required for manager reviews only"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND (not the reviewer); 409 REVIEW_STATE, CYCLE_STATE"
+  }
+];

@@ -24,3 +24,14 @@ func (m *Module) HasDirectReports(ctx context.Context, tenantID, userID uuid.UUI
 		Where("tenant_id = ? AND status = ? AND manager_user_id = ?", tenantID, "active", userID).Count(&n).Error
 	return n > 0, err
 }
+
+// DirectManager returns the manager_user_id of the user's primary active mapping, or nil (HR/Performance D7-03).
+func (m *Module) DirectManager(ctx context.Context, tenantID, userID uuid.UUID) (*uuid.UUID, error) {
+	var rows []models.Mapping
+	err := m.db.WithContext(ctx).Where("tenant_id = ? AND user_id = ? AND status = ? AND is_primary = ?", tenantID, userID, "active", true).
+		Limit(1).Find(&rows).Error
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	return rows[0].ManagerUserID, nil
+}

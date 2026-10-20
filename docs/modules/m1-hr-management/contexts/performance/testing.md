@@ -27,11 +27,21 @@
 RED first. Pure score + lifecycle packages 100% (G2, G3); services ≥ 95% (G4–G11, G15 on fakes + failure injection); controllers/routes ~100%; integration G1, G4–G6, G8–G14; migration cycle + AutoMigrate↔SQL parity.
 
 ```bash
-go test -count=1 -cover ./internal/performance/...
-JAAS_REQUIRE_INTEGRATION=1 go test -count=1 -run Performance ./tests/integration/
+go test -count=1 -cover ./internal/hr/performance/...
+JAAS_REQUIRE_INTEGRATION=1 go test -count=1 -run PerformanceLifecycle ./tests/integration/
+node scripts/console-headless.mjs <slug> <admin-email> <password> hr.perf   # console goldens
 ```
 
 ## Delivery evidence (status and Definition of Done at backend close)
 
 - P1: design frozen — 22 ops, PM-001..PM-017, 6 tables, 4 events, goldens G1–G15, decisions D7-01..D7-06.
 - P2: models (6) 100%; score + lifecycle pure packages 100% (G2, G3 green); migrations 000051–000056 cycle-verified; AutoMigrate↔SQL identical.
+- P3–P7 (2026-10-20): DTOs, events, repositories (advisory lock for the weight cap), services (cycle, goal, review, relay),
+  controllers, routes (22 ops under `/api/v1/hr/performance`), catalogue (`performance:read|manage`, sensitive), wiring in
+  the HR root with `organization.Module.DirectManager` as the manager port.
+- P8 unit evidence: services 95.9% (G4–G12, G15 on fakes + failure injection), controllers + routes 99.7% (22 ops, errors,
+  401, bad ids/bodies, pagination clamp G14), score/lifecycle/models/validators 100%.
+- P8 integration: `TestPerformanceLifecycle` (G1, G4–G14) green; full suite green; `TestSwaggerMatchesRoutes` keeps the
+  contract in step with the router.
+- P9 console: `/dev-test/hr/performance` — 22 generated operation forms, scenarios `hr.perf.flow` (37 steps) and
+  `hr.perf.rbac` (13 steps) pass against the live API (headless run, 2026-10-20; whole console 34/34).

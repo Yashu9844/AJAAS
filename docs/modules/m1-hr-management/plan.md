@@ -13,7 +13,7 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 | leave | done (20 ops) | `/dev-test/hr/leave`, 2 scenarios | |
 | payroll | done (20 ops) | `/dev-test/hr/payroll`, 2 scenarios | |
 | recruitment | done (20 ops) | `/dev-test/hr/recruitment`, 1 scenario | last-seat concurrent hire can orphan a profile (documented, untested) |
-| performance | P3 of 9: models, migrations 000051–000056, score + lifecycle engines, validators | missing | 22 ops designed |
+| performance | done (22 ops), 2026-10-20 | `/dev-test/hr/performance`, 2 scenarios | calibration + continuous feedback next (E.1 parity) |
 | core, onboarding, compensation, learning, benefits | not started | — | requirements in `specification.md` §4–8 |
 
 ## 2. Phases

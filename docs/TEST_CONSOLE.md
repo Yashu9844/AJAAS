@@ -15,10 +15,11 @@ excluded from production builds.
 | `/dev-test/hr/leave` | HR Leave & Absence | generated (20) | `S_LEAVE` |
 | `/dev-test/hr/payroll` | HR Payroll | generated (20) | `S_PAYROLL` |
 | `/dev-test/hr/recruitment` | HR Recruitment | generated (20) | `S_RECRUITMENT` |
+| `/dev-test/hr/performance` | HR Performance & OKRs | generated (22) | `S_PERFORMANCE` |
 
 From now on each feature ships its page in the same phase as its backend (delivery phase P8, `docs/ENGINEERING.md` §3).
-Last full run (2026-10-20, fresh `jaas_console` DB, headless): **32/32 scenarios passed** (A-only scenarios; the
-two-tenant `AB` scenarios run in the browser).
+Last full run (2026-10-20, `jaas_console` DB, headless): **34/34 scenarios passed** (A-only scenarios; the two-tenant
+`AB` scenarios run in the browser).
 
 ## 1. Run it
 

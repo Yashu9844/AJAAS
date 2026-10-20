@@ -16,6 +16,7 @@ const NAV = [
   { href: "/dev-test/hr/leave", label: "M1 HR — Leave & Absence" },
   { href: "/dev-test/hr/payroll", label: "M1 HR — Payroll" },
   { href: "/dev-test/hr/recruitment", label: "M1 HR — Recruitment" },
+  { href: "/dev-test/hr/performance", label: "M1 HR — Performance & OKRs" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -121,6 +122,7 @@ export function Overview() {
         <Checklist title="M1 HR — Leave & Absence" items={HR_CHECKLISTS.leave} />
         <Checklist title="M1 HR — Payroll" items={HR_CHECKLISTS.payroll} />
         <Checklist title="M1 HR — Recruitment" items={HR_CHECKLISTS.recruitment} />
+        <Checklist title="M1 HR — Performance & OKRs" items={HR_CHECKLISTS.performance} />
       </div>
       <h3>How to start</h3>
       <ol className="dt-note">

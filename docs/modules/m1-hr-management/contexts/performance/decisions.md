@@ -8,8 +8,14 @@
 - D7-04 (P1) The 9-box performance axis is the manager review's overall score; the goal score is reported alongside, not blended (blending formulas are a calibration feature, out of scope).
 - D7-05 (P1) Access denials on goals/reviews are 404, not 403, so existence is not disclosed (same as HR/Attendance, HR/Leave, HR/Payroll, HR/Recruitment self endpoints).
 - D7-06 (P1) Cycle list/get are open to any authenticated tenant user (needed to pick a cycle when setting goals); they contain no personal data.
+- D7-07 (P5) Launch reviews is idempotent on a cycle already in `review`: it creates only missing self/manager reviews
+  and does not change the status (EC-06 "a second launch creates 0"; PM-002 forbids every other repeat transition).
+- D7-08 (P5) HR/Performance reads the direct manager through its own `ManagerDirectory` port; the HR root passes
+  `organization.Module.DirectManager` (primary active mapping), so performance never imports HR/Organization (import-boundary test).
+- D7-09 (P6) A parent goal from another tenant is 404 (PM-016); a parent in another cycle or cancelled is 400.
 
 ## Changelog
 
 2026-10-09 — P1 DONE: HR/Performance = Performance & OKRs (D7-01); design frozen; Notifications scaffold unnumbered.
 2026-10-09 — P2 DONE: models, migrations, score + lifecycle goldens.
+2026-10-20 — P3–P9 DONE: backend, unit + integration goldens, swagger, console page; context complete for its v1 scope.

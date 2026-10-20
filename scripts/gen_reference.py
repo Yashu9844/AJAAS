@@ -13,7 +13,7 @@ MODULE_ORDER = ['shared', 'app', 'identity', 'organization', 'employee', 'attend
 TITLES = {'shared': 'Shared infrastructure', 'app': 'Application wiring (internal/app)', 'identity': 'M0 Identity & Access',
           'organization': 'M1 HR / Organization', 'employee': 'M1 HR / Employee', 'attendance': 'M1 HR / Attendance',
           'leave': 'M1 HR / Leave', 'payroll': 'M1 HR / Payroll', 'recruitment': 'M1 HR / Recruitment',
-          'performance': 'M1 HR / Performance (in progress)'}
+          'performance': 'M1 HR / Performance & OKRs'}
 
 
 def read(path):
@@ -98,7 +98,7 @@ def routes(module):
     # Join statements that span lines (e.g. users.POST("",\n mw,\n handler)) so every route keeps its chain.
     joined, buf, depth = [], '', 0
     for raw in read(p).split('\n'):
-        if depth == 0 and not re.search(r'\.(GET|POST|PUT|PATCH|DELETE)\(', raw):
+        if depth == 0 and not re.search(r'\.(GET|POST|PUT|PATCH|DELETE|Group)\(', raw):
             joined.append(raw)
             continue
         buf += ' ' + raw.strip()

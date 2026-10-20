@@ -11,7 +11,7 @@ Gin → TenantResolver → Authenticate → [RequirePermission(performance:read|
 → score (pure: hundredths fixed point, KR progress, goal progress, goal score, overall score, 9-box bands)
 → lifecycle (pure: cycle graph PM-002, goal status graph FR-GL004)
 → Repositories (cycle, goal + key results + check-ins, review, outbox)
-→ PostgreSQL · RabbitMQ (outbox) · M0 Identity Audit · HR/Organization MappingService (manager) · HR/Employee EmployeeService
+→ PostgreSQL · RabbitMQ (outbox) · M0 Identity Audit · HR/Organization DirectManager (port) · HR/Employee directory (employee/api)
 ```
 
 ### Access policy (PM-008, D7-05)
@@ -31,9 +31,9 @@ One transaction: lock the cycle row, ensure `active`, iterate distinct owners of
 |---|---|---|---|
 | C1 | Client → HR/Performance (22 ops) | spec §5; JWT + tenant; performance:* RBAC + PermissionFlag | 400–409 |
 | C2 | → M0 Identity Audit / middleware | Log after commit; RequirePermission + PermissionFlag(db, "performance", action, key, …) | best-effort / 401/403 |
-| C3 | → HR/Organization MappingService | `ListUserMappings(ctx, db, tenant, user, 1, 100)` → primary active mapping's manager_user_id (D7-03) | error propagates (500) |
+| C3 | → HR/Organization | `services.ManagerDirectory.DirectManager(ctx, tenant, user)` → manager_user_id of the primary active mapping, adapted by `organization.Module.DirectManager` in the HR root (D7-03, D7-08) | error propagates (500) |
 | C4 | → HR/Employee EmployeeService | `GetByID`, `GetByUserID` | 404 EMPLOYEE_NOT_FOUND |
-| C5 | → PostgreSQL | migrations 000051–000056 | rollback |
+| C5 | → PostgreSQL | `migrations/hr` 000038–000043 | rollback |
 | C6 | → RabbitMQ `jaas.performance.events` | ids, statuses, progress only | outbox + relay |
 | C7 | boot → M0 Identity permissions | performance:read, performance:manage | boot fails |
 

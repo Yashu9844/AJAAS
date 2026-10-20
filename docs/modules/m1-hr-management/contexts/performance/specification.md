@@ -30,7 +30,7 @@ Scope per masterplan (D7-01): appraisal cycles, goals/OKRs with key results and 
 - FR-CY001 Create `{title 1–150, start_date, end_date ≥ start, criteria? (1–10 distinct names 1–50 chars; default Quality, Delivery, Collaboration, Ownership)}` → `draft`.
 - FR-CY002 List (status filter) / get; update title, dates and criteria only in `draft`.
 - FR-CY003 Activate `draft → active` (event `performance.cycle_started`).
-- FR-CY004 Launch reviews `active → review`: creates self + manager reviews (PM-010).
+- FR-CY004 Launch reviews `active → review`: creates self + manager reviews (PM-010). On a cycle already in `review` it only creates missing reviews (EC-06, D7-07).
 - FR-CY005 Complete `review → completed`: pending reviews become `expired` (event `performance.cycle_completed`).
 - FR-CY006 9-box for a cycle in `review` or `completed` (PM-015).
 #### Goals (FR-GL)
@@ -73,7 +73,7 @@ Scope per masterplan (D7-01): appraisal cycles, goals/OKRs with key results and 
 | PM-016 | All ids are tenant-scoped; foreign ids → 404. |
 | PM-017 | Ratings, scores, potential and review text never appear in events or audit metadata. |
 
-### 5. API (22 operations, under `/api/v1/performance`)
+### 5. API (22 operations, under `/api/v1/hr/performance`)
 | # | Method & path | Access |
 |---|---|---|
 | C1 | POST `/cycles` | manage |
@@ -117,7 +117,7 @@ The success envelope, pagination (page ≥ 1, per_page 1–100, default 20) and 
 - NFR-D002: exact decimal arithmetic (hundredths integers, no floats).
 - NFR-P001: list endpoints p95 < 300 ms at 1k goals per tenant (indexed by cycle + employee).
 
-### 8. Data (migrations 000051–000056)
+### 8. Data (`backend/migrations/hr` 000038–000043, schema `hr`)
 - `performance_cycles` (criteria jsonb)
 - `performance_goals` (index cycle+employee; parent FK)
 - `performance_key_results`

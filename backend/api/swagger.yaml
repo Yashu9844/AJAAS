@@ -1546,6 +1546,15 @@ paths:
         '200':
           description: Self contact updated
 
+  /hr/employees/{id}/deactivate:
+    post:
+      summary: 'Deactivate an employee profile (employee:update)'
+      tags: [Employees]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Deactivated: {"data": {"status": "inactive"}}'}
+        '404': {description: NOT_FOUND}
   /hr/employees/{id}:
     get:
       summary: Get Employee Profile
@@ -2603,6 +2612,204 @@ paths:
       responses:
         '200': {description: Withdrawn, content: {application/json: {schema: {$ref: '#/components/schemas/OfferEnvelope'}}}}
         '409': {description: OFFER_STATE}
+  /hr/performance/cycles:
+    post:
+      summary: 'Create an appraisal cycle (performance:manage)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateCycleRequest'}}}}
+      responses:
+        '201': {description: 'Created (draft)', content: {application/json: {schema: {$ref: '#/components/schemas/CycleEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR (title, dates, criteria)'}
+    get:
+      summary: 'List cycles (any authenticated employee, D7-06)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [draft, active, review, completed]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Cycles', content: {application/json: {schema: {$ref: '#/components/schemas/CycleListEnvelope'}}}}
+  /hr/performance/cycles/{id}:
+    get:
+      summary: 'Get a cycle (any authenticated employee)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Cycle', content: {application/json: {schema: {$ref: '#/components/schemas/CycleEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Update title, dates or criteria while draft (performance:manage)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateCycleRequest'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/CycleEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE (not draft)'}
+  /hr/performance/cycles/{id}/activate:
+    post:
+      summary: 'Activate a draft cycle (performance:manage)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Transitioned', content: {application/json: {schema: {$ref: '#/components/schemas/CycleEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE (not draft)'}
+  /hr/performance/cycles/{id}/complete:
+    post:
+      summary: 'Complete a cycle in review; pending reviews expire (performance:manage)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Transitioned', content: {application/json: {schema: {$ref: '#/components/schemas/CycleEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE (not in review)'}
+  /hr/performance/cycles/{id}/launch-reviews:
+    post:
+      summary: 'Move active → review and create self + manager reviews; idempotent (performance:manage)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Launched (counts of created reviews)', content: {application/json: {schema: {$ref: '#/components/schemas/LaunchEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE (draft or completed)'}
+  /hr/performance/cycles/{id}/nine-box:
+    get:
+      summary: '9-box talent matrix (performance:read)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Entries per employee', content: {application/json: {schema: {$ref: '#/components/schemas/NineBoxEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE (not review/completed)'}
+  /hr/performance/goals:
+    post:
+      summary: 'Create a goal for yourself, a direct report, or anyone with performance:manage'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateGoalRequest'}}}}
+      responses:
+        '201': {description: 'Created', content: {application/json: {schema: {$ref: '#/components/schemas/GoalEnvelope'}}}}
+        '404': {description: 'NOT_FOUND / EMPLOYEE_NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE, WEIGHT_EXCEEDED, GOAL_DEPTH, EMPLOYEE_STATE'}
+    get:
+      summary: 'List goals (performance:read: any; otherwise own or a direct report)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: cycle_id, in: query, schema: {type: string, format: uuid}}, {name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [active, completed, cancelled]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Goals', content: {application/json: {schema: {$ref: '#/components/schemas/GoalListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND (not yours or a report)'}
+  /hr/performance/goals/me:
+    get:
+      summary: 'My goals'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: cycle_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Goals', content: {application/json: {schema: {$ref: '#/components/schemas/GoalListEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+  /hr/performance/goals/{id}:
+    get:
+      summary: 'Get a goal with key results and the newest 50 check-ins (owner, manager, performance:read)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Goal', content: {application/json: {schema: {$ref: '#/components/schemas/GoalEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Update title, description or weight (owner, manager, performance:manage)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateGoalRequest'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/GoalEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE, GOAL_STATE, WEIGHT_EXCEEDED'}
+  /hr/performance/goals/{id}/status:
+    post:
+      summary: 'Complete, cancel (final) or reopen a goal'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [status], properties: {status: {type: string, enum: [completed, cancelled, active]}}}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/GoalEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE, GOAL_STATE'}
+  /hr/performance/goals/{id}/key-results:
+    post:
+      summary: 'Add a key result; the goal progress becomes the mean of its key results'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/KeyResultRequest'}}}}
+      responses:
+        '201': {description: 'Goal with key results', content: {application/json: {schema: {$ref: '#/components/schemas/GoalEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE, GOAL_STATE'}
+  /hr/performance/goals/{id}/check-ins:
+    post:
+      summary: 'Record progress: progress (no key results) or key_result_id + value'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CheckInRequest'}}}}
+      responses:
+        '201': {description: 'Goal with history', content: {application/json: {schema: {$ref: '#/components/schemas/GoalEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE, GOAL_STATE, HAS_KEY_RESULTS'}
+  /hr/performance/reviews:
+    post:
+      summary: 'Assign a peer or manager reviewer while the cycle is in review (performance:manage)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssignReviewerRequest'}}}}
+      responses:
+        '201': {description: 'Assigned', content: {application/json: {schema: {$ref: '#/components/schemas/ReviewEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE, EMPLOYEE_STATE, CONFLICT'}
+    get:
+      summary: 'List reviews (performance:read)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: cycle_id, in: query, schema: {type: string, format: uuid}}, {name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [pending, submitted, expired]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Reviews', content: {application/json: {schema: {$ref: '#/components/schemas/ReviewListEnvelope'}}}}
+  /hr/performance/reviews/assigned:
+    get:
+      summary: 'Reviews I must write'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending, submitted, expired]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Reviews', content: {application/json: {schema: {$ref: '#/components/schemas/ReviewListEnvelope'}}}}
+  /hr/performance/reviews/me:
+    get:
+      summary: 'My submitted reviews of completed cycles; peer reviewers anonymous'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: cycle_id, in: query, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: 'Reviews', content: {application/json: {schema: {$ref: '#/components/schemas/ReviewArrayEnvelope'}}}}
+  /hr/performance/reviews/{id}:
+    get:
+      summary: 'Get a review (the reviewer or performance:read)'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Review', content: {application/json: {schema: {$ref: '#/components/schemas/ReviewEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/performance/reviews/{id}/submit:
+    post:
+      summary: 'Submit my review: every cycle criterion once (1–5); potential only for manager reviews'
+      tags: [Performance]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SubmitReviewRequest'}}}}
+      responses:
+        '200': {description: 'Submitted', content: {application/json: {schema: {$ref: '#/components/schemas/ReviewEnvelope'}}}}
+        '404': {description: 'NOT_FOUND (not the reviewer)'}
+        '409': {description: 'REVIEW_STATE, CYCLE_STATE'}
 components:
   securitySchemes:
     BearerAuth:
@@ -3321,3 +3528,143 @@ components:
         created_at: {type: string, format: date-time}
     OfferEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Offer'}}}
     OfferListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Offer'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    CreateCycleRequest:
+      type: object
+      required: [title, start_date, end_date]
+      properties:
+        title: {type: string, maxLength: 150, example: FY26 H1}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        criteria: {type: array, maxItems: 10, items: {type: string, maxLength: 50}, description: 'Default Quality, Delivery, Collaboration, Ownership'}
+    UpdateCycleRequest:
+      type: object
+      properties:
+        title: {type: string, maxLength: 150}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        criteria: {type: array, minItems: 1, maxItems: 10, items: {type: string, maxLength: 50}}
+    Cycle:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        criteria: {type: array, items: {type: string}}
+        status: {type: string, enum: [draft, active, review, completed]}
+        activated_at: {type: string, format: date-time}
+        review_started_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+    CycleEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Cycle'}}}
+    CycleListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Cycle'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    LaunchEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            cycle: {$ref: '#/components/schemas/Cycle'}
+            employees: {type: integer}
+            self_reviews_created: {type: integer}
+            manager_reviews_created: {type: integer}
+            without_manager: {type: integer}
+    NineBoxEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            cycle_id: {type: string, format: uuid}
+            counts: {type: object, additionalProperties: {type: integer}}
+            entries:
+              type: array
+              items:
+                type: object
+                properties:
+                  employee_id: {type: string, format: uuid}
+                  goal_score: {type: number, multipleOf: 0.01}
+                  overall_score: {type: number, multipleOf: 0.01}
+                  performance: {type: string, enum: [low, medium, high]}
+                  potential: {type: string, enum: [low, medium, high]}
+                  box: {type: string, example: high/medium, description: '<performance>/<potential> or unrated'}
+    CreateGoalRequest:
+      type: object
+      required: [cycle_id, title, weight]
+      properties:
+        cycle_id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid, description: Defaults to your own profile}
+        title: {type: string, maxLength: 200}
+        description: {type: string, maxLength: 5000}
+        weight: {type: number, minimum: 0.01, maximum: 100, example: 40}
+        parent_goal_id: {type: string, format: uuid}
+    UpdateGoalRequest:
+      type: object
+      properties:
+        title: {type: string, maxLength: 200}
+        description: {type: string, maxLength: 5000}
+        weight: {type: number, minimum: 0.01, maximum: 100}
+    KeyResultRequest:
+      type: object
+      required: [title, start_value, target_value]
+      properties:
+        title: {type: string, maxLength: 200}
+        unit: {type: string, maxLength: 20}
+        start_value: {type: number, example: 0}
+        target_value: {type: number, example: 10}
+    CheckInRequest:
+      type: object
+      properties:
+        progress: {type: number, minimum: 0, maximum: 100, description: Goals without key results}
+        key_result_id: {type: string, format: uuid}
+        value: {type: number, description: New current value of the key result}
+        note: {type: string, maxLength: 1000}
+    Goal:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        cycle_id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        parent_goal_id: {type: string, format: uuid}
+        title: {type: string}
+        description: {type: string}
+        weight: {type: number, multipleOf: 0.01}
+        progress: {type: number, multipleOf: 0.01}
+        status: {type: string, enum: [active, completed, cancelled]}
+        key_results: {type: array, items: {type: object, properties: {id: {type: string, format: uuid}, title: {type: string}, unit: {type: string}, start_value: {type: number, multipleOf: 0.01}, target_value: {type: number, multipleOf: 0.01}, current_value: {type: number, multipleOf: 0.01}, progress: {type: number, multipleOf: 0.01}}}}
+        check_ins: {type: array, items: {type: object, properties: {id: {type: string, format: uuid}, key_result_id: {type: string, format: uuid}, from_progress: {type: number, multipleOf: 0.01}, to_progress: {type: number, multipleOf: 0.01}, value: {type: number, multipleOf: 0.01}, note: {type: string}, author_user_id: {type: string, format: uuid}, created_at: {type: string, format: date-time}}}}
+    GoalEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Goal'}}}
+    GoalListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Goal'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    AssignReviewerRequest:
+      type: object
+      required: [cycle_id, employee_id, reviewer_employee_id, type]
+      properties:
+        cycle_id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        reviewer_employee_id: {type: string, format: uuid}
+        type: {type: string, enum: [peer, manager]}
+    SubmitReviewRequest:
+      type: object
+      required: [ratings]
+      properties:
+        ratings: {type: array, items: {type: object, required: [criterion, score], properties: {criterion: {type: string}, score: {type: integer, minimum: 1, maximum: 5}}}}
+        strengths: {type: string, maxLength: 5000}
+        improvements: {type: string, maxLength: 5000}
+        potential: {type: string, enum: [low, medium, high], description: Required for manager reviews only}
+    Review:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        cycle_id: {type: string, format: uuid}
+        employee_id: {type: string, format: uuid}
+        reviewer_employee_id: {type: string, format: uuid, description: Omitted for peer reviews shown to the subject}
+        type: {type: string, enum: [self, manager, peer]}
+        status: {type: string, enum: [pending, submitted, expired]}
+        ratings: {type: array, items: {type: object, properties: {criterion: {type: string}, score: {type: integer}}}}
+        strengths: {type: string}
+        improvements: {type: string}
+        overall_score: {type: number, multipleOf: 0.01}
+        potential: {type: string, enum: [low, medium, high]}
+        submitted_at: {type: string, format: date-time}
+    ReviewEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Review'}}}
+    ReviewListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Review'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    ReviewArrayEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Review'}}}}

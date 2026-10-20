@@ -66,7 +66,7 @@ if (login.status !== 200) {
 }
 setSession("A", { slug, accessToken: lb.data.access_token, refreshToken: lb.data.refresh_token, expiresAt: lb.data.expires_at, user: lb.data.user, tenantId: lb.data.tenant_id });
 const ep = { host: "localhost", port, platformKey: process.env.PLATFORM_KEY ?? "dev-platform-admin-key-change-me" };
-const all = [...S0.filter((s) => s.needs !== "AB"), ...S0_ACCESS, ...S1.filter((s) => s.needs !== "AB"), ...S2.filter((s) => s.needs !== "AB"), ...hr.S_ATTENDANCE, ...hr.S_LEAVE, ...hr.S_PAYROLL, ...hr.S_RECRUITMENT]
+const all = [...S0.filter((s) => s.needs !== "AB"), ...S0_ACCESS, ...S1.filter((s) => s.needs !== "AB"), ...S2.filter((s) => s.needs !== "AB"), ...hr.S_ATTENDANCE, ...hr.S_LEAVE, ...hr.S_PAYROLL, ...hr.S_RECRUITMENT, ...hr.S_PERFORMANCE]
   .filter((s) => !filter || s.key.includes(filter));
 let failed = 0;
 for (const sc of all) {
