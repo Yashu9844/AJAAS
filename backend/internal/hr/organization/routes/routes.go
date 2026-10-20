@@ -16,6 +16,7 @@ type Controllers struct {
 	Departments  *controllers.DepartmentController
 	Teams        *controllers.TeamController
 	Designations *controllers.DesignationController
+	Locations    *controllers.LocationController
 	Mappings     *controllers.MappingController
 	Chart        *controllers.OrgChartController
 }
@@ -56,6 +57,17 @@ func RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP, c Controller
 		desigs.GET("/:id", read, desigCtrl.GetByID)
 		desigs.PATCH("/:id", write, auditMW("designation.updated", "designation"), desigCtrl.Update)
 		desigs.POST("/:id/deactivate", write, auditMW("designation.deactivated", "designation"), desigCtrl.Deactivate)
+	}
+
+	locs := router.Group("/locations")
+	locs.Use(tenantResolver, authMiddleware)
+	{
+		locs.POST("", write, auditMW("location.created", "location"), c.Locations.Create)
+		locs.GET("", read, c.Locations.List)
+		locs.GET("/:id", read, c.Locations.GetByID)
+		locs.PATCH("/:id", write, auditMW("location.updated", "location"), c.Locations.Update)
+		locs.POST("/:id/deactivate", write, auditMW("location.deactivated", "location"), c.Locations.Deactivate)
+		locs.POST("/:id/activate", write, auditMW("location.activated", "location"), c.Locations.Activate)
 	}
 
 	mappings := router.Group("/mappings")

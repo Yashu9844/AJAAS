@@ -336,6 +336,55 @@ export const M1_DESIG: OpSpec[] = [
   t("m1.desig.deactivate", "Deactivate designation", "POST", "/hr/designations/:id/deactivate", [idf("id", "desigId"), { name: "reason", where: "body" }], [200]),
 ];
 
+export const M1_LOC: OpSpec[] = [
+  t(
+    "m1.loc.create",
+    "Create location",
+    "POST",
+    "/hr/locations",
+    [
+      { name: "code", where: "body", required: true, placeholder: "BLR-HQ" },
+      { name: "name", where: "body", required: true },
+      { name: "address_line1", where: "body" },
+      { name: "address_line2", where: "body" },
+      { name: "city", where: "body", required: true },
+      { name: "state_code", where: "body", required: true, placeholder: "KA" },
+      { name: "country_code", where: "body", placeholder: "IN" },
+      { name: "postal_code", where: "body" },
+      { name: "time_zone", where: "body", placeholder: "Asia/Kolkata" },
+    ],
+    [201],
+    { capture: [{ idKey: "locationId", from: "data.id" }], fetchAfter: "m1.loc.get" },
+  ),
+  t(
+    "m1.loc.list",
+    "List locations",
+    "GET",
+    "/hr/locations",
+    [...pg, { name: "status", where: "query", type: "select", options: ["", "active", "inactive"] }, { name: "state_code", where: "query" }, { name: "search", where: "query" }],
+    [200],
+  ),
+  t("m1.loc.get", "Get location", "GET", "/hr/locations/:id", [idf("id", "locationId")], [200]),
+  t(
+    "m1.loc.update",
+    "Update location (code is immutable)",
+    "PATCH",
+    "/hr/locations/:id",
+    [
+      idf("id", "locationId"),
+      { name: "name", where: "body" },
+      { name: "address_line1", where: "body" },
+      { name: "city", where: "body" },
+      { name: "state_code", where: "body" },
+      { name: "postal_code", where: "body" },
+      { name: "time_zone", where: "body" },
+    ],
+    [200],
+  ),
+  t("m1.loc.deactivate", "Deactivate location (409 while mappings use it)", "POST", "/hr/locations/:id/deactivate", [idf("id", "locationId")], [200]),
+  t("m1.loc.activate", "Activate location", "POST", "/hr/locations/:id/activate", [idf("id", "locationId")], [200]),
+];
+
 export const M1_MAP: OpSpec[] = [
   t(
     "m1.map.create",
@@ -347,6 +396,7 @@ export const M1_MAP: OpSpec[] = [
       { name: "department_id", where: "body", ref: "deptId" },
       { name: "team_id", where: "body", ref: "teamId" },
       { name: "designation_id", where: "body", ref: "desigId" },
+      { name: "location_id", where: "body", ref: "locationId" },
       { name: "is_primary", where: "body", type: "select", options: ["", "true", "false"] },
       { name: "manager_user_id", where: "body" },
     ],
@@ -365,6 +415,7 @@ export const M1_MAP: OpSpec[] = [
       { name: "department_id", where: "body" },
       { name: "team_id", where: "body" },
       { name: "designation_id", where: "body" },
+      { name: "location_id", where: "body" },
       { name: "is_primary", where: "body", type: "select", options: ["", "true", "false"] },
       { name: "manager_user_id", where: "body" },
     ],
@@ -388,7 +439,7 @@ export const M1_CHART: OpSpec[] = [
   t("m1.chart.chain", "Reporting chain of a user", "GET", "/hr/org-chart/chain", [{ name: "user_id", where: "query", ref: "userId", required: true }], [200]),
 ];
 
-export const M1_OPS: OpSpec[] = [...M1_DEPT, ...M1_TEAM, ...M1_DESIG, ...M1_MAP, ...M1_CHART];
+export const M1_OPS: OpSpec[] = [...M1_DEPT, ...M1_TEAM, ...M1_DESIG, ...M1_LOC, ...M1_MAP, ...M1_CHART];
 
 // ============================ MODULE 2 ============================
 const EMP_TYPES = ["", "full_time", "part_time", "contract", "intern"];

@@ -30,12 +30,14 @@ type Module struct {
 	teamRepo    repositories.TeamRepository
 	desigRepo   repositories.DesignationRepository
 	mappingRepo repositories.MappingRepository
+	locRepo     repositories.LocationRepository
 
 	// Services
 	deptSvc    services.DepartmentService
 	teamSvc    services.TeamService
 	desigSvc   services.DesignationService
 	mappingSvc services.MappingService
+	locSvc     services.LocationService
 	chartSvc   services.OrgChartService
 	consumer   services.EventConsumer
 
@@ -44,6 +46,7 @@ type Module struct {
 	teamCtrl    *controllers.TeamController
 	desigCtrl   *controllers.DesignationController
 	mappingCtrl *controllers.MappingController
+	locCtrl     *controllers.LocationController
 	chartCtrl   *controllers.OrgChartController
 }
 
@@ -61,13 +64,15 @@ func NewModule(
 	m.teamRepo = repositories.NewTeamRepository()
 	m.desigRepo = repositories.NewDesignationRepository()
 	m.mappingRepo = repositories.NewMappingRepository()
+	m.locRepo = repositories.NewLocationRepository()
 
 	users, audit := idp.Users(), idp.Audit()
 
 	m.deptSvc = services.NewDepartmentService(m.deptRepo, m.teamRepo, m.mappingRepo, publisher, audit)
 	m.teamSvc = services.NewTeamService(m.teamRepo, m.deptRepo, m.mappingRepo, users, publisher, audit)
 	m.desigSvc = services.NewDesignationService(m.desigRepo, m.mappingRepo, publisher, audit)
-	m.mappingSvc = services.NewMappingService(m.mappingRepo, m.deptRepo, m.teamRepo, m.desigRepo, users, publisher, audit)
+	m.mappingSvc = services.NewMappingService(m.mappingRepo, m.deptRepo, m.teamRepo, m.desigRepo, m.locRepo, users, publisher, audit)
+	m.locSvc = services.NewLocationService(m.locRepo, m.mappingRepo, publisher)
 	m.chartSvc = services.NewOrgChartService(m.deptRepo, m.teamRepo, m.mappingRepo, m.desigRepo, redisClient)
 	m.consumer = services.NewEventConsumer(m.mappingSvc)
 
@@ -75,6 +80,7 @@ func NewModule(
 	m.teamCtrl = controllers.NewTeamController(db, m.teamSvc)
 	m.desigCtrl = controllers.NewDesignationController(db, m.desigSvc)
 	m.mappingCtrl = controllers.NewMappingController(db, m.mappingSvc)
+	m.locCtrl = controllers.NewLocationController(db, m.locSvc)
 	m.chartCtrl = controllers.NewOrgChartController(db, m.chartSvc)
 
 	return m
@@ -86,6 +92,7 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.Department{},
 		&models.Team{},
 		&models.Designation{},
+		&models.Location{},
 		&models.Mapping{},
 		&models.OrgEventOutbox{},
 	}
@@ -135,7 +142,7 @@ func (m *Module) DesignationService() services.DesignationService { return m.des
 // module owns tenantResolver/authMiddleware construction; org reuses them.
 func (m *Module) RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP) {
 	orgRoutes.RegisterRoutes(router, idp, orgRoutes.Controllers{Departments: m.deptCtrl, Teams: m.teamCtrl,
-		Designations: m.desigCtrl, Mappings: m.mappingCtrl, Chart: m.chartCtrl}, m.ChartInvalidator())
+		Designations: m.desigCtrl, Locations: m.locCtrl, Mappings: m.mappingCtrl, Chart: m.chartCtrl}, m.ChartInvalidator())
 }
 
 // OrgEvents returns produced event type documentation for consumers.

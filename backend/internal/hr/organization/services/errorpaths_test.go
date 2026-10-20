@@ -142,7 +142,7 @@ func TestServiceErrorPropagation(t *testing.T) {
 		t.Error("desig deactivate must propagate repo error")
 	}
 
-	mapSvc := NewMappingService(&failMappingRepo{}, &stubDeptRepo{byID: map[uuid.UUID]*models.Department{}}, &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}}, &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}, &failUsers{}, &stubPublisher{}, &stubAudit{})
+	mapSvc := NewMappingService(&failMappingRepo{}, &stubDeptRepo{byID: map[uuid.UUID]*models.Department{}}, &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}}, &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}, newStubLocations(), &failUsers{}, &stubPublisher{}, &stubAudit{})
 	if _, err := mapSvc.CreateMapping(ctx, nil, tenantID, dto.CreateMappingRequest{UserID: id.String(), DepartmentID: strPtr(id.String())}, uuid.New()); !isErr(err, errBoom) {
 		t.Error("mapping create must propagate user service error")
 	}

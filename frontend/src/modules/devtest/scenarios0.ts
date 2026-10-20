@@ -44,16 +44,24 @@ export async function mkUser(r: Runner, A: Session, uid: string, tag: string, ro
   return { id: str(ex, "data.id"), email };
 }
 
-export async function roleId(r: Runner, A: Session, name: string): Promise<string> {
-  const ex = await r.call(`Find system role "${name}"`, tn(A, "GET", "/roles", undefined, { per_page: "100" }), 200);
-  const arr = (getPath(ex.resBody, "data") as { id: string; name: string }[] | undefined) ?? [];
-  return arr.find((x) => x.name === name)?.id ?? "";
+/** Pages through a list endpoint (100 per page) until match finds a row; returns its id or "". */
+async function findId<T extends { id: string }>(r: Runner, A: Session, name: string, path: string, match: (x: T) => boolean): Promise<string> {
+  for (let page = 1; page <= 50; page++) {
+    const ex = await r.call(page === 1 ? name : `${name} (page ${page})`, tn(A, "GET", path, undefined, { per_page: "100", page: String(page) }), 200);
+    const arr = (getPath(ex.resBody, "data") as T[] | undefined) ?? [];
+    const hit = arr.find(match);
+    if (hit) return hit.id;
+    if (page >= Number(getPath(ex.resBody, "meta.total_pages") ?? 1)) return "";
+  }
+  return "";
 }
 
-export async function permId(r: Runner, A: Session, resource: string, action: string): Promise<string> {
-  const ex = await r.call(`Find permission ${resource}:${action}`, tn(A, "GET", "/permissions", undefined, { per_page: "100" }), 200);
-  const arr = (getPath(ex.resBody, "data") as { id: string; resource: string; action: string }[] | undefined) ?? [];
-  return arr.find((x) => x.resource === resource && x.action === action)?.id ?? "";
+export function roleId(r: Runner, A: Session, name: string): Promise<string> {
+  return findId<{ id: string; name: string }>(r, A, `Find system role "${name}"`, "/roles", (x) => x.name === name);
+}
+
+export function permId(r: Runner, A: Session, resource: string, action: string): Promise<string> {
+  return findId<{ id: string; resource: string; action: string }>(r, A, `Find permission ${resource}:${action}`, "/permissions", (x) => x.resource === resource && x.action === action);
 }
 
 export async function login(r: Runner, name: string, slug: string, email: string, password: string, expect: number | number[] = 200): Promise<{ at: string; rt: string; ex: Exchange }> {

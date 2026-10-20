@@ -102,3 +102,4 @@ Golden behaviours run in `backend/tests/integration` against the production rout
 | G8 team move keeps mappings consistent | `TestGoldenM1_TeamMoveKeepsMappingsConsistent` |
 | G9 audit on every write | `TestGoldenM1_AuditOnEveryOrgWrite` |
 | G10 no secret leakage | `TestGoldenNoSecretLeakage` |
+| G11 locations (FR-L001..FR-L007): normalization, uniqueness, IANA zones, immutable code, filters, mapping link, deactivation blocked while mapped, inactive not assignable, isolation | `TestOrganizationLocations`; unit `TestLocationService_*`, `TestMappingService_Location`, `TestLocationController`; console `s1.loc` |

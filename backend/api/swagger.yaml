@@ -1239,6 +1239,63 @@ paths:
         '200':
           description: Designation deactivated
 
+  /hr/locations:
+    post:
+      summary: 'Create a work location (organization:update)'
+      tags: [Locations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateLocationRequest'}}}}
+      responses:
+        '201': {description: 'Created', content: {application/json: {schema: {$ref: '#/components/schemas/LocationEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR (code format, state, country, IANA time zone)'}
+        '409': {description: 'CONFLICT (code or name exists)'}
+    get:
+      summary: 'List locations (organization:read)'
+      tags: [Locations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}, {name: status, in: query, schema: {type: string, enum: [active, inactive]}}, {name: state_code, in: query, schema: {type: string}}, {name: search, in: query, schema: {type: string}, description: name, code or city}]
+      responses:
+        '200': {description: 'Locations ordered by name', content: {application/json: {schema: {$ref: '#/components/schemas/LocationListEnvelope'}}}}
+  /hr/locations/{id}:
+    get:
+      summary: 'Get a location (organization:read)'
+      tags: [Locations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'OK', content: {application/json: {schema: {$ref: '#/components/schemas/LocationEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Update a location; code is immutable (organization:update)'
+      tags: [Locations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateLocationRequest'}}}}
+      responses:
+        '200': {description: 'OK', content: {application/json: {schema: {$ref: '#/components/schemas/LocationEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR (incl. a different code)'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT (name exists)'}
+  /hr/locations/{id}/deactivate:
+    post:
+      summary: 'Deactivate a location (organization:update)'
+      tags: [Locations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'OK', content: {application/json: {schema: {$ref: '#/components/schemas/LocationEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT (active mappings use it, or already inactive)'}
+  /hr/locations/{id}/activate:
+    post:
+      summary: 'Reactivate a location (organization:update)'
+      tags: [Locations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'OK', content: {application/json: {schema: {$ref: '#/components/schemas/LocationEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT (already active)'}
   /hr/mappings:
     post:
       summary: Create Org Mapping
@@ -1268,6 +1325,10 @@ paths:
                 designation_id:
                   type: string
                   format: uuid
+                location_id:
+                  type: string
+                  format: uuid
+                  description: Active location of the tenant (FR-L005)
                 manager_user_id:
                   type: string
                   format: uuid
@@ -1352,6 +1413,10 @@ paths:
                 designation_id:
                   type: string
                   format: uuid
+                location_id:
+                  type: string
+                  format: uuid
+                  description: Active location of the tenant (FR-L005)
                 manager_user_id:
                   type: string
                   format: uuid
@@ -3837,3 +3902,46 @@ components:
     FeedbackRequestEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/FeedbackRequest'}}}
     FeedbackRequestArrayEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/FeedbackRequest'}}}}
     FeedbackRequestListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/FeedbackRequest'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    CreateLocationRequest:
+      type: object
+      required: [code, name, city, state_code]
+      properties:
+        code: {type: string, minLength: 2, maxLength: 32, example: BLR-HQ, description: 'Upper-cased; A–Z, 0–9, _ and -; unique per tenant; immutable'}
+        name: {type: string, maxLength: 150}
+        address_line1: {type: string, maxLength: 200}
+        address_line2: {type: string, maxLength: 200}
+        city: {type: string, maxLength: 100}
+        state_code: {type: string, maxLength: 10, example: KA, description: ISO 3166-2 subdivision without the country prefix}
+        country_code: {type: string, minLength: 2, maxLength: 2, example: IN}
+        postal_code: {type: string, maxLength: 20}
+        time_zone: {type: string, example: Asia/Kolkata, description: IANA zone}
+    UpdateLocationRequest:
+      type: object
+      properties:
+        code: {type: string, description: Must equal the current code}
+        name: {type: string, maxLength: 150}
+        address_line1: {type: string, maxLength: 200}
+        address_line2: {type: string, maxLength: 200}
+        city: {type: string, maxLength: 100}
+        state_code: {type: string, maxLength: 10}
+        country_code: {type: string, minLength: 2, maxLength: 2}
+        postal_code: {type: string, maxLength: 20}
+        time_zone: {type: string}
+    Location:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        address_line1: {type: string}
+        address_line2: {type: string}
+        city: {type: string}
+        state_code: {type: string}
+        country_code: {type: string}
+        postal_code: {type: string}
+        time_zone: {type: string}
+        status: {type: string, enum: [active, inactive]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    LocationEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Location'}}}
+    LocationListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Location'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}

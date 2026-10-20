@@ -223,7 +223,7 @@ product decision. Each is added to its context's specification (with goldens) wh
 
 | Context | Item | Priority | Note |
 |---|---|---|---|
-| organization | Locations (address, time zone, state for PT/holidays) | P1 | needed by core, leave calendars, payroll PT, benefits eligibility |
+| organization | Locations (address, time zone, state for PT/holidays) | P1 | done 2026-10-20 (FR-L001..FR-L007) |
 | organization | Effective-dated reporting changes via `core` actions | P1 | mappings become a projection of `core` assignments (CH-012) |
 | organization | Bulk import (CSV) with validation report | P2 | |
 | organization | Cost-centre references | P2 | cost centres are owned by M5 Finance |

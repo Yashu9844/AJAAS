@@ -39,9 +39,9 @@
 - 50 migrations (56 on the HR/Performance branch);
 - integration suite 63/63; all unit packages green.
 
-**Totals on `restructure_architecture` (2026-10-20):** 192 module routes (Part 2) + health/JWKS; migrations re-baselined
-into `migrations/identity` (18) and `migrations/hr` (46); full unit and integration suites green, including
-`TestSwaggerMatchesRoutes` (contract ↔ router) and `TestImportBoundaries`; test console 36/36 scenarios. Migration numbers
+**Totals on `restructure_architecture` (2026-10-20):** 198 module routes (Part 2) + health/JWKS; migrations re-baselined
+into `migrations/identity` (18) and `migrations/hr` (47); full unit and integration suites green, including
+`TestSwaggerMatchesRoutes` (contract ↔ router) and `TestImportBoundaries`; test console 37/37 scenarios. Migration numbers
 in the table above are the pre-split ones.
 
 **Who built what:**
@@ -678,7 +678,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/audit-logs` | [group: tenantResolver, authMiddleware] identityMiddleware.RequirePermission(authz, "audit", "read"), auditCtrl.List |
 | GET | `/api/v1/permissions` | [group: authMiddleware] identityMiddleware.RequirePermission(authz, "permissions", "read"), permCtrl.List |
 
-### M1 HR / Organization — 22 routes
+### M1 HR / Organization — 28 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -697,6 +697,12 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/designations/:id` | [group: tenantResolver, authMiddleware] read, desigCtrl.GetByID |
 | PATCH | `/api/v1/hr/designations/:id` | [group: tenantResolver, authMiddleware] write, auditMW("designation.updated", "designation"), desigCtrl.Update |
 | POST | `/api/v1/hr/designations/:id/deactivate` | [group: tenantResolver, authMiddleware] write, auditMW("designation.deactivated", "designation"), desigCtrl.Deactivate |
+| POST | `/api/v1/hr/locations` | [group: tenantResolver, authMiddleware] write, auditMW("location.created", "location"), c.Locations.Create |
+| GET | `/api/v1/hr/locations` | [group: tenantResolver, authMiddleware] read, c.Locations.List |
+| GET | `/api/v1/hr/locations/:id` | [group: tenantResolver, authMiddleware] read, c.Locations.GetByID |
+| PATCH | `/api/v1/hr/locations/:id` | [group: tenantResolver, authMiddleware] write, auditMW("location.updated", "location"), c.Locations.Update |
+| POST | `/api/v1/hr/locations/:id/deactivate` | [group: tenantResolver, authMiddleware] write, auditMW("location.deactivated", "location"), c.Locations.Deactivate |
+| POST | `/api/v1/hr/locations/:id/activate` | [group: tenantResolver, authMiddleware] write, auditMW("location.activated", "location"), c.Locations.Activate |
 | POST | `/api/v1/hr/mappings` | [group: tenantResolver, authMiddleware, invalidate] write, auditMW("mapping.created", "mapping"), mappingCtrl.Create |
 | GET | `/api/v1/hr/mappings` | [group: tenantResolver, authMiddleware, invalidate] read, mappingCtrl.ListByUser |
 | GET | `/api/v1/hr/mappings/:id` | [group: tenantResolver, authMiddleware, invalidate] read, mappingCtrl.GetByID |
@@ -861,7 +867,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/performance/feedback/requests/mine` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.MyFeedbackRequests |
 | POST | `/api/v1/hr/performance/feedback/requests/:id/decline` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.DeclineFeedbackRequest |
 
-Total routes registered by module route files: **192** (plus `GET /health`).
+Total routes registered by module route files: **198** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -1976,6 +1982,30 @@ Total routes registered by module route files: **192** (plus `GET /health`).
 - index `idx_performance_feedback_from` on `performance_feedback` (tenant_id, from_employee_id, created_at DESC)
 - index `idx_performance_feedback_public` on `performance_feedback` (tenant_id, created_at DESC) WHERE visibility = 'public'
 
+#### `hr/000047_create_locations.up.sql`
+- **table `locations`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `code` VARCHAR(32) — NOT NULL
+  - `name` VARCHAR(150) — NOT NULL
+  - `address_line1` VARCHAR(200)
+  - `address_line2` VARCHAR(200)
+  - `city` VARCHAR(100) — NOT NULL
+  - `state_code` VARCHAR(10) — NOT NULL
+  - `country_code` CHAR(2) — NOT NULL DEFAULT 'IN'
+  - `postal_code` VARCHAR(20)
+  - `time_zone` VARCHAR(64) — NOT NULL DEFAULT 'Asia/Kolkata'
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `deleted_at` TIMESTAMPTZ
+- UNIQUE index `uq_locations_tenant_code` on `locations` (tenant_id, code) WHERE deleted_at IS NULL
+- UNIQUE index `uq_locations_tenant_name` on `locations` (tenant_id, lower(name)) WHERE deleted_at IS NULL
+- index `idx_locations_tenant_status` on `locations` (tenant_id, status)
+- index `idx_locations_deleted_at` on `locations` (deleted_at)
+- index `idx_mappings_location_id` on `mappings` (location_id)
+- ALTER `mappings` ADD COLUMN location_id UUID REFERENCES locations(id) ON DELETE RESTRICT
+
 ## C. Code inventory — every file, type and function
 
 
@@ -2661,7 +2691,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(r *rolePermissionRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, roleID, permissionID uuid.UUID) error`
 - **func** `(r *rolePermissionRepository) DeleteByRoleID(ctx context.Context, tx *gorm.DB, tenantID, roleID uuid.UUID) error`
 
-#### `internal/identity/repositories/role_repository.go` (80 lines)
+#### `internal/identity/repositories/role_repository.go` (81 lines)
 - **type** `roleRepository struct{}`
 - **func** `NewRoleRepository() RoleRepository` — NewRoleRepository returns a RoleRepository.
 - **func** `(r *roleRepository) Create(ctx context.Context, tx *gorm.DB, role *models.Role) error`
@@ -3055,7 +3085,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 #### `internal/hr/organization/catalogue.go` (16 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Organization's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/organization/module.go` (149 lines)
+#### `internal/hr/organization/module.go` (156 lines)
 - **type** `Module struct` — Module encapsulates the Module 1 Organization domain.
 - **func** `NewModule(` — NewModule wires the organization module on shared handles plus Module 0 services.
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists org entity models for migrations.
@@ -3090,6 +3120,18 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(ctrl *DesignationController) Deactivate(c *gin.Context)` — Deactivate handles POST /designations/:id/deactivate. FR-DG004.
 
 #### `internal/hr/organization/controllers/errors.go` (7 lines)
+
+#### `internal/hr/organization/controllers/location_controller.go` (132 lines)
+- **type** `LocationController struct` — LocationController handles location endpoints (FR-L).
+- **func** `NewLocationController(db *gorm.DB, svc services.LocationService) *LocationController` — NewLocationController returns a LocationController.
+- **func** `(ctrl *LocationController) Create(c *gin.Context)` — Create handles POST /locations. FR-L001.
+- **func** `(ctrl *LocationController) GetByID(c *gin.Context)` — GetByID handles GET /locations/:id. FR-L002.
+- **func** `(ctrl *LocationController) List(c *gin.Context)` — List handles GET /locations?status&state_code&search. FR-L002.
+- **func** `(ctrl *LocationController) Update(c *gin.Context)` — Update handles PATCH /locations/:id. FR-L003.
+- **func** `(ctrl *LocationController) Deactivate(c *gin.Context) { ctrl.setStatus(c, "inactive") }` — Deactivate handles POST /locations/:id/deactivate. FR-L004.
+- **func** `(ctrl *LocationController) Activate(c *gin.Context) { ctrl.setStatus(c, "active") }` — Activate handles POST /locations/:id/activate. FR-L004.
+- **func** `(ctrl *LocationController) setStatus(c *gin.Context, status string)`
+- **func** `(ctrl *LocationController) ids(c *gin.Context) (uuid.UUID, uuid.UUID, bool)` — ids parses :id and the tenant; failures are answered here.
 
 #### `internal/hr/organization/controllers/mapping_controller.go` (149 lines)
 - **type** `MappingController struct` — MappingController handles user→org mapping endpoints.
@@ -3140,7 +3182,14 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `DesignationResponse struct` — DesignationResponse serializes a designation.
 - **type** `DesignationListResponse struct` — DesignationListResponse is a paginated designation list.
 
-#### `internal/hr/organization/dto/mapping_dto.go` (48 lines)
+#### `internal/hr/organization/dto/location_dto.go` (60 lines)
+- **type** `CreateLocationRequest struct` — CreateLocationRequest creates a work site. FR-L001.
+- **type** `UpdateLocationRequest struct` — UpdateLocationRequest patches a location; code is immutable (a different code is rejected). FR-L003.
+- **type** `LocationFilter struct` — LocationFilter narrows location lists. FR-L002.
+- **type** `LocationResponse struct` — LocationResponse serializes a location.
+- **type** `LocationListResponse struct` — LocationListResponse is a paginated location list.
+
+#### `internal/hr/organization/dto/mapping_dto.go` (51 lines)
 - **type** `CreateMappingRequest struct` — CreateMappingRequest maps a user into org structure. FR-M001.
 - **type** `UpdateMappingRequest struct` — UpdateMappingRequest patches a mapping (reassignment, primary swap, manager change).
 - **type** `DeactivateMappingRequest struct` — DeactivateMappingRequest deactivates with a reason (append-only, FR-M007).
@@ -3162,7 +3211,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `TeamResponse struct` — TeamResponse serializes a team with member count.
 - **type** `TeamListResponse struct` — TeamListResponse is a paginated team list.
 
-#### `internal/hr/organization/events/events.go` (101 lines)
+#### `internal/hr/organization/events/events.go` (118 lines)
 - **type** `ConsumedUserPayload struct` — ConsumedUserPayload is the identity user lifecycle payload consumed by org.
 - **type** `ConsumedTenantPayload struct` — ConsumedTenantPayload is the identity tenant lifecycle payload consumed by org.
 - **type** `Event struct` — Event is the standard envelope (mirrors identity events).
@@ -3170,6 +3219,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `DepartmentPayload struct` — DepartmentPayload carries department lifecycle data.
 - **type** `TeamPayload struct` — TeamPayload carries team lifecycle data.
 - **type** `MappingPayload struct` — MappingPayload carries mapping lifecycle data.
+- **type** `LocationPayload struct` — LocationPayload carries the location id, code, state and country — no personal data (FR-L007).
 
 #### `internal/hr/organization/models/department.go` (30 lines)
 - **type** `Department struct` — Department represents a company department scoped to a tenant. FR-D001..FR-D008.
@@ -3179,7 +3229,11 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `Designation struct` — Designation represents a job title/level scoped to a tenant. FR-DG001..FR-DG004.
 - **func** `(d *Designation) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
 
-#### `internal/hr/organization/models/mapping.go` (43 lines)
+#### `internal/hr/organization/models/location.go` (32 lines)
+- **type** `Location struct` — Location is a physical work site of a tenant: address, state (professional tax, holidays) and time zone. FR-L001..FR-L007; SQL twin: migrations/hr/000047.
+- **func** `(l *Location) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
+
+#### `internal/hr/organization/models/mapping.go` (44 lines)
 - **type** `Mapping struct` — Mapping links a user to org structure. Append-only: deactivate, never hard delete. FR-M001..FR-M007.
 - **func** `(m *Mapping) BeforeCreate(tx *gorm.DB) error` — BeforeCreate generates a UUID v4 key when unset.
 
@@ -3214,7 +3268,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(r *designationRepository) Update(ctx context.Context, tx *gorm.DB, d *models.Designation) error`
 - **func** `(r *designationRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 
-#### `internal/hr/organization/repositories/interfaces.go` (56 lines)
+#### `internal/hr/organization/repositories/interfaces.go` (68 lines)
 - **type** `DepartmentRepository interface` — DepartmentRepository handles CRUD for departments scoped by tenant.
 - **method** `DepartmentRepository.Create(ctx context.Context, tx *gorm.DB, dept *models.Department) error`
 - **method** `DepartmentRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Department, error)`
@@ -3239,6 +3293,13 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **method** `DesignationRepository.FindAll(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) ([]models.Designation, int64, error)`
 - **method** `DesignationRepository.Update(ctx context.Context, tx *gorm.DB, d *models.Designation) error`
 - **method** `DesignationRepository.Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
+- **type** `LocationRepository interface` — LocationRepository handles work sites scoped by tenant (FR-L).
+- **method** `LocationRepository.Create(ctx context.Context, tx *gorm.DB, l *models.Location) error`
+- **method** `LocationRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Location, error)`
+- **method** `LocationRepository.FindByCode(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, code string) (*models.Location, error)`
+- **method** `LocationRepository.FindByName(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, name string) (*models.Location, error)`
+- **method** `LocationRepository.FindAll(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f dto.LocationFilter, page, perPage int) ([]models.Location, int64, error)`
+- **method** `LocationRepository.Update(ctx context.Context, tx *gorm.DB, l *models.Location) error`
 - **type** `MappingRepository interface` — MappingRepository handles user→org mappings (append-only; deactivate, never hard delete).
 - **method** `MappingRepository.Create(ctx context.Context, tx *gorm.DB, m *models.Mapping) error`
 - **method** `MappingRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Mapping, error)`
@@ -3249,9 +3310,21 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **method** `MappingRepository.CountActiveByDepartment(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID) (int64, error)`
 - **method** `MappingRepository.CountActiveByTeam(ctx context.Context, db *gorm.DB, tenantID, teamID uuid.UUID) (int64, error)`
 - **method** `MappingRepository.CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error)`
+- **method** `MappingRepository.CountActiveByLocation(ctx context.Context, db *gorm.DB, tenantID, locationID uuid.UUID) (int64, error)`
 - **method** `MappingRepository.Update(ctx context.Context, tx *gorm.DB, m *models.Mapping) error`
 
-#### `internal/hr/organization/repositories/mapping_repository.go` (95 lines)
+#### `internal/hr/organization/repositories/location_repository.go` (72 lines)
+- **type** `locationRepository struct{}`
+- **func** `NewLocationRepository() LocationRepository` — NewLocationRepository returns a LocationRepository.
+- **func** `(r *locationRepository) Create(ctx context.Context, tx *gorm.DB, l *models.Location) error`
+- **func** `(r *locationRepository) FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Location, error)`
+- **func** `(r *locationRepository) FindByCode(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, code string) (*models.Location, error)`
+- **func** `(r *locationRepository) FindByName(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, name string) (*models.Location, error)`
+- **func** `(r *locationRepository) FindAll(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f dto.LocationFilter, page, perPage int) ([]models.Location, int64, error)`
+- **func** `(r *locationRepository) Update(ctx context.Context, tx *gorm.DB, l *models.Location) error`
+- **func** `firstLocation(q *gorm.DB) (*models.Location, error)`
+
+#### `internal/hr/organization/repositories/mapping_repository.go` (101 lines)
 - **type** `mappingRepository struct{}`
 - **func** `NewMappingRepository() MappingRepository` — NewMappingRepository returns a MappingRepository.
 - **func** `(r *mappingRepository) Create(ctx context.Context, tx *gorm.DB, m *models.Mapping) error`
@@ -3263,6 +3336,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(r *mappingRepository) CountActiveByDepartment(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID) (int64, error)`
 - **func** `(r *mappingRepository) CountActiveByTeam(ctx context.Context, db *gorm.DB, tenantID, teamID uuid.UUID) (int64, error)`
 - **func** `(r *mappingRepository) CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error)`
+- **func** `(r *mappingRepository) CountActiveByLocation(ctx context.Context, db *gorm.DB, tenantID, locationID uuid.UUID) (int64, error)`
 - **func** `(r *mappingRepository) Update(ctx context.Context, tx *gorm.DB, m *models.Mapping) error`
 
 #### `internal/hr/organization/repositories/team_repository.go` (80 lines)
@@ -3276,7 +3350,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(r *teamRepository) Update(ctx context.Context, tx *gorm.DB, team *models.Team) error`
 - **func** `(r *teamRepository) Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 
-#### `internal/hr/organization/routes/routes.go` (93 lines)
+#### `internal/hr/organization/routes/routes.go` (105 lines)
 - **type** `Controllers struct` — RegisterRoutes wires organization endpoint groups with Module 0 middleware (tenantResolver + authMiddleware built from the identity module; rate limiting reuses Module 0 middleware on the same Gin engine). Controllers groups the organization HTTP handlers.
 - **func** `RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP, c Controllers, chartInv services.ChartInvalidator)`
 - **func** `chartInvalidation(inv services.ChartInvalidator) gin.HandlerFunc` — chartInvalidation drops the tenant's cached org chart after every successful org write (departments, teams, mappings), so GET /org-chart is read-your-writes consistent.
@@ -3332,7 +3406,28 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `mapDeptToResponse(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, deptRepo repositories.DepartmentRepository, d *models.Department) (*dto.DepartmentResponse, error)`
 - **func** `publishOrOutbox(ctx context.Context, tx *gorm.DB, publisher queue.EventPublisher, exchange string, evt events.Event)` — publishOrOutbox publishes an org event; on broker failure the event lands in the outbox table for later retry, so queue downtime never blocks the API (FR-E005). A nil tx (unit tests without a database) skips the outbox write.
 
-#### `internal/hr/organization/services/mapping_service.go` (326 lines)
+#### `internal/hr/organization/services/location_service.go` (234 lines)
+- **type** `LocationService interface` — LocationService handles work-site lifecycle (FR-L001..FR-L007). Audit rows come from the route's audit trail.
+- **method** `LocationService.CreateLocation(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateLocationRequest, correlationID uuid.UUID) (*dto.LocationResponse, error)`
+- **method** `LocationService.GetLocation(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.LocationResponse, error)`
+- **method** `LocationService.ListLocations(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f dto.LocationFilter, page, perPage int) (*dto.LocationListResponse, error)`
+- **method** `LocationService.UpdateLocation(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.UpdateLocationRequest, correlationID uuid.UUID) (*dto.LocationResponse, error)`
+- **method** `LocationService.SetLocationStatus(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, status string, correlationID uuid.UUID) (*dto.LocationResponse, error)`
+- **type** `locationService struct`
+- **func** `NewLocationService(repo repositories.LocationRepository, mappingRepo repositories.MappingRepository, publisher queue.EventPublisher) LocationService` — NewLocationService creates a LocationService.
+- **func** `mapLocation(l *models.Location) *dto.LocationResponse`
+- **func** `invalidLocation(msg string) error`
+- **func** `(s *locationService) CreateLocation(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateLocationRequest, correlationID uuid.UUID) (*dto.LocationResponse, error)`
+- **func** `normalizeLocation(l *models.Location) error` — normalizeLocation trims and checks the editable fields (FR-L001, FR-L003).
+- **func** `(s *locationService) unique(ctx context.Context, db *gorm.DB, l *models.Location) error` — unique enforces per-tenant unique code and case-insensitive name (FR-L001).
+- **func** `(s *locationService) GetLocation(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.LocationResponse, error)`
+- **func** `(s *locationService) ListLocations(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f dto.LocationFilter, page, perPage int) (*dto.LocationListResponse, error)`
+- **func** `(s *locationService) UpdateLocation(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.UpdateLocationRequest, correlationID uuid.UUID) (*dto.LocationResponse, error)`
+- **func** `(s *locationService) SetLocationStatus(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, status string, correlationID uuid.UUID) (*dto.LocationResponse, error)` — SetLocationStatus deactivates (blocked while active mappings reference the location) or reactivates (FR-L004).
+- **func** `(s *locationService) find(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Location, error)`
+- **func** `(s *locationService) emit(ctx context.Context, tx *gorm.DB, typ, key string, l *models.Location, correlationID uuid.UUID)`
+
+#### `internal/hr/organization/services/mapping_service.go` (359 lines)
 - **type** `MappingService interface` — MappingService handles user→org mappings with hierarchy guards.
 - **method** `MappingService.CreateMapping(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateMappingRequest, correlationID uuid.UUID) (*dto.MappingResponse, error)`
 - **method** `MappingService.GetMapping(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.MappingResponse, error)`
@@ -3345,6 +3440,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `mapMapping(m *models.Mapping) *dto.MappingResponse`
 - **func** `(s *mappingService) checkUser(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) error` — checkUser resolves a user through Module 0: must exist, same tenant, active. FR-M001.
 - **func** `(s *mappingService) checkRefs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, deptID, teamID, desigID, managerID *uuid.UUID, self uuid.UUID) error` — checkRefs validates department/team/designation/manager references. FR-M001/FR-M003/FR-M004.
+- **func** `(s *mappingService) checkLocation(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, raw *string) (*uuid.UUID, error)` — checkLocation resolves an optional location_id: it must be an active location of the tenant (FR-L005).
 - **func** `(s *mappingService) assertManagerAcyclic(ctx context.Context, db *gorm.DB, tenantID, self, manager uuid.UUID) error` — assertManagerAcyclic walks the manager chain to reject cycles. FR-M003.
 - **func** `(s *mappingService) CreateMapping(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateMappingRequest, correlationID uuid.UUID) (*dto.MappingResponse, error)`
 - **func** `(s *mappingService) GetMapping(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.MappingResponse, error)`
@@ -5752,9 +5848,10 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `internal/identity/services/user_service_test.go`: TestUserService_CreateUser, TestUserService_InviteUser, TestUserService_GetByID, TestUserService_ListUsers, TestUserService_UpdateUser, TestUserService_DeactivateUser
 - `internal/identity/validators/validators_test.go`: TestValidateSlug, TestIsReservedSlug
 
-### M1 HR / Organization — 66 test functions in 22 files
+### M1 HR / Organization — 70 test functions in 24 files
 - `internal/hr/organization/controllers/department_controller_test.go`: TestDepartmentController_Create, TestDepartmentController_CreateBadBody, TestDepartmentController_GetByID, TestDepartmentController_List, TestDepartmentController_MissingTenant, TestDepartmentController_Deactivate
 - `internal/hr/organization/controllers/designation_controller_test.go`: TestDesignationController_CRUD
+- `internal/hr/organization/controllers/location_controller_test.go`: TestLocationController
 - `internal/hr/organization/controllers/mapping_controller_test.go`: TestMappingController_CreateAndList, TestMappingController_UpdateAndDeactivate
 - `internal/hr/organization/controllers/org_chart_controller_test.go`: TestOrgChartController_ChartAndChain
 - `internal/hr/organization/controllers/stubs_test.go`: (helpers only)
@@ -5771,6 +5868,7 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `internal/hr/organization/services/fault_injection_test.go`: TestFaults_Departments, TestFaults_Teams, TestFaults_Designations, TestFaults_MappingsAndChart, TestTeamMoveMakesMappingsFollow
 - `internal/hr/organization/services/helpers_test.go`: TestPublishOrOutbox_BrokerDown, TestPublishOrOutbox_SuccessSkipsOutbox
 - `internal/hr/organization/services/hierarchy_test.go`: TestHierarchyDepthCap, TestHierarchyMoveValidation, TestDeactivateWithActiveMappingsGuard, TestUpdateRepoErrorPropagation
+- `internal/hr/organization/services/location_service_test.go`: TestLocationService_Lifecycle, TestMappingService_Location, TestLocationService_Failures
 - `internal/hr/organization/services/mapping_service_test.go`: TestMappingService_CreateAndPrimaryGuard, TestMappingService_CRUDAndPrimarySwap, TestMappingService_ManagerCycle, TestMappingService_ManagerSelfAndMissing, TestMappingService_DeactivateUserConverges
 - `internal/hr/organization/services/org_chart_service_test.go`: TestOrgChart_EmptyTenant, TestOrgChart_ForestBuild, TestOrgChart_UserChain, TestOrgChart_InvalidateChartDropsOnlyThatTenant, TestOrgChart_InvalidateChartNilCache, TestOrgChart_CacheHitAndSet, TestDepartmentService_ForceCascadeDeactivatesChildren
 - `internal/hr/organization/services/team_service_test.go`: TestTeamService_CreateTeam, TestTeamService_MoveAndDeactivate, TestTeamService_GetListRenameConflict
@@ -5891,6 +5989,7 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `identity_test.go`: TestTenantRoutesRequirePlatformKey, TestTenantLifecycle, TestTenantAdminProvisioningIsAtomic, TestPlatformRoutesDisabledWithoutKeyIsCoveredByMiddlewareUnit, TestAuthLoginErrors, TestLoginRateLimitCountsFailuresOnly, TestRefreshRotationReuseAndLogout, TestAccessTokenValidation, TestForgotAndResetPassword, TestAuthMe, TestUserLifecycle, TestDeactivatedUserSessionsAreRevoked, TestAssignAndRemoveRoles, TestRolesAndPermissions, TestRBACEnforcement, TestAuditTrail, TestPaginationIsClampedEverywhere, TestErrorEnvelopeIsUniform, TestCORSHeaders, TestTenantIsolation
 - `invitation_test.go`: TestInvitationLifecycle, TestInvitationRevokeAndEscalation
 - `leave_test.go`: TestLeaveLifecycle, TestLeaveOverlapAndPagination, TestLeaveRBACAndSelfApproval, TestLeaveIsolation, TestLeaveConcurrency
+- `location_test.go`: TestOrganizationLocations
 - `org_test.go`: TestDepartmentLifecycleAndHierarchy, TestDepartmentDepthLimit, TestTeamLifecycle, TestDesignationLifecycle, TestMappingRulesAndUserDeactivationConvergence, TestOrgChartIsReadYourWritesConsistent, TestOrgChartUserChain, TestOrgRBAC
 - `payroll_test.go`: TestPayrollLifecycle, TestPayrollRBACAndIsolation
 - `perf_test.go`: TestPerformanceBudgets
@@ -6391,6 +6490,13 @@ route widens; scoped routes opt in through `RequireScopedPermission`.
 | FR-DG002 | Titles unique per tenant (case-insensitive); codes unique per tenant when set. |
 | FR-DG003 | Get/List (paginated, `level` ordering), Update (code immutable), Deactivate, soft delete — same lifecycle as departments. |
 | FR-DG004 | Deactivation blocked while active mappings reference the designation (409) unless mappings are migrated first. |
+| FR-L001 | Create a location: `code` (required, 2–32, `^[A-Z0-9_-]+$` after upper-casing, unique per tenant), `name` (1–150, unique per tenant case-insensitive), `address_line1`/`address_line2` (≤ 200), `city` (1–100), `state_code` (required, 1–10 letters/digits, e.g. `KA`, ISO 3166-2 subdivision without the country prefix), `country_code` (ISO 3166-1 alpha-2, default `IN`), `postal_code` (≤ 20), `time_zone` (IANA name, validated, default `Asia/Kolkata`). |
+| FR-L002 | Get by id (tenant-scoped, 404 otherwise). List paginated with `status`, `state_code` and `search` (name, code or city, case-insensitive) filters, ordered by name. |
+| FR-L003 | Update any field except `code` (immutable once set: rejected with 400 if it differs). The same validation applies. |
+| FR-L004 | Deactivate (`active → inactive`). Blocked with 409 while active mappings reference the location. Activate (`inactive → active`). Repeating either is 409. |
+| FR-L005 | Mappings gain an optional `location_id` (create and update). When set, it must be an active location of the tenant (404 unknown, 409 inactive). |
+| FR-L006 | `organization:read` reads locations; `organization:update` writes them. |
+| FR-L007 | Events `organization.location.created` / `updated` / `deactivated` / `activated` carry the location id, code, state and country (no personal data). |
 | FR-H001 | Departments form a forest: `parent_department_id` nullable; exactly one path to a root; cycles rejected (409 `hierarchy.cycle`). |
 | FR-H002 | Team→department edge is many-to-one and mandatory. |
 | FR-H003 | Setting a parent validates: parent exists, same tenant, not self, not a descendant (cycle check in tx). |
@@ -6449,6 +6555,12 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 ### 2026-10-06 — hardening pass (branch `fix/module-0-2-hardening`)
 Verification-console findings fixed and pinned by tests; full list in the hardening report in `docs/modules/m0-identity-access/testing.md`. Highlights: duplicate codes → 409, active-team deactivation rule, org-chart cache invalidation, team move keeps mappings consistent, tenant-scoped unique codes, optional deactivate bodies.
 Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pass; coverage 86.5 % (services 93-97 %); migrations up/down/up clean.
+### 2026-10-20 — locations (HR parity P1)
+- DO-L1: a location's state is a code (ISO 3166-2 subdivision without country) rather than a free name, so payroll PT slabs and holiday calendars can key on it.
+- DO-L2: time zones are validated against the embedded IANA database (`time/tzdata`) so validation does not depend on the host.
+- DO-L3: the worker's location is an optional field of the mapping (FR-L005); core will own effective-dated assignment later (CH-012) and mappings become its projection.
+- DO-L4: location writes are audited by the route audit trail only (actor-aware); the service does not write a second, actor-less audit row.
+Evidence: migration hr/000047 (up/down/up verified); services 95.7 %, location controller 100 %; `TestOrganizationLocations` green; console `s1.loc` 15 steps; whole console 37/37.
 
 ### m1-hr-management/contexts/employee  _(from specification.md)_
 

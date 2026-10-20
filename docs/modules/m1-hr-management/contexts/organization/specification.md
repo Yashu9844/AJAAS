@@ -44,6 +44,22 @@ Own the company structure inside a tenant: departments, teams, designations, rep
 | FR-DG003 | Get/List (paginated, `level` ordering), Update (code immutable), Deactivate, soft delete — same lifecycle as departments. |
 | FR-DG004 | Deactivation blocked while active mappings reference the designation (409) unless mappings are migrated first. |
 
+#### Locations (FR-L) — HR parity P1, 2026-10-20
+
+A location is a physical work site. It carries the address, the state used for professional-tax slabs and holiday
+calendars, and the time zone used for attendance days. Core, leave, payroll and benefits read a worker's location from
+the worker's primary mapping.
+
+| ID | Requirement |
+|---|---|
+| FR-L001 | Create a location: `code` (required, 2–32, `^[A-Z0-9_-]+$` after upper-casing, unique per tenant), `name` (1–150, unique per tenant case-insensitive), `address_line1`/`address_line2` (≤ 200), `city` (1–100), `state_code` (required, 1–10 letters/digits, e.g. `KA`, ISO 3166-2 subdivision without the country prefix), `country_code` (ISO 3166-1 alpha-2, default `IN`), `postal_code` (≤ 20), `time_zone` (IANA name, validated, default `Asia/Kolkata`). |
+| FR-L002 | Get by id (tenant-scoped, 404 otherwise). List paginated with `status`, `state_code` and `search` (name, code or city, case-insensitive) filters, ordered by name. |
+| FR-L003 | Update any field except `code` (immutable once set: rejected with 400 if it differs). The same validation applies. |
+| FR-L004 | Deactivate (`active → inactive`). Blocked with 409 while active mappings reference the location. Activate (`inactive → active`). Repeating either is 409. |
+| FR-L005 | Mappings gain an optional `location_id` (create and update). When set, it must be an active location of the tenant (404 unknown, 409 inactive). |
+| FR-L006 | `organization:read` reads locations; `organization:update` writes them. |
+| FR-L007 | Events `organization.location.created` / `updated` / `deactivated` / `activated` carry the location id, code, state and country (no personal data). |
+
 #### Reporting hierarchy (FR-H)
 
 | ID | Requirement |

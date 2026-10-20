@@ -247,4 +247,37 @@ export const S1: Scenario[] = [
       await r.call("Pagination page=-1 handled (not 500)", tn(A, "GET", "/hr/departments", undefined, { page: "-1" }), [200, 400]);
     },
   },
+  {
+    key: "s1.loc",
+    module: 1,
+    title: "Locations: create, validate, filter, link to mappings, deactivation rules (FR-L001..FR-L005)",
+    description:
+      "Creates two locations (code upper-cased, defaults IN / Asia/Kolkata), checks duplicates and bad time zones, filters by state, maps a fresh user to a location, proves deactivation is blocked while mapped and an inactive location cannot be assigned, then reactivates and moves the mapping.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const code = `BLR${uid}`.toUpperCase();
+      const blr = await r.call("Create location (lower-case code)", tn(A, "POST", "/hr/locations", { code: code.toLowerCase(), name: `Bengaluru ${uid}`, city: "Bengaluru", state_code: "ka" }), 201,
+        expectFields(["data.code", code], ["data.state_code", "KA"], ["data.country_code", "IN"], ["data.time_zone", "Asia/Kolkata"]),
+      );
+      await r.call("Duplicate code → 409", tn(A, "POST", "/hr/locations", { code, name: `Other ${uid}`, city: "X", state_code: "KA" }), 409);
+      await r.call("Unknown time zone → 400", tn(A, "POST", "/hr/locations", { code: `Z${uid}`, name: `Z ${uid}`, city: "X", state_code: "KA", time_zone: "Mars/Base" }), 400);
+      const pnq = await r.call("Create Pune location", tn(A, "POST", "/hr/locations", { code: `PNQ${uid}`, name: `Pune ${uid}`, city: "Pune", state_code: "MH" }), 201);
+      await r.call("Filter by state MH", tn(A, "GET", "/hr/locations", undefined, { state_code: "MH", search: uid }), 200, (e) => {
+        const rows = (getPath(e.resBody, "data") as Record<string, unknown>[] | undefined) ?? [];
+        return rows.length === 1 && rows[0].city === "Pune" ? null : "expected only Pune";
+      });
+      await r.call("Code is immutable → 400", tn(A, "PATCH", `/hr/locations/${str(blr, "data.id")}`, { code: "OTHER" }), 400);
+      const u = await mkUser(r, A, uid, "loc");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Loc ${uid}`, code: `loc-${uid}` }), 201);
+      const m = await r.call("Map the user to Bengaluru", tn(A, "POST", "/hr/mappings", { user_id: u.id, department_id: str(d, "data.id"), is_primary: true, location_id: str(blr, "data.id") }), 201,
+        expectFields(["data.location_id", str(blr, "data.id")]),
+      );
+      await r.call("Deactivate a mapped location → 409", tn(A, "POST", `/hr/locations/${str(blr, "data.id")}/deactivate`), 409);
+      await r.call("Deactivate Pune", tn(A, "POST", `/hr/locations/${str(pnq, "data.id")}/deactivate`), 200);
+      await r.call("Assign an inactive location → 409", tn(A, "PATCH", `/hr/mappings/${str(m, "data.id")}`, { location_id: str(pnq, "data.id") }), 409);
+      await r.call("Reactivate Pune", tn(A, "POST", `/hr/locations/${str(pnq, "data.id")}/activate`), 200);
+      await r.call("Move the mapping to Pune", tn(A, "PATCH", `/hr/mappings/${str(m, "data.id")}`, { location_id: str(pnq, "data.id") }), 200);
+      await r.call("Bengaluru can be deactivated now", tn(A, "POST", `/hr/locations/${str(blr, "data.id")}/deactivate`), 200);
+    },
+  },
 ];

@@ -297,7 +297,7 @@ func newWorld(f *faults) *world {
 	w.deptSvc = NewDepartmentService(dr, tr, mr, &stubPublisher{}, &stubAudit{})
 	w.teamSvc = NewTeamService(tr, dr, mr, ur, &stubPublisher{}, &stubAudit{})
 	w.desigSvc = NewDesignationService(gr, mr, &stubPublisher{}, &stubAudit{})
-	w.mapSvc = NewMappingService(mr, dr, tr, gr, ur, &stubPublisher{}, &stubAudit{})
+	w.mapSvc = NewMappingService(mr, dr, tr, gr, newStubLocations(), ur, &stubPublisher{}, &stubAudit{})
 	w.chartSvc = NewOrgChartService(dr, tr, mr, gr, nil)
 	return w
 }

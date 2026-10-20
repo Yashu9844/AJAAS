@@ -95,7 +95,7 @@ func TestMappingService_DeactivateUserRepoError(t *testing.T) {
 	teams := &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}}
 	desigs := &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}
 	users := &stubUserChecker{users: map[uuid.UUID]*identityport.User{}}
-	svc := NewMappingService(&errMappingRepo{base}, depts, teams, desigs, users, &stubPublisher{}, &stubAudit{})
+	svc := NewMappingService(&errMappingRepo{base}, depts, teams, desigs, newStubLocations(), users, &stubPublisher{}, &stubAudit{})
 
 	if err := svc.DeactivateUserMappings(context.Background(), nil, uuid.New(), uuid.New(), uuid.New()); !errors.Is(err, errBoom) {
 		t.Fatalf("expected repo error to propagate, got %v", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/models"
 	"gorm.io/gorm"
 )
@@ -41,6 +42,16 @@ type DesignationRepository interface {
 	Delete(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error
 }
 
+// LocationRepository handles work sites scoped by tenant (FR-L).
+type LocationRepository interface {
+	Create(ctx context.Context, tx *gorm.DB, l *models.Location) error
+	FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Location, error)
+	FindByCode(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, code string) (*models.Location, error)
+	FindByName(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, name string) (*models.Location, error)
+	FindAll(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f dto.LocationFilter, page, perPage int) ([]models.Location, int64, error)
+	Update(ctx context.Context, tx *gorm.DB, l *models.Location) error
+}
+
 // MappingRepository handles user→org mappings (append-only; deactivate, never hard delete).
 type MappingRepository interface {
 	Create(ctx context.Context, tx *gorm.DB, m *models.Mapping) error
@@ -52,5 +63,6 @@ type MappingRepository interface {
 	CountActiveByDepartment(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID) (int64, error)
 	CountActiveByTeam(ctx context.Context, db *gorm.DB, tenantID, teamID uuid.UUID) (int64, error)
 	CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error)
+	CountActiveByLocation(ctx context.Context, db *gorm.DB, tenantID, locationID uuid.UUID) (int64, error)
 	Update(ctx context.Context, tx *gorm.DB, m *models.Mapping) error
 }

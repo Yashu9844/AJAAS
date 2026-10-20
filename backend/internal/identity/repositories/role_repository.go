@@ -57,7 +57,8 @@ func (r *roleRepository) FindAll(ctx context.Context, db *gorm.DB, tenantID uuid
 	}
 
 	offset := (page - 1) * perPage
-	err := query.Order("created_at DESC, id").Offset(offset).Limit(perPage).Find(&roles).Error
+	// Built-in roles first (system, then predefined templates), then custom roles newest first.
+	err := query.Order("is_system DESC, template_key IS NULL, created_at DESC, id").Offset(offset).Limit(perPage).Find(&roles).Error
 	if err != nil {
 		return nil, 0, err
 	}

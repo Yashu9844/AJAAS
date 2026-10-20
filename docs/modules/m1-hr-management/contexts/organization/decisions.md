@@ -29,3 +29,10 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 ### 2026-10-06 — hardening pass (branch `fix/module-0-2-hardening`)
 Verification-console findings fixed and pinned by tests; full list in the hardening report in `docs/modules/m0-identity-access/testing.md`. Highlights: duplicate codes → 409, active-team deactivation rule, org-chart cache invalidation, team move keeps mappings consistent, tenant-scoped unique codes, optional deactivate bodies.
 Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pass; coverage 86.5 % (services 93-97 %); migrations up/down/up clean.
+
+### 2026-10-20 — locations (HR parity P1)
+- DO-L1: a location's state is a code (ISO 3166-2 subdivision without country) rather than a free name, so payroll PT slabs and holiday calendars can key on it.
+- DO-L2: time zones are validated against the embedded IANA database (`time/tzdata`) so validation does not depend on the host.
+- DO-L3: the worker's location is an optional field of the mapping (FR-L005); core will own effective-dated assignment later (CH-012) and mappings become its projection.
+- DO-L4: location writes are audited by the route audit trail only (actor-aware); the service does not write a second, actor-less audit row.
+Evidence: migration hr/000047 (up/down/up verified); services 95.7 %, location controller 100 %; `TestOrganizationLocations` green; console `s1.loc` 15 steps; whole console 37/37.

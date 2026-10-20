@@ -25,7 +25,7 @@ func newMappingSvc() (*stubMappingRepo, *stubDeptRepo, *stubTeamRepo, MappingSer
 	depts := &stubDeptRepo{byID: map[uuid.UUID]*models.Department{}}
 	teams := &stubTeamRepo{byID: map[uuid.UUID]*models.Team{}}
 	users := &stubUserChecker{users: map[uuid.UUID]*identityport.User{}}
-	svc := NewMappingService(mappings, depts, teams, &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}, users, &stubPublisher{}, &stubAudit{})
+	svc := NewMappingService(mappings, depts, teams, &stubDesigRepo{byID: map[uuid.UUID]*models.Designation{}, byTitle: map[string]*models.Designation{}}, newStubLocations(), users, &stubPublisher{}, &stubAudit{})
 	return mappings, depts, teams, svc, users
 }
 

@@ -8,6 +8,7 @@ type CreateMappingRequest struct {
 	DepartmentID  *string `json:"department_id" binding:"omitempty,uuid"`
 	TeamID        *string `json:"team_id" binding:"omitempty,uuid"`
 	DesignationID *string `json:"designation_id" binding:"omitempty,uuid"`
+	LocationID    *string `json:"location_id" binding:"omitempty,uuid"`
 	IsPrimary     bool    `json:"is_primary"`
 	ManagerUserID *string `json:"manager_user_id" binding:"omitempty,uuid"`
 }
@@ -17,6 +18,7 @@ type UpdateMappingRequest struct {
 	DepartmentID  *string `json:"department_id" binding:"omitempty,uuid"`
 	TeamID        *string `json:"team_id" binding:"omitempty,uuid"`
 	DesignationID *string `json:"designation_id" binding:"omitempty,uuid"`
+	LocationID    *string `json:"location_id" binding:"omitempty,uuid"`
 	IsPrimary     *bool   `json:"is_primary"`
 	ManagerUserID *string `json:"manager_user_id" binding:"omitempty,uuid"`
 }
@@ -34,6 +36,7 @@ type MappingResponse struct {
 	DepartmentID  *string   `json:"department_id,omitempty"`
 	TeamID        *string   `json:"team_id,omitempty"`
 	DesignationID *string   `json:"designation_id,omitempty"`
+	LocationID    *string   `json:"location_id,omitempty"`
 	IsPrimary     bool      `json:"is_primary"`
 	ManagerUserID *string   `json:"manager_user_id,omitempty"`
 	Status        string    `json:"status"`

@@ -21,6 +21,10 @@ const (
 	TypeMappingUpdated        = "MappingUpdated"
 	TypeMappingDeactivated    = "MappingDeactivated"
 	TypeHierarchyMoved        = "HierarchyMoved"
+	TypeLocationCreated       = "LocationCreated"
+	TypeLocationUpdated       = "LocationUpdated"
+	TypeLocationDeactivated   = "LocationDeactivated"
+	TypeLocationActivated     = "LocationActivated"
 )
 
 // Routing keys.
@@ -35,6 +39,10 @@ const (
 	RoutingKeyMappingUpdated        = "organization.mapping.updated"
 	RoutingKeyMappingDeactivated    = "organization.mapping.deactivated"
 	RoutingKeyHierarchyMoved        = "organization.hierarchy.moved"
+	RoutingKeyLocationCreated       = "organization.location.created"
+	RoutingKeyLocationUpdated       = "organization.location.updated"
+	RoutingKeyLocationDeactivated   = "organization.location.deactivated"
+	RoutingKeyLocationActivated     = "organization.location.activated"
 )
 
 // Consumed identity routing keys (FR-E001..FR-E004, connections C7).
@@ -98,4 +106,13 @@ type TeamPayload struct {
 type MappingPayload struct {
 	MappingID uuid.UUID `json:"mapping_id"`
 	UserID    uuid.UUID `json:"user_id"`
+}
+
+// LocationPayload carries the location id, code, state and country — no personal data (FR-L007).
+type LocationPayload struct {
+	LocationID  uuid.UUID `json:"location_id"`
+	Code        string    `json:"code"`
+	StateCode   string    `json:"state_code"`
+	CountryCode string    `json:"country_code"`
+	Status      string    `json:"status"`
 }

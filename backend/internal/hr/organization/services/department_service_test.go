@@ -176,6 +176,15 @@ func (s *stubMappingRepo) CountActiveByTeam(ctx context.Context, db *gorm.DB, te
 	}
 	return n, nil
 }
+func (s *stubMappingRepo) CountActiveByLocation(ctx context.Context, db *gorm.DB, tenantID, locationID uuid.UUID) (int64, error) {
+	var n int64
+	for _, m := range s.byID {
+		if m.LocationID != nil && *m.LocationID == locationID && m.Status == "active" {
+			n++
+		}
+	}
+	return n, nil
+}
 func (s *stubMappingRepo) CountActiveByDesignation(ctx context.Context, db *gorm.DB, tenantID, designationID uuid.UUID) (int64, error) {
 	var n int64
 	for _, m := range s.byID {

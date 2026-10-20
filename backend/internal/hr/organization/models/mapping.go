@@ -16,6 +16,7 @@ type Mapping struct {
 	DepartmentID  *uuid.UUID `gorm:"type:uuid;index:idx_mappings_department_id" json:"department_id,omitempty"`
 	TeamID        *uuid.UUID `gorm:"type:uuid;index:idx_mappings_team_id" json:"team_id,omitempty"`
 	DesignationID *uuid.UUID `gorm:"type:uuid;index:idx_mappings_designation_id" json:"designation_id,omitempty"`
+	LocationID    *uuid.UUID `gorm:"type:uuid;index:idx_mappings_location_id" json:"location_id,omitempty"`
 	IsPrimary     bool       `gorm:"not null;default:false;index:idx_mappings_primary" json:"is_primary"`
 	ManagerUserID *uuid.UUID `gorm:"type:uuid;index:idx_mappings_manager_user_id" json:"manager_user_id,omitempty"`
 	Status        string     `gorm:"type:varchar(20);not null;default:'active';index:idx_mappings_status" json:"status"`

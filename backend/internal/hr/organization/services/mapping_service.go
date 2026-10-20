@@ -28,6 +28,7 @@ type mappingService struct {
 	deptRepo    repositories.DepartmentRepository
 	teamRepo    repositories.TeamRepository
 	desigRepo   repositories.DesignationRepository
+	locRepo     repositories.LocationRepository
 	users       userChecker
 	publisher   queue.EventPublisher
 	audit       auditLogger
@@ -39,18 +40,19 @@ func NewMappingService(
 	deptRepo repositories.DepartmentRepository,
 	teamRepo repositories.TeamRepository,
 	desigRepo repositories.DesignationRepository,
+	locRepo repositories.LocationRepository,
 	users userChecker,
 	publisher queue.EventPublisher,
 	audit auditLogger,
 ) MappingService {
-	return &mappingService{mappingRepo: mappingRepo, deptRepo: deptRepo, teamRepo: teamRepo, desigRepo: desigRepo, users: users, publisher: publisher, audit: audit}
+	return &mappingService{mappingRepo: mappingRepo, deptRepo: deptRepo, teamRepo: teamRepo, desigRepo: desigRepo, locRepo: locRepo, users: users, publisher: publisher, audit: audit}
 }
 
 func mapMapping(m *models.Mapping) *dto.MappingResponse {
 	return &dto.MappingResponse{
 		ID: m.ID.String(), TenantID: m.TenantID.String(), UserID: m.UserID.String(),
 		DepartmentID: uuidToString(m.DepartmentID), TeamID: uuidToString(m.TeamID),
-		DesignationID: uuidToString(m.DesignationID), IsPrimary: m.IsPrimary,
+		DesignationID: uuidToString(m.DesignationID), LocationID: uuidToString(m.LocationID), IsPrimary: m.IsPrimary,
 		ManagerUserID: uuidToString(m.ManagerUserID), Status: m.Status,
 		CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
 	}
@@ -116,6 +118,28 @@ func (s *mappingService) checkRefs(ctx context.Context, db *gorm.DB, tenantID uu
 	return nil
 }
 
+// checkLocation resolves an optional location_id: it must be an active location of the tenant (FR-L005).
+func (s *mappingService) checkLocation(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, raw *string) (*uuid.UUID, error) {
+	id, err := parseUUID(raw)
+	if err != nil {
+		return nil, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: "invalid location_id", StatusCode: 400}
+	}
+	if id == nil {
+		return nil, nil
+	}
+	l, err := s.locRepo.FindByID(ctx, db, tenantID, *id)
+	if err != nil {
+		return nil, err
+	}
+	if l == nil {
+		return nil, sharedErrors.ErrNotFound
+	}
+	if l.Status != "active" {
+		return nil, &sharedErrors.AppError{Code: "CONFLICT", Message: "location is inactive", StatusCode: 409}
+	}
+	return id, nil
+}
+
 // assertManagerAcyclic walks the manager chain to reject cycles. FR-M003.
 func (s *mappingService) assertManagerAcyclic(ctx context.Context, db *gorm.DB, tenantID, self, manager uuid.UUID) error {
 	seen := map[uuid.UUID]bool{self: true}
@@ -158,6 +182,10 @@ func (s *mappingService) CreateMapping(ctx context.Context, tx *gorm.DB, tenantI
 	if err != nil {
 		return nil, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: "invalid manager_user_id", StatusCode: 400}
 	}
+	locID, err := s.checkLocation(ctx, tx, tenantID, req.LocationID)
+	if err != nil {
+		return nil, err
+	}
 	if teamID == nil && deptID == nil && desigID == nil {
 		return nil, &sharedErrors.AppError{Code: "VALIDATION_ERROR", Message: "at least one of department, team, or designation is required", StatusCode: 400}
 	}
@@ -175,7 +203,7 @@ func (s *mappingService) CreateMapping(ctx context.Context, tx *gorm.DB, tenantI
 	}
 
 	m := &models.Mapping{
-		UserID: userID, DepartmentID: deptID, TeamID: teamID, DesignationID: desigID,
+		UserID: userID, DepartmentID: deptID, TeamID: teamID, DesignationID: desigID, LocationID: locID,
 		IsPrimary: req.IsPrimary, ManagerUserID: managerID, Status: "active",
 	}
 	m.TenantID = tenantID
@@ -252,6 +280,11 @@ func (s *mappingService) UpdateMapping(ctx context.Context, tx *gorm.DB, tenantI
 	}
 	if err := s.checkRefs(ctx, tx, tenantID, deptID, teamID, desigID, managerID, m.UserID); err != nil {
 		return nil, err
+	}
+	if req.LocationID != nil {
+		if m.LocationID, err = s.checkLocation(ctx, tx, tenantID, req.LocationID); err != nil {
+			return nil, err
+		}
 	}
 	if req.IsPrimary != nil && *req.IsPrimary && !m.IsPrimary {
 		existing, err := s.mappingRepo.FindPrimaryByUser(ctx, tx, tenantID, m.UserID)
