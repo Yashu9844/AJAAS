@@ -76,7 +76,24 @@ predefined roles. Target design:
 | B9 | Login identity is `(tenant, email)` per tenant — matches §3.5; no change. Password minimum 8, bcrypt 12, reset 1 h, access 15 min, refresh 7 days — match §3.10 | none (re-check before release) | — |
 | B10 | Tables in schema `public` | move to schema `identity` together with HR's schema split (HR plan step C.7) | gate (schema) |
 
-Order: B0 → B7 → B6 → B1 → B2 → B3 → B5 → B4 → B10 (B10 runs with HR Phase C step 7). Each step: RED tests
+**Status 2026-10-20 — Phase B done except B10 (runs with HR Phase C step 7):**
+
+| Step | Result | Commit |
+|---|---|---|
+| B0 | access model (scopes, inheritance, predefined + automatic roles, grants, blocks, explain) | `110107a` |
+| B7 | `X-Correlation-ID` validated, echoed, carried into audit (`audit_logs.correlation_id`, migration 000058) and events | `cf8a8af` |
+| B6 | `/health/live`, `/health/ready` (Postgres + Redis; RabbitMQ deliberately not required) | `cf8a8af` |
+| B1 | shared `internal/shared/outbox`; identity events written in-transaction to `identity_events_outbox` (000059) and relayed; envelope `event_version`, `causation_id`; events carry no emails/names/tokens; secret-delivery port + dev mailbox (`GET /api/v1/dev/mailbox`, platform key, development/test only) | `843ebd7` |
+| B2 | shared `internal/shared/idempotency`: `Idempotency-Key` on every write, DB-claimed (`idempotency_records`, 000060), replay / 409 reuse / 409 in-progress, 5xx releases, 24 h retention | `415f99a` |
+| B3 | invitations (000061): `POST/GET /invitations`, resend, revoke, `POST /auth/accept-invitation`; hire saga invites through it; invite-time roles get escalation checks; login checks the password before revealing account state | `72306d0` |
+| B4 | EdDSA (Ed25519) access tokens with `kid`, `/.well-known/jwks.json`; `jwt.signing_key` required in production; HS256 accepted only while `accept_legacy_hs256` is true | `23fddd9` |
+| B5 | contract for other services: `identity.Module.Authorizer()` (scope resolution) and `RegisterCatalogue` (permission registration) — consumed through `hr/identityport` in Phase C | `110107a` |
+
+Remaining limitation (documented): the idempotency middleware stores the outcome after the handler's own transaction
+commits, so a crash between the two leaves the key "in progress" until it expires (24 h); high-impact HR commands
+(payroll finalize, hire) are additionally idempotent by their state machines.
+
+Original order: B0 → B7 → B6 → B1 → B2 → B3 → B5 → B4 → B10 (B10 runs with HR Phase C step 7). Each step: RED tests
 first, integration ring green, console page updated, docs updated, one commit.
 
 ## 5. Later (not in Phase B)

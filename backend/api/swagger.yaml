@@ -666,6 +666,85 @@ paths:
         '200': {description: Unblocked}
         '404': {description: No such block}
 
+  /invitations:
+    post:
+      summary: Invite a user (account created as invited; single-use token sent through the secret channel) (users:create)
+      tags: [Invitations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, first_name, last_name]
+              properties:
+                email: {type: string, format: email}
+                first_name: {type: string}
+                last_name: {type: string}
+                role_ids: {type: array, items: {type: string, format: uuid}}
+      responses:
+        '201': {description: 'Invited user and pending invitation (expires in 7 days)'}
+        '403': {description: A role reaches further than the inviter's access}
+        '409': {description: Email already used in the tenant}
+    get:
+      summary: List invitations; status=pending for open ones (users:read)
+      tags: [Invitations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending]}}]
+      responses:
+        '200': {description: 'Invitations with status pending, accepted, revoked or expired'}
+
+  /invitations/{id}/resend:
+    post:
+      summary: Issue a fresh token and revoke the previous one (users:create)
+      tags: [Invitations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: New pending invitation}
+        '409': {description: Already accepted, or the user is no longer invited}
+
+  /invitations/{id}/revoke:
+    post:
+      summary: Revoke an open invitation (users:update)
+      tags: [Invitations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: Revoked}
+
+  /auth/accept-invitation:
+    post:
+      summary: Accept an invitation with its token and set the password (public, failure rate limited)
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password, confirm_password]
+              properties:
+                token: {type: string}
+                password: {type: string, minLength: 8, maxLength: 72}
+                confirm_password: {type: string}
+      responses:
+        '200': {description: Account activated; the user can sign in}
+        '400': {description: 'INVALID_TOKEN: unknown, used, revoked or expired'}
+
+  /dev/mailbox:
+    get:
+      summary: Development and test only - one-time secrets (reset and invitation tokens) sent to an address
+      tags: [Development]
+      security: [{PlatformKey: []}]
+      parameters:
+        - {name: tenant_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: email, in: query, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Messages, newest first}
+
   /access/automatic-roles/sync:
     post:
       summary: Reconcile the tenant's automatic Employee and Manager roles from HR data now (access:manage)
@@ -2543,6 +2622,8 @@ components:
       description: The request host header containing the tenant subdomain slug (e.g. acme.jaas.com).
   parameters:
     ID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    IdempotencyKey: {name: Idempotency-Key, in: header, required: false, schema: {type: string, maxLength: 255}, description: 'Accepted on every POST/PUT/PATCH/DELETE. Same key + same request replays the stored outcome (Idempotent-Replayed: true); same key + different request is 409 IDEMPOTENCY_KEY_REUSED; while the first is running 409 IDEMPOTENCY_IN_PROGRESS. Keys live 24 h.'}
+    CorrelationID: {name: X-Correlation-ID, in: header, required: false, schema: {type: string, format: uuid}, description: Echoed back and stored on audit rows and events; invalid values are replaced}
     Page: {name: page, in: query, schema: {type: integer, default: 1, minimum: 1}, description: Invalid values clamp to 1}
     PerPage: {name: per_page, in: query, schema: {type: integer, default: 20, minimum: 1, maximum: 100}, description: Invalid values clamp to 20; above 100 clamps to 100}
     FromDate: {name: from, in: query, schema: {type: string, format: date}}
