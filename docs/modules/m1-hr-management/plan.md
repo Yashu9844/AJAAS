@@ -14,7 +14,8 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 | payroll | done (20 ops) | `/dev-test/hr/payroll`, 2 scenarios | |
 | recruitment | done (20 ops) | `/dev-test/hr/recruitment`, 1 scenario | last-seat concurrent hire can orphan a profile (documented, untested) |
 | performance | done (33 ops incl. calibration + continuous feedback), 2026-10-20 | `/dev-test/hr/performance`, 4 scenarios | P2: templates per role, peer nomination |
-| core, onboarding, compensation, learning, benefits | not started | — | requirements in `specification.md` §4–8 |
+| core | done (32 ops), 2026-10-21 | `/dev-test/hr/core`, 2 scenarios (live run pending) | `contexts/core/` |
+| onboarding, compensation, learning, benefits | not started | — | requirements in `specification.md` §5–8 |
 
 ## 2. Phases
 

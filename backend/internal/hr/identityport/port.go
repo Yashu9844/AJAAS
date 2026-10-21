@@ -37,6 +37,8 @@ type Users interface {
 	// GetByID returns the user, or nil when it does not exist in the tenant.
 	GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*User, error)
 	DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id, correlationID uuid.UUID) error
+	// ActivateUser re-enables a deactivated login (HR/Core rehire and rescinded termination).
+	ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error
 	InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in Invite, correlationID uuid.UUID) (*User, error)
 }
 

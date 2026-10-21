@@ -32,6 +32,7 @@
 | 4 Leave | types, holidays, ledger-backed balances, requests, approvals | 20 | 6 (000032–000037) | `jaas.leave.events` | on `main`, backend closed |
 | 5 Payroll | structures, CTC assignments, runs (maker-checker), statutory, payslips, CSV | 20 | 7 (000038–000044) | `jaas.payroll.events` | on `main`, backend closed |
 | 6 Recruitment | jobs, candidates + stage history, interviews, offers, hire saga | 20 | 6 (000045–000050) | `jaas.recruitment.events` | on `main`, backend closed |
+| Core HCM | job architecture, positions, effective-dated assignments, HR actions, headcount | 32 | 6 (hr 000048–000053) | `jaas.core.events` | backend closed 2026-10-21 |
 | 7 Performance & OKRs | cycles, goals + key results + check-ins, reviews, 9-box, calibration, continuous feedback | 33 | 9 (hr 000038–000046) | `jaas.performance.events` | backend closed 2026-10-20 (branch `restructure_architecture`) |
 
 **Totals on `main`:**
@@ -39,8 +40,8 @@
 - 50 migrations (56 on the HR/Performance branch);
 - integration suite 63/63; all unit packages green.
 
-**Totals on `restructure_architecture` (2026-10-20):** 198 module routes (Part 2) + health/JWKS; migrations re-baselined
-into `migrations/identity` (18) and `migrations/hr` (47); full unit and integration suites green, including
+**Totals on `restructure_architecture` (2026-10-20):** 230 module routes (Part 2) + health/JWKS; migrations re-baselined
+into `migrations/identity` (18) and `migrations/hr` (53); full unit and integration suites green, including
 `TestSwaggerMatchesRoutes` (contract ↔ router) and `TestImportBoundaries`; test console 37/37 scenarios. Migration numbers
 in the table above are the pre-split ones.
 
@@ -867,7 +868,44 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/performance/feedback/requests/mine` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.MyFeedbackRequests |
 | POST | `/api/v1/hr/performance/feedback/requests/:id/decline` | [group: mw.TenantResolver, mw.Authenticate, mw.Flag(ActionRead, controllers.FlagRead), mw.Flag(ActionManage, controllers.FlagManage)] ctl.DeclineFeedbackRequest |
 
-Total routes registered by module route files: **198** (plus `GET /health`).
+### M1 HR / Core HCM — 32 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/hr/core/job-families` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateFamily |
+| GET | `/api/v1/hr/core/job-families` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListFamilies |
+| PATCH | `/api/v1/hr/core/job-families/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateFamily |
+| POST | `/api/v1/hr/core/grades` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateGrade |
+| GET | `/api/v1/hr/core/grades` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListGrades |
+| PATCH | `/api/v1/hr/core/grades/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateGrade |
+| POST | `/api/v1/hr/core/job-profiles` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateProfile |
+| GET | `/api/v1/hr/core/job-profiles` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListProfiles |
+| GET | `/api/v1/hr/core/job-profiles/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.GetProfile |
+| PATCH | `/api/v1/hr/core/job-profiles/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateProfile |
+| POST | `/api/v1/hr/core/positions` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreatePosition |
+| GET | `/api/v1/hr/core/positions` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListPositions |
+| GET | `/api/v1/hr/core/positions/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.GetPosition |
+| PATCH | `/api/v1/hr/core/positions/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdatePosition |
+| POST | `/api/v1/hr/core/positions/:id/status` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.SetPositionStatus |
+| POST | `/api/v1/hr/core/actions` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreateAction |
+| GET | `/api/v1/hr/core/actions` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListActions |
+| GET | `/api/v1/hr/core/actions/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.GetAction |
+| PATCH | `/api/v1/hr/core/actions/:id` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.UpdateAction |
+| POST | `/api/v1/hr/core/actions/:id/submit` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.SubmitAction |
+| POST | `/api/v1/hr/core/actions/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.ApproveAction |
+| POST | `/api/v1/hr/core/actions/:id/reject` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.RejectAction |
+| POST | `/api/v1/hr/core/actions/:id/cancel` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CancelAction |
+| POST | `/api/v1/hr/core/actions/:id/rescind` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.RescindAction |
+| GET | `/api/v1/hr/core/workers/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.MyWork |
+| GET | `/api/v1/hr/core/workers/:employee_id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Worker |
+| GET | `/api/v1/hr/core/assignments` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Assignments |
+| POST | `/api/v1/hr/core/headcount-plans` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.CreatePlan |
+| GET | `/api/v1/hr/core/headcount-plans` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListPlans |
+| GET | `/api/v1/hr/core/headcount` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Headcount |
+| POST | `/api/v1/hr/core/backfill` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Backfill |
+| POST | `/api/v1/hr/core/effects/run` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.RunEffects |
+
+Total routes registered by module route files: **230** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -2006,6 +2044,154 @@ Total routes registered by module route files: **198** (plus `GET /health`).
 - index `idx_mappings_location_id` on `mappings` (location_id)
 - ALTER `mappings` ADD COLUMN location_id UUID REFERENCES locations(id) ON DELETE RESTRICT
 
+#### `hr/000048_create_core_job_architecture.up.sql`
+- **table `core_job_families`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `code` VARCHAR(32) — NOT NULL
+  - `name` VARCHAR(150) — NOT NULL
+  - `description` VARCHAR(1000)
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `core_grades`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `code` VARCHAR(32) — NOT NULL
+  - `name` VARCHAR(150) — NOT NULL
+  - `rank` INT — NOT NULL CHECK (rank >= 1)
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `core_job_profiles`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `code` VARCHAR(32) — NOT NULL
+  - `title` VARCHAR(150) — NOT NULL
+  - `family_id` UUID — NOT NULL REFERENCES core_job_families(id)
+  - `default_grade_id` UUID — REFERENCES core_grades(id)
+  - `category` VARCHAR(20) — NOT NULL CHECK (category IN ('staff', 'management', 'executive'))
+  - `probation_days` INT — NOT NULL DEFAULT 90 CHECK (probation_days BETWEEN 0 AND 365)
+  - `description` VARCHAR(2000)
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_core_job_families_code` on `core_job_families` (tenant_id, code)
+- UNIQUE index `uq_core_grades_code` on `core_grades` (tenant_id, code)
+- UNIQUE index `uq_core_grades_rank` on `core_grades` (tenant_id, rank)
+- UNIQUE index `uq_core_job_profiles_code` on `core_job_profiles` (tenant_id, code)
+- index `idx_core_job_profiles_family` on `core_job_profiles` (tenant_id, family_id)
+
+#### `hr/000049_create_core_positions.up.sql`
+- **table `core_positions`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `code` VARCHAR(32) — NOT NULL
+  - `title` VARCHAR(150) — NOT NULL
+  - `job_profile_id` UUID — NOT NULL REFERENCES core_job_profiles(id)
+  - `department_id` UUID — NOT NULL REFERENCES departments(id)
+  - `location_id` UUID — REFERENCES locations(id)
+  - `budgeted_fte` NUMERIC(5,2) — NOT NULL DEFAULT 1 CHECK (budgeted_fte > 0 AND budgeted_fte < 100)
+  - `shared` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'frozen', 'closed'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_core_positions_code` on `core_positions` (tenant_id, code)
+- index `idx_core_positions_department` on `core_positions` (tenant_id, department_id, status)
+
+#### `hr/000050_create_core_hr_actions.up.sql`
+- **table `core_hr_actions`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `type` VARCHAR(30) — NOT NULL CHECK (type IN ('hire', 'promote', 'demote', 'transfer', 'change_job', 'change_manager'
+  - _constraint:_ 'change_location', 'probation_confirm', 'terminate', 'rehire'))
+  - `employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `effective_date` DATE — NOT NULL
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'completed', 'rejected', 'cancelled', 'rescinded'))
+  - `reason_code` VARCHAR(50) — NOT NULL
+  - `comment` VARCHAR(2000)
+  - `changes` JSONB — NOT NULL DEFAULT '{}'::jsonb
+  - `initiated_by_user_id` UUID — NOT NULL
+  - `decided_by_user_id` UUID
+  - `decision_comment` VARCHAR(1000)
+  - `submitted_at` TIMESTAMPTZ
+  - `completed_at` TIMESTAMPTZ
+  - `rescinded_at` TIMESTAMPTZ
+  - `rescind_reason` VARCHAR(1000)
+  - `previous_assignment_id` UUID
+  - `previous_effective_to` DATE
+  - `new_assignment_id` UUID
+  - `previous_employee_status` VARCHAR(20)
+  - `effects_applied_at` TIMESTAMPTZ
+  - `effects_reversed_at` TIMESTAMPTZ
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_core_hr_actions_employee` on `core_hr_actions` (tenant_id, employee_id, status, effective_date)
+- index `idx_core_hr_actions_status` on `core_hr_actions` (tenant_id, status, created_at DESC)
+- index `idx_core_hr_actions_pending_effects` on `core_hr_actions` (effective_date) WHERE status = 'completed' AND effects_applied_at IS NULL
+
+#### `hr/000051_create_core_job_assignments.up.sql`
+- **table `core_job_assignments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `action_id` UUID — NOT NULL REFERENCES core_hr_actions(id)
+  - `job_profile_id` UUID — REFERENCES core_job_profiles(id)
+  - `position_id` UUID — REFERENCES core_positions(id)
+  - `department_id` UUID — REFERENCES departments(id)
+  - `location_id` UUID — REFERENCES locations(id)
+  - `manager_employee_id` UUID — REFERENCES employee_profiles(id)
+  - `grade_id` UUID — REFERENCES core_grades(id)
+  - `worker_type` VARCHAR(20) — NOT NULL CHECK (worker_type IN ('employee', 'contractor', 'intern'))
+  - `employment_type` VARCHAR(20) — NOT NULL CHECK (employment_type IN ('full_time', 'part_time', 'contract', 'intern'))
+  - `fte` NUMERIC(5,2) — NOT NULL DEFAULT 1 CHECK (fte > 0 AND fte <= 1)
+  - `probation_end_date` DATE
+  - `effective_from` DATE — NOT NULL
+  - `effective_to` DATE
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'rescinded'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (effective_to IS NULL OR effective_to > effective_from)
+  - _constraint:_ CHECK (manager_employee_id IS NULL OR manager_employee_id <> employee_id)
+  - _constraint:_ CONSTRAINT ex_core_job_assignments_overlap EXCLUDE USING gist (
+  - `tenant_id` WITH — =, employee_id WITH =, daterange(effective_from, effective_to) WITH &&
+  - _constraint:_ ) WHERE (status = 'active')
+- index `idx_core_job_assignments_employee` on `core_job_assignments` (tenant_id, employee_id, effective_from)
+- index `idx_core_job_assignments_position` on `core_job_assignments` (tenant_id, position_id) WHERE status = 'active'
+- index `idx_core_job_assignments_department` on `core_job_assignments` (tenant_id, department_id) WHERE status = 'active'
+
+#### `hr/000052_create_core_headcount_plans.up.sql`
+- **table `core_headcount_plans`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `department_id` UUID — NOT NULL REFERENCES departments(id)
+  - `period_start` DATE — NOT NULL
+  - `period_end` DATE — NOT NULL
+  - `planned_fte` NUMERIC(7,2) — NOT NULL CHECK (planned_fte >= 0)
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (period_end >= period_start)
+  - _constraint:_ CONSTRAINT ex_core_headcount_plans_overlap EXCLUDE USING gist (
+  - `tenant_id` WITH — =, department_id WITH =, daterange(period_start, period_end, '[]') WITH &&
+  - _constraint:_ )
+
+#### `hr/000053_create_core_events_outbox.up.sql`
+- **table `core_events_outbox`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `event_id` UUID — NOT NULL
+  - `event_type` VARCHAR(100) — NOT NULL
+  - `routing_key` VARCHAR(100) — NOT NULL
+  - `payload` JSONB — NOT NULL
+  - `published` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `published_at` TIMESTAMPTZ
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `last_error` TEXT
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_core_outbox_event_id` on `core_events_outbox` (event_id)
+- index `idx_core_outbox_tenant` on `core_events_outbox` (tenant_id)
+- index `idx_core_outbox_published` on `core_events_outbox` (published) WHERE published = FALSE
+
 ## C. Code inventory — every file, type and function
 
 
@@ -3085,6 +3271,12 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 #### `internal/hr/organization/catalogue.go` (16 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Organization's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
+#### `internal/hr/organization/core_port.go` (82 lines)
+- **func** `(m *Module) DepartmentState(ctx context.Context, tenantID, id uuid.UUID) (exists, active bool, err error)` — DepartmentState reports whether the department exists in the tenant and whether it is active.
+- **func** `(m *Module) LocationState(ctx context.Context, tenantID, id uuid.UUID) (exists, active bool, err error)` — LocationState reports whether the location exists in the tenant and whether it is active (FR-L).
+- **func** `(m *Module) PrimaryPlacement(ctx context.Context, tenantID, userID uuid.UUID) (dept, location, managerUser *uuid.UUID, err error)` — PrimaryPlacement returns the department, location and manager user of the user's active primary mapping (all nil when there is none). HR/Core back-fill reads it (CO-042).
+- **func** `(m *Module) ProjectPrimaryMapping(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, dept, location, managerUser *uuid.UUID) error` — ProjectPrimaryMapping makes the user's active primary mapping reflect HR/Core's assignment (core CO-040): it updates department, location and manager of the existing primary mapping (dropping a team that belongs to another department) or creates one. Without a department and without a mapping there is nothing to project. It runs in the caller's transaction and drops the cached org chart.
+
 #### `internal/hr/organization/module.go` (156 lines)
 - **type** `Module struct` — Module encapsulates the Module 1 Organization domain.
 - **func** `NewModule(` — NewModule wires the organization module on shared handles plus Module 0 services.
@@ -3498,25 +3690,29 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 #### `internal/hr/employee/catalogue.go` (24 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Employee's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/employee/module.go` (130 lines)
+#### `internal/hr/employee/module.go` (133 lines)
 - **type** `Module struct` — Module encapsulates the Module 2 Employee domain.
 - **func** `NewModule(`
 - **func** `(m *Module) RegisterModels() []interface{}`
 - **func** `(m *Module) RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the employee endpoints behind the M0 guards provided by idp.
 - **func** `(m *Module) EmployeeService() services.EmployeeService`
 - **func** `(m *Module) Directory() api.Directory { return m.empSvc }` — Directory is the employee directory published to the other HR contexts (employee/api).
+- **func** `(m *Module) Lifecycle() api.Lifecycle { return services.NewCoreLifecycle(m.db) }` — Lifecycle is the status port HR/Core uses to project HR actions (employee/api).
 - **func** `(m *Module) EventConsumer() services.EventConsumer`
 - **type** `userDeactivationConverger struct{ svc services.EmployeeService }` — userDeactivationConverger adapts the employee service to the Module 0 deactivation hook (FR-EV001, synchronous).
 - **func** `(c userDeactivationConverger) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, _ uuid.UUID) error`
 - **func** `(m *Module) UserDeactivationConverger() identityport.DeactivationHook` — UserDeactivationConverger returns the hook that keeps employee profiles in step with Module 0 user deactivation.
 
-#### `internal/hr/employee/api/api.go` (19 lines)
+#### `internal/hr/employee/api/api.go` (36 lines)
 _Package:_ Package api is what HR/Employee publishes to the other HR contexts: the employee directory. Other contexts depend on this package and on employee/dto only, never on employee services, repositories or models (import-boundary test in internal/hr).
 - **type** `Directory interface` — Directory reads and creates employee records.
 - **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dto.EmployeeResponse, error)`
 - **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*dto.EmployeeResponse, error)`
 - **method** `Directory.List(ctx context.Context, tenantID uuid.UUID, filter dto.EmployeeFilter) ([]dto.EmployeeResponse, int64, error)`
 - **method** `Directory.CreateEmployee(ctx context.Context, tenantID uuid.UUID, req dto.CreateEmployeeRequest) (*dto.EmployeeResponse, error)`
+- **type** `StatusChange struct` — StatusChange is a worker status set by HR/Core when an HR action takes effect (core DC-07).
+- **type** `Lifecycle interface` — Lifecycle lets HR/Core project worker status changes. Unlike the manual status matrix it may leave a final status (rehire, rescinded termination). It runs inside the caller's transaction.
+- **method** `Lifecycle.ApplyCoreStatus(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, change StatusChange) (previous string, err error)`
 
 #### `internal/hr/employee/controllers/document_controller.go` (99 lines)
 - **type** `DocumentController struct`
@@ -3674,6 +3870,11 @@ _Package:_ Package api is what HR/Employee publishes to the other HR contexts: t
 #### `internal/hr/employee/routes/routes.go` (66 lines)
 - **type** `Controllers struct` — RegisterRoutes wires employee endpoint groups with Module 0 middleware and RBAC. Controllers groups the employee HTTP handlers.
 - **func** `RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP, c Controllers)`
+
+#### `internal/hr/employee/services/core_lifecycle.go` (76 lines)
+- **type** `CoreLifecycle struct` — CoreLifecycle implements api.Lifecycle: HR/Core projects worker status changes inside its own transaction. It may leave final statuses (rehire, rescinded termination), which the manual status matrix forbids.
+- **func** `NewCoreLifecycle(db *gorm.DB) *CoreLifecycle` — NewCoreLifecycle builds the lifecycle port over the HR database.
+- **func** `(l *CoreLifecycle) ApplyCoreStatus(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, change api.StatusChange) (string, error)` — ApplyCoreStatus sets the status (and confirmation or exit dates), appends a timeline entry and returns the previous status. Setting the current status again only updates the dates.
 
 #### `internal/hr/employee/services/document_service.go` (121 lines)
 - **type** `EmployeeDocumentService interface`
@@ -5794,6 +5995,426 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - **func** `Canonical(criteria []string, ratings models.Ratings) models.Ratings` — Canonical returns validated ratings in the cycle's criteria order and spelling.
 - **func** `Potential(reviewType string, p *string) error` — Potential enforces PM-012: required (low|medium|high) for manager reviews, absent otherwise.
 
+### M1 HR / Core HCM
+
+
+#### `internal/hr/core/catalogue.go` (19 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Core's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). Approving is separate from initiating (DC-02).
+
+#### `internal/hr/core/module.go` (75 lines)
+_Package:_ Package core wires HR/Core (job architecture, positions, assignments, HR actions) into M1 (docs/modules/m1-hr-management/contexts/core).
+- **type** `Ports struct` — Ports are the collaborators HR/Core consumes (design.md C2–C4).
+- **type** `Module struct` — Module is the HR/Core DI container.
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires repositories, services and the controller.
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists HR/Core models for legacy AutoMigrate (the SQL migrations are the authority).
+- **type** `RouteDeps struct` — RouteDeps is the M0 infrastructure the routes need.
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts HR/Core under rg.
+- **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
+- **func** `(m *Module) RunEffects(ctx context.Context) { m.effects.Run(ctx, sweepInterval) }` — RunEffects runs the hourly effective-date sweep until ctx is cancelled (CO-041).
+
+#### `internal/hr/core/controllers/controllers.go` (341 lines)
+- **type** `ArchitectureService interface` — ArchitectureService is the job-architecture surface (CO-001..CO-003).
+- **method** `ArchitectureService.CreateFamily(ctx context.Context, a services.Actor, req dto.CreateFamilyRequest) (*dto.FamilyResponse, error)`
+- **method** `ArchitectureService.Families(ctx context.Context, tenantID uuid.UUID, status string, page dto.Page) ([]dto.FamilyResponse, dto.PageMeta, error)`
+- **method** `ArchitectureService.UpdateFamily(ctx context.Context, a services.Actor, id uuid.UUID, req dto.UpdateArchitectureRequest) (*dto.FamilyResponse, error)`
+- **method** `ArchitectureService.CreateGrade(ctx context.Context, a services.Actor, req dto.CreateGradeRequest) (*dto.GradeResponse, error)`
+- **method** `ArchitectureService.Grades(ctx context.Context, tenantID uuid.UUID, status string, page dto.Page) ([]dto.GradeResponse, dto.PageMeta, error)`
+- **method** `ArchitectureService.UpdateGrade(ctx context.Context, a services.Actor, id uuid.UUID, req dto.UpdateArchitectureRequest) (*dto.GradeResponse, error)`
+- **method** `ArchitectureService.CreateProfile(ctx context.Context, a services.Actor, req dto.CreateProfileRequest) (*dto.ProfileResponse, error)`
+- **method** `ArchitectureService.Profiles(ctx context.Context, tenantID uuid.UUID, f repositories.ProfileFilter, page dto.Page) ([]dto.ProfileResponse, dto.PageMeta, error)`
+- **method** `ArchitectureService.Profile(ctx context.Context, tenantID, id uuid.UUID) (*dto.ProfileResponse, error)`
+- **method** `ArchitectureService.UpdateProfile(ctx context.Context, a services.Actor, id uuid.UUID, req dto.UpdateArchitectureRequest) (*dto.ProfileResponse, error)`
+- **type** `PositionService interface` — PositionService is the position surface (CO-010..CO-014).
+- **method** `PositionService.Create(ctx context.Context, a services.Actor, req dto.CreatePositionRequest) (*dto.PositionResponse, error)`
+- **method** `PositionService.Get(ctx context.Context, tenantID, id uuid.UUID, asOf string) (*dto.PositionResponse, error)`
+- **method** `PositionService.List(ctx context.Context, tenantID uuid.UUID, f repositories.PositionFilter, vacant *bool, asOf string, page dto.Page) ([]dto.PositionResponse, dto.PageMeta, error)`
+- **method** `PositionService.Update(ctx context.Context, a services.Actor, id uuid.UUID, req dto.UpdatePositionRequest) (*dto.PositionResponse, error)`
+- **method** `PositionService.SetStatus(ctx context.Context, a services.Actor, id uuid.UUID, to string) (*dto.PositionResponse, error)`
+- **type** `ActionService interface` — ActionService is the HR-action surface (CO-030..CO-039).
+- **method** `ActionService.Create(ctx context.Context, a services.Actor, req dto.CreateActionRequest) (*dto.ActionResponse, error)`
+- **method** `ActionService.Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.ActionResponse, error)`
+- **method** `ActionService.List(ctx context.Context, tenantID uuid.UUID, f repositories.ActionFilter, page dto.Page) ([]dto.ActionResponse, dto.PageMeta, error)`
+- **method** `ActionService.Update(ctx context.Context, a services.Actor, id uuid.UUID, req dto.UpdateActionRequest) (*dto.ActionResponse, error)`
+- **method** `ActionService.Submit(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.ActionResponse, error)`
+- **method** `ActionService.Approve(ctx context.Context, a services.Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)`
+- **method** `ActionService.Reject(ctx context.Context, a services.Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)`
+- **method** `ActionService.Cancel(ctx context.Context, a services.Actor, id uuid.UUID) (*dto.ActionResponse, error)`
+- **method** `ActionService.Rescind(ctx context.Context, a services.Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)`
+- **type** `WorkerService interface` — WorkerService is the worker, headcount and back-fill surface (CO-021, CO-022, CO-042, CO-050, CO-051).
+- **method** `WorkerService.Worker(ctx context.Context, tenantID, employeeID uuid.UUID, asOf string) (*dto.WorkerResponse, error)`
+- **method** `WorkerService.Me(ctx context.Context, a services.Actor, asOf string) (*dto.WorkerResponse, error)`
+- **method** `WorkerService.Assignments(ctx context.Context, tenantID uuid.UUID, asOf string, f repositories.AssignmentFilter, page dto.Page) ([]dto.AssignmentResponse, dto.PageMeta, error)`
+- **method** `WorkerService.CreatePlan(ctx context.Context, a services.Actor, req dto.CreatePlanRequest) (*dto.PlanResponse, error)`
+- **method** `WorkerService.Plans(ctx context.Context, tenantID uuid.UUID, dept *uuid.UUID, page dto.Page) ([]dto.PlanResponse, dto.PageMeta, error)`
+- **method** `WorkerService.Headcount(ctx context.Context, tenantID uuid.UUID, dept *uuid.UUID, asOf string) (*dto.HeadcountResponse, error)`
+- **method** `WorkerService.Backfill(ctx context.Context, a services.Actor) (*dto.RunResponse, error)`
+- **type** `EffectsService interface` — EffectsService runs the effective-date sweep (CO-041).
+- **method** `EffectsService.Sweep(ctx context.Context, tenant *uuid.UUID) (*dto.RunResponse, error)`
+- **type** `Services struct` — Services bundles the controller's collaborators.
+- **type** `Controller struct{ s Services }` — Controller serves all 32 HR/Core operations.
+- **func** `New(s Services) *Controller { return &Controller{s: s} }` — New builds the Controller.
+- **func** `queryUUID(c *gin.Context, name string) (*uuid.UUID, bool)`
+- **func** `create[Req any, Res any](c *gin.Context, fn func(context.Context, services.Actor, Req) (Res, error))` — create binds a body and calls fn for the 201 create endpoints.
+- **func** `patch[Req any, Res any](c *gin.Context, fn func(context.Context, services.Actor, uuid.UUID, Req) (Res, error))` — patch binds a body and calls fn for :id endpoints answering 200.
+- **func** `optionalBody(c *gin.Context, dst interface{}) bool` — optionalBody binds a JSON body when one was sent (decisions may omit it).
+- **func** `(ctl *Controller) CreateFamily(c *gin.Context)  { create(c, ctl.s.Architecture.CreateFamily) }`
+- **func** `(ctl *Controller) UpdateFamily(c *gin.Context)  { patch(c, ctl.s.Architecture.UpdateFamily) }`
+- **func** `(ctl *Controller) CreateGrade(c *gin.Context)   { create(c, ctl.s.Architecture.CreateGrade) }`
+- **func** `(ctl *Controller) UpdateGrade(c *gin.Context)   { patch(c, ctl.s.Architecture.UpdateGrade) }`
+- **func** `(ctl *Controller) CreateProfile(c *gin.Context) { create(c, ctl.s.Architecture.CreateProfile) }`
+- **func** `(ctl *Controller) UpdateProfile(c *gin.Context) { patch(c, ctl.s.Architecture.UpdateProfile) }`
+- **func** `(ctl *Controller) ListFamilies(c *gin.Context)`
+- **func** `(ctl *Controller) ListGrades(c *gin.Context)`
+- **func** `(ctl *Controller) ListProfiles(c *gin.Context)`
+- **func** `(ctl *Controller) GetProfile(c *gin.Context)`
+- **func** `(ctl *Controller) CreatePosition(c *gin.Context) { create(c, ctl.s.Positions.Create) }`
+- **func** `(ctl *Controller) UpdatePosition(c *gin.Context) { patch(c, ctl.s.Positions.Update) }`
+- **func** `(ctl *Controller) GetPosition(c *gin.Context)`
+- **func** `(ctl *Controller) ListPositions(c *gin.Context)`
+- **func** `(ctl *Controller) SetPositionStatus(c *gin.Context)`
+- **func** `(ctl *Controller) CreateAction(c *gin.Context) { create(c, ctl.s.Actions.Create) }`
+- **func** `(ctl *Controller) UpdateAction(c *gin.Context) { patch(c, ctl.s.Actions.Update) }`
+- **func** `(ctl *Controller) GetAction(c *gin.Context)`
+- **func** `(ctl *Controller) ListActions(c *gin.Context)`
+- **func** `(ctl *Controller) act(c *gin.Context, fn func(context.Context, services.Actor, uuid.UUID, dto.DecisionRequest) (*dto.ActionResponse, error))` — act runs a body-less (or optional-body) action command.
+- **func** `(ctl *Controller) SubmitAction(c *gin.Context)`
+- **func** `(ctl *Controller) ApproveAction(c *gin.Context) { ctl.act(c, ctl.s.Actions.Approve) }`
+- **func** `(ctl *Controller) RejectAction(c *gin.Context)  { ctl.act(c, ctl.s.Actions.Reject) }`
+- **func** `(ctl *Controller) RescindAction(c *gin.Context) { ctl.act(c, ctl.s.Actions.Rescind) }`
+- **func** `(ctl *Controller) CancelAction(c *gin.Context)`
+- **func** `(ctl *Controller) Worker(c *gin.Context)`
+- **func** `(ctl *Controller) MyWork(c *gin.Context)`
+- **func** `(ctl *Controller) Assignments(c *gin.Context)`
+- **func** `(ctl *Controller) CreatePlan(c *gin.Context) { create(c, ctl.s.Workers.CreatePlan) }`
+- **func** `(ctl *Controller) ListPlans(c *gin.Context)`
+- **func** `(ctl *Controller) Headcount(c *gin.Context)`
+- **func** `(ctl *Controller) Backfill(c *gin.Context)`
+- **func** `(ctl *Controller) RunEffects(c *gin.Context)`
+
+#### `internal/hr/core/controllers/respond.go` (132 lines)
+_Package:_ Package controllers is HR/Core's thin HTTP edge: parse → validate → service → envelope.
+- **type** `errorBody struct`
+- **func** `ok(c *gin.Context, status int, data interface{})`
+- **func** `okList(c *gin.Context, data interface{}, meta dto.PageMeta)`
+- **func** `fail(c *gin.Context, err error)` — fail maps AppErrors to their status after shared normalization (unique violation → 409, not found → 404); anything else is an opaque 500 (no internals leaked).
+- **func** `bindJSON(c *gin.Context, dst interface{}) bool` — bindJSON decodes and validates a body; failures become VALIDATION_ERROR with field details.
+- **func** `snake(s string) string`
+- **func** `actorFrom(c *gin.Context) (services.Actor, bool)` — actorFrom builds the caller from M0 middleware context only (NFR-SEC002).
+- **func** `pathID(c *gin.Context, name string) (uuid.UUID, bool)` — pathID parses a :param UUID; malformed ids are 400.
+- **func** `page(c *gin.Context) dto.Page`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)` — respond writes data or the mapped error.
+- **func** `respondList(c *gin.Context, data interface{}, meta dto.PageMeta, err error)` — respondList writes a paginated list or the mapped error.
+- **func** `pathIDIf(c *gin.Context, actorOK bool) (uuid.UUID, bool)` — pathIDIf parses :id only when the actor resolved (the actor failure already wrote 401).
+
+#### `internal/hr/core/dto/dto.go` (297 lines)
+_Package:_ Package dto holds HR/Core request and response shapes (specification.md §4).
+- **type** `CreateFamilyRequest struct` — CreateFamilyRequest creates a job family.
+- **type** `CreateGradeRequest struct` — CreateGradeRequest creates a grade.
+- **type** `CreateProfileRequest struct` — CreateProfileRequest creates a job profile.
+- **type** `UpdateArchitectureRequest struct` — UpdateArchitectureRequest patches a family, grade or profile; fields that do not apply to the resource are ignored.
+- **type** `FamilyResponse struct` — FamilyResponse is a job family.
+- **type** `GradeResponse struct` — GradeResponse is a grade.
+- **type** `ProfileResponse struct` — ProfileResponse is a job profile.
+- **type** `CreatePositionRequest struct` — CreatePositionRequest creates a position.
+- **type** `UpdatePositionRequest struct` — UpdatePositionRequest patches a position.
+- **type** `PositionStatusRequest struct` — PositionStatusRequest moves a position (CO-013).
+- **type** `PositionResponse struct` — PositionResponse is a position with its occupancy as of a date (CO-011).
+- **type** `CreateActionRequest struct` — CreateActionRequest creates a draft action.
+- **type** `UpdateActionRequest struct` — UpdateActionRequest edits a draft.
+- **type** `DecisionRequest struct` — DecisionRequest carries a decision comment (reject) or a reason (rescind).
+- **type** `ActionResponse struct` — ActionResponse is an HR action.
+- **type** `AssignmentResponse struct` — AssignmentResponse is one effective-dated assignment.
+- **type** `WorkerResponse struct` — WorkerResponse is CO-021: the assignment in effect on as_of, the full history and the action log.
+- **type** `CreatePlanRequest struct` — CreatePlanRequest creates a headcount plan.
+- **type** `PlanResponse struct` — PlanResponse is a headcount plan.
+- **type** `HeadcountRow struct` — HeadcountRow is one department's headcount as of a date (CO-051).
+- **type** `HeadcountResponse struct` — HeadcountResponse is CO-051.
+- **type** `RunResponse struct` — RunResponse reports how many items an operation processed (back-fill, effects sweep).
+- **type** `PageMeta struct` — PageMeta is list metadata.
+- **type** `Page struct{ Page, PerPage int }` — Page is a clamped page request.
+- **func** `ParsePage(pageStr, perPageStr string) Page` — ParsePage clamps raw query values (page ≥ 1 default 1, per_page 1–100 default 20).
+- **func** `(p Page) Offset() int { return (p.Page - 1) * p.PerPage }` — Offset is the SQL offset.
+- **func** `(p Page) Meta(total int64) PageMeta` — Meta builds list metadata.
+
+#### `internal/hr/core/events/events.go` (64 lines)
+_Package:_ Package events defines HR/Core event types and the shared envelope (specification.md §6).
+- **type** `Envelope struct` — Envelope is the platform event envelope (same shape as the other HR contexts).
+- **type** `Source struct` — Source identifies who and when an event came from.
+- **func** `New(routingKey string, src Source, payload interface{}) Envelope` — New wraps a payload in the envelope.
+- **type** `ActionPayload struct` — ActionPayload carries ids, type, status and the effective date only — never comments or reasons (HR-009).
+- **type** `PositionPayload struct` — PositionPayload carries a position's id, status and department.
+
+#### `internal/hr/core/lifecycle/lifecycle.go` (85 lines)
+_Package:_ Package lifecycle is HR/Core's pure rules: the HR action state graph (CO-030) and the action types (CO-033..CO-038).
+- **func** `CanMove(from, to string) bool` — CanMove reports a legal action status change.
+- **func** `ValidStatus(s string) bool` — ValidStatus reports a known action status (list filters).
+- **func** `ValidType(t string) bool { return types[t] }` — ValidType reports a known action type.
+- **func** `Starts(t string) bool { return t == Hire || t == Rehire }` — Starts reports types that open a worker's first (or a new) employment: they need no current assignment.
+- **func** `Changes(t string) bool` — Changes reports types that replace the current assignment with a modified copy.
+- **func** `CanMovePosition(from, to string) bool` — Position status moves (CO-013): active ↔ frozen, active|frozen → closed; closed is final.
+
+#### `internal/hr/core/models/models.go` (268 lines)
+_Package:_ Package models holds HR/Core persistence models; migrations/hr 000048–000053 are the SQL twin.
+- **type** `JobFamily struct` — JobFamily groups job profiles (CO-001).
+- **func** `(JobFamily) TableName() string { return "core_job_families" }` — TableName maps to core_job_families.
+- **func** `(f *JobFamily) BeforeCreate(*gorm.DB) error { return assignID(&f.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Grade struct` — Grade is a pay/seniority level with a unique rank (CO-001).
+- **func** `(Grade) TableName() string { return "core_grades" }` — TableName maps to core_grades.
+- **func** `(g *Grade) BeforeCreate(*gorm.DB) error { return assignID(&g.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `JobProfile struct` — JobProfile is a job (CO-001).
+- **func** `(JobProfile) TableName() string { return "core_job_profiles" }` — TableName maps to core_job_profiles.
+- **func** `(p *JobProfile) BeforeCreate(*gorm.DB) error { return assignID(&p.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Position struct` — Position is a budgeted seat (CO-010..CO-014).
+- **func** `(Position) TableName() string { return "core_positions" }` — TableName maps to core_positions.
+- **func** `(p *Position) BeforeCreate(*gorm.DB) error { return assignID(&p.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Assignment struct` — Assignment is a worker's job over [EffectiveFrom, EffectiveTo) (CO-020); EffectiveTo nil means open-ended.
+- **func** `(Assignment) TableName() string { return "core_job_assignments" }` — TableName maps to core_job_assignments.
+- **func** `(a *Assignment) BeforeCreate(*gorm.DB) error { return assignID(&a.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `(a *Assignment) CoversDate(d time.Time) bool` — CoversDate reports whether the assignment is in effect on d (dates at UTC midnight).
+- **type** `Changes struct` — Changes is the typed payload of an HR action (CO-033..CO-038), stored as JSON.
+- **func** `(c Changes) Value() (driver.Value, error)` — Value encodes the changes as JSON.
+- **func** `(c *Changes) Scan(src interface{}) error` — Scan decodes the changes from JSON.
+- **type** `Action struct` — Action is one HR business process (CO-030..CO-039).
+- **func** `(Action) TableName() string { return "core_hr_actions" }` — TableName maps to core_hr_actions.
+- **func** `(a *Action) BeforeCreate(*gorm.DB) error { return assignID(&a.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `HeadcountPlan struct` — HeadcountPlan is a department's planned FTE for a period (CO-050).
+- **func** `(HeadcountPlan) TableName() string { return "core_headcount_plans" }` — TableName maps to core_headcount_plans.
+- **func** `(h *HeadcountPlan) BeforeCreate(*gorm.DB) error { return assignID(&h.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `OutboxEvent struct` — OutboxEvent is a transactional-outbox row.
+- **func** `(OutboxEvent) TableName() string { return "core_events_outbox" }` — TableName maps to core_events_outbox.
+- **func** `(o *OutboxEvent) BeforeCreate(*gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `assignID(id *uuid.UUID) error`
+
+#### `internal/hr/core/repositories/repositories.go` (285 lines)
+_Package:_ Package repositories is HR/Core data access: tenant_id on every scoped query, `db`/`tx` passed per call.
+- **type** `ProfileFilter struct` — ProfileFilter narrows job-profile lists.
+- **type** `PositionFilter struct` — PositionFilter narrows position lists.
+- **type** `AssignmentFilter struct` — AssignmentFilter narrows the "as of" view (CO-022).
+- **type** `ActionFilter struct` — ActionFilter narrows action lists.
+- **type** `Repository interface` — Repository is HR/Core's single data-access surface (one aggregate per method group).
+- **method** `Repository.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Repository.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Repository.CodeTaken(ctx context.Context, db *gorm.DB, model interface{}, tenantID uuid.UUID, code string, except uuid.UUID) (bool, error)` — CodeTaken reports whether another row of model's table in the tenant uses code.
+- **method** `Repository.Family(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.JobFamily, error)`
+- **method** `Repository.Families(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page dto.Page) ([]models.JobFamily, int64, error)`
+- **method** `Repository.Grade(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Grade, error)`
+- **method** `Repository.Grades(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page dto.Page) ([]models.Grade, int64, error)`
+- **method** `Repository.RankTaken(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rank int, except uuid.UUID) (bool, error)`
+- **method** `Repository.Profile(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.JobProfile, error)`
+- **method** `Repository.Profiles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ProfileFilter, page dto.Page) ([]models.JobProfile, int64, error)`
+- **method** `Repository.Position(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Position, error)`
+- **method** `Repository.Positions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f PositionFilter, page dto.Page) ([]models.Position, int64, error)`
+- **method** `Repository.LockWorker(ctx context.Context, tx *gorm.DB, employeeID uuid.UUID) error` — LockWorker / LockPosition take transaction-scoped advisory locks (CO-020, CO-014).
+- **method** `Repository.LockPosition(ctx context.Context, tx *gorm.DB, positionID uuid.UUID) error`
+- **method** `Repository.Assignment(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Assignment, error)`
+- **method** `Repository.WorkerAssignments(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]models.Assignment, error)` — WorkerAssignments returns every assignment of the worker (rescinded included), oldest first.
+- **method** `Repository.PositionAssignments(ctx context.Context, db *gorm.DB, tenantID, positionID uuid.UUID, from time.Time, to *time.Time) ([]models.Assignment, error)` — PositionAssignments returns the position's active assignments that overlap [from, to) (to nil = open).
+- **method** `Repository.AsOf(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, asOf time.Time, f AssignmentFilter, page dto.Page) ([]models.Assignment, int64, error)` — AsOf returns the active assignments in effect on the date.
+- **method** `Repository.AssignedWorkers(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (map[uuid.UUID]bool, error)` — AssignedWorkers returns the workers that have any active assignment.
+- **method** `Repository.Action(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Action, error)`
+- **method** `Repository.LockAction(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Action, error)`
+- **method** `Repository.Actions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ActionFilter, page dto.Page) ([]models.Action, int64, error)`
+- **method** `Repository.CompletedActions(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]models.Action, error)` — CompletedActions returns the worker's completed actions, latest effective first.
+- **method** `Repository.PendingEffects(ctx context.Context, db *gorm.DB, today time.Time, limit int) ([]models.Action, error)` — PendingEffects returns completed actions whose effects are due on or before the date (cross-tenant, sweep).
+- **method** `Repository.Plans(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, departmentID *uuid.UUID, page dto.Page) ([]models.HeadcountPlan, int64, error)`
+- **method** `Repository.PlanOverlaps(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID, start, end time.Time) (bool, error)`
+- **method** `Repository.MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
+- **method** `Repository.RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
+- **method** `Repository.FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
+- **type** `repository struct{}`
+- **func** `New() Repository { return repository{} }` — New builds the HR/Core repository.
+- **func** `(repository) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(repository) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(repository) CodeTaken(ctx context.Context, db *gorm.DB, model interface{}, tenantID uuid.UUID, code string, except uuid.UUID) (bool, error)`
+- **func** `scoped[T any](ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*T, error)`
+- **func** `(repository) Family(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.JobFamily, error)`
+- **func** `(repository) Families(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page dto.Page) ([]models.JobFamily, int64, error)`
+- **func** `(repository) Grade(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Grade, error)`
+- **func** `(repository) Grades(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page dto.Page) ([]models.Grade, int64, error)`
+- **func** `(repository) RankTaken(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rank int, except uuid.UUID) (bool, error)`
+- **func** `(repository) Profile(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.JobProfile, error)`
+- **func** `(repository) Profiles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ProfileFilter, page dto.Page) ([]models.JobProfile, int64, error)`
+- **func** `(repository) Position(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Position, error)`
+- **func** `(repository) Positions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f PositionFilter, page dto.Page) ([]models.Position, int64, error)`
+- **func** `(repository) LockWorker(ctx context.Context, tx *gorm.DB, employeeID uuid.UUID) error`
+- **func** `(repository) LockPosition(ctx context.Context, tx *gorm.DB, positionID uuid.UUID) error`
+- **func** `(repository) Assignment(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Assignment, error)`
+- **func** `(repository) WorkerAssignments(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]models.Assignment, error)`
+- **func** `(repository) PositionAssignments(ctx context.Context, db *gorm.DB, tenantID, positionID uuid.UUID, from time.Time, to *time.Time) ([]models.Assignment, error)`
+- **func** `(repository) AsOf(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, asOf time.Time, f AssignmentFilter, page dto.Page) ([]models.Assignment, int64, error)`
+- **func** `(repository) AssignedWorkers(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (map[uuid.UUID]bool, error)`
+- **func** `(repository) Action(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Action, error)`
+- **func** `(repository) LockAction(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*models.Action, error)`
+- **func** `(repository) Actions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ActionFilter, page dto.Page) ([]models.Action, int64, error)`
+- **func** `(repository) CompletedActions(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]models.Action, error)`
+- **func** `(repository) PendingEffects(ctx context.Context, db *gorm.DB, today time.Time, limit int) ([]models.Action, error)`
+- **func** `(repository) Plans(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, departmentID *uuid.UUID, page dto.Page) ([]models.HeadcountPlan, int64, error)`
+- **func** `(repository) PlanOverlaps(ctx context.Context, db *gorm.DB, tenantID, departmentID uuid.UUID, start, end time.Time) (bool, error)`
+- **func** `(repository) MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
+- **func** `(repository) RecordFailure(ctx context.Context, db *gorm.DB, id uuid.UUID, reason string) error`
+- **func** `(repository) FetchUnpublished(ctx context.Context, db *gorm.DB, limit, maxAttempts int) ([]models.OutboxEvent, error)`
+- **func** `withStatus(q *gorm.DB, status string) *gorm.DB`
+- **func** `first[T any](q *gorm.DB) (*T, error)`
+- **func** `paged[T any](q *gorm.DB, order string, page dto.Page) ([]T, int64, error)`
+
+#### `internal/hr/core/routes/routes.go` (64 lines)
+_Package:_ Package routes mounts HR/Core endpoints (specification.md §4) behind M0 middleware.
+- **type** `Middleware struct` — Middleware is the M0 middleware HR/Core depends on.
+- **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Controller)` — RegisterRoutes mounts all 32 operations; only /workers/me is open to any authenticated worker.
+
+#### `internal/hr/core/services/actions.go` (226 lines)
+- **type** `ActionService struct{ base }` — ActionService implements HR actions (CO-030..CO-039).
+- **func** `NewActionService(d Deps) *ActionService { return &ActionService{base{d}} }` — NewActionService builds the service.
+- **func** `(s *ActionService) Create(ctx context.Context, a Actor, req dto.CreateActionRequest) (*dto.ActionResponse, error)` — Create is CO-031: a draft action.
+- **func** `(s *ActionService) edit(act *models.Action, date, reason, comment *string, changes *models.Changes) error` — edit applies the editable fields of a draft.
+- **func** `(s *ActionService) Update(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateActionRequest) (*dto.ActionResponse, error)` — Update is CO-031: only drafts are edited.
+- **func** `(s *ActionService) Submit(ctx context.Context, a Actor, id uuid.UUID) (*dto.ActionResponse, error)` — Submit is CO-031: full validation, then submitted.
+- **func** `(s *ActionService) Cancel(ctx context.Context, a Actor, id uuid.UUID) (*dto.ActionResponse, error)` — Cancel moves a draft or submitted action to cancelled.
+- **func** `(s *ActionService) Reject(ctx context.Context, a Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)` — Reject is a decision on a submitted action; the initiator cannot decide (CORE_SELF_APPROVAL).
+- **func** `(s *ActionService) transition(ctx context.Context, a Actor, id uuid.UUID, to string, fn func(*gorm.DB, *models.Action) error) (*models.Action, error)` — transition locks the action, checks the move (to "" = stay), runs fn, saves and audits (plus the submitted event).
+- **func** `(b base) actionEvent(ctx context.Context, tx *gorm.DB, a Actor, act *models.Action, key string) (*models.OutboxEvent, error)`
+- **func** `(b base) audit(act *models.Action, verb string) auditEntry` — audit is the action's audit entry: ids, type, status and date only (HR-009).
+- **func** `(s *ActionService) Get(ctx context.Context, tenantID, id uuid.UUID) (*dto.ActionResponse, error)` — Get returns one action.
+- **func** `(s *ActionService) List(ctx context.Context, tenantID uuid.UUID, f repositories.ActionFilter, page dto.Page) ([]dto.ActionResponse, dto.PageMeta, error)` — List filters actions by worker, status and type.
+- **func** `actionResponse(a *models.Action) *dto.ActionResponse`
+
+#### `internal/hr/core/services/apply.go` (365 lines)
+- **func** `(s *ActionService) Approve(ctx context.Context, a Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)` — Approve completes a submitted action (CO-030, CO-035): re-plan under the worker lock, close and open assignments, and apply the effects at once when they are due (DC-06). The initiator cannot approve (DC-02).
+- **func** `(b base) write(ctx context.Context, tx *gorm.DB, act *models.Action, out *outcome) error` — write closes the current assignment and opens the next one (CO-035, CO-037), remembering what to restore.
+- **func** `(s *ActionService) Rescind(ctx context.Context, a Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)` — Rescind is CO-039: only the worker's latest completed action; assignments and applied effects are restored.
+- **func** `(b base) restore(ctx context.Context, tx *gorm.DB, act *models.Action) error` — restore rescinds the action's new assignment and gives the previous one back its old end, checking that its seat is still free for the restored period (a rescinded termination must not double-fill the position, CO-014).
+- **func** `(b base) applyEffects(ctx context.Context, tx *gorm.DB, a Actor, act *models.Action) error` — applyEffects projects a completed action onto the worker's status, organization mapping and login (CO-040).
+- **func** `(b base) reverseEffects(ctx context.Context, tx *gorm.DB, a Actor, act *models.Action) error` — reverseEffects undoes applied effects when an action is rescinded (CO-039, CG9).
+- **func** `(b base) project(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, as *models.Assignment) error` — project makes the worker's primary organization mapping match an assignment (CO-040, DC-09).
+- **type** `EffectsService struct{ base }` — EffectsService runs the effective-date sweep (CO-041).
+- **func** `NewEffectsService(d Deps) *EffectsService { return &EffectsService{base{d}} }` — NewEffectsService builds the service.
+- **func** `effectsDate(act *models.Action) time.Time` — effectsDate is when an action's projections are due: a termination after the last working day, others on their date.
+- **func** `(s *EffectsService) Sweep(ctx context.Context, tenant *uuid.UUID) (*dto.RunResponse, error)` — Sweep applies due effects of completed actions; tenant nil sweeps every tenant (background job). It is idempotent.
+- **func** `(s *EffectsService) Run(ctx context.Context, interval time.Duration)` — Run ticks Sweep every interval until ctx is cancelled (also once at start).
+
+#### `internal/hr/core/services/architecture.go` (391 lines)
+- **type** `ArchitectureService struct{ base }` — ArchitectureService implements job families, grades and job profiles (CO-001..CO-003).
+- **func** `NewArchitectureService(d Deps) *ArchitectureService { return &ArchitectureService{base{d}} }` — NewArchitectureService builds the service.
+- **func** `(s *ArchitectureService) CreateFamily(ctx context.Context, a Actor, req dto.CreateFamilyRequest) (*dto.FamilyResponse, error)` — CreateFamily creates a job family.
+- **func** `(s *ArchitectureService) CreateGrade(ctx context.Context, a Actor, req dto.CreateGradeRequest) (*dto.GradeResponse, error)` — CreateGrade creates a grade with a unique rank.
+- **func** `(s *ArchitectureService) CreateProfile(ctx context.Context, a Actor, req dto.CreateProfileRequest) (*dto.ProfileResponse, error)` — CreateProfile creates a job profile; its family and default grade must be active (CO-003).
+- **func** `(s *ArchitectureService) activeRefs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, family, grade *uuid.UUID) error` — activeRefs checks that a family and grade (when given) exist and are active (CO-003).
+- **func** `(s *ArchitectureService) create(ctx context.Context, a Actor, row, model interface{}, c, resource string) error`
+- **func** `(s *ArchitectureService) insert(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, row, model interface{}, c string) error` — insert checks the code is free (CO-002) and inserts the row.
+- **func** `idOf(row interface{}) string`
+- **func** `(s *ArchitectureService) Families(ctx context.Context, tenantID uuid.UUID, status string, page dto.Page) ([]dto.FamilyResponse, dto.PageMeta, error)` — Families lists job families.
+- **func** `(s *ArchitectureService) Grades(ctx context.Context, tenantID uuid.UUID, status string, page dto.Page) ([]dto.GradeResponse, dto.PageMeta, error)` — Grades lists grades by rank.
+- **func** `(s *ArchitectureService) Profiles(ctx context.Context, tenantID uuid.UUID, f repositories.ProfileFilter, page dto.Page) ([]dto.ProfileResponse, dto.PageMeta, error)` — Profiles lists job profiles.
+- **func** `(s *ArchitectureService) Profile(ctx context.Context, tenantID, id uuid.UUID) (*dto.ProfileResponse, error)` — Profile gets one job profile.
+- **func** `(s *ArchitectureService) UpdateFamily(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateArchitectureRequest) (*dto.FamilyResponse, error)` — UpdateFamily patches name, description and status.
+- **func** `(s *ArchitectureService) UpdateGrade(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateArchitectureRequest) (*dto.GradeResponse, error)` — UpdateGrade patches name, rank and status.
+- **func** `(s *ArchitectureService) UpdateProfile(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateArchitectureRequest) (*dto.ProfileResponse, error)` — UpdateProfile patches title, description, family, default grade, category, probation days and status.
+- **func** `patchCommon(name *string, desc **string, status *string, req dto.UpdateArchitectureRequest, newName *string) error` — patchCommon applies the name/title, description and status shared by the architecture records.
+- **func** `statusFilter(status string) error`
+- **func** `familyResponse(f *models.JobFamily) dto.FamilyResponse`
+- **func** `gradeResponse(g *models.Grade) dto.GradeResponse`
+- **func** `profileResponse(p *models.JobProfile) dto.ProfileResponse`
+
+#### `internal/hr/core/services/errors.go` (40 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
+
+#### `internal/hr/core/services/helpers.go` (187 lines)
+- **type** `base struct{ Deps }` — base carries Deps plus helpers shared by all services.
+- **func** `(b base) today() time.Time { return dateOf(b.Now()) }` — today is the current calendar date (UTC midnight).
+- **func** `dateOf(t time.Time) time.Time`
+- **func** `parseDate(field, s string) (time.Time, error)`
+- **func** `parseOptionalDate(field string, s *string) (*time.Time, error)`
+- **func** `(b base) asOf(raw string) (time.Time, error)` — asOf parses an optional as_of query value; empty means today.
+- **func** `fmtDate(t time.Time) string { return t.Format(dto.DateLayout) }`
+- **func** `fmtDatePtr(t *time.Time) *string`
+- **func** `parseUUIDField(field, raw string) (uuid.UUID, error)`
+- **func** `parseOptionalUUID(field string, raw *string) (*uuid.UUID, error)`
+- **func** `code(raw string) (string, error)` — code normalizes and checks CO-002.
+- **func** `text(field, s string, max int) (string, error)` — text trims s and checks 1..max characters.
+- **func** `optionalText(field string, s *string, max int) (*string, error)` — optionalText trims an optional field; blank → nil; longer than max → 400.
+- **func** `(b base) employee(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)` — employee loads a worker of the tenant; unknown → EMPLOYEE_NOT_FOUND.
+- **func** `(b base) self(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — self resolves the caller's own worker (self endpoints).
+- **func** `(b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, key string, payload interface{}) (*models.OutboxEvent, error)` — writeOutbox stores the event inside the business transaction.
+- **type** `auditEntry struct` — auditEntry is one audit row; metadata holds ids, types, statuses and dates only (HR-009).
+- **func** `(b base) afterCommit(ctx context.Context, a Actor, e auditEntry, rows ...*models.OutboxEvent)` — afterCommit writes the audit row and tries to publish the events; the relay retries what fails.
+- **func** `orNotFound(err error) error`
+- **func** `conflictOK(err error) error` — conflictOK swallows the 409 an idempotent login change returns when the login is already in the target state.
+
+#### `internal/hr/core/services/plan.go` (343 lines)
+- **type** `outcome struct` — outcome is what completing an action writes (CO-035..CO-038).
+- **func** `(b base) plan(ctx context.Context, tx *gorm.DB, act *models.Action) (*outcome, error)` — plan validates an action against the worker's state on its effective date and computes the outcome. It runs inside a transaction (submit, approve); seats are checked under the position lock.
+- **func** `(b base) planStart(ctx context.Context, tx *gorm.DB, act *models.Action, worker *employeeDTO.EmployeeResponse, active []models.Assignment, out *outcome) error`
+- **func** `openOn(active []models.Assignment, d time.Time) (*models.Assignment, error)` — openOn returns the worker's open-ended assignment in effect on d, or ErrNoAssignment.
+- **func** `(b base) planTerminate(act *models.Action, active []models.Assignment, out *outcome) error`
+- **func** `(b base) planChange(ctx context.Context, tx *gorm.DB, act *models.Action, active []models.Assignment, out *outcome) error`
+- **func** `(b base) mergeChanges(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, as *models.Assignment, ch models.Changes) error` — mergeChanges applies the action's field changes to an assignment; a position supplies the department and profile.
+- **func** `(b base) typeRule(ctx context.Context, tx *gorm.DB, act *models.Action, cur, next *models.Assignment) error` — typeRule is CO-034 and CO-036 for change actions.
+- **func** `probationRule(ch models.Changes, cur, next *models.Assignment) error`
+- **func** `(b base) rank(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, id *uuid.UUID) (int, error)`
+- **func** `(b base) checkNext(ctx context.Context, tx *gorm.DB, act *models.Action, next *models.Assignment, exclude uuid.UUID) error` — checkNext validates the references of the assignment to open (CO-003, CO-014, CO-033).
+- **func** `sameID(a, b *uuid.UUID) bool`
+
+#### `internal/hr/core/services/ports.go` (79 lines)
+_Package:_ Package services holds HR/Core business rules (specification.md CO-001..CO-051).
+- **type** `EmployeeDirectory interface` — EmployeeDirectory is core's view of HR/Employee (connection C2); employee/api.Directory satisfies it.
+- **method** `EmployeeDirectory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `EmployeeDirectory.List(ctx context.Context, tenantID uuid.UUID, filter employeeDTO.EmployeeFilter) ([]employeeDTO.EmployeeResponse, int64, error)`
+- **type** `OrgDirectory interface` — OrgDirectory is core's view of HR/Organization (connection C3); organization.Module satisfies it.
+- **method** `OrgDirectory.DepartmentState(ctx context.Context, tenantID, id uuid.UUID) (exists, active bool, err error)`
+- **method** `OrgDirectory.LocationState(ctx context.Context, tenantID, id uuid.UUID) (exists, active bool, err error)`
+- **method** `OrgDirectory.PrimaryPlacement(ctx context.Context, tenantID, userID uuid.UUID) (dept, location, managerUser *uuid.UUID, err error)`
+- **method** `OrgDirectory.ProjectPrimaryMapping(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, dept, location, managerUser *uuid.UUID) error`
+- **type** `Logins interface` — Logins deactivates and reactivates M0 logins (connection C4); identityport.Users satisfies it.
+- **method** `Logins.DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id, correlationID uuid.UUID) error`
+- **method** `Logins.ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
+- **type** `AuditLogger interface` — AuditLogger is core's view of the M0 audit trail.
+- **method** `AuditLogger.Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
+- **type** `TxRunner interface` — TxRunner opens database transactions.
+- **method** `TxRunner.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `TxRunner.DB() *gorm.DB`
+- **type** `Clock func() time.Time` — Clock returns the current instant.
+- **type** `Actor struct` — Actor is the authenticated caller from M0 middleware context only.
+- **type** `Deps struct` — Deps is everything an HR/Core service needs.
+- **type** `gormRunner struct{ db *gorm.DB }`
+- **func** `NewTxRunner(db *gorm.DB) TxRunner { return gormRunner{db: db} }` — NewTxRunner wraps a GORM handle as a TxRunner.
+- **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
+
+#### `internal/hr/core/services/positions.go` (379 lines)
+- **type** `PositionService struct{ base }` — PositionService implements positions and occupancy (CO-010..CO-014).
+- **func** `NewPositionService(d Deps) *PositionService { return &PositionService{base{d}} }` — NewPositionService builds the service.
+- **func** `(s *PositionService) Create(ctx context.Context, a Actor, req dto.CreatePositionRequest) (*dto.PositionResponse, error)` — Create is CO-010.
+- **func** `(b base) refs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, profile, dept, loc *uuid.UUID) error` — refs checks a job profile (active), a department and a location (exist and active) — CO-003, CO-010.
+- **func** `(b base) changed(ctx context.Context, tx *gorm.DB, a Actor, p *models.Position) (*models.OutboxEvent, error)`
+- **func** `(s *PositionService) Get(ctx context.Context, tenantID, id uuid.UUID, asOf string) (*dto.PositionResponse, error)` — Get is CO-011 for one position.
+- **func** `(s *PositionService) List(ctx context.Context, tenantID uuid.UUID, f repositories.PositionFilter, vacant *bool, asOf string, page dto.Page) ([]dto.PositionResponse, dto.PageMeta, error)` — List is CO-011 with filters; vacant filters on occupancy as of the date.
+- **func** `(s *PositionService) Update(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdatePositionRequest) (*dto.PositionResponse, error)` — Update is CO-012: the budget never drops below the current or any future filled FTE.
+- **func** `(s *PositionService) patch(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, p *models.Position, req dto.UpdatePositionRequest) error`
+- **func** `(s *PositionService) SetStatus(ctx context.Context, a Actor, id uuid.UUID, to string) (*dto.PositionResponse, error)` — SetStatus is CO-013.
+- **func** `(b base) peak(ctx context.Context, db *gorm.DB, tenantID, positionID uuid.UUID, from time.Time, to *time.Time, exclude uuid.UUID) (kernel.Fixed, int, error)` — peak returns the highest filled FTE and incumbent count of a position over [from, to), ignoring one assignment.
+- **func** `(b base) checkSeat(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, as *models.Assignment, exclude uuid.UUID) error` — checkSeat is CO-014 for an assignment about to be written: the position is active and has room on every date.
+- **func** `(b base) response(ctx context.Context, db *gorm.DB, p *models.Position, d time.Time) (*dto.PositionResponse, error)` — response maps a position with its occupancy on date d (CO-011).
+
+#### `internal/hr/core/services/workers.go` (337 lines)
+- **type** `WorkerService struct{ base }` — WorkerService implements worker history, the as-of org view, headcount and back-fill (CO-021, CO-022, CO-042, CO-050, CO-051).
+- **func** `NewWorkerService(d Deps) *WorkerService { return &WorkerService{base{d}} }` — NewWorkerService builds the service.
+- **func** `(s *WorkerService) Worker(ctx context.Context, tenantID, employeeID uuid.UUID, asOf string) (*dto.WorkerResponse, error)` — Worker is CO-021.
+- **func** `(s *WorkerService) Me(ctx context.Context, a Actor, asOf string) (*dto.WorkerResponse, error)` — Me is CO-021 for the caller.
+- **func** `(s *WorkerService) Assignments(ctx context.Context, tenantID uuid.UUID, asOf string, f repositories.AssignmentFilter, page dto.Page) ([]dto.AssignmentResponse, dto.PageMeta, error)` — Assignments is CO-022: who held what on a date.
+- **func** `(s *WorkerService) CreatePlan(ctx context.Context, a Actor, req dto.CreatePlanRequest) (*dto.PlanResponse, error)` — CreatePlan is CO-050.
+- **func** `(s *WorkerService) Plans(ctx context.Context, tenantID uuid.UUID, dept *uuid.UUID, page dto.Page) ([]dto.PlanResponse, dto.PageMeta, error)` — Plans lists headcount plans.
+- **func** `(s *WorkerService) Headcount(ctx context.Context, tenantID uuid.UUID, dept *uuid.UUID, asOf string) (*dto.HeadcountResponse, error)` — Headcount is CO-051: per department, planned vs budgeted vs filled FTE, open positions and workers on a date.
+- **func** `(s *WorkerService) Backfill(ctx context.Context, a Actor) (*dto.RunResponse, error)` — Backfill is CO-042: one initial assignment per worker without one, from their joining date and primary mapping, recorded as a completed hire with reason "backfill" (DC-08). Idempotent.
+- **func** `(s *WorkerService) backfillOne(ctx context.Context, a Actor, emp *employeeDTO.EmployeeResponse) error`
+- **func** `assignmentResponse(a *models.Assignment) dto.AssignmentResponse`
+- **func** `planResponse(p *models.HeadcountPlan) dto.PlanResponse`
+- **type** `OutboxRelay struct` — OutboxRelay republishes outbox rows the request path could not publish.
+- **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the context dependencies.
+- **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
+- **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled.
+
 ## D. Test inventory
 
 
@@ -5979,10 +6600,19 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 - `internal/hr/performance/services/parity_test.go`: TestGolden_G16_Calibration, TestCalibration_Validation, TestGolden_G17_FinalRatingForSubject, TestGolden_G18_FeedbackVisibility, TestGolden_G19_FeedbackRequests, TestGolden_G20_ParityPrivacy, TestFeedback_Validation, TestFailures_Parity
 - `internal/hr/performance/validators/validators_test.go`: TestCriteria_PM001, TestDatesWeightsProgressKR, TestRatings_PM012
 
+### M1 HR / Core HCM — 17 test functions in 6 files
+- `internal/hr/core/controllers/controllers_test.go`: TestControllers_EveryOperation, TestControllers_Errors, TestControllers_BadInput
+- `internal/hr/core/lifecycle/lifecycle_test.go`: TestCanMove, TestTypes, TestCanMovePosition
+- `internal/hr/core/services/fakes_test.go`: (helpers only)
+- `internal/hr/core/services/golden_test.go`: TestGolden_HireAndEffects, TestGolden_StateGraphAndSelfApproval, TestGolden_ChangeRules, TestGolden_Positions, TestGolden_TerminateRescindRehire, TestArchitecture
+- `internal/hr/core/services/harness_test.go`: (helpers only)
+- `internal/hr/core/services/more_test.go`: TestWorkersHeadcountBackfill, TestActionsInputAndLists, TestRelayAndLoops, TestFailures, TestFailures_ReverseAndSweep
+
 ### Integration suite (`backend/tests/integration`)
 - `access_test.go`: TestAccessPredefinedRoles, TestAccessScopesInheritanceAndCycles, TestAccessUserGrantsAndBlocks, TestAccessAntiEscalation, TestAccessAutomaticRoles, TestAccessTenantIsolation
 - `attendance_test.go`: TestAttendancePunchFlow, TestAttendanceRegularization, TestAttendanceRBAC, TestAttendanceIsolation, TestAttendanceConcurrentPunches, TestAttendancePagination
 - `contract_test.go`: TestSwaggerMatchesRoutes
+- `core_test.go`: TestCoreLifecycle
 - `employee_test.go`: TestEmployeeLifecycle, TestEmployeeStatusStateMachine, TestEmployeeStatutoryAndPIIMasking, TestEmployeeDocuments, TestEmployeeSelfService, TestEmployeeRBACTiers, TestUserDeactivationConvergesEmployee
 - `golden_test.go`: TestGoldenM1_TeamMoveKeepsMappingsConsistent, TestGoldenM1_AuditOnEveryOrgWrite, TestGoldenNoSecretLeakage, TestGoldenM2_EmployeeForForeignTenantUser, TestGoldenM2_AtomicOnboarding, TestGoldenM1_RejectedHierarchyChangeLeavesNoTrace
 - `harness_test.go`: TestMain
@@ -7139,3 +7769,70 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 2026-10-20 — P3–P9 DONE: backend, unit + integration goldens, swagger, console page; context complete for its v1 scope.
 2026-10-20 — Parity design: calibration (PM-018..PM-022) and continuous feedback (FB-001..FB-006), goldens G16–G20.
 2026-10-20 — Parity DONE: calibration + continuous feedback built and verified (33 ops in total).
+
+### m1-hr-management/contexts/core  _(from specification.md)_
+
+**Requirements and rules (ID-tagged table rows)**
+
+| ID | Text | … |
+|---|---|---|
+| CO-001 | Job families `{code, name, description?}`; grades `{code, name, rank ≥ 1}`; job profiles `{code, title, family_id, default_grade_id?, category: staff\|management\|executive, probation_days 0–365 (default 90), description?}`. |
+| CO-002 | Codes are 2–32 characters of `A–Z 0–9 _ -` (upper-cased), unique per tenant and immutable. Grade ranks are unique per tenant. |
+| CO-003 | Nothing is deleted. `status: active\|inactive` via PATCH; an inactive family, grade or profile cannot be newly referenced (409 `INACTIVE_REFERENCE`). Existing references stay valid. |
+| CO-010 | Create `{code, title, job_profile_id, department_id, location_id?, budgeted_fte 0.01–99.99 (default 1), shared (default false)}`. The department and location are checked through HR/Organization. |
+| CO-011 | List or get with occupancy as of `as_of` (default today): `filled_fte`, `incumbents`, `open_fte`, and `vacant` (no incumbent). Filters: `department_id`, `job_profile_id`, `status`, `vacant`. |
+| CO-012 | Update title, job profile, department, location, budgeted FTE and shared. The budgeted FTE cannot drop below the current or any future filled FTE (409 `POSITION_OVERFILLED`). |
+| CO-013 | Status `active → frozen → active`, `active\|frozen → closed`. Closed is final. Closing needs no current or future incumbent (409 `POSITION_OCCUPIED`). |
+| CO-014 | Occupancy: a non-shared position holds at most one worker on any date. A shared one holds Σ FTE ≤ budgeted FTE on every date. Violations → 409 `POSITION_FILLED`. Only `active` positions take new incumbents (409 `POSITION_STATE`). |
+| CO-020 | A worker's active assignments never overlap. A database exclusion constraint backs this, and a per-worker lock serialises writes. |
+| CO-021 | `GET /workers/{employee_id}?as_of`: the assignment in effect on the date (or none), the full history (rescinded rows flagged) and the action log. `GET /workers/me` is the same for the caller. |
+| CO-022 | `GET /assignments?as_of&department_id&position_id&page&per_page`: who held what on a date (the "as of" org view). |
+| CO-030 | Lifecycle (HR-013): `draft → submitted → completed`, `draft\|submitted → cancelled`, `submitted → rejected`, `completed → rescinded`. Approval completes the action at once (single step until M7). Illegal moves → 409 `INVALID_STATE`. |
+| CO-031 | Create `{type, employee_id, effective_date, reason_code, comment?, changes}` as draft. Only drafts can be edited. Submit validates fully. Approve re-validates under the worker lock. |
+| CO-032 | Sequencing: an action's effective date must be after the start of the worker's latest active assignment, and no completed action with a later effective date may exist (409 `LATER_CHANGE_EXISTS`). |
+| CO-033 | `hire`: the worker has no active assignment. It needs a job profile, department, worker type and employment type, plus optionally a position, location, manager, grade (default: the profile's default grade) and FTE (default 1). The probation end is the effective date + the profile's probation days (none when 0). |
+| CO-034 | `promote` / `demote`: needs a grade whose rank is higher / lower than the current one, unless `grade_override_reason` is given. `transfer`: a different department or location. `change_job`: a different job profile or position. `change_manager`: a different manager. `change_location`: a different location. Any of these may carry other field changes. |
+| CO-035 | Completing a change closes the current assignment at the effective date and opens a new one with the changes merged. Future-dated actions complete now and take effect on their date. Reads "as of" a date see the change only from its date. |
+| CO-036 | `probation_confirm` `{outcome: confirm\|extend, probation_end_date (extend only, after the current end)}`. It needs a current assignment with an open probation. Extending writes a new assignment row with the new end; confirming clears it. |
+| CO-037 | `terminate` `{termination_type: voluntary\|involuntary, last_working_day ≥ effective_date, notice_date?, eligible_for_rehire}` plus the reason code. The assignment closes after the last working day (`effective_to = LWD + 1`), which frees the position. |
+| CO-038 | `rehire`: the worker's status is terminated or resigned and there is no open assignment. It needs the same fields as hire. The worker record and history are kept. |
+| CO-039 | Rescind `{reason}`: only the worker's latest completed action. It marks the action's assignment rescinded, restores the previous assignment's `effective_to`, and reverses effects already applied (CO-040). |
+| CO-040 | Core is the system of record. When an action takes effect (at completion if its date is today or earlier, otherwise by the effective-date sweep), core projects onto the other contexts: the worker's primary organization mapping (department, location, manager), the employee status (hire / rehire → probation or active, probation confirmation → active, termination → terminated with exit date and reason) and the login (termination deactivates it, rehire reactivates it, rescinding a termination restores both). |
+| CO-041 | The sweep runs hourly and on demand (`POST /effects/run`). It is idempotent: an action's effects are applied once (`effects_applied_at`). |
+| CO-042 | Back-fill `POST /backfill`: every worker without an assignment gets one initial assignment from their joining date (department, location and manager from their primary mapping, employment type from HR/Employee). It records a completed `hire` action with `reason_code = backfill`. It is idempotent. |
+| CO-050 | Plans `{department_id, period_start, period_end, planned_fte}`. Periods do not overlap per department (409). |
+| CO-051 | `GET /headcount?as_of&department_id`: per department, the planned FTE (the plan covering the date), the budgeted FTE and filled FTE of active positions, open positions, and the workers with an assignment in effect. |
+
+**Errors**
+
+| Status | Codes |
+|---|---|
+| 400 | `VALIDATION_ERROR` |
+| 403 | `FORBIDDEN`, `CORE_SELF_APPROVAL` |
+| 404 | `NOT_FOUND`, `EMPLOYEE_NOT_FOUND` |
+| 409 | `CONFLICT`, `INVALID_STATE`, `INACTIVE_REFERENCE`, `LATER_CHANGE_EXISTS`, `NO_ASSIGNMENT`, `ALREADY_ASSIGNED`, `POSITION_FILLED`, `POSITION_STATE`, `POSITION_OCCUPIED`, `POSITION_OVERFILLED`, `GRADE_RULE`, `NO_CHANGE`, `PROBATION_STATE`, `NOT_TERMINATED`, `NOT_LATEST` |
+
+**Decision log (decisions.md, verbatim)**
+
+- **DC-01** Core is the system of record for job data. Employee status, the organization primary mapping and the login
+  are projections that core updates when an action takes effect (CO-040). Manual edits in those contexts stay
+  possible for now and are overwritten by the next core action.
+- **DC-02** Approval is a single step inside core until M7 Approvals exists (HR-013). Approving completes the action.
+  The initiator can never approve (`CORE_SELF_APPROVAL`).
+- **DC-03** Assignments never overlap. This is enforced twice: a per-worker advisory lock in the service and a
+  `btree_gist` exclusion constraint in the database. `btree_gist` is a standard contrib extension, created by
+  migration hr/000048.
+- **DC-04** Changes per worker are sequential. A new action cannot take effect before an already completed later
+  action (`LATER_CHANGE_EXISTS`), and only the latest completed action can be rescinded (`NOT_LATEST`). A correction
+  is a rescind followed by a new action (HR-004).
+- **DC-05** Position attributes are current-state in v1. Their history comes from `hr.core.position_changed` events
+  and audit. Occupancy is effective-dated through assignments.
+- **DC-06** Effects apply at completion when the effective date is today or earlier, otherwise by an hourly
+  idempotent sweep (also callable on demand). A termination's effects apply after the last working day.
+- **DC-07** The employee context gets a dedicated `Lifecycle` port for core (`ApplyCoreStatus`). The manual status
+  matrix treats terminated as final, but core may rehire and rescind.
+- **DC-08** Back-fill creates `hire` actions with `reason_code = backfill` so the history is uniform.
+- **DC-09** The manager is a worker (`manager_employee_id`, HR-002). The organization projection converts it to the
+  manager's user id.
+##### Changelog
+2026-10-20 — Design: spec CO-001..CO-051, 32 operations, goldens CG1–CG12.

@@ -10,6 +10,7 @@ import { CHECKLIST } from "./specs";
 const NAV = [
   { href: "/dev-test", label: "Overview / Checklist" },
   { href: "/dev-test/identity", label: "M0 — Identity & Access" },
+  { href: "/dev-test/hr/core", label: "M1 HR — Core HCM" },
   { href: "/dev-test/hr/organization", label: "M1 HR — Organization" },
   { href: "/dev-test/hr/employee", label: "M1 HR — Employee" },
   { href: "/dev-test/hr/attendance", label: "M1 HR — Attendance & Time" },
@@ -116,6 +117,7 @@ export function Overview() {
       </p>
       <div className="dt-grid">
         <Checklist title="M0 — Identity & Access" items={CHECKLIST[0]} />
+        <Checklist title="M1 HR — Core HCM" items={HR_CHECKLISTS.core} />
         <Checklist title="M1 HR — Organization" items={CHECKLIST[1]} />
         <Checklist title="M1 HR — Employee" items={CHECKLIST[2]} />
         <Checklist title="M1 HR — Attendance & Time" items={HR_CHECKLISTS.attendance} />

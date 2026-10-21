@@ -205,6 +205,10 @@ func newMockUserService() *mockUserService {
 	}
 }
 
+func (m *mockUserService) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error {
+	return nil
+}
+
 func (m *mockUserService) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in identityport.Invite, correlationID uuid.UUID) (*identityport.User, error) {
 	return nil, nil
 }

@@ -20,6 +20,7 @@ CONTEXTS = {
     'payroll': ('HR_PAYROLL', ['/hr/payroll']),
     'recruitment': ('HR_RECRUITMENT', ['/hr/recruitment']),
     'performance': ('HR_PERFORMANCE', ['/hr/performance']),
+    'core': ('HR_CORE', ['/hr/core']),
 }
 METHODS = ['post', 'get', 'put', 'patch', 'delete']
 

@@ -1,8 +1,8 @@
 "use client";
 import { Checklist, OpGroup, ScenarioCard } from "./components";
-import { HR_ATTENDANCE, HR_LEAVE, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
+import { HR_ATTENDANCE, HR_CORE, HR_LEAVE, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
 import type { Scenario } from "./runner";
-import { S_ATTENDANCE, S_LEAVE, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
+import { S_ATTENDANCE, S_CORE, S_LEAVE, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
 import { Tabs } from "./shell";
 import type { ChecklistItem, OpSpec } from "./types";
 
@@ -73,6 +73,7 @@ export const HR_CHECKLISTS: Record<string, ChecklistItem[]> = {
   payroll: items(S_PAYROLL),
   recruitment: items(S_RECRUITMENT),
   performance: items(S_PERFORMANCE),
+  core: items(S_CORE),
 };
 
 export function HrPerformance() {
@@ -131,6 +132,18 @@ export function HrRecruitment() {
       ops={HR_RECRUITMENT}
       scenarios={S_RECRUITMENT}
       checklist={HR_CHECKLISTS.recruitment}
+    />
+  );
+}
+
+export function HrCore() {
+  return (
+    <ContextPage
+      title="HR / Core HCM"
+      intro="Job architecture, positions with effective-dated occupancy, HR actions (hire … rehire) with maker-checker approval, worker history as of any date, headcount and back-fill. core:read | manage | approve; /workers/me for everyone."
+      ops={HR_CORE}
+      scenarios={S_CORE}
+      checklist={HR_CHECKLISTS.core}
     />
   );
 }

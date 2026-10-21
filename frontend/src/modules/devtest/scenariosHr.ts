@@ -260,7 +260,83 @@ export const S_RECRUITMENT: Scenario[] = [
   },
 ];
 
-const perfRatings = (...s: number[]) => ["Quality", "Delivery", "Collaboration", "Ownership"].map((criterion, i) => ({ criterion, score: s[i] }));
+const isoDay = (offset: number) => ymd(addDays(new Date(), offset));
+
+export const S_CORE: Scenario[] = [
+  {
+    key: "hr.core.flow",
+    module: "core",
+    title: "Job architecture → position → hire → promote → terminate → rescind (CG4–CG9)",
+    description:
+      "Builds a family, two grades, a job profile and a single seat; hires a fresh worker into it (the maker cannot approve their own action, an approver holding core:approve does), refuses a second incumbent, promotes, shows the as-of history, terminates (status, login and seat follow) and rescinds the termination (everything is restored).",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const approver = await limited(r, A, uid, "cap", [["core", "approve"], ["core", "read"]]);
+      const w = await member(r, A, uid, "cw");
+      const other = await member(r, A, uid, "co");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Core ${uid}`, code: `CO${uid}`.toUpperCase() }), 201);
+      const dept = str(d, "data.id");
+      const fam = await r.call("Job family", tn(A, "POST", "/hr/core/job-families", { code: `F${uid}`, name: `Engineering ${uid}` }), 201);
+      const g1 = await r.call("Grade L1 (rank 1)", tn(A, "POST", "/hr/core/grades", { code: `L1${uid}`, name: "Level 1", rank: 1 }), [201, 409]);
+      const g2 = await r.call("Grade L2 (rank 2)", tn(A, "POST", "/hr/core/grades", { code: `L2${uid}`, name: "Level 2", rank: 2 }), [201, 409]);
+      const grades = await r.call("Grades by rank", tn(A, "GET", "/hr/core/grades"), 200);
+      const byRank = (n: number) => String(list(grades).find((x) => x.rank === n)?.id ?? "");
+      const [l1, l2] = [str(g1, "data.id") || byRank(1), str(g2, "data.id") || byRank(2)];
+      const prof = await r.call("Job profile (default grade L1, 90-day probation)", tn(A, "POST", "/hr/core/job-profiles", {
+        code: `SWE${uid}`, title: "Software Engineer", family_id: str(fam, "data.id"), default_grade_id: l1, category: "staff", probation_days: 90 }), 201);
+      const pos = await r.call("Position (single seat)", tn(A, "POST", "/hr/core/positions", { code: `P${uid}`, title: "Backend seat",
+        job_profile_id: str(prof, "data.id"), department_id: dept }), 201);
+      const pid = str(pos, "data.id");
+      const act = async (name: string, type: string, emp: string, date: string, changes: Record<string, unknown>, expectSubmit: number | number[] = 200) => {
+        const c = await r.call(`${name}: draft`, tn(A, "POST", "/hr/core/actions", { type, employee_id: emp, effective_date: date, reason_code: "console", changes }), 201);
+        await r.call(`${name}: submit`, tn(A, "POST", `/hr/core/actions/${str(c, "data.id")}/submit`), expectSubmit);
+        return str(c, "data.id");
+      };
+      const hire = await act("Hire", "hire", w.empId, isoDay(-120), { position_id: pid, worker_type: "employee", employment_type: "full_time" });
+      await r.call("Maker approves own action → 403 CORE_SELF_APPROVAL", tn(A, "POST", `/hr/core/actions/${hire}/approve`), 403);
+      await r.call("Approver approves → completed", tn(approver, "POST", `/hr/core/actions/${hire}/approve`), 200, (e) =>
+        str(e, "data.status") === "completed" && getPath(e.resBody, "data.effects_applied") === true ? null : "not completed",
+      );
+      await act("Second incumbent → 409 POSITION_FILLED", "hire", other.empId, isoDay(-60), { position_id: pid, worker_type: "employee", employment_type: "full_time" }, 409);
+      const promo = await act("Promote to L2", "promote", w.empId, isoDay(-30), { grade_id: l2 });
+      await r.call("Approve promotion", tn(approver, "POST", `/hr/core/actions/${promo}/approve`), 200);
+      await r.call("As of 31 days ago: L1", tn(A, "GET", `/hr/core/workers/${w.empId}`, undefined, { as_of: isoDay(-31) }), 200, (e) =>
+        str(e, "data.current.grade_id") === l1 ? null : "expected L1",
+      );
+      await r.call("Today: L2, history of 2", tn(A, "GET", `/hr/core/workers/${w.empId}`), 200, (e) =>
+        str(e, "data.current.grade_id") === l2 && list(e, "data.history").length === 2 ? null : "expected L2",
+      );
+      const term = await act("Terminate (last day yesterday)", "terminate", w.empId, isoDay(-2), { termination_type: "voluntary", last_working_day: isoDay(-1) });
+      await r.call("Approve termination", tn(approver, "POST", `/hr/core/actions/${term}/approve`), 200);
+      await r.call("Employee is terminated", tn(A, "GET", `/hr/employees/${w.empId}`), 200, (e) => (str(e, "data.status") === "terminated" ? null : "status"));
+      await r.call("Seat is vacant", tn(A, "GET", `/hr/core/positions/${pid}`), 200, (e) => (getPath(e.resBody, "data.vacant") === true ? null : "occupied"));
+      await r.call("Rescind needs a reason → 400", tn(approver, "POST", `/hr/core/actions/${term}/rescind`, {}), 400);
+      await r.call("Rescind the termination", tn(approver, "POST", `/hr/core/actions/${term}/rescind`, { reason: "resignation withdrawn" }), 200);
+      await r.call("Employee is active again", tn(A, "GET", `/hr/employees/${w.empId}`), 200, (e) => (str(e, "data.status") === "active" ? null : "status"));
+      await r.call("Seat is occupied again", tn(A, "GET", `/hr/core/positions/${pid}`), 200, (e) => (getPath(e.resBody, "data.vacant") === false ? null : "vacant"));
+      await r.call("Headcount for the department", tn(A, "GET", "/hr/core/headcount", undefined, { department_id: dept }), 200, (e) =>
+        getPath(e.resBody, "data.departments.0.workers") === 1 ? null : "expected 1 worker",
+      );
+    },
+  },
+  {
+    key: "hr.core.rbac",
+    module: "core",
+    title: "RBAC: workers see themselves; core:read reads; only core:manage initiates",
+    description: "A plain employee reads /workers/me but nothing else; core:read lists positions but cannot create actions.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const m = await member(r, A, uid, "crb");
+      await r.call("Employee: /workers/me → 200", tn(m.S, "GET", "/hr/core/workers/me"), 200);
+      await r.call("Employee: positions → 403", tn(m.S, "GET", "/hr/core/positions"), 403);
+      const reader = await limited(r, A, uid, "crd", [["core", "read"]]);
+      await r.call("core:read lists positions", tn(reader, "GET", "/hr/core/positions"), 200);
+      await r.call("core:read cannot create actions → 403", tn(reader, "POST", "/hr/core/actions", {}), 403);
+    },
+  },
+];
+
+const perfRatings =(...s: number[]) => ["Quality", "Delivery", "Collaboration", "Ownership"].map((criterion, i) => ({ criterion, score: s[i] }));
 
 export const S_PERFORMANCE: Scenario[] = [
   {

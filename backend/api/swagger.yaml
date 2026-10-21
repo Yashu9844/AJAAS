@@ -2976,6 +2976,291 @@ paths:
         '200': {description: 'Declined', content: {application/json: {schema: {$ref: '#/components/schemas/FeedbackRequestEnvelope'}}}}
         '404': {description: 'NOT_FOUND'}
         '409': {description: 'REQUEST_STATE'}
+  /hr/core/job-families:
+    post:
+      summary: 'Create a job family (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateJobFamily'}}}}
+      responses:
+        '201': {description: 'Created', content: {application/json: {schema: {$ref: '#/components/schemas/CoreFamilyEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT (code or rank taken), INACTIVE_REFERENCE'}
+    get:
+      summary: 'List job familys (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, inactive]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'List', content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/core/job-families/{id}:
+    patch:
+      summary: 'Update a job family; code is immutable; status active|inactive (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateArchitecture'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/CoreFamilyEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT, INACTIVE_REFERENCE'}
+  /hr/core/grades:
+    post:
+      summary: 'Create a grade (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateGrade'}}}}
+      responses:
+        '201': {description: 'Created', content: {application/json: {schema: {$ref: '#/components/schemas/CoreGradeEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT (code or rank taken), INACTIVE_REFERENCE'}
+    get:
+      summary: 'List grades (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, inactive]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'List', content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/core/grades/{id}:
+    patch:
+      summary: 'Update a grade; code is immutable; status active|inactive (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateArchitecture'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/CoreGradeEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT, INACTIVE_REFERENCE'}
+  /hr/core/job-profiles:
+    post:
+      summary: 'Create a job profile (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateJobProfile'}}}}
+      responses:
+        '201': {description: 'Created', content: {application/json: {schema: {$ref: '#/components/schemas/CoreProfileEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT (code or rank taken), INACTIVE_REFERENCE'}
+    get:
+      summary: 'List job profiles (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: family_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [active, inactive]}}, {name: category, in: query, schema: {type: string, enum: [staff, management, executive]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'List', content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/core/job-profiles/{id}:
+    get:
+      summary: 'Get a job profile (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Profile', content: {application/json: {schema: {$ref: '#/components/schemas/CoreProfileEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Update a job profile; code is immutable; status active|inactive (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateArchitecture'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/CoreProfileEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT, INACTIVE_REFERENCE'}
+  /hr/core/positions:
+    post:
+      summary: 'Create a position (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreatePosition'}}}}
+      responses:
+        '201': {description: 'Created', content: {application/json: {schema: {$ref: '#/components/schemas/CorePositionEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT, INACTIVE_REFERENCE'}
+    get:
+      summary: 'List positions with occupancy as of a date (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: department_id, in: query, schema: {type: string, format: uuid}}, {name: job_profile_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [active, frozen, closed]}}, {name: vacant, in: query, schema: {type: boolean}}, {name: as_of, in: query, schema: {type: string, format: date}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Positions', content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/core/positions/{id}:
+    get:
+      summary: 'Get a position with occupancy as of a date (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}, {name: as_of, in: query, schema: {type: string, format: date}}]
+      responses:
+        '200': {description: 'Position', content: {application/json: {schema: {$ref: '#/components/schemas/CorePositionEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Update a position; budget never below filled FTE (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdatePosition'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/CorePositionEnvelope'}}}}
+        '409': {description: 'POSITION_OVERFILLED, INACTIVE_REFERENCE'}
+  /hr/core/positions/{id}/status:
+    post:
+      summary: 'Freeze, reactivate or close a position (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PositionStatus'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/CorePositionEnvelope'}}}}
+        '409': {description: 'POSITION_STATE, POSITION_OCCUPIED'}
+  /hr/core/actions:
+    post:
+      summary: 'Create a draft HR action (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateAction'}}}}
+      responses:
+        '201': {description: 'Draft', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+    get:
+      summary: 'List HR actions (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string}}, {name: type, in: query, schema: {type: string}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Actions', content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/core/actions/{id}:
+    get:
+      summary: 'Get an HR action (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Action', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit a draft action (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateAction'}}}}
+      responses:
+        '200': {description: 'Updated', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '409': {description: 'INVALID_STATE'}
+  /hr/core/actions/{id}/submit:
+    post:
+      summary: 'Submit a draft (full validation) (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Action', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '409': {description: 'INVALID_STATE, LATER_CHANGE_EXISTS, NO_ASSIGNMENT, ALREADY_ASSIGNED, POSITION_FILLED, GRADE_RULE, NO_CHANGE'}
+  /hr/core/actions/{id}/approve:
+    post:
+      summary: 'Approve and complete a submitted action; never the initiator (core:approve)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/Decision'}}}}
+      responses:
+        '200': {description: 'Action', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '409': {description: '403 CORE_SELF_APPROVAL; 409 as submit'}
+  /hr/core/actions/{id}/reject:
+    post:
+      summary: 'Reject a submitted action; never the initiator (core:approve)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/Decision'}}}}
+      responses:
+        '200': {description: 'Action', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '409': {description: 'INVALID_STATE'}
+  /hr/core/actions/{id}/cancel:
+    post:
+      summary: 'Cancel a draft or submitted action (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      responses:
+        '200': {description: 'Action', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '409': {description: 'INVALID_STATE'}
+  /hr/core/actions/{id}/rescind:
+    post:
+      summary: 'Rescind the worker latest completed action and reverse its effects (reason required) (core:approve)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{$ref: '#/components/parameters/ID'}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/Decision'}}}}
+      responses:
+        '200': {description: 'Action', content: {application/json: {schema: {$ref: '#/components/schemas/CoreActionEnvelope'}}}}
+        '409': {description: 'INVALID_STATE, NOT_LATEST, POSITION_FILLED'}
+  /hr/core/workers/me:
+    get:
+      summary: 'My assignment, history and actions (authenticated)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: as_of, in: query, schema: {type: string, format: date}}]
+      responses:
+        '200': {description: 'Worker', content: {application/json: {schema: {$ref: '#/components/schemas/CoreWorkerEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+  /hr/core/workers/{employee_id}:
+    get:
+      summary: 'A worker assignment as of a date, full history and actions (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: path, required: true, schema: {type: string, format: uuid}}, {name: as_of, in: query, schema: {type: string, format: date}}]
+      responses:
+        '200': {description: 'Worker', content: {application/json: {schema: {$ref: '#/components/schemas/CoreWorkerEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+  /hr/core/assignments:
+    get:
+      summary: 'Who held what on a date (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: as_of, in: query, schema: {type: string, format: date}}, {name: department_id, in: query, schema: {type: string, format: uuid}}, {name: position_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Assignments', content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/core/headcount-plans:
+    post:
+      summary: 'Create a headcount plan (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreatePlan'}}}}
+      responses:
+        '201': {description: 'Created', content: {application/json: {schema: {$ref: '#/components/schemas/CorePlanEnvelope'}}}}
+        '409': {description: 'CONFLICT (overlapping period)'}
+    get:
+      summary: 'List headcount plans (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: department_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: 'Plans', content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/core/headcount:
+    get:
+      summary: 'Planned vs budgeted vs filled FTE per department (core:read)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: department_id, in: query, schema: {type: string, format: uuid}}, {name: as_of, in: query, schema: {type: string, format: date}}]
+      responses:
+        '200': {description: 'Headcount', content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/core/backfill:
+    post:
+      summary: 'Back-fill one initial assignment per unassigned worker (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: 'Processed/skipped counts', content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/core/effects/run:
+    post:
+      summary: 'Apply due effects of completed actions now (core:manage)'
+      tags: [Core HCM]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: 'Processed/skipped counts', content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
 components:
   securitySchemes:
     BearerAuth:
@@ -3945,3 +4230,112 @@ components:
         updated_at: {type: string, format: date-time}
     LocationEnvelope: {type: object, properties: {data: {$ref: '#/components/schemas/Location'}}}
     LocationListEnvelope: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Location'}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    CreateJobFamily:
+      type: object
+      required: [code, name]
+      properties: {code: {type: string, example: ENG}, name: {type: string}, description: {type: string}}
+    CreateGrade:
+      type: object
+      required: [code, name, rank]
+      properties: {code: {type: string, example: L1}, name: {type: string}, rank: {type: integer, minimum: 1}}
+    CreateJobProfile:
+      type: object
+      required: [code, title, family_id, category]
+      properties:
+        code: {type: string, example: SWE}
+        title: {type: string}
+        family_id: {type: string, format: uuid}
+        default_grade_id: {type: string, format: uuid}
+        category: {type: string, enum: [staff, management, executive]}
+        probation_days: {type: integer, minimum: 0, maximum: 365, default: 90}
+        description: {type: string}
+    UpdateArchitecture:
+      type: object
+      description: Fields that do not apply to the resource are ignored
+      properties:
+        name: {type: string}
+        title: {type: string}
+        description: {type: string}
+        rank: {type: integer}
+        family_id: {type: string, format: uuid}
+        default_grade_id: {type: string, format: uuid}
+        category: {type: string, enum: [staff, management, executive]}
+        probation_days: {type: integer}
+        status: {type: string, enum: [active, inactive]}
+    CreatePosition:
+      type: object
+      required: [code, title, job_profile_id, department_id]
+      properties:
+        code: {type: string}
+        title: {type: string}
+        job_profile_id: {type: string, format: uuid}
+        department_id: {type: string, format: uuid}
+        location_id: {type: string, format: uuid}
+        budgeted_fte: {type: number, default: 1}
+        shared: {type: boolean, default: false}
+    UpdatePosition:
+      type: object
+      properties:
+        title: {type: string}
+        job_profile_id: {type: string, format: uuid}
+        department_id: {type: string, format: uuid}
+        location_id: {type: string, format: uuid}
+        budgeted_fte: {type: number}
+        shared: {type: boolean}
+    PositionStatus:
+      type: object
+      required: [status]
+      properties: {status: {type: string, enum: [active, frozen, closed]}}
+    ActionChanges:
+      type: object
+      properties:
+        job_profile_id: {type: string, format: uuid}
+        position_id: {type: string, format: uuid}
+        clear_position: {type: boolean}
+        department_id: {type: string, format: uuid}
+        location_id: {type: string, format: uuid}
+        manager_employee_id: {type: string, format: uuid}
+        grade_id: {type: string, format: uuid}
+        grade_override_reason: {type: string}
+        worker_type: {type: string, enum: [employee, contractor, intern]}
+        employment_type: {type: string, enum: [full_time, part_time, contract, intern]}
+        fte: {type: number}
+        probation_outcome: {type: string, enum: [confirm, extend]}
+        probation_end_date: {type: string, format: date}
+        termination_type: {type: string, enum: [voluntary, involuntary]}
+        last_working_day: {type: string, format: date}
+        notice_date: {type: string, format: date}
+        eligible_for_rehire: {type: boolean}
+    CreateAction:
+      type: object
+      required: [type, employee_id, effective_date, reason_code]
+      properties:
+        type: {type: string, enum: [hire, promote, demote, transfer, change_job, change_manager, change_location, probation_confirm, terminate, rehire]}
+        employee_id: {type: string, format: uuid}
+        effective_date: {type: string, format: date}
+        reason_code: {type: string}
+        comment: {type: string}
+        changes: {$ref: '#/components/schemas/ActionChanges'}
+    UpdateAction:
+      type: object
+      properties:
+        effective_date: {type: string, format: date}
+        reason_code: {type: string}
+        comment: {type: string}
+        changes: {$ref: '#/components/schemas/ActionChanges'}
+    Decision:
+      type: object
+      properties: {comment: {type: string}, reason: {type: string, description: Required to rescind}}
+    CreatePlan:
+      type: object
+      required: [department_id, period_start, period_end, planned_fte]
+      properties: {department_id: {type: string, format: uuid}, period_start: {type: string, format: date}, period_end: {type: string, format: date}, planned_fte: {type: number}}
+    CoreObjectEnvelope: {type: object, properties: {data: {type: object}}}
+    CoreListEnvelope: {type: object, properties: {data: {type: array, items: {type: object}}, meta: {$ref: '#/components/schemas/PageMeta'}}}
+    CoreFamilyEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
+    CoreGradeEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
+    CoreProfileEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
+    CorePositionEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
+    CoreActionEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
+    CoreWorkerEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
+    CorePlanEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}

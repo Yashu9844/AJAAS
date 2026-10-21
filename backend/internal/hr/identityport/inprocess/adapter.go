@@ -87,6 +87,11 @@ func (u users) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id, co
 	return u.svc.DeactivateUser(ctx, tx, tenantID, id, correlationID)
 }
 
+func (u users) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error {
+	_, err := u.svc.ActivateUser(ctx, tx, tenantID, id)
+	return err
+}
+
 func (u users) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in identityport.Invite, correlationID uuid.UUID) (*identityport.User, error) {
 	res, err := u.svc.InviteUser(ctx, tx, tenantID, identityDTO.InviteUserRequest{Email: in.Email, FirstName: in.FirstName, LastName: in.LastName}, correlationID)
 	if err != nil {

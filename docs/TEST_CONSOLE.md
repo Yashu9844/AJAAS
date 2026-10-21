@@ -15,6 +15,7 @@ excluded from production builds.
 | `/dev-test/hr/leave` | HR Leave & Absence | generated (20) | `S_LEAVE` |
 | `/dev-test/hr/payroll` | HR Payroll | generated (20) | `S_PAYROLL` |
 | `/dev-test/hr/recruitment` | HR Recruitment | generated (20) | `S_RECRUITMENT` |
+| `/dev-test/hr/core` | HR Core HCM | generated (32) | `S_CORE` (2) |
 | `/dev-test/hr/performance` | HR Performance & OKRs | generated (33) | `S_PERFORMANCE` (4) |
 
 From now on each feature ships its page in the same phase as its backend (delivery phase P8, `docs/ENGINEERING.md` §3).

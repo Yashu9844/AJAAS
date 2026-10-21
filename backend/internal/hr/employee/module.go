@@ -113,6 +113,9 @@ func (m *Module) EmployeeService() services.EmployeeService {
 // Directory is the employee directory published to the other HR contexts (employee/api).
 func (m *Module) Directory() api.Directory { return m.empSvc }
 
+// Lifecycle is the status port HR/Core uses to project HR actions (employee/api).
+func (m *Module) Lifecycle() api.Lifecycle { return services.NewCoreLifecycle(m.db) }
+
 func (m *Module) EventConsumer() services.EventConsumer {
 	return m.consumer
 }

@@ -85,7 +85,7 @@ Role names are tenant data, not code. Code checks permissions only.
 | HR-013 | HR business processes (lifecycle actions, compensation changes, enrolments, regularizations, leave) follow one request shape: `draft → submitted → approved → completed`, or `rejected` / `cancelled`; approvals run in-context (single step) until M7 Approvals exists, then delegate to it without changing the HR API. |
 | HR-014 | Deactivating a worker's login (M0) never deletes HR data; termination in HR triggers M0 deactivation, not the reverse, once `core` exists. |
 
-## 4. Context `core` — job architecture, positions and lifecycle (planned)
+## 4. Context `core` — job architecture, positions and lifecycle (built 2026-10-21; contract in `contexts/core/specification.md`)
 
 **Purpose:** the Workday "Core HCM" backbone: what jobs exist, which positions are budgeted, which worker holds
 which job/position over time, and the business processes that change it.

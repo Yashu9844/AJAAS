@@ -3766,3 +3766,1185 @@ export const HR_PERFORMANCE: OpSpec[] = [
     "note": "Errors: 404 NOT_FOUND (not the reviewer); 409 REVIEW_STATE, CYCLE_STATE"
   }
 ];
+
+export const HR_CORE: OpSpec[] = [
+  {
+    "key": "hr.core.post.hr.core.actions",
+    "label": "Create a draft HR action (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/actions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "hire",
+          "promote",
+          "demote",
+          "transfer",
+          "change_job",
+          "change_manager",
+          "change_location",
+          "probation_confirm",
+          "terminate",
+          "rehire"
+        ],
+        "required": true
+      },
+      {
+        "name": "employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "effective_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "reason_code",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      },
+      {
+        "name": "changes",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "coreActionsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.core.get.hr.core.actions",
+    "label": "List HR actions (core:read)",
+    "method": "GET",
+    "path": "/hr/core/actions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query"
+      },
+      {
+        "name": "type",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.get.hr.core.actions.id",
+    "label": "Get an HR action (core:read)",
+    "method": "GET",
+    "path": "/hr/core/actions/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreActionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.core.patch.hr.core.actions.id",
+    "label": "Edit a draft action (core:manage)",
+    "method": "PATCH",
+    "path": "/hr/core/actions/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreActionsId"
+      },
+      {
+        "name": "effective_date",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "reason_code",
+        "where": "body"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      },
+      {
+        "name": "changes",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 INVALID_STATE"
+  },
+  {
+    "key": "hr.core.post.hr.core.actions.id.approve",
+    "label": "Approve and complete a submitted action; never the initiator (core:approve)",
+    "method": "POST",
+    "path": "/hr/core/actions/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreActionsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "placeholder": "Required to rescind"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 403 CORE_SELF_APPROVAL; 409 as submit"
+  },
+  {
+    "key": "hr.core.post.hr.core.actions.id.cancel",
+    "label": "Cancel a draft or submitted action (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/actions/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreActionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 INVALID_STATE"
+  },
+  {
+    "key": "hr.core.post.hr.core.actions.id.reject",
+    "label": "Reject a submitted action; never the initiator (core:approve)",
+    "method": "POST",
+    "path": "/hr/core/actions/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreActionsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "placeholder": "Required to rescind"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 INVALID_STATE"
+  },
+  {
+    "key": "hr.core.post.hr.core.actions.id.rescind",
+    "label": "Rescind the worker latest completed action and reverse its effects (reason required) (core:approve)",
+    "method": "POST",
+    "path": "/hr/core/actions/:id/rescind",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreActionsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "placeholder": "Required to rescind"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 INVALID_STATE, NOT_LATEST, POSITION_FILLED"
+  },
+  {
+    "key": "hr.core.post.hr.core.actions.id.submit",
+    "label": "Submit a draft (full validation) (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/actions/:id/submit",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreActionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 INVALID_STATE, LATER_CHANGE_EXISTS, NO_ASSIGNMENT, ALREADY_ASSIGNED, POSITION_FILLED, GRADE_RULE, NO_CHANGE"
+  },
+  {
+    "key": "hr.core.get.hr.core.assignments",
+    "label": "Who held what on a date (core:read)",
+    "method": "GET",
+    "path": "/hr/core/assignments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "as_of",
+        "where": "query"
+      },
+      {
+        "name": "department_id",
+        "where": "query"
+      },
+      {
+        "name": "position_id",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.post.hr.core.backfill",
+    "label": "Back-fill one initial assignment per unassigned worker (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/backfill",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.post.hr.core.effects.run",
+    "label": "Apply due effects of completed actions now (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/effects/run",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.post.hr.core.grades",
+    "label": "Create a grade (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/grades",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "code",
+        "where": "body",
+        "required": true,
+        "placeholder": "L1"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "rank",
+        "where": "body",
+        "type": "number",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "coreGradesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT (code or rank taken), INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.get.hr.core.grades",
+    "label": "List grades (core:read)",
+    "method": "GET",
+    "path": "/hr/core/grades",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "inactive"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.patch.hr.core.grades.id",
+    "label": "Update a grade; code is immutable; status active|inactive (core:manage)",
+    "method": "PATCH",
+    "path": "/hr/core/grades/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreGradesId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "rank",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "family_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "default_grade_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "category",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "staff",
+          "management",
+          "executive"
+        ]
+      },
+      {
+        "name": "probation_days",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "inactive"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CONFLICT, INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.get.hr.core.headcount",
+    "label": "Planned vs budgeted vs filled FTE per department (core:read)",
+    "method": "GET",
+    "path": "/hr/core/headcount",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "department_id",
+        "where": "query"
+      },
+      {
+        "name": "as_of",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.post.hr.core.headcount.plans",
+    "label": "Create a headcount plan (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/headcount-plans",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "department_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "period_start",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "period_end",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "planned_fte",
+        "where": "body",
+        "type": "number",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "coreHeadcountPlansId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 409 CONFLICT (overlapping period)"
+  },
+  {
+    "key": "hr.core.get.hr.core.headcount.plans",
+    "label": "List headcount plans (core:read)",
+    "method": "GET",
+    "path": "/hr/core/headcount-plans",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "department_id",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.post.hr.core.job.families",
+    "label": "Create a job family (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/job-families",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "code",
+        "where": "body",
+        "required": true,
+        "placeholder": "ENG"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "description",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "coreJobFamiliesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT (code or rank taken), INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.get.hr.core.job.families",
+    "label": "List job familys (core:read)",
+    "method": "GET",
+    "path": "/hr/core/job-families",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "inactive"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.patch.hr.core.job.families.id",
+    "label": "Update a job family; code is immutable; status active|inactive (core:manage)",
+    "method": "PATCH",
+    "path": "/hr/core/job-families/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreJobFamiliesId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "rank",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "family_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "default_grade_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "category",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "staff",
+          "management",
+          "executive"
+        ]
+      },
+      {
+        "name": "probation_days",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "inactive"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CONFLICT, INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.post.hr.core.job.profiles",
+    "label": "Create a job profile (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/job-profiles",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "code",
+        "where": "body",
+        "required": true,
+        "placeholder": "SWE"
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "family_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "default_grade_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "category",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "staff",
+          "management",
+          "executive"
+        ],
+        "required": true
+      },
+      {
+        "name": "probation_days",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "coreJobProfilesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT (code or rank taken), INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.get.hr.core.job.profiles",
+    "label": "List job profiles (core:read)",
+    "method": "GET",
+    "path": "/hr/core/job-profiles",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "family_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "inactive"
+        ]
+      },
+      {
+        "name": "category",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "staff",
+          "management",
+          "executive"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.get.hr.core.job.profiles.id",
+    "label": "Get a job profile (core:read)",
+    "method": "GET",
+    "path": "/hr/core/job-profiles/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreJobProfilesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.core.patch.hr.core.job.profiles.id",
+    "label": "Update a job profile; code is immutable; status active|inactive (core:manage)",
+    "method": "PATCH",
+    "path": "/hr/core/job-profiles/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "coreJobProfilesId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "rank",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "family_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "default_grade_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "category",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "staff",
+          "management",
+          "executive"
+        ]
+      },
+      {
+        "name": "probation_days",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "inactive"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CONFLICT, INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.post.hr.core.positions",
+    "label": "Create a position (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/positions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "code",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "job_profile_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "department_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "location_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "budgeted_fte",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "shared",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "corePositionsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 CONFLICT, INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.get.hr.core.positions",
+    "label": "List positions with occupancy as of a date (core:read)",
+    "method": "GET",
+    "path": "/hr/core/positions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "department_id",
+        "where": "query"
+      },
+      {
+        "name": "job_profile_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "frozen",
+          "closed"
+        ]
+      },
+      {
+        "name": "vacant",
+        "where": "query",
+        "type": "bool"
+      },
+      {
+        "name": "as_of",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.core.get.hr.core.positions.id",
+    "label": "Get a position with occupancy as of a date (core:read)",
+    "method": "GET",
+    "path": "/hr/core/positions/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "corePositionsId"
+      },
+      {
+        "name": "as_of",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.core.patch.hr.core.positions.id",
+    "label": "Update a position; budget never below filled FTE (core:manage)",
+    "method": "PATCH",
+    "path": "/hr/core/positions/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "corePositionsId"
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "job_profile_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "department_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "location_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "budgeted_fte",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "shared",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 POSITION_OVERFILLED, INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.core.post.hr.core.positions.id.status",
+    "label": "Freeze, reactivate or close a position (core:manage)",
+    "method": "POST",
+    "path": "/hr/core/positions/:id/status",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "corePositionsId"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "frozen",
+          "closed"
+        ],
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 POSITION_STATE, POSITION_OCCUPIED"
+  },
+  {
+    "key": "hr.core.get.hr.core.workers.me",
+    "label": "My assignment, history and actions (authenticated)",
+    "method": "GET",
+    "path": "/hr/core/workers/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "as_of",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.core.get.hr.core.workers.employee.id",
+    "label": "A worker assignment as of a date, full history and actions (core:read)",
+    "method": "GET",
+    "path": "/hr/core/workers/:employee_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "path",
+        "required": true,
+        "ref": "coreWorkersId"
+      },
+      {
+        "name": "as_of",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  }
+];
