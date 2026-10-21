@@ -227,8 +227,8 @@ product decision. Each is added to its context's specification (with goldens) wh
 | organization | Effective-dated reporting changes via `core` actions | P1 | mappings become a projection of `core` assignments (CH-012) |
 | organization | Bulk import (CSV) with validation report | P2 | |
 | organization | Cost-centre references | P2 | cost centres are owned by M5 Finance |
-| employee | Personal-data change requests with approval (bank, address, name) | P1 | uses HR-013 request shape |
-| employee | Emergency contacts, education, prior employment | P1 | |
+| employee | Personal-data change requests with approval (bank, address, name) | P1 | done 2026-10-21 (FR-CR) |
+| employee | Emergency contacts, education, prior employment | P1 | done 2026-10-21 (FR-ER) |
 | employee | Document files (upload/download) | P2 | M8 Documents; metadata exists today |
 | attendance | Manager-scoped approval inbox | P1 | |
 | attendance | Overtime calculation and rosters / shift rotations | P1 | |

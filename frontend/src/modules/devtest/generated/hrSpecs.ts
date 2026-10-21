@@ -4948,3 +4948,1038 @@ export const HR_CORE: OpSpec[] = [
     "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
   }
 ];
+
+export const HR_EMPLOYEE_RECORDS: OpSpec[] = [
+  {
+    "key": "hr.employee_records.get.hr.employee.change.requests",
+    "label": "Approval queue (employee:approve_changes)",
+    "method": "GET",
+    "path": "/hr/employee-change-requests",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "submitted",
+          "approved",
+          "rejected",
+          "cancelled"
+        ]
+      },
+      {
+        "name": "type",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "name",
+          "address",
+          "bank"
+        ]
+      },
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.employee_records.get.hr.employee.change.requests.rid",
+    "label": "Get a change request (employee:approve_changes)",
+    "method": "GET",
+    "path": "/hr/employee-change-requests/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeeChangeRequestsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employee.change.requests.rid.approve",
+    "label": "Approve a change request; never your own (employee:approve_changes)",
+    "method": "POST",
+    "path": "/hr/employee-change-requests/:rid/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeeChangeRequestsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 EMPLOYEE_SELF_APPROVAL; 409 REQUEST_STATE"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employee.change.requests.rid.reject",
+    "label": "Reject a change request; never your own (employee:approve_changes)",
+    "method": "POST",
+    "path": "/hr/employee-change-requests/:rid/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeeChangeRequestsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 EMPLOYEE_SELF_APPROVAL; 409 REQUEST_STATE"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.me.change.requests",
+    "label": "Request a name, address or bank change (approval required)",
+    "method": "POST",
+    "path": "/hr/employees/me/change-requests",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "name",
+          "address",
+          "bank"
+        ],
+        "required": true
+      },
+      {
+        "name": "reason",
+        "where": "body"
+      },
+      {
+        "name": "payload",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "employeesMeId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT (one open request per type)"
+  },
+  {
+    "key": "hr.employee_records.get.hr.employees.me.change.requests",
+    "label": "My change requests (bank numbers masked)",
+    "method": "GET",
+    "path": "/hr/employees/me/change-requests",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "submitted",
+          "approved",
+          "rejected",
+          "cancelled"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.me.change.requests.rid.cancel",
+    "label": "Cancel my submitted request",
+    "method": "POST",
+    "path": "/hr/employees/me/change-requests/:rid/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesMeId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 REQUEST_STATE"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.me.education",
+    "label": "Add to my education",
+    "method": "POST",
+    "path": "/hr/employees/me/education",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "institution",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "qualification",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "field_of_study",
+        "where": "body"
+      },
+      {
+        "name": "start_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "end_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "grade",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "employeesMeId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT / OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.get.hr.employees.me.education",
+    "label": "List my education",
+    "method": "GET",
+    "path": "/hr/employees/me/education",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.put.hr.employees.me.education.rid",
+    "label": "Replace one of my education",
+    "method": "PUT",
+    "path": "/hr/employees/me/education/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesMeId"
+      },
+      {
+        "name": "institution",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "qualification",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "field_of_study",
+        "where": "body"
+      },
+      {
+        "name": "start_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "end_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "grade",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.delete.hr.employees.me.education.rid",
+    "label": "Delete one of my education",
+    "method": "DELETE",
+    "path": "/hr/employees/me/education/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesMeId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.me.emergency.contacts",
+    "label": "Add to my emergency contacts",
+    "method": "POST",
+    "path": "/hr/employees/me/emergency-contacts",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "relationship",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "phone",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "email",
+        "where": "body"
+      },
+      {
+        "name": "is_primary",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "employeesMeId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT / OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.get.hr.employees.me.emergency.contacts",
+    "label": "List my emergency contacts",
+    "method": "GET",
+    "path": "/hr/employees/me/emergency-contacts",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.put.hr.employees.me.emergency.contacts.rid",
+    "label": "Replace one of my emergency contacts",
+    "method": "PUT",
+    "path": "/hr/employees/me/emergency-contacts/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesMeId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "relationship",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "phone",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "email",
+        "where": "body"
+      },
+      {
+        "name": "is_primary",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.delete.hr.employees.me.emergency.contacts.rid",
+    "label": "Delete one of my emergency contacts",
+    "method": "DELETE",
+    "path": "/hr/employees/me/emergency-contacts/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesMeId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.me.prior.employment",
+    "label": "Add to my prior employment",
+    "method": "POST",
+    "path": "/hr/employees/me/prior-employment",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employer",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "start_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "reason_for_leaving",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "employeesMeId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT / OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.get.hr.employees.me.prior.employment",
+    "label": "List my prior employment",
+    "method": "GET",
+    "path": "/hr/employees/me/prior-employment",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.put.hr.employees.me.prior.employment.rid",
+    "label": "Replace one of my prior employment",
+    "method": "PUT",
+    "path": "/hr/employees/me/prior-employment/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesMeId"
+      },
+      {
+        "name": "employer",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "start_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "reason_for_leaving",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.delete.hr.employees.me.prior.employment.rid",
+    "label": "Delete one of my prior employment",
+    "method": "DELETE",
+    "path": "/hr/employees/me/prior-employment/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesMeId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.id.education",
+    "label": "Add to an employee's (employee:read / employee:update) education",
+    "method": "POST",
+    "path": "/hr/employees/:id/education",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "institution",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "qualification",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "field_of_study",
+        "where": "body"
+      },
+      {
+        "name": "start_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "end_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "grade",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "employeesEducationId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT / OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.get.hr.employees.id.education",
+    "label": "List an employee's (employee:read / employee:update) education",
+    "method": "GET",
+    "path": "/hr/employees/:id/education",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.put.hr.employees.id.education.rid",
+    "label": "Replace one of an employee's (employee:read / employee:update) education",
+    "method": "PUT",
+    "path": "/hr/employees/:id/education/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesEducationId"
+      },
+      {
+        "name": "institution",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "qualification",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "field_of_study",
+        "where": "body"
+      },
+      {
+        "name": "start_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "end_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "grade",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.delete.hr.employees.id.education.rid",
+    "label": "Delete one of an employee's (employee:read / employee:update) education",
+    "method": "DELETE",
+    "path": "/hr/employees/:id/education/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesEducationId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.id.emergency.contacts",
+    "label": "Add to an employee's (employee:read / employee:update) emergency contacts",
+    "method": "POST",
+    "path": "/hr/employees/:id/emergency-contacts",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "relationship",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "phone",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "email",
+        "where": "body"
+      },
+      {
+        "name": "is_primary",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "employeesEmergencyContactsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT / OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.get.hr.employees.id.emergency.contacts",
+    "label": "List an employee's (employee:read / employee:update) emergency contacts",
+    "method": "GET",
+    "path": "/hr/employees/:id/emergency-contacts",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.put.hr.employees.id.emergency.contacts.rid",
+    "label": "Replace one of an employee's (employee:read / employee:update) emergency contacts",
+    "method": "PUT",
+    "path": "/hr/employees/:id/emergency-contacts/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesEmergencyContactsId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "relationship",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "phone",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "email",
+        "where": "body"
+      },
+      {
+        "name": "is_primary",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.delete.hr.employees.id.emergency.contacts.rid",
+    "label": "Delete one of an employee's (employee:read / employee:update) emergency contacts",
+    "method": "DELETE",
+    "path": "/hr/employees/:id/emergency-contacts/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesEmergencyContactsId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.post.hr.employees.id.prior.employment",
+    "label": "Add to an employee's (employee:read / employee:update) prior employment",
+    "method": "POST",
+    "path": "/hr/employees/:id/prior-employment",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "employer",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "start_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "reason_for_leaving",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "employeesPriorEmploymentId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT / OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.get.hr.employees.id.prior.employment",
+    "label": "List an employee's (employee:read / employee:update) prior employment",
+    "method": "GET",
+    "path": "/hr/employees/:id/prior-employment",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.employee_records.put.hr.employees.id.prior.employment.rid",
+    "label": "Replace one of an employee's (employee:read / employee:update) prior employment",
+    "method": "PUT",
+    "path": "/hr/employees/:id/prior-employment/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesPriorEmploymentId"
+      },
+      {
+        "name": "employer",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "start_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "reason_for_leaving",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 OVERLAP"
+  },
+  {
+    "key": "hr.employee_records.delete.hr.employees.id.prior.employment.rid",
+    "label": "Delete one of an employee's (employee:read / employee:update) prior employment",
+    "method": "DELETE",
+    "path": "/hr/employees/:id/prior-employment/:rid",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "employeesXId"
+      },
+      {
+        "name": "rid",
+        "where": "path",
+        "required": true,
+        "ref": "employeesPriorEmploymentId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  }
+];

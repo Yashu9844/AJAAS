@@ -3261,6 +3261,292 @@ paths:
       security: [{BearerAuth: []}, {TenantSubdomain: []}]
       responses:
         '200': {description: 'Processed/skipped counts', content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/employees/me/emergency-contacts:
+    get:
+      summary: 'List my emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+    post:
+      summary: 'Add to my emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EmergencyContactInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT / OVERLAP'}
+  /hr/employees/me/emergency-contacts/{rid}:
+    put:
+      summary: 'Replace one of my emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EmergencyContactInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OVERLAP'}
+    delete:
+      summary: 'Delete one of my emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/employees/me/education:
+    get:
+      summary: 'List my education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+    post:
+      summary: 'Add to my education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EducationInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT / OVERLAP'}
+  /hr/employees/me/education/{rid}:
+    put:
+      summary: 'Replace one of my education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EducationInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OVERLAP'}
+    delete:
+      summary: 'Delete one of my education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/employees/me/prior-employment:
+    get:
+      summary: 'List my prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+    post:
+      summary: 'Add to my prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PriorEmploymentInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT / OVERLAP'}
+  /hr/employees/me/prior-employment/{rid}:
+    put:
+      summary: 'Replace one of my prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PriorEmploymentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OVERLAP'}
+    delete:
+      summary: 'Delete one of my prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/employees/{id}/emergency-contacts:
+    get:
+      summary: 'List an employee''s (employee:read / employee:update) emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+    post:
+      summary: 'Add to an employee''s (employee:read / employee:update) emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EmergencyContactInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT / OVERLAP'}
+  /hr/employees/{id}/emergency-contacts/{rid}:
+    put:
+      summary: 'Replace one of an employee''s (employee:read / employee:update) emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EmergencyContactInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OVERLAP'}
+    delete:
+      summary: 'Delete one of an employee''s (employee:read / employee:update) emergency contacts'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/employees/{id}/education:
+    get:
+      summary: 'List an employee''s (employee:read / employee:update) education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+    post:
+      summary: 'Add to an employee''s (employee:read / employee:update) education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EducationInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT / OVERLAP'}
+  /hr/employees/{id}/education/{rid}:
+    put:
+      summary: 'Replace one of an employee''s (employee:read / employee:update) education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EducationInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OVERLAP'}
+    delete:
+      summary: 'Delete one of an employee''s (employee:read / employee:update) education'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/employees/{id}/prior-employment:
+    get:
+      summary: 'List an employee''s (employee:read / employee:update) prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+    post:
+      summary: 'Add to an employee''s (employee:read / employee:update) prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PriorEmploymentInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT / OVERLAP'}
+  /hr/employees/{id}/prior-employment/{rid}:
+    put:
+      summary: 'Replace one of an employee''s (employee:read / employee:update) prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PriorEmploymentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OVERLAP'}
+    delete:
+      summary: 'Delete one of an employee''s (employee:read / employee:update) prior employment'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/employees/me/change-requests:
+    post:
+      summary: 'Request a name, address or bank change (approval required)'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChangeRequestInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT (one open request per type)'}
+    get:
+      summary: 'My change requests (bank numbers masked)'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [submitted, approved, rejected, cancelled]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/employees/me/change-requests/{rid}/cancel:
+    post:
+      summary: 'Cancel my submitted request'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE'}
+  /hr/employee-change-requests:
+    get:
+      summary: 'Approval queue (employee:approve_changes)'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [submitted, approved, rejected, cancelled]}}, {name: type, in: query, schema: {type: string, enum: [name, address, bank]}}, {name: employee_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/employee-change-requests/{rid}:
+    get:
+      summary: 'Get a change request (employee:approve_changes)'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/employee-change-requests/{rid}/approve:
+    post:
+      summary: 'Approve a change request; never your own (employee:approve_changes)'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'EMPLOYEE_SELF_APPROVAL'}
+        '409': {description: 'REQUEST_STATE'}
+  /hr/employee-change-requests/{rid}/reject:
+    post:
+      summary: 'Reject a change request; never your own (employee:approve_changes)'
+      tags: [Employee records]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: rid, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'EMPLOYEE_SELF_APPROVAL'}
+        '409': {description: 'REQUEST_STATE'}
 components:
   securitySchemes:
     BearerAuth:
@@ -4339,3 +4625,24 @@ components:
     CoreActionEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
     CoreWorkerEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
     CorePlanEnvelope: {$ref: '#/components/schemas/CoreObjectEnvelope'}
+    EmergencyContactInput:
+      type: object
+      required: [name, relationship, phone]
+      properties: {name: {type: string, maxLength: 150}, relationship: {type: string, maxLength: 50}, phone: {type: string, minLength: 5, maxLength: 30}, email: {type: string}, is_primary: {type: boolean}}
+    EducationInput:
+      type: object
+      required: [institution, qualification]
+      properties: {institution: {type: string, maxLength: 200}, qualification: {type: string, maxLength: 150}, field_of_study: {type: string}, start_year: {type: integer}, end_year: {type: integer}, grade: {type: string}}
+    PriorEmploymentInput:
+      type: object
+      required: [employer, title, start_date, end_date]
+      properties: {employer: {type: string, maxLength: 200}, title: {type: string, maxLength: 150}, start_date: {type: string, format: date}, end_date: {type: string, format: date}, reason_for_leaving: {type: string, maxLength: 500}}
+    ChangeRequestInput:
+      type: object
+      required: [type, payload]
+      properties:
+        type: {type: string, enum: [name, address, bank]}
+        reason: {type: string, maxLength: 500}
+        payload:
+          type: object
+          properties: {first_name: {type: string}, last_name: {type: string}, display_name: {type: string}, current_address: {type: string}, permanent_address: {type: string}, bank_name: {type: string}, bank_account_number: {type: string}, bank_routing_swift: {type: string}}

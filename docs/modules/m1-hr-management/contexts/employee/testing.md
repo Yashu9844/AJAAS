@@ -75,3 +75,15 @@ Golden behaviours run in `backend/tests/integration` against the production rout
 | G8 sensitive access | `TestEmployeeStatutoryAndPIIMasking` |
 | G9 status transition | `TestEmployeeStatusStateMachine` |
 | G10 deactivation sync | `TestUserDeactivationConvergesEmployee` |
+
+## Parity evidence (2026-10-21): records and change requests
+
+- Package `internal/hr/employee/records` (migrations hr/000054–000057, up/down/up verified).
+- Unit: the service and HTTP edge are nearly fully covered. Golden suites cover contacts and the single-primary
+  rule, education, prior-employment overlap, change requests (masking, one open request per type, self-approval,
+  apply, cancel, reject), failure injection with rollback, and the HTTP routes and guards. The gorm store is
+  covered by integration.
+- Integration: `TestEmployeeRecordsAndChangeRequests` covers FR-ER001..FR-ER005 and FR-CR001..FR-CR005, including
+  the applied bank change, the timeline entry, isolation and the privacy scan.
+- Console: the employee page has a "Records & change requests" tab (31 generated operations) and scenario
+  `hr.emp.records`.

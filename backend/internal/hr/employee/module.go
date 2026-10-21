@@ -1,12 +1,15 @@
 package employee
 
 import (
+	"time"
+
 	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/hr/employee/api"
 	"github.com/jaas/jaas/internal/hr/employee/controllers"
 	"github.com/jaas/jaas/internal/hr/employee/models"
+	"github.com/jaas/jaas/internal/hr/employee/records"
 	"github.com/jaas/jaas/internal/hr/employee/repositories"
 	employeeRoutes "github.com/jaas/jaas/internal/hr/employee/routes"
 	"github.com/jaas/jaas/internal/hr/employee/services"
@@ -42,6 +45,7 @@ type Module struct {
 	statCtrl *controllers.StatutoryController
 	docCtrl  *controllers.DocumentController
 	tlCtrl   *controllers.TimelineController
+	records  *records.Handler
 }
 
 func NewModule(
@@ -85,6 +89,7 @@ func NewModule(
 		statCtrl:      statCtrl,
 		docCtrl:       docCtrl,
 		tlCtrl:        tlCtrl,
+		records:       records.NewHandler(records.NewService(records.NewStore(db), idp.Audit(), time.Now)),
 	}
 }
 
@@ -97,6 +102,10 @@ func (m *Module) RegisterModels() []interface{} {
 		&models.EmployeeDocument{},
 		&models.EmployeeTimeline{},
 		&models.EmployeeEventsOutbox{},
+		&records.EmergencyContact{},
+		&records.Education{},
+		&records.PriorEmployment{},
+		&records.ChangeRequest{},
 	}
 }
 
@@ -104,6 +113,10 @@ func (m *Module) RegisterModels() []interface{} {
 func (m *Module) RegisterRoutes(router *gin.RouterGroup, idp identityport.HTTP) {
 	employeeRoutes.RegisterRoutes(router, idp, employeeRoutes.Controllers{Employees: m.empCtrl, Statutory: m.statCtrl,
 		Documents: m.docCtrl, Timeline: m.tlCtrl})
+	// Records and change requests (FR-ER, FR-CR).
+	tenant, auth := idp.TenantResolver(), idp.Authenticate()
+	m.records.Register(router.Group("/employees/me", tenant, auth), router.Group("/employees/:id", tenant, auth),
+		router.Group("/employee-change-requests", tenant, auth, idp.Require("employee", "approve_changes")), idp)
 }
 
 func (m *Module) EmployeeService() services.EmployeeService {

@@ -55,6 +55,30 @@ Own employee profiles, employment lifecycle records, personal/contact details, s
 | FR-DOC002 | List documents for employee (tenant-scoped). |
 | FR-DOC003 | Verify document: `POST /employees/{id}/documents/{doc_id}/verify` records `verified_at` and `verified_by` user ID (requires `employee:admin`). |
 
+#### Employee records (FR-ER), HR parity P1, 2026-10-21
+
+Structured records the worker maintains, with an HR view:
+
+| ID | Requirement |
+|---|---|
+| FR-ER001 | Emergency contacts `{name 1–150, relationship 1–50, phone 5–30, email?, is_primary}`, at most 5 per worker. Exactly one is primary when any exist: setting a new primary clears the old one, and the first contact becomes primary. |
+| FR-ER002 | Education `{institution 1–200, qualification 1–150, field_of_study?, start_year?, end_year? (≥ start, ≤ current year + 6), grade?}`. |
+| FR-ER003 | Prior employment `{employer 1–200, title 1–150, start_date, end_date ≥ start (≤ today), reason_for_leaving? ≤ 500}`. Periods may not overlap (409 `OVERLAP`). |
+| FR-ER004 | Self-service CRUD under `/employees/me/{emergency-contacts\|education\|prior-employment}`. HR reads under `/employees/{id}/…` (`employee:read`) and writes with `employee:update`. Foreign ids → 404. |
+| FR-ER005 | Records carry no compensation. Audit and events hold ids only. |
+
+#### Personal-data change requests (FR-CR), HR parity P1, 2026-10-21
+
+Sensitive self-service changes go through approval (HR-013), so a compromised login cannot silently redirect pay.
+
+| ID | Requirement |
+|---|---|
+| FR-CR001 | Types and payloads:<br>- `name {first_name, last_name, display_name?}`<br>- `address {current_address?, permanent_address?}`, with at least one address<br>- `bank {bank_name, bank_account_number 6–34 alphanumeric, bank_routing_swift 4–20}`<br>The request also carries a `reason?`. |
+| FR-CR002 | A worker submits for themselves (`POST /employees/me/change-requests`). At most one `submitted` request per type (409 `CONFLICT`). The worker may cancel while it is submitted. |
+| FR-CR003 | Approvers hold `employee:approve_changes`. They list (`GET /employee-change-requests?status&type&employee_id`), read, approve or reject (with a comment). An approver can never decide their own request (403 `EMPLOYEE_SELF_APPROVAL`). Only submitted requests can be decided (409 `REQUEST_STATE`). |
+| FR-CR004 | Approving applies the payload in the same transaction: the name goes to the profile, addresses to the contact record, and bank details to the statutory record. A timeline entry `personal_data_changed:<type>` is written. |
+| FR-CR005 | Bank account numbers in responses are masked (`****1234`) unless the caller holds `employee:read_sensitive`. Audit and events (`employee.change_request.submitted\|approved\|rejected`) carry ids and the type only. |
+
 #### Milestone Timeline (FR-TL)
 
 | ID | Requirement |

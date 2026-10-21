@@ -18,6 +18,8 @@ func Catalogue() []access.PermissionDef {
 			Defaults: map[string]access.Scope{access.TemplateHRAdmin: access.ScopeTenant}},
 		{Module: "hr", Resource: "employee", Action: "update_sensitive", Description: "Edit statutory / bank details", Sensitive: true,
 			Defaults: map[string]access.Scope{access.TemplateHRAdmin: access.ScopeTenant}},
+		{Module: "hr", Resource: "employee", Action: "approve_changes", Description: "Approve or reject personal-data change requests (name, address, bank)", Sensitive: true,
+			Defaults: map[string]access.Scope{access.TemplateHRAdmin: access.ScopeTenant}},
 		{Module: "hr", Resource: "employee", Action: "admin", Description: "Verify employee documents and administer employees", Sensitive: false,
 			Defaults: map[string]access.Scope{access.TemplateHRAdmin: access.ScopeTenant}},
 	}

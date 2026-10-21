@@ -17,7 +17,9 @@ func TestPerformanceCalibrationAndFeedback(t *testing.T) {
 	cid := cy.str("data.id")
 	expect(t, tc.do(t, "POST", "/hr/performance/cycles/"+cid+"/activate"), 200, "activate")
 	expect(t, tc.as(t, alice.tok, "POST", "/hr/performance/goals", body(map[string]any{"cycle_id": cid, "title": "Goal", "weight": 50})), 201, "goal")
-	calib := func(tok string, b map[string]any) resp { return tc.as(t, tok, "POST", "/hr/performance/cycles/"+cid+"/calibrations", body(b)) }
+	calib := func(tok string, b map[string]any) resp {
+		return tc.as(t, tok, "POST", "/hr/performance/cycles/"+cid+"/calibrations", body(b))
+	}
 	cb := map[string]any{"employee_id": alice.emp, "overall_score": 4.25, "reason": "SECRET-REASON calibration session"}
 	expectErr(t, calib(tc.token, cb), 409, "CYCLE_STATE", "G16 not in review")
 	expect(t, tc.do(t, "POST", "/hr/performance/cycles/"+cid+"/launch-reviews"), 200, "launch")
@@ -46,7 +48,9 @@ func TestPerformanceCalibrationAndFeedback(t *testing.T) {
 	}
 
 	// G18/G19 continuous feedback.
-	give := func(tok string, b map[string]any) resp { return tc.as(t, tok, "POST", "/hr/performance/feedback", body(b)) }
+	give := func(tok string, b map[string]any) resp {
+		return tc.as(t, tok, "POST", "/hr/performance/feedback", body(b))
+	}
 	expect(t, give(bob.tok, map[string]any{"to_employee_id": alice.emp, "kind": "praise", "visibility": "public", "message": "SECRET-MESSAGE great launch"}), 201, "public praise")
 	expectErr(t, give(bob.tok, map[string]any{"to_employee_id": alice.emp, "kind": "constructive", "visibility": "public", "message": "x"}), 400, "VALIDATION_ERROR", "G18 public constructive")
 	reqs := tc.as(t, alice.tok, "POST", "/hr/performance/feedback/requests", body(map[string]any{"responder_employee_ids": []string{bob.emp}, "question": "SECRET-QUESTION how was it?"}))

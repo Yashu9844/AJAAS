@@ -21,3 +21,13 @@
 ### 2026-10-06 — hardening pass (branch `fix/module-0-2-hardening`)
 Verification-console findings fixed and pinned by tests; full list in the hardening report in `docs/modules/m0-identity-access/testing.md`. Highlights: PII unmask requires employee:read_sensitive (audited), status state machine + exit/confirmation effects, synchronous user-deactivation convergence (FR-EV001), emergency-contact validation, document verify ownership, statutory upsert fix.
 Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pass; coverage 86.5 % (services 93-97 %); migrations up/down/up clean.
+
+### 2026-10-21 — records and change requests (HR parity P1)
+- DE-R1: Name, address and bank changes from self-service go through approval (FR-CR). The existing
+  `PATCH /employees/me` keeps phone and emergency contacts only, so a stolen session cannot redirect pay silently.
+- DE-R2: Approval needs a new `employee:approve_changes` permission (default `hr_admin`). Approvers can never
+  decide their own request.
+- DE-R3: Structured emergency contacts live in their own table (FR-ER001). The legacy JSONB field on the contact
+  record remains for compatibility.
+- DE-R4: Prior-employment periods are kept non-overlapping by a `btree_gist` exclusion constraint as well as the
+  service.

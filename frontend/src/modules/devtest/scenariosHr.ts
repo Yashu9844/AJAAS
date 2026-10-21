@@ -262,6 +262,48 @@ export const S_RECRUITMENT: Scenario[] = [
 
 const isoDay = (offset: number) => ymd(addDays(new Date(), offset));
 
+export const S_EMPLOYEE_RECORDS: Scenario[] = [
+  {
+    key: "hr.emp.records",
+    module: 2,
+    title: "Records and approval-gated change requests (FR-ER, FR-CR)",
+    description:
+      "A fresh worker maintains emergency contacts (single primary), education and prior employment (no overlaps), then asks for a bank change: the number is masked, a second request is refused, the worker cannot approve, an approver with employee:approve_changes approves and the bank details are applied.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const w = await member(r, A, uid, "rec");
+      const me = (method: "GET" | "POST" | "PUT" | "DELETE", path: string, b?: unknown) => tn(w.S, method, `/hr/employees/me${path}`, b);
+      await r.call("First emergency contact is primary", me("POST", "/emergency-contacts", { name: "Asha", relationship: "Mother", phone: "+919800000001" }), 201, (e) =>
+        getPath(e.resBody, "data.is_primary") === true ? null : "not primary",
+      );
+      await r.call("New primary replaces it", me("POST", "/emergency-contacts", { name: "Ravi", relationship: "Brother", phone: "+919800000002", is_primary: true }), 201);
+      await r.call("Exactly one primary, listed first", me("GET", "/emergency-contacts"), 200, (e) => {
+        const rows = list(e);
+        return rows.length === 2 && rows[0].name === "Ravi" && rows.filter((x) => x.is_primary).length === 1 ? null : "primary mismatch";
+      });
+      await r.call("Education", me("POST", "/education", { institution: "IIT Madras", qualification: "B.Tech", start_year: 2012, end_year: 2016 }), 201);
+      await r.call("Prior employment", me("POST", "/prior-employment", { employer: "Acme", title: "Engineer", start_date: "2016-07-01", end_date: "2020-06-30" }), 201);
+      await r.call("Overlapping period → 409 OVERLAP", me("POST", "/prior-employment", { employer: "Beta", title: "SE", start_date: "2020-01-01", end_date: "2021-01-01" }), 409);
+      await r.call("HR reads the worker's education", tn(A, "GET", `/hr/employees/${w.empId}/education`), 200, (e) => (list(e).length === 1 ? null : "expected 1"));
+      const cr = await r.call("Bank change request (number masked)", me("POST", "/change-requests", { type: "bank", reason: "salary account moved",
+        payload: { bank_name: "HDFC", bank_account_number: "50100123456789", bank_routing_swift: "HDFC0001234" } }), 201, (e) =>
+        str(e, "data.payload.bank_account_number") === "****6789" ? null : "not masked",
+      );
+      await r.call("Second open bank request → 409", me("POST", "/change-requests", { type: "bank",
+        payload: { bank_name: "SBI", bank_account_number: "12345678", bank_routing_swift: "SBIN0000001" } }), 409);
+      await r.call("Worker cannot open the approval queue → 403", tn(w.S, "GET", "/hr/employee-change-requests"), 403);
+      const approver = await limited(r, A, uid, "rap", [["employee", "approve_changes"]]);
+      await r.call("Approver approves", tn(approver, "POST", `/hr/employee-change-requests/${str(cr, "data.id")}/approve`, { comment: "verified" }), 200, (e) =>
+        str(e, "data.status") === "approved" ? null : "not approved",
+      );
+      await r.call("Deciding again → 409 REQUEST_STATE", tn(approver, "POST", `/hr/employee-change-requests/${str(cr, "data.id")}/reject`), 409);
+      await r.call("Bank details applied (statutory, masked read)", tn(A, "GET", `/hr/employees/${w.empId}/statutory`), 200, (e) =>
+        str(e, "data.bank_name") === "HDFC" ? null : "bank not applied",
+      );
+    },
+  },
+];
+
 export const S_CORE: Scenario[] = [
   {
     key: "hr.core.flow",

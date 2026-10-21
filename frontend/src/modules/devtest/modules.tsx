@@ -4,7 +4,9 @@ import { Checklist, OpGroup, ScenarioCard, SessionBox } from "./components";
 import { S0 } from "./scenarios0";
 import { S0_ACCESS } from "./scenariosAccess";
 import { S1 } from "./scenarios1";
+import { HR_EMPLOYEE_RECORDS } from "./generated/hrSpecs";
 import { S2 } from "./scenarios2";
+import { S_EMPLOYEE_RECORDS } from "./scenariosHr";
 import { Tabs } from "./shell";
 import { useDevStore } from "./store";
 import {
@@ -136,7 +138,8 @@ export function Module2() {
           { id: "emp", label: "Employees", body: <OpGroup title="Employee profiles" ops={M2_EMP} /> },
           { id: "stat", label: "Statutory & bank", body: <OpGroup title="Statutory / bank" ops={M2_STAT} /> },
           { id: "doc", label: "Documents & timeline", body: <OpGroup title="Documents & timeline" ops={M2_DOC} /> },
-          { id: "sc", label: "Scenarios (automated)", body: <Scenarios list={S2} /> },
+          { id: "rec", label: "Records & change requests", body: <OpGroup title="Emergency contacts, education, prior employment, change requests" ops={HR_EMPLOYEE_RECORDS} /> },
+          { id: "sc", label: "Scenarios (automated)", body: <Scenarios list={[...S2, ...S_EMPLOYEE_RECORDS]} /> },
           { id: "ck", label: "Checklist", body: <Checklist title="MODULE 2" items={CHECKLIST[2]} /> },
         ]}
       />

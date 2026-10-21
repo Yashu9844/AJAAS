@@ -8,7 +8,7 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 | Context | Backend | Test console | Notes |
 |---|---|---|---|
 | organization | done (28 ops incl. locations, 2026-10-20) | `/dev-test/hr/organization` (Locations tab, `s1.loc`) | |
-| employee | done (14 ops) | `/dev-test/hr/employee` | |
+| employee | done (14 + 31 parity ops, 2026-10-21) | `/dev-test/hr/employee` (records tab, `hr.emp.records`) | |
 | attendance | done (19 ops) | `/dev-test/hr/attendance`, 3 scenarios | |
 | leave | done (20 ops) | `/dev-test/hr/leave`, 2 scenarios | |
 | payroll | done (20 ops) | `/dev-test/hr/payroll`, 2 scenarios | |
