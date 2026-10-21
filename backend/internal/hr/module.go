@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/hr/attendance"
+	"github.com/jaas/jaas/internal/hr/compensation"
 	"github.com/jaas/jaas/internal/hr/core"
 	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/hr/identityport"
@@ -48,6 +49,7 @@ type Module struct {
 	recruitment *recruitment.Module
 	performance *performance.Module
 	core        *core.Module
+	comp        *compensation.Module
 }
 
 // New builds and prepares every HR context.
@@ -64,6 +66,8 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	m.performance = performance.NewModule(o.DB, performance.Ports{Employees: emp, Managers: m.org, Audit: o.Identity.Audit(), Publisher: o.Publisher})
 	m.core = core.NewModule(o.DB, core.Ports{Employees: emp, Lifecycle: m.employee.Lifecycle(), Org: m.org, Logins: o.Identity.Users(),
 		Audit: o.Identity.Audit(), Publisher: o.Publisher})
+	m.comp = compensation.NewModule(o.DB, compensation.Ports{Employees: emp, Core: m.core.Directory(), Ratings: m.performance.Ratings(),
+		Payroll: m.payroll.CTC(), Audit: o.Identity.Audit()})
 
 	// FR-M005 / FR-EV001: deactivating a login converges org mappings and the employee profile in the same transaction.
 	o.Identity.OnUserDeactivated(m.org.UserDeactivationConverger())
@@ -85,7 +89,7 @@ func (m *Module) migrate() error {
 	}
 	var all []interface{}
 	for _, ms := range [][]interface{}{m.org.RegisterModels(), m.employee.RegisterModels(), m.attendance.RegisterModels(),
-		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels()} {
+		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels(), m.comp.RegisterModels()} {
 		all = append(all, ms...)
 	}
 	if err := m.o.DB.AutoMigrate(all...); err != nil {
@@ -99,7 +103,7 @@ func (m *Module) registerPermissions(ctx context.Context) error {
 	for name, defs := range map[string][]access.PermissionDef{
 		"organization": organization.Catalogue(), "employee": employee.Catalogue(), "attendance": attendance.Catalogue(),
 		"leave": leave.Catalogue(), "payroll": payroll.Catalogue(), "recruitment": recruitment.Catalogue(),
-		"performance": performance.Catalogue(), "core": core.Catalogue(),
+		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(),
 	} {
 		if err := m.o.Identity.RegisterPermissions(ctx, defs); err != nil {
 			return fmt.Errorf("%s permission catalogue: %w", name, err)
@@ -132,6 +136,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	m.recruitment.RegisterRoutes(rg, recruitment.RouteDeps{Identity: idp})
 	m.performance.RegisterRoutes(rg, performance.RouteDeps{Identity: idp})
 	m.core.RegisterRoutes(rg, core.RouteDeps{Identity: idp})
+	m.comp.RegisterRoutes(rg, idp)
 }
 
 // roleFacts adapts HR/Employee and HR/Organization to identityport.RoleFacts: employees hold the automatic Employee

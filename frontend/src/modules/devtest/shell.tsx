@@ -11,6 +11,7 @@ const NAV = [
   { href: "/dev-test", label: "Overview / Checklist" },
   { href: "/dev-test/identity", label: "M0 — Identity & Access" },
   { href: "/dev-test/hr/core", label: "M1 HR — Core HCM" },
+  { href: "/dev-test/hr/compensation", label: "M1 HR — Compensation" },
   { href: "/dev-test/hr/organization", label: "M1 HR — Organization" },
   { href: "/dev-test/hr/employee", label: "M1 HR — Employee" },
   { href: "/dev-test/hr/attendance", label: "M1 HR — Attendance & Time" },

@@ -146,7 +146,7 @@ restricted visibility).
 **Golden candidates:** duplicate hire event creates one checklist; blocking task holds completion; final settlement not
 released before clearance; employee cannot see exit-interview answers of others.
 
-## 6. Context `compensation` (planned)
+## 6. Context `compensation` (built 2026-10-21; detail in `contexts/compensation/`)
 
 **Entities (proposed):** `PayGrade` (grade, currency, min/mid/max annual amounts, effective-dated), `CompensationPlan`
 (kind `salary|allowance|bonus_target`), `CompensationRecord` (worker, annual base, plan, effective-dated, reason

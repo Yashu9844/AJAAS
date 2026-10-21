@@ -55,6 +55,9 @@ func (s *ActionService) Approve(ctx context.Context, a Actor, id uuid.UUID, req 
 		if err := s.Repo.Save(ctx, tx, act); err != nil {
 			return err
 		}
+		if err := s.runHooks(ctx, tx, act, false); err != nil {
+			return err
+		}
 		row, err = s.actionEvent(ctx, tx, a, act, events.ActionCompleted)
 		return err
 	})
@@ -125,6 +128,9 @@ func (s *ActionService) Rescind(ctx context.Context, a Actor, id uuid.UUID, req 
 		now := s.Now().UTC()
 		act.Status, act.RescindedAt, act.RescindReason, act.UpdatedAt = lifecycle.Rescinded, &now, &reason, now
 		if err := s.Repo.Save(ctx, tx, act); err != nil {
+			return err
+		}
+		if err := s.runHooks(ctx, tx, act, true); err != nil {
 			return err
 		}
 		row, err = s.actionEvent(ctx, tx, a, act, events.ActionRescinded)

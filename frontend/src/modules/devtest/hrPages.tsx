@@ -1,8 +1,8 @@
 "use client";
 import { Checklist, OpGroup, ScenarioCard } from "./components";
-import { HR_ATTENDANCE, HR_CORE, HR_LEAVE, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
+import { HR_ATTENDANCE, HR_COMPENSATION, HR_CORE, HR_LEAVE, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
 import type { Scenario } from "./runner";
-import { S_ATTENDANCE, S_CORE, S_LEAVE, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
+import { S_ATTENDANCE, S_COMPENSATION, S_CORE, S_LEAVE, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
 import { Tabs } from "./shell";
 import type { ChecklistItem, OpSpec } from "./types";
 
@@ -74,6 +74,7 @@ export const HR_CHECKLISTS: Record<string, ChecklistItem[]> = {
   recruitment: items(S_RECRUITMENT),
   performance: items(S_PERFORMANCE),
   core: items(S_CORE),
+  compensation: items(S_COMPENSATION),
 };
 
 export function HrPerformance() {
@@ -144,6 +145,18 @@ export function HrCore() {
       ops={HR_CORE}
       scenarios={S_CORE}
       checklist={HR_CHECKLISTS.core}
+    />
+  );
+}
+
+export function HrCompensation() {
+  return (
+    <ContextPage
+      title="HR / Compensation"
+      intro="Pay ranges per grade, effective-dated base pay synced to payroll, off-cycle changes with maker-checker (raises above 10% need compensation:approve, never your own) and merit cycles with guidelines, budgets and manager proposals. /me for everyone."
+      ops={HR_COMPENSATION}
+      scenarios={S_COMPENSATION}
+      checklist={HR_CHECKLISTS.compensation}
     />
   );
 }

@@ -3547,6 +3547,237 @@ paths:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
         '403': {description: 'EMPLOYEE_SELF_APPROVAL'}
         '409': {description: 'REQUEST_STATE'}
+  /hr/compensation/pay-ranges:
+    post:
+      summary: 'Create a pay range for a core grade; closes the open one (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompPayRangeInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND (grade)'}
+        '409': {description: 'INACTIVE_REFERENCE / BACKDATED'}
+    get:
+      summary: 'List pay ranges (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: grade_id, in: query, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/compensation/changes:
+    post:
+      summary: 'Request an off-cycle change; first records and raises up to 10%% apply at once (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompChangeInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+        '409': {description: 'CONFLICT / NO_CHANGE / BACKDATED'}
+    get:
+      summary: 'List off-cycle changes (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [pending, approved, rejected, cancelled]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/compensation/changes/{id}:
+    get:
+      summary: 'Get an off-cycle change (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/compensation/changes/{id}/approve:
+    post:
+      summary: 'Approve a pending change (compensation:approve; never your own)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'COMP_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CHANGE_STATE / BACKDATED'}
+  /hr/compensation/changes/{id}/reject:
+    post:
+      summary: 'Reject a pending change (compensation:approve; never your own)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'COMP_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CHANGE_STATE / BACKDATED'}
+  /hr/compensation/changes/{id}/cancel:
+    post:
+      summary: 'Cancel a pending change (the requester or compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'COMP_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CHANGE_STATE / BACKDATED'}
+  /hr/compensation/workers/{id}:
+    get:
+      summary: 'A worker''s current pay, compa-ratio, history and pending changes (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+  /hr/compensation/me:
+    get:
+      summary: 'My compensation'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+  /hr/compensation/merit-cycles:
+    post:
+      summary: 'Create a draft merit cycle (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompCycleInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    get:
+      summary: 'List merit cycles (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [draft, open, in_review, approved, applied]}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/compensation/merit-cycles/{id}:
+    get:
+      summary: 'Get a merit cycle (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit a draft merit cycle (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompCycleInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE'}
+  /hr/compensation/merit-cycles/{id}/budgets:
+    put:
+      summary: 'Replace department budgets of a draft cycle (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompBudgetsInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '409': {description: 'CYCLE_STATE'}
+    get:
+      summary: 'Department budgets (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/compensation/merit-cycles/{id}/open:
+    post:
+      summary: 'Open the cycle and snapshot proposals (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'COMP_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE'}
+  /hr/compensation/merit-cycles/{id}/close:
+    post:
+      summary: 'Close the cycle for review (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'COMP_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE'}
+  /hr/compensation/merit-cycles/{id}/approve:
+    post:
+      summary: 'Approve the cycle; never the opener (compensation:approve)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'COMP_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE'}
+  /hr/compensation/merit-cycles/{id}/apply:
+    post:
+      summary: 'Apply approved increases and sync payroll (compensation:manage)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'COMP_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE'}
+  /hr/compensation/merit-cycles/{id}/usage:
+    get:
+      summary: 'Live budget usage per department (compensation:read)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/compensation/merit-cycles/{id}/proposals:
+    get:
+      summary: 'Proposals: all for compensation:read, else those I manage while open or in review'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/compensation/merit-cycles/{id}/proposals/mine:
+    get:
+      summary: 'Proposals for workers I manage (open or in review only)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/compensation/proposals/{id}:
+    patch:
+      summary: 'Set a proposal''s increase (the worker''s manager or compensation:manage; cycle open)'
+      tags: [Compensation]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompProposalInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR (justification required outside guideline or over budget)'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CYCLE_STATE / BUDGET_EXCEEDED'}
 components:
   securitySchemes:
     BearerAuth:
@@ -4646,3 +4877,33 @@ components:
         payload:
           type: object
           properties: {first_name: {type: string}, last_name: {type: string}, display_name: {type: string}, current_address: {type: string}, permanent_address: {type: string}, bank_name: {type: string}, bank_account_number: {type: string}, bank_routing_swift: {type: string}}
+    CompPayRangeInput:
+      type: object
+      required: [grade_id, min_amount, mid_amount, max_amount, effective_from]
+      properties: {grade_id: {type: string, format: uuid}, min_amount: {type: number}, mid_amount: {type: number}, max_amount: {type: number}, effective_from: {type: string, format: date}}
+    CompChangeInput:
+      type: object
+      required: [employee_id, annual_base, effective_from, reason]
+      properties: {employee_id: {type: string, format: uuid}, annual_base: {type: number}, effective_from: {type: string, format: date}, reason: {type: string, enum: [hire, promotion, market, correction]}, comment: {type: string, maxLength: 1000}}
+    CompCycleInput:
+      type: object
+      properties:
+        name: {type: string, maxLength: 150}
+        effective_date: {type: string, format: date}
+        performance_cycle_id: {type: string, description: 'UUID, or empty to clear'}
+        guidelines:
+          type: array
+          items:
+            type: object
+            required: [rating, compa, min_pct, max_pct]
+            properties: {rating: {type: string, enum: [low, medium, high, unrated]}, compa: {type: string, enum: [below, within, above, unknown]}, min_pct: {type: number}, max_pct: {type: number, maximum: 50}}
+    CompBudgetsInput:
+      type: array
+      items:
+        type: object
+        required: [department_id, amount]
+        properties: {department_id: {type: string, format: uuid}, amount: {type: number, minimum: 0}}
+    CompProposalInput:
+      type: object
+      required: [increase_pct]
+      properties: {increase_pct: {type: number, minimum: 0, maximum: 50}, justification: {type: string, maxLength: 1000}, override_budget: {type: boolean}}

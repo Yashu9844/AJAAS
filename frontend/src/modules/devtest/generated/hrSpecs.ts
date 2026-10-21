@@ -4949,6 +4949,632 @@ export const HR_CORE: OpSpec[] = [
   }
 ];
 
+export const HR_COMPENSATION: OpSpec[] = [
+  {
+    "key": "hr.compensation.post.hr.compensation.changes",
+    "label": "Request an off-cycle change; first records and raises up to 10%% apply at once (compensation:manage)",
+    "method": "POST",
+    "path": "/hr/compensation/changes",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "annual_base",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "effective_from",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "hire",
+          "promotion",
+          "market",
+          "correction"
+        ],
+        "required": true
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "compensationChangesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 EMPLOYEE_NOT_FOUND; 409 CONFLICT / NO_CHANGE / BACKDATED"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.changes",
+    "label": "List off-cycle changes (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/changes",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "approved",
+          "rejected",
+          "cancelled"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.changes.id",
+    "label": "Get an off-cycle change (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/changes/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationChangesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.changes.id.approve",
+    "label": "Approve a pending change (compensation:approve; never your own)",
+    "method": "POST",
+    "path": "/hr/compensation/changes/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationChangesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 COMP_SELF_APPROVAL; 404 NOT_FOUND; 409 CHANGE_STATE / BACKDATED"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.changes.id.cancel",
+    "label": "Cancel a pending change (the requester or compensation:manage)",
+    "method": "POST",
+    "path": "/hr/compensation/changes/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationChangesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 COMP_SELF_APPROVAL; 404 NOT_FOUND; 409 CHANGE_STATE / BACKDATED"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.changes.id.reject",
+    "label": "Reject a pending change (compensation:approve; never your own)",
+    "method": "POST",
+    "path": "/hr/compensation/changes/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationChangesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 COMP_SELF_APPROVAL; 404 NOT_FOUND; 409 CHANGE_STATE / BACKDATED"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.me",
+    "label": "My compensation",
+    "method": "GET",
+    "path": "/hr/compensation/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.merit.cycles",
+    "label": "Create a draft merit cycle (compensation:manage)",
+    "method": "POST",
+    "path": "/hr/compensation/merit-cycles",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "effective_date",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "performance_cycle_id",
+        "where": "body",
+        "placeholder": "UUID, or empty to clear"
+      },
+      {
+        "name": "guidelines",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "compensationMeritCyclesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.merit.cycles",
+    "label": "List merit cycles (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/merit-cycles",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "draft",
+          "open",
+          "in_review",
+          "approved",
+          "applied"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.merit.cycles.id",
+    "label": "Get a merit cycle (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/merit-cycles/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.compensation.patch.hr.compensation.merit.cycles.id",
+    "label": "Edit a draft merit cycle (compensation:manage)",
+    "method": "PATCH",
+    "path": "/hr/compensation/merit-cycles/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "effective_date",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "performance_cycle_id",
+        "where": "body",
+        "placeholder": "UUID, or empty to clear"
+      },
+      {
+        "name": "guidelines",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CYCLE_STATE"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.merit.cycles.id.apply",
+    "label": "Apply approved increases and sync payroll (compensation:manage)",
+    "method": "POST",
+    "path": "/hr/compensation/merit-cycles/:id/apply",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 COMP_SELF_APPROVAL; 404 NOT_FOUND; 409 CYCLE_STATE"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.merit.cycles.id.approve",
+    "label": "Approve the cycle; never the opener (compensation:approve)",
+    "method": "POST",
+    "path": "/hr/compensation/merit-cycles/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 COMP_SELF_APPROVAL; 404 NOT_FOUND; 409 CYCLE_STATE"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.merit.cycles.id.budgets",
+    "label": "Department budgets (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/merit-cycles/:id/budgets",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.compensation.put.hr.compensation.merit.cycles.id.budgets",
+    "label": "Replace department budgets of a draft cycle (compensation:manage)",
+    "method": "PUT",
+    "path": "/hr/compensation/merit-cycles/:id/budgets",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 409 CYCLE_STATE"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.merit.cycles.id.close",
+    "label": "Close the cycle for review (compensation:manage)",
+    "method": "POST",
+    "path": "/hr/compensation/merit-cycles/:id/close",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 COMP_SELF_APPROVAL; 404 NOT_FOUND; 409 CYCLE_STATE"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.merit.cycles.id.open",
+    "label": "Open the cycle and snapshot proposals (compensation:manage)",
+    "method": "POST",
+    "path": "/hr/compensation/merit-cycles/:id/open",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 COMP_SELF_APPROVAL; 404 NOT_FOUND; 409 CYCLE_STATE"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.merit.cycles.id.proposals",
+    "label": "Proposals: all for compensation:read, else those I manage while open or in review",
+    "method": "GET",
+    "path": "/hr/compensation/merit-cycles/:id/proposals",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.merit.cycles.id.proposals.mine",
+    "label": "Proposals for workers I manage (open or in review only)",
+    "method": "GET",
+    "path": "/hr/compensation/merit-cycles/:id/proposals/mine",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.merit.cycles.id.usage",
+    "label": "Live budget usage per department (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/merit-cycles/:id/usage",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationMeritCyclesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.compensation.post.hr.compensation.pay.ranges",
+    "label": "Create a pay range for a core grade; closes the open one (compensation:manage)",
+    "method": "POST",
+    "path": "/hr/compensation/pay-ranges",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "grade_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "min_amount",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "mid_amount",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "max_amount",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "effective_from",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "compensationPayRangesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND (grade); 409 INACTIVE_REFERENCE / BACKDATED"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.pay.ranges",
+    "label": "List pay ranges (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/pay-ranges",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "grade_id",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.compensation.patch.hr.compensation.proposals.id",
+    "label": "Set a proposal's increase (the worker's manager or compensation:manage; cycle open)",
+    "method": "PATCH",
+    "path": "/hr/compensation/proposals/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationProposalsId"
+      },
+      {
+        "name": "increase_pct",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "justification",
+        "where": "body"
+      },
+      {
+        "name": "override_budget",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR (justification required outside guideline or over budget); 404 NOT_FOUND; 409 CYCLE_STATE / BUDGET_EXCEEDED"
+  },
+  {
+    "key": "hr.compensation.get.hr.compensation.workers.id",
+    "label": "A worker's current pay, compa-ratio, history and pending changes (compensation:read)",
+    "method": "GET",
+    "path": "/hr/compensation/workers/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "compensationWorkersId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  }
+];
+
 export const HR_EMPLOYEE_RECORDS: OpSpec[] = [
   {
     "key": "hr.employee_records.get.hr.employee.change.requests",

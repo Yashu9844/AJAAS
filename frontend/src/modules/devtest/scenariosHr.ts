@@ -540,3 +540,75 @@ export const S_PERFORMANCE: Scenario[] = [
     },
   },
 ];
+
+export const S_COMPENSATION: Scenario[] = [
+  {
+    key: "hr.comp",
+    module: "compensation",
+    title: "Pay range → auto and approved changes → merit cycle with guideline, budget and maker-checker (CO-G2–G8)",
+    description:
+      "Hires a fresh worker into a graded seat, sets a pay range, records the first base (applies at once), requests a 30% promotion raise (the requester cannot approve; an approver holding compensation:approve does), checks compa-ratio and the worker's own view, then runs a merit cycle: budgets, open (snapshot), a proposal outside the guideline is refused, one over budget is refused, close, approve by someone other than the opener, apply, apply again is refused.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const coreApprover = await limited(r, A, uid, "kca", [["core", "approve"], ["core", "read"]]);
+      const approver = await limited(r, A, uid, "kap", [["compensation", "approve"], ["compensation", "read"]]);
+      const w = await member(r, A, uid, "kw");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Comp ${uid}`, code: `CP${uid}`.toUpperCase() }), 201);
+      const dept = str(d, "data.id");
+      const fam = await r.call("Job family", tn(A, "POST", "/hr/core/job-families", { code: `KF${uid}`, name: `Comp family ${uid}` }), 201);
+      const g = await r.call("Grade", tn(A, "POST", "/hr/core/grades", { code: `K${uid}`, name: `Comp grade ${uid}`, rank: 50 }), [201, 409]);
+      const grades = await r.call("Grades", tn(A, "GET", "/hr/core/grades"), 200);
+      const grade = str(g, "data.id") || String(list(grades).find((x) => x.code === `K${uid}`)?.id ?? "");
+      const prof = await r.call("Job profile", tn(A, "POST", "/hr/core/job-profiles", { code: `KP${uid}`, title: "Analyst", family_id: str(fam, "data.id"),
+        default_grade_id: grade, category: "staff", probation_days: 0 }), 201);
+      const pos = await r.call("Position", tn(A, "POST", "/hr/core/positions", { code: `KS${uid}`, title: "Analyst seat", job_profile_id: str(prof, "data.id"),
+        department_id: dept }), 201);
+      const h = await r.call("Hire: draft", tn(A, "POST", "/hr/core/actions", { type: "hire", employee_id: w.empId, effective_date: isoDay(-120), reason_code: "console",
+        changes: { position_id: str(pos, "data.id"), worker_type: "employee", employment_type: "full_time" } }), 201);
+      await r.call("Hire: submit", tn(A, "POST", `/hr/core/actions/${str(h, "data.id")}/submit`), 200);
+      await r.call("Hire: approve", tn(coreApprover, "POST", `/hr/core/actions/${str(h, "data.id")}/approve`), 200);
+
+      const B = "/hr/compensation";
+      const rng = { grade_id: grade, min_amount: 800000, mid_amount: 1000000, max_amount: 1200000, effective_from: isoDay(-300) };
+      await r.call("Pay range for the grade", tn(A, "POST", `${B}/pay-ranges`, rng), 201);
+      await r.call("Same start again → 409 BACKDATED", tn(A, "POST", `${B}/pay-ranges`, rng), 409);
+      await r.call("First base applies at once", tn(A, "POST", `${B}/changes`, { employee_id: w.empId, annual_base: 1000000, effective_from: isoDay(-120), reason: "hire" }),
+        201, (e) => (str(e, "data.status") === "approved" ? null : "expected approved"));
+      const big = await r.call("30% raise waits for approval", tn(A, "POST", `${B}/changes`, { employee_id: w.empId, annual_base: 1300000,
+        effective_from: isoDay(-60), reason: "promotion" }), 201, (e) => (str(e, "data.status") === "pending" ? null : "expected pending"));
+      await r.call("Requester approves → 403 COMP_SELF_APPROVAL", tn(A, "POST", `${B}/changes/${str(big, "data.id")}/approve`), 403);
+      await r.call("Approver approves", tn(approver, "POST", `${B}/changes/${str(big, "data.id")}/approve`, { comment: "promotion" }), 200);
+      await r.call("Worker view: 1.30 compa, above range, 2 records", tn(A, "GET", `${B}/workers/${w.empId}`), 200, (e) =>
+        getPath(e.resBody, "data.position.compa_ratio") === 1.3 && str(e, "data.position.compa_band") === "above" && list(e, "data.history").length === 2
+          ? null
+          : "unexpected position",
+      );
+      await r.call("Worker sees own pay (/me)", tn(w.S, "GET", `${B}/me`), 200, (e) =>
+        getPath(e.resBody, "data.current.annual_base") === 1300000 ? null : "expected 1300000",
+      );
+      await r.call("Worker cannot read others → 403", tn(w.S, "GET", `${B}/workers/${w.empId}`), 403);
+
+      const cy = await r.call("Merit cycle (guideline: unrated/above 0–3%)", tn(A, "POST", `${B}/merit-cycles`, { name: `Merit ${uid}`, effective_date: isoDay(10),
+        guidelines: [{ rating: "unrated", compa: "above", min_pct: 0, max_pct: 3 }] }), 201);
+      const cid = str(cy, "data.id");
+      await r.call("Budget 50,000 for the department", tn(A, "PUT", `${B}/merit-cycles/${cid}/budgets`, [{ department_id: dept, amount: 50000 }]), 200);
+      await r.call("Open (snapshot proposals)", tn(A, "POST", `${B}/merit-cycles/${cid}/open`), 200);
+      const props = await r.call("Proposals", tn(A, "GET", `${B}/merit-cycles/${cid}/proposals`), 200);
+      const pid = String(list(props).find((x) => x.employee_id === w.empId)?.id ?? "");
+      await r.call("5% is outside the guideline without justification → 400", tn(A, "PATCH", `${B}/proposals/${pid}`, { increase_pct: 5 }), 400);
+      await r.call("4% with justification exceeds the budget → 409", tn(A, "PATCH", `${B}/proposals/${pid}`, { increase_pct: 4, justification: "star" }), 409);
+      await r.call("3% → 39,000", tn(A, "PATCH", `${B}/proposals/${pid}`, { increase_pct: 3 }), 200, (e) =>
+        getPath(e.resBody, "data.amount") === 39000 ? null : "expected 39000",
+      );
+      await r.call("Live budget usage", tn(A, "GET", `${B}/merit-cycles/${cid}/usage`), 200);
+      await r.call("Close for review", tn(A, "POST", `${B}/merit-cycles/${cid}/close`), 200);
+      await r.call("Opener approves → 403 COMP_SELF_APPROVAL", tn(A, "POST", `${B}/merit-cycles/${cid}/approve`), 403);
+      await r.call("Approver approves the cycle", tn(approver, "POST", `${B}/merit-cycles/${cid}/approve`), 200);
+      await r.call("Apply", tn(A, "POST", `${B}/merit-cycles/${cid}/apply`), 200);
+      await r.call("Apply again → 409 CYCLE_STATE", tn(A, "POST", `${B}/merit-cycles/${cid}/apply`), 409);
+      await r.call("History has the merit record", tn(A, "GET", `${B}/workers/${w.empId}`), 200, (e) =>
+        list(e, "data.history").length === 3 ? null : "expected 3 records",
+      );
+    },
+  },
+];

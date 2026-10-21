@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/hr/performance/api"
 	"github.com/jaas/jaas/internal/hr/performance/controllers"
 	"github.com/jaas/jaas/internal/hr/performance/models"
 	"github.com/jaas/jaas/internal/hr/performance/repositories"
@@ -19,6 +20,7 @@ import (
 type Module struct {
 	controller *controllers.Controller
 	relay      *services.OutboxRelay
+	ratings    *services.RatingsPort
 }
 
 // Ports are the collaborators HR/Performance consumes (design.md connections C2–C4).
@@ -41,7 +43,8 @@ func NewModule(db *gorm.DB, p Ports) *Module {
 	return &Module{
 		controller: controllers.New(controllers.Services{Cycles: services.NewCycleService(deps), Goals: services.NewGoalService(deps),
 			Reviews: services.NewReviewService(deps), Calibrations: services.NewCalibrationService(deps), Feedback: services.NewFeedbackService(deps)}),
-		relay: services.NewOutboxRelay(deps),
+		relay:   services.NewOutboxRelay(deps),
+		ratings: services.NewRatingsPort(deps),
 	}
 }
 
@@ -66,3 +69,6 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 
 // Relay exposes the outbox relay.
 func (m *Module) Relay() *services.OutboxRelay { return m.relay }
+
+// Ratings is the final-rating port the other HR contexts use (performance/api).
+func (m *Module) Ratings() api.Ratings { return m.ratings }

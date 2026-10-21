@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jaas/jaas/internal/hr/payroll/api"
 	"github.com/jaas/jaas/internal/hr/payroll/controllers"
 	"github.com/jaas/jaas/internal/hr/payroll/models"
 	"github.com/jaas/jaas/internal/hr/payroll/repositories"
@@ -20,6 +21,7 @@ type Module struct {
 	db          *gorm.DB
 	controllers routes.Controllers
 	relay       *services.OutboxRelay
+	ctc         *services.CTCPort
 }
 
 // Ports are the cross-module collaborators Module 5 consumes (connections C2–C4).
@@ -45,6 +47,7 @@ func NewModule(db *gorm.DB, p Ports) *Module {
 			Run:   controllers.NewRunController(services.NewRunService(deps), services.NewPayslipService(deps)),
 		},
 		relay: services.NewOutboxRelay(deps),
+		ctc:   services.NewCTCPort(deps),
 	}
 }
 
@@ -69,3 +72,6 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 
 // Relay exposes the outbox relay.
 func (m *Module) Relay() *services.OutboxRelay { return m.relay }
+
+// CTC is the port HR/Compensation uses to set CTC from a date (payroll/api).
+func (m *Module) CTC() api.CTC { return m.ctc }

@@ -65,6 +65,7 @@ type Deps struct {
 	Audit     AuditLogger
 	Publisher queue.EventPublisher
 	Now       Clock
+	Hooks     *Hooks
 }
 
 type gormRunner struct{ db *gorm.DB }
