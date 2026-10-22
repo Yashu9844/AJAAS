@@ -17,6 +17,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/leave"
+	leavePlus "github.com/jaas/jaas/internal/hr/leave/plus"
 	"github.com/jaas/jaas/internal/hr/onboarding"
 	"github.com/jaas/jaas/internal/hr/organization"
 	"github.com/jaas/jaas/internal/hr/payroll"
@@ -63,7 +64,8 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	m.employee = employee.NewModule(o.DB, o.Redis, o.Publisher, o.Logger, o.Identity)
 	emp := m.employee.Directory()
 	m.attendance = attendance.NewModule(o.DB, o.Publisher, emp, o.Identity.Audit())
-	m.leave = leave.NewModule(o.DB, leave.Ports{Employees: emp, Audit: o.Identity.Audit(), Attendance: m.attendance.LeaveSync(), Publisher: o.Publisher})
+	m.leave = leave.NewModule(o.DB, leave.Ports{Employees: emp, Audit: o.Identity.Audit(), Attendance: m.attendance.LeaveSync(), Reports: m.org,
+		Presence: m.attendance.Presence(), Publisher: o.Publisher})
 	m.payroll = payroll.NewModule(o.DB, payroll.Ports{Employees: emp, Leave: m.leave.UnpaidLeave(), Audit: o.Identity.Audit(), Publisher: o.Publisher})
 	m.recruitment = recruitment.NewModule(o.DB, recruitment.Ports{Employees: emp, Users: o.Identity.Users(),
 		Departments: m.org.DepartmentService(), Designations: m.org.DesignationService(), Audit: o.Identity.Audit(), Publisher: o.Publisher})
@@ -76,6 +78,7 @@ func New(ctx context.Context, o Options) (*Module, error) {
 		Payroll: m.payroll.CTC(), Audit: o.Identity.Audit()})
 	m.onb = onboarding.NewModule(o.DB, onboarding.Ports{Employees: emp, Core: m.core.Directory(), Documents: m.employee.Documents(),
 		Audit: o.Identity.Audit()})
+	m.leave.SetLocations(leavePlus.FromCore(m.core.Directory())) // LP-05: employee location for calendars
 	// OB-03: core actions and recruitment hires start onboarding/offboarding inside their own transactions.
 	m.core.OnActionCompleted(m.onb.Service().CoreHook)
 	m.recruitment.OnHired(m.onb.Service().RecruitmentHook)
@@ -134,6 +137,7 @@ func (m *Module) startRelays() {
 	go m.performance.Relay().Run(m.o.Background)
 	go m.core.Relay().Run(m.o.Background)
 	go m.core.RunEffects(m.o.Background)
+	go m.leave.RunCompOffExpiry(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("leave comp-off expiry sweep failed") })
 	go m.attOps.RunAutoAbsent(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("attendance auto-absent sweep failed") })
 }
 

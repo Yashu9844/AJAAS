@@ -29,6 +29,15 @@ type AttendanceSync interface {
 	ClearLeave(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, dates []time.Time) error
 }
 
+// CalendarSource is the leave parity package's contribution to pricing and the leave year (LP-02..LP-05). A nil source
+// keeps the tenant calendar, Saturday/Sunday weekly off and calendar-year leave year.
+type CalendarSource interface {
+	// YearStartMonth returns the month (1–12) in which the tenant's leave year starts.
+	YearStartMonth(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (int, error)
+	// For returns the extra blocked dates of the employee's location in [from, to] and its weekly-off test (nil = default).
+	For(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, from, to time.Time) (holidays []time.Time, weekOff func(time.Time) bool, err error)
+}
+
 // TxRunner opens database transactions; controllers never see *gorm.DB.
 type TxRunner interface {
 	InTx(ctx context.Context, fn func(tx *gorm.DB) error) error
@@ -64,6 +73,7 @@ type Deps struct {
 	Employees  EmployeeDirectory
 	Audit      AuditLogger
 	Attendance AttendanceSync
+	Calendar   CalendarSource
 	Publisher  queue.EventPublisher
 	Now        Clock
 }

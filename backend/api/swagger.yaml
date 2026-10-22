@@ -4091,6 +4091,259 @@ paths:
       security: [{BearerAuth: []}, {TenantSubdomain: []}]
       responses:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/policy:
+    put:
+      summary: 'Save the leave policy: leave-year start month, comp-off type and expiry (leave:manage)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LeavePolicyInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'YEAR_LOCKED / INACTIVE_REFERENCE'}
+    get:
+      summary: 'The leave policy, or the defaults (leave:read)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/location-holidays:
+    post:
+      summary: 'Add a holiday for one organization location (leave:manage)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveLocationHolidayInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'LOCATION_NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'List location holidays of a year (leave:read)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: location_id, in: query, schema: {type: string, format: uuid}}, {name: year, in: query, schema: {type: string}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/location-holidays/{id}:
+    delete:
+      summary: 'Delete a location holiday (leave:manage)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/leave/week-offs:
+    get:
+      summary: 'List per-location weekly-off patterns (leave:read)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/week-offs/{id}:
+    put:
+      summary: 'Set the weekly-off weekdays of a location; {id} is the location (leave:manage)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveWeekOffInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'LOCATION_NOT_FOUND'}
+    delete:
+      summary: 'Remove a location pattern (leave:manage)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/leave/inbox:
+    get:
+      summary: 'Pending leave requests of my direct reports (scope=all needs leave:approve at tenant scope)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: scope, in: query, schema: {type: string, enum: [team, all]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+  /hr/leave/inbox/{id}/approve:
+    post:
+      summary: 'Approve a reports leave request (rules of LV-010)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'LEAVE_NOT_PENDING'}
+  /hr/leave/inbox/{id}/reject:
+    post:
+      summary: 'Reject a reports leave request (rules of LV-010)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'LEAVE_NOT_PENDING'}
+  /hr/leave/team-calendar:
+    get:
+      summary: 'Pending and approved leave of my reports (everyone for leave:read) plus tenant holidays, up to 62 days'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: from, in: query, required: true, schema: {type: string, format: date}}, {name: to, in: query, required: true, schema: {type: string, format: date}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'INVALID_RANGE'}
+  /hr/leave/comp-off:
+    post:
+      summary: 'Request comp-off for work on a holiday or weekly off'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCompOffInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '409': {description: 'COMP_OFF_NOT_CONFIGURED / NOT_A_NON_WORKING_DAY / NO_WORK_RECORDED / CONFLICT'}
+    get:
+      summary: 'List comp-off requests (leave:read)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [pending, approved, rejected, cancelled]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/comp-off/me:
+    get:
+      summary: 'My comp-off requests'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/comp-off/expire:
+    post:
+      summary: 'Debit overdue comp-off credits, never below zero (leave:manage)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/comp-off/{id}/approve:
+    post:
+      summary: 'Approve a comp-off request (the worker''s manager or leave:approve; credits the balance)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE'}
+  /hr/leave/comp-off/{id}/reject:
+    post:
+      summary: 'Reject a comp-off request (comment required)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE'}
+  /hr/leave/comp-off/{id}/cancel:
+    post:
+      summary: 'Cancel a comp-off request (the requester, while pending)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE'}
+  /hr/leave/encashment-rules:
+    get:
+      summary: 'List encashment rules (leave:read)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/encashment-rules/{id}:
+    put:
+      summary: 'Make a leave type encashable; {id} is the leave type (leave:manage)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveEncashmentRuleInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /hr/leave/encashments:
+    post:
+      summary: 'Request to encash leave days'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveEncashInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '409': {description: 'NOT_ENCASHABLE / ENCASH_LIMIT / INSUFFICIENT_BALANCE / CONFLICT'}
+    get:
+      summary: 'List encashment requests (leave:read)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: leave_type_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [pending, approved, rejected, cancelled]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/encashments/me:
+    get:
+      summary: 'My encashment requests'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/leave/encashments/{id}/approve:
+    post:
+      summary: 'Approve an encashment request (the worker''s manager or leave:approve; debits the balance)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE / INSUFFICIENT_BALANCE / ENCASH_LIMIT'}
+  /hr/leave/encashments/{id}/reject:
+    post:
+      summary: 'Reject an encashment request (comment required)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE / INSUFFICIENT_BALANCE / ENCASH_LIMIT'}
+  /hr/leave/encashments/{id}/cancel:
+    post:
+      summary: 'Cancel an encashment request (the requester, while pending)'
+      tags: [Leave operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LeaveCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUEST_STATE / INSUFFICIENT_BALANCE / ENCASH_LIMIT'}
 components:
   securitySchemes:
     BearerAuth:
@@ -5277,3 +5530,30 @@ components:
             type: object
             required: [employee_code, date, punch_in, punch_out]
             properties: {employee_code: {type: string}, date: {type: string, format: date}, punch_in: {type: string, format: date-time}, punch_out: {type: string, format: date-time}}
+    LeavePolicyInput:
+      type: object
+      required: [year_start_month, comp_off_expiry_days]
+      properties: {year_start_month: {type: integer, minimum: 1, maximum: 12}, comp_off_leave_type_id: {type: string, format: uuid}, comp_off_expiry_days: {type: integer, minimum: 1, maximum: 365}}
+    LeaveLocationHolidayInput:
+      type: object
+      required: [location_id, date, name]
+      properties: {location_id: {type: string, format: uuid}, date: {type: string, format: date}, name: {type: string, maxLength: 100}, is_optional: {type: boolean}}
+    LeaveWeekOffInput:
+      type: object
+      required: [week_off_days]
+      properties: {week_off_days: {type: array, items: {type: integer, minimum: 0, maximum: 6}}}
+    LeaveCommentInput:
+      type: object
+      properties: {comment: {type: string, maxLength: 500}}
+    LeaveCompOffInput:
+      type: object
+      required: [worked_date, days, reason]
+      properties: {worked_date: {type: string, format: date}, days: {type: number, enum: [0.5, 1]}, reason: {type: string, maxLength: 500}}
+    LeaveEncashmentRuleInput:
+      type: object
+      required: [max_days_per_year, min_balance_after]
+      properties: {max_days_per_year: {type: number, minimum: 0, maximum: 365}, min_balance_after: {type: number, minimum: 0}}
+    LeaveEncashInput:
+      type: object
+      required: [leave_type_id, days]
+      properties: {leave_type_id: {type: string, format: uuid}, days: {type: number, minimum: 0.5}, reason: {type: string, maxLength: 500}}

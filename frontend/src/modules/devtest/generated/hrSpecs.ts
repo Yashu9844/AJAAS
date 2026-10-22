@@ -1097,6 +1097,370 @@ export const HR_LEAVE: OpSpec[] = [
     "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
   },
   {
+    "key": "hr.leave.post.hr.leave.comp.off",
+    "label": "Request comp-off for work on a holiday or weekly off",
+    "method": "POST",
+    "path": "/hr/leave/comp-off",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "worked_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "days",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "0.5",
+          "1"
+        ],
+        "required": true
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "leaveCompOffId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 409 COMP_OFF_NOT_CONFIGURED / NOT_A_NON_WORKING_DAY / NO_WORK_RECORDED / CONFLICT"
+  },
+  {
+    "key": "hr.leave.get.hr.leave.comp.off",
+    "label": "List comp-off requests (leave:read)",
+    "method": "GET",
+    "path": "/hr/leave/comp-off",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "approved",
+          "rejected",
+          "cancelled"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.post.hr.leave.comp.off.expire",
+    "label": "Debit overdue comp-off credits, never below zero (leave:manage)",
+    "method": "POST",
+    "path": "/hr/leave/comp-off/expire",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.get.hr.leave.comp.off.me",
+    "label": "My comp-off requests",
+    "method": "GET",
+    "path": "/hr/leave/comp-off/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.post.hr.leave.comp.off.id.approve",
+    "label": "Approve a comp-off request (the worker's manager or leave:approve; credits the balance)",
+    "method": "POST",
+    "path": "/hr/leave/comp-off/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveCompOffId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REQUEST_STATE"
+  },
+  {
+    "key": "hr.leave.post.hr.leave.comp.off.id.cancel",
+    "label": "Cancel a comp-off request (the requester, while pending)",
+    "method": "POST",
+    "path": "/hr/leave/comp-off/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveCompOffId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REQUEST_STATE"
+  },
+  {
+    "key": "hr.leave.post.hr.leave.comp.off.id.reject",
+    "label": "Reject a comp-off request (comment required)",
+    "method": "POST",
+    "path": "/hr/leave/comp-off/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveCompOffId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REQUEST_STATE"
+  },
+  {
+    "key": "hr.leave.get.hr.leave.encashment.rules",
+    "label": "List encashment rules (leave:read)",
+    "method": "GET",
+    "path": "/hr/leave/encashment-rules",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.put.hr.leave.encashment.rules.id",
+    "label": "Make a leave type encashable; {id} is the leave type (leave:manage)",
+    "method": "PUT",
+    "path": "/hr/leave/encashment-rules/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveEncashmentRulesId"
+      },
+      {
+        "name": "max_days_per_year",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "min_balance_after",
+        "where": "body",
+        "type": "number",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.leave.post.hr.leave.encashments",
+    "label": "Request to encash leave days",
+    "method": "POST",
+    "path": "/hr/leave/encashments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "leave_type_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "days",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "reason",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "leaveEncashmentsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 409 NOT_ENCASHABLE / ENCASH_LIMIT / INSUFFICIENT_BALANCE / CONFLICT"
+  },
+  {
+    "key": "hr.leave.get.hr.leave.encashments",
+    "label": "List encashment requests (leave:read)",
+    "method": "GET",
+    "path": "/hr/leave/encashments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "leave_type_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "approved",
+          "rejected",
+          "cancelled"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.get.hr.leave.encashments.me",
+    "label": "My encashment requests",
+    "method": "GET",
+    "path": "/hr/leave/encashments/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.post.hr.leave.encashments.id.approve",
+    "label": "Approve an encashment request (the worker's manager or leave:approve; debits the balance)",
+    "method": "POST",
+    "path": "/hr/leave/encashments/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveEncashmentsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REQUEST_STATE / INSUFFICIENT_BALANCE / ENCASH_LIMIT"
+  },
+  {
+    "key": "hr.leave.post.hr.leave.encashments.id.cancel",
+    "label": "Cancel an encashment request (the requester, while pending)",
+    "method": "POST",
+    "path": "/hr/leave/encashments/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveEncashmentsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REQUEST_STATE / INSUFFICIENT_BALANCE / ENCASH_LIMIT"
+  },
+  {
+    "key": "hr.leave.post.hr.leave.encashments.id.reject",
+    "label": "Reject an encashment request (comment required)",
+    "method": "POST",
+    "path": "/hr/leave/encashments/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveEncashmentsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REQUEST_STATE / INSUFFICIENT_BALANCE / ENCASH_LIMIT"
+  },
+  {
     "key": "hr.leave.post.hr.leave.holidays",
     "label": "Add a holiday (leave:manage)",
     "method": "POST",
@@ -1171,6 +1535,78 @@ export const HR_LEAVE: OpSpec[] = [
     "note": "Errors: 404 NOT_FOUND"
   },
   {
+    "key": "hr.leave.get.hr.leave.inbox",
+    "label": "Pending leave requests of my direct reports (scope=all needs leave:approve at tenant scope)",
+    "method": "GET",
+    "path": "/hr/leave/inbox",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "scope",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "team",
+          "all"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN"
+  },
+  {
+    "key": "hr.leave.post.hr.leave.inbox.id.approve",
+    "label": "Approve a reports leave request (rules of LV-010)",
+    "method": "POST",
+    "path": "/hr/leave/inbox/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveInboxId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 LEAVE_NOT_PENDING"
+  },
+  {
+    "key": "hr.leave.post.hr.leave.inbox.id.reject",
+    "label": "Reject a reports leave request (rules of LV-010)",
+    "method": "POST",
+    "path": "/hr/leave/inbox/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveInboxId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 LEAVE_NOT_PENDING"
+  },
+  {
     "key": "hr.leave.get.hr.leave.ledger",
     "label": "Balance ledger (leave:read)",
     "method": "GET",
@@ -1201,6 +1637,132 @@ export const HR_LEAVE: OpSpec[] = [
     "expect": [
       200
     ]
+  },
+  {
+    "key": "hr.leave.post.hr.leave.location.holidays",
+    "label": "Add a holiday for one organization location (leave:manage)",
+    "method": "POST",
+    "path": "/hr/leave/location-holidays",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "location_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "is_optional",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "leaveLocationHolidaysId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 404 LOCATION_NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "hr.leave.get.hr.leave.location.holidays",
+    "label": "List location holidays of a year (leave:read)",
+    "method": "GET",
+    "path": "/hr/leave/location-holidays",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "location_id",
+        "where": "query"
+      },
+      {
+        "name": "year",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.delete.hr.leave.location.holidays.id",
+    "label": "Delete a location holiday (leave:manage)",
+    "method": "DELETE",
+    "path": "/hr/leave/location-holidays/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveLocationHolidaysId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.leave.get.hr.leave.policy",
+    "label": "The leave policy, or the defaults (leave:read)",
+    "method": "GET",
+    "path": "/hr/leave/policy",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.put.hr.leave.policy",
+    "label": "Save the leave policy: leave-year start month, comp-off type and expiry (leave:manage)",
+    "method": "PUT",
+    "path": "/hr/leave/policy",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "year_start_month",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "comp_off_leave_type_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "comp_off_expiry_days",
+        "where": "body",
+        "type": "number",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 YEAR_LOCKED / INACTIVE_REFERENCE"
   },
   {
     "key": "hr.leave.post.hr.leave.requests",
@@ -1475,6 +2037,30 @@ export const HR_LEAVE: OpSpec[] = [
     "note": "Errors: 400 VALIDATION_ERROR (comment required); 403 SELF_APPROVAL_FORBIDDEN | FORBIDDEN; 409 LEAVE_NOT_PENDING"
   },
   {
+    "key": "hr.leave.get.hr.leave.team.calendar",
+    "label": "Pending and approved leave of my reports (everyone for leave:read) plus tenant holidays, up to 62 days",
+    "method": "GET",
+    "path": "/hr/leave/team-calendar",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "from",
+        "where": "query",
+        "required": true
+      },
+      {
+        "name": "to",
+        "where": "query",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 INVALID_RANGE"
+  },
+  {
     "key": "hr.leave.post.hr.leave.types",
     "label": "Create a leave type (leave:manage)",
     "method": "POST",
@@ -1717,6 +2303,64 @@ export const HR_LEAVE: OpSpec[] = [
       200
     ],
     "note": "Errors: 409 CONFLICT (already inactive)"
+  },
+  {
+    "key": "hr.leave.get.hr.leave.week.offs",
+    "label": "List per-location weekly-off patterns (leave:read)",
+    "method": "GET",
+    "path": "/hr/leave/week-offs",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.leave.put.hr.leave.week.offs.id",
+    "label": "Set the weekly-off weekdays of a location; {id} is the location (leave:manage)",
+    "method": "PUT",
+    "path": "/hr/leave/week-offs/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveWeekOffsId"
+      },
+      {
+        "name": "week_off_days",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 LOCATION_NOT_FOUND"
+  },
+  {
+    "key": "hr.leave.delete.hr.leave.week.offs.id",
+    "label": "Remove a location pattern (leave:manage)",
+    "method": "DELETE",
+    "path": "/hr/leave/week-offs/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "leaveWeekOffsId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
   }
 ];
 

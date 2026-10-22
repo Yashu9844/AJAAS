@@ -234,9 +234,9 @@ product decision. Each is added to its context's specification (with goldens) wh
 | attendance | Overtime calculation and rosters / shift rotations | P1 | done 2026-10-22 (AP-03..AP-06) |
 | attendance | Nightly auto-absent job, bulk import | P1 | done 2026-10-22 (AP-07..AP-11) |
 | attendance | Geofence enforcement (coordinates already stored) | P2 | |
-| leave | Manager-routed approvals and team calendar | P1 | multi-step through M7 later |
-| leave | Per-location holiday calendars and weekly-off patterns | P1 | depends on organization locations |
-| leave | Comp-off, encashment, non-calendar leave year | P1 | |
+| leave | Manager-routed approvals and team calendar | P1 | done 2026-10-22 (LP-06, LP-07); multi-step through M7 later |
+| leave | Per-location holiday calendars and weekly-off patterns | P1 | done 2026-10-22 (LP-03..LP-05) |
+| leave | Comp-off, encashment, non-calendar leave year | P1 | done 2026-10-22 (LP-01, LP-02, LP-08..LP-15) |
 | leave | Proof attachments | P2 | M8 Documents |
 | payroll | Employer PF/ESI contributions, state-wise PT slabs | P1 | |
 | payroll | Arrears and mid-month CTC change split | P1 | needed by compensation and core |

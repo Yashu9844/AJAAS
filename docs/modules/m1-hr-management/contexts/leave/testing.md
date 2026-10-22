@@ -109,3 +109,19 @@ From the partner frontend test guide (2026-10-09). Paths are the pre-restructure
 - [ ] **Pagination:** `per_page=0` and `page=-1` render page 1 with 20 rows and no error. *(G15)*
 
 ---
+
+## Parity evidence (2026-10-22)
+
+| # | Behaviour | Location |
+|---|---|---|
+| LG1 | A non-calendar leave year labels dates, accrues exactly and locks once balances exist | `calc/parity_test.go`, `plus` unit, `TestLeaveParity` |
+| LG2 | A location holiday and week-off pattern change pricing for that location only | `calc/parity_test.go`, `plus` unit, `TestLeaveParity` |
+| LG3 | The inbox shows only reports; strangers cannot decide; the calendar hides reasons | `plus` unit, `TestLeaveParity` |
+| LG4 | Comp-off needs real work on a non-working day, credits once, expires without going negative | `plus` unit, `TestLeaveParity` |
+| LG5 | Encashment respects the yearly cap and minimum balance and debits exactly once; events carry no reasons | `plus` unit, `TestLeaveParity` |
+
+- Package `internal/hr/leave/plus` (migrations hr/000073–000076, up/down/up verified), 87% unit coverage; the gorm store
+  is covered by integration.
+- The existing leave goldens pass unchanged after the hooks.
+- Contract: 27 new operations in `backend/api/swagger.yaml` (tag Leave operations).
+- Console: the leave page lists 47 operations; scenario `hr.leave.plus`.

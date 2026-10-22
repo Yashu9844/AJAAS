@@ -152,3 +152,36 @@ Multi-tier / manager-routed approval chains and team inbox (M7 Approvals; v1 = a
 - A4-02 HR/Employee `employment.joining_date` drives proration; missing joining date → treated as before the leave year (full entitlement).
 - A4-03 "Today" for notice, backdating and accrual = UTC date (matches HR/Attendance default timezone).
 - A4-04 tenant_admin bypasses RBAC (M0 Identity behavior) and is therefore an approver.
+
+## Parity (2026-10-22): manager routing, location calendars, leave year, comp-off, encashment
+
+Package `internal/hr/leave/plus`, routes under `/api/v1/hr/leave`. Permissions are the existing
+`leave:read | manage | approve`; manager and worker endpoints need only a login with an employee profile.
+
+| ID | Requirement |
+|---|---|
+| LP-01 | Policy: `PUT/GET /policy` (`manage` / `read`): `year_start_month` (1–12, default 1), `comp_off_leave_type_id` (an active leave type, optional), `comp_off_expiry_days` (1–365, default 90). Changing `year_start_month` after balances exist is refused (409 `YEAR_LOCKED`) unless no balance row exists yet. |
+| LP-02 | Leave year: the leave year is labelled by the calendar year in which it starts. With `year_start_month = 4`, 2026-05-10 and 2027-02-01 are both in leave year 2026. LV-003 (range in the current leave year), balance rows, accrual and carry-forward all use the leave year. Accrual credits months from the later of the year start and the joining month through the year end (annual) or through the current month (monthly); month 12 of the year still lands exactly on the allowance. |
+| LP-03 | Location holidays: `POST/GET /location-holidays`, `DELETE /location-holidays/{id}` (`manage` / `read`): a date, name and optional flag for one organization location. Unique per location and date. An employee's location is their core assignment on the date; employees without one use the tenant calendar only. |
+| LP-04 | Week-off patterns: `PUT /week-offs/{location_id}` (`manage`) sets the weekly-off weekdays (0 = Sunday … 6; empty list allowed) for a location, `GET /week-offs` (`read`) lists them, `DELETE /week-offs/{location_id}` removes it. Without a pattern the location (and every employee without one) uses Saturday and Sunday. |
+| LP-05 | Pricing (LV-006) and attendance marking use the employee's calendar: tenant holidays ∪ their location's non-optional holidays as blocked dates, and the location's week-off weekdays instead of Saturday/Sunday. Existing requests keep their snapshotted `total_days` (LV-012). |
+| LP-06 | Manager routing: `GET /inbox` lists pending requests of the caller's direct reports (organization mappings); `POST /inbox/{id}/approve|reject` decide them through LV-010. A request of anyone else is 404; tenant-scope `leave:approve` holders pass `scope=all` to see every pending request. |
+| LP-07 | Team calendar: `GET /team-calendar?from=&to=` (range ≤ 62 days) returns, for the caller's direct reports (all workers for `leave:read`), their pending and approved leave overlapping the range plus the dates blocked for the tenant. Rejected and cancelled leave is never shown; reasons are never shown. |
+| LP-08 | Comp-off request: `POST /comp-off {worked_date, days, reason}` (days 0.5 or 1; the worked date within the last 30 days, a holiday or week-off for the worker, with attendance work minutes > 0; one non-cancelled request per worker and date; needs `comp_off_leave_type_id` in the policy, else 409 `COMP_OFF_NOT_CONFIGURED`). Errors: 409 `NOT_A_NON_WORKING_DAY`, 409 `NO_WORK_RECORDED`, 409 `CONFLICT`. |
+| LP-09 | Decision: `POST /comp-off/{id}/approve|reject|cancel`. The worker's manager or a `leave:approve` tenant holder decides; never the requester (403 `SELF_APPROVAL_FORBIDDEN`); the requester cancels their own pending request. Approval credits the comp-off leave type through a balance adjustment (ledger row, note "comp-off") in the same transaction and sets `expires_on = worked_date + comp_off_expiry_days`. |
+| LP-10 | Expiry: `POST /comp-off/expire` (`manage`) and a daily sweep debit each approved, unexpired-flag credit whose `expires_on` has passed by `min(credit days, balance available)` (never below zero) and mark it expired with the debited days. Idempotent. |
+| LP-11 | Lists: `GET /comp-off/me`, `GET /comp-off` (`read`, filters status/employee_id). |
+| LP-12 | Encashment rules: `PUT /encashment-rules/{leave_type_id}` (`manage`) sets `max_days_per_year` (0–365) and `min_balance_after` (≥ 0), `GET /encashment-rules` (`read`) lists them. A type without a rule is not encashable (409 `NOT_ENCASHABLE`). |
+| LP-13 | Encashment request: `POST /encashments {leave_type_id, days, reason}` (days a multiple of 0.5 > 0). Rules: type active and encashable; `days` ≤ remaining annual allowance (max − approved − pending in the leave year); the balance available now, minus pending encashments, minus `days` must stay ≥ `min_balance_after` (409 `INSUFFICIENT_BALANCE`); at most one pending request per worker and type (409 `CONFLICT`). |
+| LP-14 | Decision: `POST /encashments/{id}/approve|reject|cancel`. The worker's manager or a `leave:approve` tenant holder decides; never the requester; the requester cancels own pending. Approval re-checks LP-13 and debits the balance with an adjustment (ledger note "encashment"); the request keeps `paid_out_at = null` until payroll consumes it (payroll parity). |
+| LP-15 | Lists: `GET /encashments/me`, `GET /encashments` (`read`, filters status/employee_id/leave_type_id). |
+| LP-16 | Every write takes the per-employee leave lock (LV-014) so balances cannot race with applications. |
+| LP-17 | Events `leave.comp_off_credited`, `leave.encashment_approved` carry ids and day counts only; audit metadata never includes reasons. |
+| LP-18 | Failure semantics: a failed balance adjustment rolls the decision back; nothing is half-applied. |
+
+Errors added: `YEAR_LOCKED`, `COMP_OFF_NOT_CONFIGURED`, `NOT_A_NON_WORKING_DAY`, `NO_WORK_RECORDED`, `NOT_ENCASHABLE`.
+
+**Golden tests:** `LG1` a non-calendar leave year labels dates and accrues exactly; `LG2` a location holiday and week-off
+pattern change pricing for that location only; `LG3` the inbox shows only reports and strangers cannot decide;
+`LG4` comp-off needs real work on a non-working day, credits once and expires without going negative; `LG5` encashment
+respects the annual cap and minimum balance and debits exactly once.

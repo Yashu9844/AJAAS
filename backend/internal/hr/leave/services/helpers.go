@@ -62,6 +62,33 @@ func joiningOf(emp *employeeDTO.EmployeeResponse) *time.Time {
 	return &j
 }
 
+// leaveYear labels the leave year of a date (LP-02).
+func (b base) leaveYear(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, d time.Time) (int, error) {
+	m, err := b.yearStartMonth(ctx, db, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	return calc.YearOf(d, m), nil
+}
+
+// yearStartMonth is the tenant's leave-year start month (1 without a calendar source).
+func (b base) yearStartMonth(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (int, error) {
+	if b.Calendar == nil {
+		return 1, nil
+	}
+	return b.Calendar.YearStartMonth(ctx, db, tenantID)
+}
+
+// calendarFor returns the blocked dates and weekly-off test for one employee's range (LP-05).
+func (b base) calendarFor(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, from, to time.Time) ([]time.Time, func(time.Time) bool, error) {
+	holidays, err := b.blockingHolidays(ctx, db, tenantID, from, to)
+	if err != nil || b.Calendar == nil {
+		return holidays, nil, err
+	}
+	extra, weekOff, err := b.Calendar.For(ctx, db, tenantID, employeeID, from, to)
+	return append(holidays, extra...), weekOff, err
+}
+
 // typeByID loads a leave type in the caller's tenant; unknown → 404.
 func (b base) typeByID(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, raw string) (*models.LeaveType, error) {
 	id, err := parseUUIDField("leave_type_id", raw)

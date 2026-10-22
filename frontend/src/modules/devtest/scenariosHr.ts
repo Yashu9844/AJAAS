@@ -220,6 +220,85 @@ export const S_LEAVE: Scenario[] = [
       await r.call("Employee: own requests → 200", tn(m.S, "GET", "/hr/leave/requests/me"), 200);
     },
   },
+  {
+    key: "hr.leave.plus",
+    module: "leave",
+    title: "Location calendar, manager inbox, comp-off and encashment (LG2–LG5)",
+    description:
+      "A worker hired at a location whose weekly off is Sunday only can take a Saturday that the tenant calendar would refuse; a local holiday removes a day only there. The worker's manager (no HR permission) decides the request from the inbox while a stranger cannot. Real work on a weekly off earns comp-off that the manager credits once and the expiry run takes back without going negative. Encashment respects the yearly cap and the minimum balance and debits exactly once.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const coreApprover = await limited(r, A, uid, "lca", [["core", "approve"], ["core", "read"]]);
+      const w = await member(r, A, uid, "lw");
+      const boss = await member(r, A, uid, "lb");
+      const peer = await member(r, A, uid, "lp");
+      const L = "/hr/leave";
+      const pol = await r.call("Current leave policy", tn(A, "GET", `${L}/policy`), 200);
+      const month = num(pol, "data.year_start_month") || 1;
+      const el = str(await r.call("Leave type EL (12)", tn(A, "POST", `${L}/types`, { name: `EL ${uid}`, code: `EL${uid}`.slice(0, 10).toUpperCase(), annual_allowance: 12, carry_forward_limit: 5 }), 201), "data.id");
+      const co = str(await r.call("Leave type CO (0)", tn(A, "POST", `${L}/types`, { name: `CO ${uid}`, code: `CO${uid}`.slice(0, 10).toUpperCase(), annual_allowance: 0, carry_forward_limit: 0 }), 201), "data.id");
+      await r.call("Policy with the comp-off type (same leave year)", tn(A, "PUT", `${L}/policy`, { year_start_month: month, comp_off_leave_type_id: co, comp_off_expiry_days: 1 }), 200);
+      const loc = str(await r.call("Location", tn(A, "POST", "/hr/locations", { code: `lp${uid}`.toLowerCase(), name: `Leave site ${uid}`, city: "Pune", state_code: "mh" }), 201), "data.id");
+
+      const d = str(await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Lv ${uid}`, code: `LV${uid}`.toUpperCase() }), 201), "data.id");
+      const fam = str(await r.call("Job family", tn(A, "POST", "/hr/core/job-families", { code: `LF${uid}`, name: `Leave family ${uid}` }), 201), "data.id");
+      const gr = await r.call("Grade", tn(A, "POST", "/hr/core/grades", { code: `LG${uid}`, name: `Leave grade ${uid}`, rank: 70 }), [201, 409]);
+      const grades = await r.call("Grades", tn(A, "GET", "/hr/core/grades"), 200);
+      const grade = str(gr, "data.id") || String(list(grades).find((x) => x.code === `LG${uid}`)?.id ?? "");
+      const prof = str(await r.call("Job profile", tn(A, "POST", "/hr/core/job-profiles", { code: `LP${uid}`, title: "Associate", family_id: fam, default_grade_id: grade, category: "staff", probation_days: 0 }), 201), "data.id");
+      const pos = str(await r.call("Position", tn(A, "POST", "/hr/core/positions", { code: `LS${uid}`, title: "Leave seat", job_profile_id: prof, department_id: d }), 201), "data.id");
+      const h = await r.call("Hire at the location: draft", tn(A, "POST", "/hr/core/actions", { type: "hire", employee_id: w.empId, effective_date: ymd(addDays(new Date(), -60)), reason_code: "console",
+        changes: { position_id: pos, manager_employee_id: boss.empId, worker_type: "employee", employment_type: "full_time", location_id: loc } }), 201);
+      await r.call("Hire: submit", tn(A, "POST", `/hr/core/actions/${str(h, "data.id")}/submit`), 200);
+      await r.call("Hire: approve", tn(coreApprover, "POST", `/hr/core/actions/${str(h, "data.id")}/approve`), 200);
+
+      const sat = addDays(monday(0), 5);
+      const preview = (S: Session, from: Date, to: Date) => tn(S, "POST", `${L}/requests/preview`, { leave_type_id: el, start_date: ymd(from), end_date: ymd(to), reason: "x" });
+      await r.call("Saturday is off by default → 400", preview(w.S, sat, sat), 400);
+      await r.call("Location weekly off: Sunday only", tn(A, "PUT", `${L}/week-offs/${loc}`, { week_off_days: [0] }), 200);
+      await r.call("Saturday now works at the location (1 day)", preview(w.S, sat, sat), 200, (e) => (num(e, "data.total_days") === 1 ? null : "expected 1 day"));
+      await r.call("Other locations keep Saturday off → 400", preview(peer.S, sat, sat), 400);
+      const lh = await r.call("Local holiday on Monday", tn(A, "POST", `${L}/location-holidays`, { location_id: loc, date: ymd(monday(0)), name: "Local festival" }), 201);
+      await r.call("Mon+Tue at the location = 1 day", preview(w.S, monday(0), addDays(monday(0), 1)), 200, (e) => (num(e, "data.total_days") === 1 ? null : "expected 1 day"));
+      await r.call("Mon+Tue elsewhere = 2 days", preview(peer.S, monday(0), addDays(monday(0), 1)), 200, (e) => (num(e, "data.total_days") === 2 ? null : "expected 2 days"));
+
+      const req = await r.call("Worker applies for Mon+Tue next week", tn(w.S, "POST", `${L}/requests`, { leave_type_id: el, start_date: ymd(monday(1)), end_date: ymd(addDays(monday(1), 1)), reason: "family wedding" }), 201);
+      const rid = str(req, "data.id");
+      await r.call("Manager inbox shows it", tn(boss.S, "GET", `${L}/inbox`), 200, (e) => (list(e).length === 1 ? null : "expected 1 item"));
+      await r.call("Stranger inbox is empty", tn(peer.S, "GET", `${L}/inbox`), 200, (e) => (list(e).length === 0 ? null : "expected none"));
+      await r.call("Stranger cannot decide → 404", tn(peer.S, "POST", `${L}/inbox/${rid}/approve`), 404);
+      await r.call("Team calendar shows the leave without its reason", tn(boss.S, "GET", `${L}/team-calendar`, undefined, { from: ymd(monday(1)), to: ymd(addDays(monday(1), 6)) }), 200, (e) =>
+        list(e, "data.leaves").length === 1 && !JSON.stringify(e.resBody).includes("family wedding") ? null : "expected one leave, no reason",
+      );
+      await r.call("Manager approves", tn(boss.S, "POST", `${L}/inbox/${rid}/approve`, { comment: "enjoy" }), 200);
+
+      let sun = addDays(new Date(), -3);
+      while (sun.getUTCDay() !== 0) sun = addDays(sun, -1);
+      const code = String(getPath((await r.call("Worker profile", tn(A, "GET", `/hr/employees/${w.empId}`), 200)).resBody, "data.employee_code"));
+      const cReq = { worked_date: ymd(sun), days: 1, reason: "release support" };
+      await r.call("Comp-off on a working day → 409", tn(w.S, "POST", `${L}/comp-off`, { worked_date: ymd(addDays(sun, 3)), days: 1, reason: "x" }), 409);
+      await r.call("Comp-off without attendance → 409", tn(w.S, "POST", `${L}/comp-off`, cReq), 409);
+      await r.call("Import the Sunday's work", tn(A, "POST", "/hr/attendance/imports", { rows: [{ employee_code: code, date: ymd(sun), punch_in: `${ymd(sun)}T09:00:00Z`, punch_out: `${ymd(sun)}T15:00:00Z` }] }), 200, (e) =>
+        num(e, "data.applied") === 1 ? null : "import not applied",
+      );
+      const cr = await r.call("Comp-off request", tn(w.S, "POST", `${L}/comp-off`, cReq), 201);
+      await r.call("Own approval → 403", tn(w.S, "POST", `${L}/comp-off/${str(cr, "data.id")}/approve`), 403);
+      await r.call("Manager credits it", tn(boss.S, "POST", `${L}/comp-off/${str(cr, "data.id")}/approve`, { comment: "thanks" }), 200);
+      await r.call("Credited twice → 409", tn(boss.S, "POST", `${L}/comp-off/${str(cr, "data.id")}/approve`), 409);
+      await r.call("Expiry run takes it back", tn(A, "POST", `${L}/comp-off/expire`), 200, (e) => (num(e, "data.days_debited") >= 1 ? null : "expected a debit"));
+
+      await r.call("Encashment rule: 3 days a year, keep 2", tn(A, "PUT", `${L}/encashment-rules/${el}`, { max_days_per_year: 3, min_balance_after: 2 }), 200);
+      await r.call("Not encashable without a rule → 409", tn(w.S, "POST", `${L}/encashments`, { leave_type_id: co, days: 1 }), 409);
+      await r.call("Over the yearly cap → 409", tn(w.S, "POST", `${L}/encashments`, { leave_type_id: el, days: 4 }), 409);
+      const en = await r.call("Encash 2 days", tn(w.S, "POST", `${L}/encashments`, { leave_type_id: el, days: 2, reason: "cash needed" }), 201);
+      await r.call("Own approval → 403", tn(w.S, "POST", `${L}/encashments/${str(en, "data.id")}/approve`), 403);
+      await r.call("Manager approves (balance debited)", tn(boss.S, "POST", `${L}/encashments/${str(en, "data.id")}/approve`, { comment: "ok" }), 200);
+      await r.call("Debited once → 409", tn(boss.S, "POST", `${L}/encashments/${str(en, "data.id")}/approve`), 409);
+      await r.call("2 + 2 exceeds the cap → 409", tn(w.S, "POST", `${L}/encashments`, { leave_type_id: el, days: 2 }), 409);
+      await r.call("Delete the local holiday", tn(A, "DELETE", `${L}/location-holidays/${str(lh, "data.id")}`), 204);
+      await r.call("Delete the weekly-off pattern", tn(A, "DELETE", `${L}/week-offs/${loc}`), 204);
+    },
+  },
 ];
 
 export const S_PAYROLL: Scenario[] = [

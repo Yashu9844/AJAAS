@@ -35,7 +35,11 @@ func (s *requestService) run(ctx context.Context, a Actor, tr transition) (*dto.
 		if typ, err = s.Repos.Types.FindByID(ctx, tx, a.TenantID, r.LeaveTypeID); err != nil || typ == nil {
 			return orNotFound(err)
 		}
-		bal, _, err := s.Repos.Balances.FindOrCreate(ctx, tx, keyFor(a.TenantID, r.EmployeeProfileID, typ, r.StartDate.Year()))
+		year, err := s.leaveYear(ctx, tx, a.TenantID, r.StartDate)
+		if err != nil {
+			return err
+		}
+		bal, _, err := s.Repos.Balances.FindOrCreate(ctx, tx, keyFor(a.TenantID, r.EmployeeProfileID, typ, year))
 		if err != nil {
 			return err
 		}
@@ -173,11 +177,11 @@ func (s *requestService) leaveDates(ctx context.Context, tx *gorm.DB, r *models.
 	if r.HalfDay != nil {
 		return nil, nil
 	}
-	holidays, err := s.blockingHolidays(ctx, tx, r.TenantID, r.StartDate, r.EndDate)
+	holidays, weekOff, err := s.calendarFor(ctx, tx, r.TenantID, r.EmployeeProfileID, r.StartDate, r.EndDate)
 	if err != nil {
 		return nil, err
 	}
-	return calc.CountDays(calc.CountInput{Start: r.StartDate, End: r.EndDate, Holidays: holidays}).WorkingDates, nil
+	return calc.CountDays(calc.CountInput{Start: r.StartDate, End: r.EndDate, Holidays: holidays, WeekOff: weekOff}).WorkingDates, nil
 }
 
 func (s *requestService) review(r *models.Request, a Actor, status string, comment *string) {

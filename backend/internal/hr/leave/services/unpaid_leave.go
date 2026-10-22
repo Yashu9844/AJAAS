@@ -68,9 +68,9 @@ func (u *unpaidLeave) clippedDays(ctx context.Context, r models.Request, p perio
 	if end.After(p.to) {
 		end = p.to
 	}
-	holidays, err := u.blockingHolidays(ctx, u.Tx.DB(), r.TenantID, start, end)
+	holidays, weekOff, err := u.calendarFor(ctx, u.Tx.DB(), r.TenantID, r.EmployeeProfileID, start, end)
 	if err != nil {
 		return 0, err
 	}
-	return calc.CountDays(calc.CountInput{Start: start, End: end, Half: r.HalfDay != nil, Sandwich: sandwich, Holidays: holidays}).Total, nil
+	return calc.CountDays(calc.CountInput{Start: start, End: end, Half: r.HalfDay != nil, Sandwich: sandwich, Holidays: holidays, WeekOff: weekOff}).Total, nil
 }

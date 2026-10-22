@@ -35,15 +35,6 @@ func (s *Service) RunAutoAbsent(ctx context.Context, tenantID uuid.UUID, date ti
 	if err != nil {
 		return nil, err
 	}
-	status := attModels.StatusAbsent
-	if p.weekOff(date) {
-		status = attModels.StatusWeekOff
-	}
-	if h, err := s.p.Holidays.IsHoliday(ctx, s.store.DB(), tenantID, date); err != nil {
-		return nil, err
-	} else if h {
-		status = attModels.StatusHoliday
-	}
 	res := &AutoAbsentResult{Date: Date{date}}
 	for _, st := range workingStatuses {
 		for page := 1; ; page++ {
@@ -56,8 +47,12 @@ func (s *Service) RunAutoAbsent(ctx context.Context, tenantID uuid.UUID, date ti
 					res.Skipped++
 					continue
 				}
+				status, err := s.dayStatus(ctx, p, tenantID, e.ID, date)
+				if err != nil {
+					return nil, err
+				}
 				var created bool
-				err := s.store.InTx(ctx, func(tx *gorm.DB) (err error) {
+				err = s.store.InTx(ctx, func(tx *gorm.DB) (err error) {
 					created, err = s.p.Writer.MarkDay(ctx, tx, tenantID, e.ID, date, status)
 					return err
 				})
@@ -83,6 +78,26 @@ func (s *Service) RunAutoAbsent(ctx context.Context, tenantID uuid.UUID, date ti
 	run := &JobRun{TenantID: tenantID, Kind: jobAutoAbsent, RunDate: Date{date}, Absent: res.Absent, WeekOff: res.WeekOff, Holiday: res.Holiday,
 		Skipped: res.Skipped, TriggeredByUserID: by, RanAt: s.now().UTC()}
 	return res, s.store.InTx(ctx, func(tx *gorm.DB) error { return s.store.Create(ctx, tx, run) })
+}
+
+// dayStatus is the status a missing record gets: the worker's holiday (tenant or location) wins, then the weekly off
+// (their location's pattern, else the attendance policy), else absent (AP-07).
+func (s *Service) dayStatus(ctx context.Context, p *Policy, tenantID, employeeID uuid.UUID, date time.Time) (string, error) {
+	holiday, weekOff, err := s.p.Holidays.IsHolidayFor(ctx, s.store.DB(), tenantID, employeeID, date)
+	if err != nil {
+		return "", err
+	}
+	off := p.weekOff(date)
+	if weekOff != nil {
+		off = *weekOff
+	}
+	switch {
+	case holiday:
+		return attModels.StatusHoliday, nil
+	case off:
+		return attModels.StatusWeekOff, nil
+	}
+	return attModels.StatusAbsent, nil
 }
 
 // workedOn reports whether the worker was employed on the date (joined by then, not yet exited).

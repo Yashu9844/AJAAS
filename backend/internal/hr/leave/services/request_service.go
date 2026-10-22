@@ -38,6 +38,7 @@ func NewRequestService(d Deps) RequestService { return &requestService{base{d}} 
 
 // quote is a fully validated, priced request plus its locked balance.
 type quote struct {
+	employeeID uuid.UUID
 	typ        *models.LeaveType
 	start, end time.Time
 	half       *string
@@ -113,12 +114,12 @@ func (s *requestService) quote(ctx context.Context, tx *gorm.DB, a Actor, in quo
 	if err := s.Repos.Balances.LockEmployee(ctx, tx, a.TenantID, in.emp.ID); err != nil {
 		return nil, err
 	}
-	q := &quote{}
+	q := &quote{employeeID: in.emp.ID}
 	var err error
 	if q.typ, err = s.applicableType(ctx, tx, a.TenantID, in); err != nil {
 		return nil, err
 	}
-	if err := s.parseRange(q, in.req); err != nil {
+	if err := s.parseRange(ctx, tx, a.TenantID, q, in.req); err != nil {
 		return nil, err
 	}
 	if q.count, err = s.price(ctx, tx, a.TenantID, q); err != nil {
@@ -127,7 +128,11 @@ func (s *requestService) quote(ctx context.Context, tx *gorm.DB, a Actor, in quo
 	if err := s.checkOverlap(ctx, tx, a.TenantID, in.emp.ID, q); err != nil {
 		return nil, err
 	}
-	e := entitlement{EmployeeID: in.emp.ID, Joining: joiningOf(in.emp), Year: q.start.Year()}
+	year, err := s.leaveYear(ctx, tx, a.TenantID, q.start)
+	if err != nil {
+		return nil, err
+	}
+	e := entitlement{EmployeeID: in.emp.ID, Joining: joiningOf(in.emp), Year: year}
 	if q.bal, err = s.ensure(ctx, tx, a, q.typ, e); err != nil {
 		return nil, err
 	}
@@ -151,7 +156,7 @@ func (s *requestService) applicableType(ctx context.Context, tx *gorm.DB, tenant
 }
 
 // parseRange applies LV-003, LV-004 and LV-005.
-func (s *requestService) parseRange(q *quote, req dto.ApplyLeaveRequest) error {
+func (s *requestService) parseRange(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, q *quote, req dto.ApplyLeaveRequest) error {
 	var err error
 	if q.start, err = validators.ParseDate(req.StartDate); err != nil {
 		return invalid("start_date", err.Error())
@@ -159,9 +164,21 @@ func (s *requestService) parseRange(q *quote, req dto.ApplyLeaveRequest) error {
 	if q.end, err = validators.ParseDate(req.EndDate); err != nil {
 		return invalid("end_date", err.Error())
 	}
-	year := s.today().Year()
-	if q.start.After(q.end) || q.start.Year() != year || q.end.Year() != year {
+	if q.start.After(q.end) {
 		return ErrInvalidRange
+	}
+	year, err := s.leaveYear(ctx, tx, tenantID, s.today())
+	if err != nil {
+		return err
+	}
+	for _, d := range []time.Time{q.start, q.end} {
+		y, err := s.leaveYear(ctx, tx, tenantID, d)
+		if err != nil {
+			return err
+		}
+		if y != year {
+			return ErrInvalidRange
+		}
 	}
 	if req.HalfDay != "" {
 		if !q.typ.AllowHalfDay || !q.start.Equal(q.end) {
@@ -178,11 +195,11 @@ func (s *requestService) parseRange(q *quote, req dto.ApplyLeaveRequest) error {
 
 // price counts days with the tenant calendar (LV-006, LV-007).
 func (s *requestService) price(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, q *quote) (calc.Count, error) {
-	holidays, err := s.blockingHolidays(ctx, tx, tenantID, q.start, q.end)
+	holidays, weekOff, err := s.calendarFor(ctx, tx, tenantID, q.employeeID, q.start, q.end)
 	if err != nil {
 		return calc.Count{}, err
 	}
-	c := calc.CountDays(calc.CountInput{Start: q.start, End: q.end, Half: q.half != nil, Sandwich: q.typ.SandwichRule, Holidays: holidays})
+	c := calc.CountDays(calc.CountInput{Start: q.start, End: q.end, Half: q.half != nil, Sandwich: q.typ.SandwichRule, Holidays: holidays, WeekOff: weekOff})
 	if c.Total == 0 {
 		return c, ErrNoWorkingDays
 	}

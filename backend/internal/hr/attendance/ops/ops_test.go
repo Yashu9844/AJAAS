@@ -283,8 +283,13 @@ func (r *fakeRegs) Reject(_ context.Context, _ attServices.Actor, id uuid.UUID, 
 }
 
 type fakeHolidays struct {
-	dates map[string]bool
-	err   error
+	dates   map[string]bool
+	weekOff *bool
+	err     error
+}
+
+func (h *fakeHolidays) IsHolidayFor(_ context.Context, _ *gorm.DB, _, _ uuid.UUID, d time.Time) (bool, *bool, error) {
+	return h.dates[d.Format(DateLayout)], h.weekOff, h.err
 }
 
 func (h *fakeHolidays) IsHoliday(_ context.Context, _ *gorm.DB, _ uuid.UUID, d time.Time) (bool, error) {

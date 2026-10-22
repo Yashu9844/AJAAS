@@ -61,7 +61,11 @@ func (b base) ensure(ctx context.Context, tx *gorm.DB, a Actor, typ *models.Leav
 			return nil, err
 		}
 	}
-	target := calc.Accrued(calc.Policy{Allowance: typ.AnnualAllowance, Monthly: typ.Accrual == models.AccrualMonthly}, e.Joining, e.Year, b.Now())
+	startMonth, err := b.yearStartMonth(ctx, tx, a.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	target := calc.AccruedFrom(calc.Policy{Allowance: typ.AnnualAllowance, Monthly: typ.Accrual == models.AccrualMonthly}, e.Joining, e.Year, startMonth, b.Now())
 	delta := target - bal.Accrued
 	if delta <= 0 {
 		return bal, nil

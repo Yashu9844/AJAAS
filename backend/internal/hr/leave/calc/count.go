@@ -25,6 +25,8 @@ type CountInput struct {
 	Half       bool
 	Sandwich   bool
 	Holidays   []time.Time
+	// WeekOff overrides the Saturday/Sunday weekly off (per-location pattern, LP-04); nil keeps the default.
+	WeekOff func(time.Time) bool
 }
 
 // Count is the priced range: Total leave days and the full working dates to mark in attendance.
@@ -43,7 +45,11 @@ func CountDays(in CountInput) Count {
 	var working []time.Time
 	first, last := -1, -1
 	for i, day := 0, in.Start; !day.After(in.End); i, day = i+1, day.AddDate(0, 0, 1) {
-		if IsWeekend(day) || off[day.Format(dayLayout)] {
+		weekOff := IsWeekend
+		if in.WeekOff != nil {
+			weekOff = in.WeekOff
+		}
+		if weekOff(day) || off[day.Format(dayLayout)] {
 			continue
 		}
 		working = append(working, day)

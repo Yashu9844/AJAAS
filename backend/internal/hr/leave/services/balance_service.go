@@ -62,7 +62,11 @@ func (s *balanceService) balancesFor(ctx context.Context, a Actor, emp *employee
 		if err != nil {
 			return err
 		}
-		e := entitlement{EmployeeID: emp.ID, Joining: joiningOf(emp), Year: s.today().Year()}
+		year, err := s.leaveYear(ctx, tx, a.TenantID, s.today())
+		if err != nil {
+			return err
+		}
+		e := entitlement{EmployeeID: emp.ID, Joining: joiningOf(emp), Year: year}
 		for i := range types {
 			bal, err := s.ensure(ctx, tx, a, &types[i], e)
 			if err != nil {
@@ -93,7 +97,11 @@ func (s *balanceService) Adjust(ctx context.Context, a Actor, req dto.AdjustBala
 		if err := s.Repos.Balances.LockEmployee(ctx, tx, a.TenantID, emp.ID); err != nil {
 			return err
 		}
-		bal, err := s.ensure(ctx, tx, a, typ, entitlement{EmployeeID: emp.ID, Joining: joiningOf(emp), Year: s.today().Year()})
+		year, err := s.leaveYear(ctx, tx, a.TenantID, s.today())
+		if err != nil {
+			return err
+		}
+		bal, err := s.ensure(ctx, tx, a, typ, entitlement{EmployeeID: emp.ID, Joining: joiningOf(emp), Year: year})
 		if err != nil {
 			return err
 		}

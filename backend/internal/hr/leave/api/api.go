@@ -14,4 +14,7 @@ import (
 type Holidays interface {
 	// IsHoliday reports whether the date is a (non-optional) holiday for the tenant.
 	IsHoliday(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, date time.Time) (bool, error)
+	// IsHolidayFor is IsHoliday for one worker: tenant or their location's holiday, plus the location's weekly-off
+	// verdict when it has a pattern (nil otherwise, so callers keep their own default).
+	IsHolidayFor(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (holiday bool, weekOff *bool, err error)
 }

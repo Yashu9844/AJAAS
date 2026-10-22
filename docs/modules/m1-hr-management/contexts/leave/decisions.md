@@ -27,3 +27,25 @@
 2026-10-09 — P7 DONE: live goldens PASS (11 goldens), full suite 16/16, migration cycle + parity identical.
 2026-10-09 — P9 DONE (backend CLOSED): DoD walked with evidence; perf caveat recorded (D4-11).
 2026-10-09 — Integrated onto M0 Identity, HR/Organization, HR/Employee hardening (branch integrate/m3-m4-on-hardening): migrations renumbered 000026–000037, app wiring, error normalization, integration tests ported; 59/59 PASS.
+
+## Parity decisions (2026-10-22)
+
+- **DL-P1** Parity lives in `leave/plus`; the old services change in three places only, each behind a nil-safe hook:
+  the leave year (`calc.AccruedFrom`/`YearOf`), the pricing calendar (`CalendarSource.For` plus `CountInput.WeekOff`) and
+  the balance mover. With no calendar source nothing changes (the old goldens pass untouched).
+- **DL-P2** The leave year is labelled by the calendar year in which it starts. It cannot be changed once any balance
+  row exists (`YEAR_LOCKED`): re-labelling ledgers would rewrite history (LV-016). Tenants choose it before first use.
+- **DL-P3** A worker's calendar is chosen by their core assignment's location on the first day of the range. A range
+  that spans a transfer is priced with the starting location; this is simple, predictable and documented.
+- **DL-P4** Location holidays and week-off patterns add to, never replace, the tenant calendar: blocked dates are the
+  union, the weekly off is the location's pattern when it has one. Optional holidays never block.
+- **DL-P5** Manager reach uses organization mappings (primary, active, `manager_user_id`), the same rule as the
+  attendance inbox. The inbox routes only need a login; a stranger gets 404.
+- **DL-P6** Comp-off and encashment adjust balances through `BalanceMover` inside the decision's transaction, so a
+  failed adjustment rolls the decision back (LP-18). Comp-off is credited as an `adjustment` ledger row with a note
+  rather than a new ledger kind, which keeps the ledger CHECK constraint and every report unchanged.
+- **DL-P7** Comp-off expiry debits `min(credit, available)`, never below zero. It does not track which credit a day of
+  comp-off leave consumed (no FIFO bookkeeping); in the worst case an old credit's expiry removes days that belonged to
+  a newer credit, which is the safe direction for the employer and never produces a negative balance.
+- **DL-P8** Encashment keeps `paid_out_at = null` until payroll consumes it; the payroll parity item (final settlement
+  and encashment payout) adds the port that reads and marks approved, unpaid encashments.
