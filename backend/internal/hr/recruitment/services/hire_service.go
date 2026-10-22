@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"github.com/jaas/jaas/internal/hr/recruitment/api"
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
@@ -134,6 +135,9 @@ func (s *HireService) complete(ctx context.Context, a Actor, candidateID, employ
 			job.Status, job.ClosedAt = pipeline.JobFilled, &now
 		}
 		if err := s.Repos.Jobs.Update(ctx, tx, job); err != nil {
+			return err
+		}
+		if err := s.Hooks.run(ctx, tx, a.TenantID, api.HireFact{CandidateID: c.ID, EmployeeID: employeeID, JoiningDate: plan.offer.JoiningDate}); err != nil {
 			return err
 		}
 		var err error

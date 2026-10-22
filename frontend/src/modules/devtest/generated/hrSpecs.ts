@@ -5575,6 +5575,593 @@ export const HR_COMPENSATION: OpSpec[] = [
   }
 ];
 
+export const HR_ONBOARDING: OpSpec[] = [
+  {
+    "key": "hr.onboarding.post.hr.onboarding.checklists",
+    "label": "Start a checklist by hand (onboarding:manage)",
+    "method": "POST",
+    "path": "/hr/onboarding/checklists",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "onboarding",
+          "offboarding"
+        ],
+        "required": true
+      },
+      {
+        "name": "anchor_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "onboardingChecklistsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND; 409 CONFLICT (open checklist of this kind)"
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.checklists",
+    "label": "Checklists: all for onboarding:read, else those where I am the worker or the manager",
+    "method": "GET",
+    "path": "/hr/onboarding/checklists",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "kind",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "onboarding",
+          "offboarding"
+        ]
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "open",
+          "completed",
+          "cancelled"
+        ]
+      },
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "department_id",
+        "where": "query"
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.checklists.id",
+    "label": "A checklist with tasks, clearance and progress (onboarding:read, the worker or the manager)",
+    "method": "GET",
+    "path": "/hr/onboarding/checklists/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingChecklistsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.onboarding.post.hr.onboarding.checklists.id.cancel",
+    "label": "Cancel with a reason (onboarding:manage)",
+    "method": "POST",
+    "path": "/hr/onboarding/checklists/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingChecklistsId"
+      },
+      {
+        "name": "reason",
+        "where": "body"
+      },
+      {
+        "name": "note",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CHECKLIST_STATE"
+  },
+  {
+    "key": "hr.onboarding.post.hr.onboarding.checklists.id.clearances.area.clear",
+    "label": "Sign an exit clearance area (manager: the workers manager; others: onboarding:manage)",
+    "method": "POST",
+    "path": "/hr/onboarding/checklists/:id/clearances/:area/clear",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingChecklistsId"
+      },
+      {
+        "name": "area",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingChecklistsId",
+        "type": "select",
+        "options": [
+          "",
+          "manager",
+          "hr",
+          "it",
+          "finance"
+        ]
+      },
+      {
+        "name": "reason",
+        "where": "body"
+      },
+      {
+        "name": "note",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 ALREADY_CLEARED / CHECKLIST_STATE"
+  },
+  {
+    "key": "hr.onboarding.post.hr.onboarding.checklists.id.complete",
+    "label": "Complete early; open non-blocking tasks are skipped (onboarding:manage)",
+    "method": "POST",
+    "path": "/hr/onboarding/checklists/:id/complete",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingChecklistsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 BLOCKING_OPEN / CLEARANCE_PENDING / CHECKLIST_STATE"
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.checklists.id.exit.interview",
+    "label": "Read an exit interview (the worker or onboarding:exit_interview)",
+    "method": "GET",
+    "path": "/hr/onboarding/checklists/:id/exit-interview",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingChecklistsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.onboarding.put.hr.onboarding.checklists.id.exit.interview",
+    "label": "Submit my exit interview once (the departing worker)",
+    "method": "PUT",
+    "path": "/hr/onboarding/checklists/:id/exit-interview",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingChecklistsId"
+      },
+      {
+        "name": "answers",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 ALREADY_SUBMITTED / CHECKLIST_STATE"
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.me",
+    "label": "My checklists with tasks",
+    "method": "GET",
+    "path": "/hr/onboarding/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.my.tasks",
+    "label": "Tasks assigned to me, plus pool tasks for onboarding:manage",
+    "method": "GET",
+    "path": "/hr/onboarding/my-tasks",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.reports.progress",
+    "label": "Open and completed checklists, open and overdue tasks per department (onboarding:read)",
+    "method": "GET",
+    "path": "/hr/onboarding/reports/progress",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "kind",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "onboarding",
+          "offboarding"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.onboarding.post.hr.onboarding.tasks.id.done",
+    "label": "Complete a task (its assignee or onboarding:manage); document tasks need a verified document",
+    "method": "POST",
+    "path": "/hr/onboarding/tasks/:id/done",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingTasksId"
+      },
+      {
+        "name": "reason",
+        "where": "body"
+      },
+      {
+        "name": "note",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 TASK_STATE / TASK_BLOCKING / DOCUMENT_REQUIRED / CHECKLIST_STATE"
+  },
+  {
+    "key": "hr.onboarding.post.hr.onboarding.tasks.id.reopen",
+    "label": "Reopen a task (onboarding:manage)",
+    "method": "POST",
+    "path": "/hr/onboarding/tasks/:id/reopen",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingTasksId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 TASK_STATE / TASK_BLOCKING / DOCUMENT_REQUIRED / CHECKLIST_STATE"
+  },
+  {
+    "key": "hr.onboarding.post.hr.onboarding.tasks.id.skip",
+    "label": "Skip a non-blocking task with a reason (onboarding:manage)",
+    "method": "POST",
+    "path": "/hr/onboarding/tasks/:id/skip",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingTasksId"
+      },
+      {
+        "name": "reason",
+        "where": "body"
+      },
+      {
+        "name": "note",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 TASK_STATE / TASK_BLOCKING / DOCUMENT_REQUIRED / CHECKLIST_STATE"
+  },
+  {
+    "key": "hr.onboarding.post.hr.onboarding.templates",
+    "label": "Create a checklist template (onboarding:manage)",
+    "method": "POST",
+    "path": "/hr/onboarding/templates",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "onboarding",
+          "offboarding"
+        ]
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "department_id",
+        "where": "body"
+      },
+      {
+        "name": "job_profile_id",
+        "where": "body"
+      },
+      {
+        "name": "location_id",
+        "where": "body"
+      },
+      {
+        "name": "worker_type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "",
+          "employee",
+          "contractor",
+          "intern"
+        ]
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "onboardingTemplatesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.templates",
+    "label": "List templates (onboarding:read)",
+    "method": "GET",
+    "path": "/hr/onboarding/templates",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "kind",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "onboarding",
+          "offboarding"
+        ]
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.onboarding.get.hr.onboarding.templates.id",
+    "label": "Get a template with its tasks (onboarding:read)",
+    "method": "GET",
+    "path": "/hr/onboarding/templates/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingTemplatesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.onboarding.patch.hr.onboarding.templates.id",
+    "label": "Edit a template; empty strings clear criteria (onboarding:manage)",
+    "method": "PATCH",
+    "path": "/hr/onboarding/templates/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingTemplatesId"
+      },
+      {
+        "name": "kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "onboarding",
+          "offboarding"
+        ]
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "department_id",
+        "where": "body"
+      },
+      {
+        "name": "job_profile_id",
+        "where": "body"
+      },
+      {
+        "name": "location_id",
+        "where": "body"
+      },
+      {
+        "name": "worker_type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "",
+          "employee",
+          "contractor",
+          "intern"
+        ]
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.onboarding.put.hr.onboarding.templates.id.tasks",
+    "label": "Replace the template tasks, 1-50 (onboarding:manage)",
+    "method": "PUT",
+    "path": "/hr/onboarding/templates/:id/tasks",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "onboardingTemplatesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  }
+];
+
 export const HR_EMPLOYEE_RECORDS: OpSpec[] = [
   {
     "key": "hr.employee_records.get.hr.employee.change.requests",

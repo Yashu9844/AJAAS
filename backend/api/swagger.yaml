@@ -3778,6 +3778,184 @@ paths:
         '400': {description: 'VALIDATION_ERROR (justification required outside guideline or over budget)'}
         '404': {description: 'NOT_FOUND'}
         '409': {description: 'CYCLE_STATE / BUDGET_EXCEEDED'}
+  /hr/onboarding/templates:
+    post:
+      summary: 'Create a checklist template (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OnbTemplateInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    get:
+      summary: 'List templates (onboarding:read)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: kind, in: query, schema: {type: string, enum: [onboarding, offboarding]}}, {name: status, in: query, schema: {type: string, enum: [active, archived]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/onboarding/templates/{id}:
+    get:
+      summary: 'Get a template with its tasks (onboarding:read)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit a template; empty strings clear criteria (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OnbTemplateInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/onboarding/templates/{id}/tasks:
+    put:
+      summary: 'Replace the template tasks, 1-50 (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OnbTaskList'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /hr/onboarding/checklists:
+    post:
+      summary: 'Start a checklist by hand (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OnbStartInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+        '409': {description: 'CONFLICT (open checklist of this kind)'}
+    get:
+      summary: 'Checklists: all for onboarding:read, else those where I am the worker or the manager'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: kind, in: query, schema: {type: string, enum: [onboarding, offboarding]}}, {name: status, in: query, schema: {type: string, enum: [open, completed, cancelled]}}, {name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: department_id, in: query, schema: {type: string, format: uuid}}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreListEnvelope'}}}}
+  /hr/onboarding/checklists/{id}:
+    get:
+      summary: 'A checklist with tasks, clearance and progress (onboarding:read, the worker or the manager)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/onboarding/checklists/{id}/complete:
+    post:
+      summary: 'Complete early; open non-blocking tasks are skipped (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'BLOCKING_OPEN / CLEARANCE_PENDING / CHECKLIST_STATE'}
+  /hr/onboarding/checklists/{id}/cancel:
+    post:
+      summary: 'Cancel with a reason (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OnbReasonInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CHECKLIST_STATE'}
+  /hr/onboarding/checklists/{id}/clearances/{area}/clear:
+    post:
+      summary: 'Sign an exit clearance area (manager: the workers manager; others: onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: area, in: path, required: true, schema: {type: string, enum: [manager, hr, it, finance]}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/OnbReasonInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'ALREADY_CLEARED / CHECKLIST_STATE'}
+  /hr/onboarding/checklists/{id}/exit-interview:
+    put:
+      summary: 'Submit my exit interview once (the departing worker)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OnbExitInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'ALREADY_SUBMITTED / CHECKLIST_STATE'}
+    get:
+      summary: 'Read an exit interview (the worker or onboarding:exit_interview)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/onboarding/my-tasks:
+    get:
+      summary: 'Tasks assigned to me, plus pool tasks for onboarding:manage'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/onboarding/tasks/{id}/done:
+    post:
+      summary: 'Complete a task (its assignee or onboarding:manage); document tasks need a verified document'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/OnbReasonInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'TASK_STATE / TASK_BLOCKING / DOCUMENT_REQUIRED / CHECKLIST_STATE'}
+  /hr/onboarding/tasks/{id}/skip:
+    post:
+      summary: 'Skip a non-blocking task with a reason (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/OnbReasonInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'TASK_STATE / TASK_BLOCKING / DOCUMENT_REQUIRED / CHECKLIST_STATE'}
+  /hr/onboarding/tasks/{id}/reopen:
+    post:
+      summary: 'Reopen a task (onboarding:manage)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'TASK_STATE / TASK_BLOCKING / DOCUMENT_REQUIRED / CHECKLIST_STATE'}
+  /hr/onboarding/me:
+    get:
+      summary: 'My checklists with tasks'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+  /hr/onboarding/reports/progress:
+    get:
+      summary: 'Open and completed checklists, open and overdue tasks per department (onboarding:read)'
+      tags: [Onboarding]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: kind, in: query, schema: {type: string, enum: [onboarding, offboarding]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
 components:
   securitySchemes:
     BearerAuth:
@@ -4907,3 +5085,23 @@ components:
       type: object
       required: [increase_pct]
       properties: {increase_pct: {type: number, minimum: 0, maximum: 50}, justification: {type: string, maxLength: 1000}, override_budget: {type: boolean}}
+    OnbTemplateInput:
+      type: object
+      properties: {kind: {type: string, enum: [onboarding, offboarding]}, name: {type: string, maxLength: 150}, department_id: {type: string}, job_profile_id: {type: string}, location_id: {type: string}, worker_type: {type: string, enum: ['', employee, contractor, intern]}, status: {type: string, enum: [active, archived]}}
+    OnbTaskList:
+      type: array
+      items:
+        type: object
+        required: [title, owner_role]
+        properties: {title: {type: string, maxLength: 200}, description: {type: string, maxLength: 2000}, owner_role: {type: string, enum: [employee, manager, hr, it, finance]}, due_offset_days: {type: integer, minimum: -90, maximum: 365}, document_type: {type: string, maxLength: 50}, blocking: {type: boolean}}
+    OnbStartInput:
+      type: object
+      required: [employee_id, kind, anchor_date]
+      properties: {employee_id: {type: string, format: uuid}, kind: {type: string, enum: [onboarding, offboarding]}, anchor_date: {type: string, format: date}}
+    OnbReasonInput:
+      type: object
+      properties: {reason: {type: string, maxLength: 1000}, note: {type: string, maxLength: 1000}}
+    OnbExitInput:
+      type: object
+      required: [answers]
+      properties: {answers: {type: object, additionalProperties: {type: string, maxLength: 2000}}}

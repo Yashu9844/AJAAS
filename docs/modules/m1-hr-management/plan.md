@@ -16,7 +16,8 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 | performance | done (33 ops incl. calibration + continuous feedback), 2026-10-20 | `/dev-test/hr/performance`, 4 scenarios | P2: templates per role, peer nomination |
 | core | done (32 ops), 2026-10-21 | `/dev-test/hr/core`, 2 scenarios (live run pending) | `contexts/core/` |
 | compensation | done (24 ops), 2026-10-21 | `/dev-test/hr/compensation`, 1 scenario | `contexts/compensation/` |
-| onboarding, learning, benefits | not started | — | requirements in `specification.md` §5, §7, §8 |
+| onboarding | done (19 ops), 2026-10-22 | `/dev-test/hr/onboarding`, 1 scenario | `contexts/onboarding/`; hooks on core and recruitment; `onboarding/api.Clearance` for payroll final settlement |
+| learning, benefits | not started | — | requirements in `specification.md` §7, §8 |
 
 ## 2. Phases
 

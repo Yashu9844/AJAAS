@@ -1,8 +1,8 @@
 "use client";
 import { Checklist, OpGroup, ScenarioCard } from "./components";
-import { HR_ATTENDANCE, HR_COMPENSATION, HR_CORE, HR_LEAVE, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
+import { HR_ATTENDANCE, HR_COMPENSATION, HR_CORE, HR_LEAVE, HR_ONBOARDING, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
 import type { Scenario } from "./runner";
-import { S_ATTENDANCE, S_COMPENSATION, S_CORE, S_LEAVE, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
+import { S_ATTENDANCE, S_COMPENSATION, S_CORE, S_LEAVE, S_ONBOARDING, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
 import { Tabs } from "./shell";
 import type { ChecklistItem, OpSpec } from "./types";
 
@@ -75,6 +75,7 @@ export const HR_CHECKLISTS: Record<string, ChecklistItem[]> = {
   performance: items(S_PERFORMANCE),
   core: items(S_CORE),
   compensation: items(S_COMPENSATION),
+  onboarding: items(S_ONBOARDING),
 };
 
 export function HrPerformance() {
@@ -157,6 +158,18 @@ export function HrCompensation() {
       ops={HR_COMPENSATION}
       scenarios={S_COMPENSATION}
       checklist={HR_CHECKLISTS.compensation}
+    />
+  );
+}
+
+export function HrOnboarding() {
+  return (
+    <ContextPage
+      title="HR / Onboarding & Offboarding"
+      intro="Templates (most specific wins), checklists started by core hires/terminations and recruitment hires, tasks for the worker, manager or HR/IT/finance pool, document-backed tasks, exit clearance and exit interviews. onboarding:read | manage | exit_interview; /me and /my-tasks for everyone."
+      ops={HR_ONBOARDING}
+      scenarios={S_ONBOARDING}
+      checklist={HR_CHECKLISTS.onboarding}
     />
   );
 }

@@ -98,6 +98,9 @@ func TestRecruitmentLifecycle(t *testing.T) {
 	if s := sqlStr(t, "SELECT hired_count||'/'||status FROM recruitment_jobs WHERE id = ?", job); s != "1/filled" {
 		t.Fatalf("G10 job %s", s)
 	}
+	if s := sqlStr(t, "SELECT source||'/'||status FROM onb_checklists WHERE employee_profile_id = ? AND kind = 'onboarding'", hire.str("data.employee_id")); s != "recruitment/open" {
+		t.Fatalf("OB-03 recruitment hire starts onboarding: %s", s)
+	}
 	expectErr(t, tc.addCandidate(t, job, "late."+uniq()+"@example.com"), 409, "JOB_NOT_OPEN", "G4 filled job")
 
 	if n := sqlStr(t, "SELECT count(*) FROM recruitment_events_outbox WHERE tenant_id = ? AND (payload::text ILIKE ? OR payload::text LIKE '%Priya%' OR payload::text LIKE '%1800000%' OR payload::text LIKE '%excellent%')", tc.id, "%"+email+"%"); n != "0" {

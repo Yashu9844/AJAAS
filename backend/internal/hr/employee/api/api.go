@@ -34,3 +34,9 @@ type StatusChange struct {
 type Lifecycle interface {
 	ApplyCoreStatus(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, change StatusChange) (previous string, err error)
 }
+
+// Documents reads employee document verification for other contexts (onboarding OB-05).
+type Documents interface {
+	// VerifiedDocument returns the id of a verified document of the type, or nil.
+	VerifiedDocument(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, documentType string) (*uuid.UUID, error)
+}

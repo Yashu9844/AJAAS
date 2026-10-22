@@ -122,7 +122,7 @@ promotion), M0 (login deactivation/reactivation).
 its date; rescinded termination restores assignment, position and login; position never double-filled; full history
 reproducible "as of" any date.
 
-## 5. Context `onboarding` — onboarding and offboarding (planned)
+## 5. Context `onboarding` — onboarding and offboarding (built 2026-10-22; detail in `contexts/onboarding/`)
 
 **Entities (proposed):** `ChecklistTemplate` (kind `onboarding|offboarding`, applicability by department/job
 profile/location/worker type), `TemplateTask` (title, description, owner role `employee|manager|hr|it|finance`,

@@ -612,3 +612,79 @@ export const S_COMPENSATION: Scenario[] = [
     },
   },
 ];
+
+export const S_ONBOARDING: Scenario[] = [
+  {
+    key: "hr.onb",
+    module: "onboarding",
+    title: "Hire → onboarding checklist → document task → termination → clearance → exit interview → rescind (OG2–OG8)",
+    description:
+      "Creates department-specific onboarding and generic offboarding templates, hires a fresh worker through core (the checklist starts by itself, once), shows the worker's own tasks, refuses a document task until the document is verified, completes the rest (the checklist closes), terminates (offboarding from the last working day), refuses completion before clearance, signs the four clearances, takes the exit interview (an onboarding:read holder cannot read it) and rescinds the termination (its checklist is cancelled).",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const coreApprover = await limited(r, A, uid, "oca", [["core", "approve"], ["core", "read"]]);
+      const reader = await limited(r, A, uid, "ord", [["onboarding", "read"]]);
+      const w = await member(r, A, uid, "ow");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Onb ${uid}`, code: `ON${uid}`.toUpperCase() }), 201);
+      const dept = str(d, "data.id");
+      const fam = await r.call("Job family", tn(A, "POST", "/hr/core/job-families", { code: `OF${uid}`, name: `Onb family ${uid}` }), 201);
+      const g = await r.call("Grade", tn(A, "POST", "/hr/core/grades", { code: `O${uid}`, name: `Onb grade ${uid}`, rank: 60 }), [201, 409]);
+      const grades = await r.call("Grades", tn(A, "GET", "/hr/core/grades"), 200);
+      const grade = str(g, "data.id") || String(list(grades).find((x) => x.code === `O${uid}`)?.id ?? "");
+      const prof = await r.call("Job profile", tn(A, "POST", "/hr/core/job-profiles", { code: `OP${uid}`, title: "Associate", family_id: str(fam, "data.id"),
+        default_grade_id: grade, category: "staff", probation_days: 0 }), 201);
+      const pos = await r.call("Position", tn(A, "POST", "/hr/core/positions", { code: `OS${uid}`, title: "Associate seat", job_profile_id: str(prof, "data.id"),
+        department_id: dept }), 201);
+
+      const B = "/hr/onboarding";
+      const t1 = await r.call("Onboarding template for the department", tn(A, "POST", `${B}/templates`, { kind: "onboarding", name: `Dept ${uid}`, department_id: dept }), 201);
+      await r.call("Its tasks (document task is blocking)", tn(A, "PUT", `${B}/templates/${str(t1, "data.id")}/tasks`, [
+        { title: "Upload ID proof", owner_role: "employee", document_type: `id_${uid}`, blocking: true },
+        { title: "Laptop", owner_role: "it", due_offset_days: 1 },
+      ]), 200);
+      const t2 = await r.call("Offboarding template", tn(A, "POST", `${B}/templates`, { kind: "offboarding", name: `Exit ${uid}`, department_id: dept }), 201);
+      await r.call("Its tasks", tn(A, "PUT", `${B}/templates/${str(t2, "data.id")}/tasks`, [{ title: "Return laptop", owner_role: "it" }]), 200);
+
+      const act = async (name: string, type: string, date: string, changes: Record<string, unknown>) => {
+        const c = await r.call(`${name}: draft`, tn(A, "POST", "/hr/core/actions", { type, employee_id: w.empId, effective_date: date, reason_code: "console", changes }), 201);
+        await r.call(`${name}: submit`, tn(A, "POST", `/hr/core/actions/${str(c, "data.id")}/submit`), 200);
+        await r.call(`${name}: approve`, tn(coreApprover, "POST", `/hr/core/actions/${str(c, "data.id")}/approve`), 200);
+        return str(c, "data.id");
+      };
+      await act("Hire", "hire", isoDay(-3), { position_id: str(pos, "data.id"), worker_type: "employee", employment_type: "full_time" });
+      const lst = await r.call("One onboarding checklist started by the hire", tn(A, "GET", `${B}/checklists`, undefined, { kind: "onboarding", employee_id: w.empId }),
+        200, (e) => (list(e).length === 1 && list(e)[0].source === "core_action" ? null : "expected one core_action checklist"));
+      const cid = String(list(lst)[0]?.id ?? "");
+      const cl = await r.call("Checklist detail: 2 tasks", tn(A, "GET", `${B}/checklists/${cid}`), 200, (e) => (list(e, "data.tasks").length === 2 ? null : "expected 2 tasks"));
+      const tasks = list(cl, "data.tasks");
+      const [idTask, laptop] = [String(tasks[0]?.id ?? ""), String(tasks[1]?.id ?? "")];
+      await r.call("Worker sees their task", tn(w.S, "GET", `${B}/my-tasks`), 200, (e) => (list(e).length === 1 ? null : "expected 1 task"));
+      await r.call("Worker cannot do the IT task → 404", tn(w.S, "POST", `${B}/tasks/${laptop}/done`), 404);
+      await r.call("Document task without a verified document → 409", tn(w.S, "POST", `${B}/tasks/${idTask}/done`), 409);
+      const doc = await r.call("Register the document", tn(A, "POST", `/hr/employees/${w.empId}/documents`, { document_type: `id_${uid}`, file_name: "id.pdf",
+        file_url: "https://example.com/id.pdf", file_size: 1024, mime_type: "application/pdf" }), 201);
+      await r.call("Verify it", tn(A, "POST", `/hr/employees/${w.empId}/documents/${str(doc, "data.id")}/verify`), 200);
+      await r.call("Worker completes the document task", tn(w.S, "POST", `${B}/tasks/${idTask}/done`, { note: "uploaded" }), 200, (e) =>
+        str(e, "data.evidence_document_id") === str(doc, "data.id") ? null : "evidence missing",
+      );
+      await r.call("HR completes the IT task", tn(A, "POST", `${B}/tasks/${laptop}/done`), 200);
+      await r.call("Checklist completed by itself", tn(A, "GET", `${B}/checklists/${cid}`), 200, (e) => (str(e, "data.status") === "completed" ? null : "not completed"));
+
+      const term = await act("Terminate", "terminate", isoDay(0), { termination_type: "voluntary", last_working_day: isoDay(10) });
+      const off = await r.call("Offboarding checklist from the last working day", tn(A, "GET", `${B}/checklists`, undefined, { kind: "offboarding", employee_id: w.empId }),
+        200, (e) => (list(e).length === 1 && list(e)[0].anchor_date === isoDay(10) ? null : "expected one offboarding checklist"));
+      const oid = String(list(off)[0]?.id ?? "");
+      await r.call("Complete before clearance → 409 CLEARANCE_PENDING", tn(A, "POST", `${B}/checklists/${oid}/complete`), 409);
+      for (const area of ["manager", "hr", "it", "finance"]) {
+        await r.call(`Clear ${area}`, tn(A, "POST", `${B}/checklists/${oid}/clearances/${area}/clear`, { note: "ok" }), 200);
+      }
+      await r.call("Clear twice → 409", tn(A, "POST", `${B}/checklists/${oid}/clearances/hr/clear`), 409);
+      await r.call("Worker submits the exit interview", tn(w.S, "PUT", `${B}/checklists/${oid}/exit-interview`, { answers: { why: "growth" } }), 201);
+      await r.call("onboarding:read cannot read it → 404", tn(reader, "GET", `${B}/checklists/${oid}/exit-interview`), 404);
+      await r.call("HR (exit_interview) reads it", tn(A, "GET", `${B}/checklists/${oid}/exit-interview`), 200);
+      await r.call("Progress report", tn(A, "GET", `${B}/reports/progress`, undefined, { kind: "offboarding" }), 200);
+      await r.call("Rescind the termination", tn(coreApprover, "POST", `/hr/core/actions/${term}/rescind`, { reason: "withdrawn" }), 200);
+      await r.call("Offboarding checklist cancelled", tn(A, "GET", `${B}/checklists/${oid}`), 200, (e) => (str(e, "data.status") === "cancelled" ? null : "not cancelled"));
+    },
+  },
+];

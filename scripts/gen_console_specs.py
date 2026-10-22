@@ -22,6 +22,7 @@ CONTEXTS = {
     'performance': ('HR_PERFORMANCE', ['/hr/performance']),
     'core': ('HR_CORE', ['/hr/core']),
     'compensation': ('HR_COMPENSATION', ['/hr/compensation']),
+    'onboarding': ('HR_ONBOARDING', ['/hr/onboarding']),
     'employee_records': ('HR_EMPLOYEE_RECORDS', [b + r for b in ('/hr/employees/me', '/hr/employees/{id}') for r in
                          ('/emergency-contacts', '/education', '/prior-employment', '/change-requests')] + ['/hr/employee-change-requests']),
 }

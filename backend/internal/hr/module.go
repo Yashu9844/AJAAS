@@ -16,6 +16,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/hr/identityport"
 	"github.com/jaas/jaas/internal/hr/leave"
+	"github.com/jaas/jaas/internal/hr/onboarding"
 	"github.com/jaas/jaas/internal/hr/organization"
 	"github.com/jaas/jaas/internal/hr/payroll"
 	"github.com/jaas/jaas/internal/hr/performance"
@@ -50,6 +51,7 @@ type Module struct {
 	performance *performance.Module
 	core        *core.Module
 	comp        *compensation.Module
+	onb         *onboarding.Module
 }
 
 // New builds and prepares every HR context.
@@ -68,6 +70,11 @@ func New(ctx context.Context, o Options) (*Module, error) {
 		Audit: o.Identity.Audit(), Publisher: o.Publisher})
 	m.comp = compensation.NewModule(o.DB, compensation.Ports{Employees: emp, Core: m.core.Directory(), Ratings: m.performance.Ratings(),
 		Payroll: m.payroll.CTC(), Audit: o.Identity.Audit()})
+	m.onb = onboarding.NewModule(o.DB, onboarding.Ports{Employees: emp, Core: m.core.Directory(), Documents: m.employee.Documents(),
+		Audit: o.Identity.Audit()})
+	// OB-03: core actions and recruitment hires start onboarding/offboarding inside their own transactions.
+	m.core.OnActionCompleted(m.onb.Service().CoreHook)
+	m.recruitment.OnHired(m.onb.Service().RecruitmentHook)
 
 	// FR-M005 / FR-EV001: deactivating a login converges org mappings and the employee profile in the same transaction.
 	o.Identity.OnUserDeactivated(m.org.UserDeactivationConverger())
@@ -89,7 +96,6 @@ func (m *Module) migrate() error {
 	}
 	var all []interface{}
 	for _, ms := range [][]interface{}{m.org.RegisterModels(), m.employee.RegisterModels(), m.attendance.RegisterModels(),
-		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels(), m.comp.RegisterModels()} {
 		all = append(all, ms...)
 	}
 	if err := m.o.DB.AutoMigrate(all...); err != nil {
@@ -103,7 +109,7 @@ func (m *Module) registerPermissions(ctx context.Context) error {
 	for name, defs := range map[string][]access.PermissionDef{
 		"organization": organization.Catalogue(), "employee": employee.Catalogue(), "attendance": attendance.Catalogue(),
 		"leave": leave.Catalogue(), "payroll": payroll.Catalogue(), "recruitment": recruitment.Catalogue(),
-		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(),
+		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(), "onboarding": onboarding.Catalogue(),
 	} {
 		if err := m.o.Identity.RegisterPermissions(ctx, defs); err != nil {
 			return fmt.Errorf("%s permission catalogue: %w", name, err)
@@ -137,6 +143,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	m.performance.RegisterRoutes(rg, performance.RouteDeps{Identity: idp})
 	m.core.RegisterRoutes(rg, core.RouteDeps{Identity: idp})
 	m.comp.RegisterRoutes(rg, idp)
+	m.onb.RegisterRoutes(rg, idp)
 }
 
 // roleFacts adapts HR/Employee and HR/Organization to identityport.RoleFacts: employees hold the automatic Employee

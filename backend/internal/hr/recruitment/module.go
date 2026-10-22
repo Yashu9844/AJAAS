@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"github.com/jaas/jaas/internal/hr/identityport"
+	recruitmentAPI "github.com/jaas/jaas/internal/hr/recruitment/api"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,7 @@ type Module struct {
 	db         *gorm.DB
 	controller *controllers.Controller
 	relay      *services.OutboxRelay
+	hooks      *services.Hooks
 }
 
 // DepartmentReader is the Module 1 department lookup Module 6 needs (D6-03).
@@ -54,13 +56,14 @@ func NewModule(db *gorm.DB, p Ports) *Module {
 		Repos: services.Repos{Jobs: repositories.NewJobRepository(), Candidates: repositories.NewCandidateRepository(),
 			Interviews: repositories.NewInterviewRepository(), Offers: repositories.NewOfferRepository(), Outbox: repositories.NewOutboxRepository()},
 		Employees: p.Employees, Users: p.Users, Org: orgDirectory{db: db, depts: p.Departments, desigs: p.Designations},
-		Audit: p.Audit, Publisher: p.Publisher, Now: time.Now,
+		Audit: p.Audit, Publisher: p.Publisher, Now: time.Now, Hooks: &services.Hooks{},
 	}
 	return &Module{
 		db: db,
 		controller: controllers.New(controllers.Services{Jobs: services.NewJobService(deps), Candidates: services.NewCandidateService(deps),
 			Hire: services.NewHireService(deps), Interviews: services.NewInterviewService(deps), Offers: services.NewOfferService(deps)}),
 		relay: services.NewOutboxRelay(deps),
+		hooks: deps.Hooks,
 	}
 }
 
@@ -111,3 +114,6 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 
 // Relay exposes the outbox relay.
 func (m *Module) Relay() *services.OutboxRelay { return m.relay }
+
+// OnHired registers a hook run inside the hire transaction (onboarding OB-03).
+func (m *Module) OnHired(h recruitmentAPI.HireHook) { m.hooks.Add(h) }

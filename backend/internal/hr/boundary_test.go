@@ -18,7 +18,7 @@ import (
 func TestImportBoundaries(t *testing.T) {
 	const mod = "github.com/jaas/jaas/internal/"
 	contexts := map[string]bool{"organization": true, "employee": true, "attendance": true, "leave": true,
-		"payroll": true, "recruitment": true, "performance": true, "core": true, "compensation": true}
+		"payroll": true, "recruitment": true, "performance": true, "core": true, "compensation": true, "onboarding": true}
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") {
 			return err
