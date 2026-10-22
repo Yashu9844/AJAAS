@@ -2,8 +2,12 @@
 package leave
 
 import (
+	"context"
 	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/hr/leave/api"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/hr/leave/controllers"
@@ -21,6 +25,7 @@ type Module struct {
 	controllers routes.Controllers
 	relay       *services.OutboxRelay
 	unpaid      services.UnpaidLeave
+	holidays    repositories.HolidayRepository
 }
 
 // Ports are the cross-module collaborators Module 4 consumes (connections C2, C3, C8).
@@ -50,8 +55,9 @@ func NewModule(db *gorm.DB, p Ports) *Module {
 			Balance: controllers.NewBalanceController(services.NewBalanceService(deps)),
 			Request: controllers.NewRequestController(services.NewRequestService(deps)),
 		},
-		relay:  services.NewOutboxRelay(deps),
-		unpaid: services.NewUnpaidLeave(deps),
+		relay:    services.NewOutboxRelay(deps),
+		unpaid:   services.NewUnpaidLeave(deps),
+		holidays: deps.Repos.Holidays,
 	}
 }
 
@@ -82,3 +88,15 @@ func (m *Module) UnpaidLeave() services.UnpaidLeave { return m.unpaid }
 
 // Relay exposes the outbox relay; cmd/main.go runs it until shutdown.
 func (m *Module) Relay() *services.OutboxRelay { return m.relay }
+
+// Holidays is the holiday-calendar port other HR contexts use (leave/api).
+func (m *Module) Holidays() api.Holidays { return holidayPort{repo: m.holidays} }
+
+type holidayPort struct {
+	repo repositories.HolidayRepository
+}
+
+func (h holidayPort) IsHoliday(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, date time.Time) (bool, error) {
+	row, err := h.repo.FindByDate(ctx, db, tenantID, date)
+	return err == nil && row != nil && !row.IsOptional, err
+}

@@ -35,3 +35,12 @@ func (m *Module) DirectManager(ctx context.Context, tenantID, userID uuid.UUID) 
 	}
 	return rows[0].ManagerUserID, nil
 }
+
+// DirectReportUserIDs lists the users whose primary active mapping reports to the manager (attendance AP-01).
+func (m *Module) DirectReportUserIDs(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := m.db.WithContext(ctx).Model(&models.Mapping{}).
+		Where("tenant_id = ? AND status = ? AND is_primary = ? AND manager_user_id = ?", tenantID, "active", true, managerUserID).
+		Distinct().Pluck("user_id", &ids).Error
+	return ids, err
+}

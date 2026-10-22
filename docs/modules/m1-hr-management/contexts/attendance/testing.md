@@ -134,3 +134,18 @@ From the partner frontend test guide (2026-10-09). Paths are the pre-restructure
 - [ ] **Summary card:** the counts match the records.
 - [ ] **RBAC:** the member gets 403 on records, summary, shifts and the regularization list, but `/me`, punch and own regularizations work. *(G9)*
 - [ ] **Privacy:** no IP address is ever shown in any response.
+
+## Parity evidence (2026-10-22)
+
+| # | Behaviour | Location |
+|---|---|---|
+| AG1 | Inbox shows only a manager's reports; a stranger cannot decide (404); `scope=all` needs tenant `attendance:approve` | `ops` unit + `TestAttendanceParity` |
+| AG2 | Overtime threshold, daily and monthly caps and rates are exact integers; week-off days count fully | `ops` unit + `TestAttendanceParity` |
+| AG3 | A roster lays segments end to end; an overlap changes nothing for any worker | `ops` unit + `TestAttendanceParity` |
+| AG4 | Auto-absent is idempotent and leaves punched, leave and regularized days alone; week-off and holiday days are marked as such | `ops` unit + `TestAttendanceParity` |
+| AG5 | An import with one bad row writes nothing; dry run validates only; overwrite replaces; audit carries no punch times | `ops` unit + `TestAttendanceParity` |
+
+- Package `internal/hr/attendance/ops` (migrations hr/000069–000072, up/down/up verified), 90% unit coverage; the gorm
+  store is covered by integration.
+- Contract: 15 new operations in `backend/api/swagger.yaml` (tag Attendance operations).
+- Console: the attendance page lists 34 operations; scenario `hr.att.ops`.

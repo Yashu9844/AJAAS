@@ -44,41 +44,12 @@ func (s *regularizationService) Approve(ctx context.Context, a Actor, id uuid.UU
 
 // applyToRecord supersedes existing punches and inserts the requested in/out (AT-017, AT-019).
 func (s *regularizationService) applyToRecord(ctx context.Context, tx *gorm.DB, g *models.Regularization) error {
-	if err := s.Repos.Records.LockEmployee(ctx, tx, g.TenantID, g.EmployeeProfileID); err != nil {
-		return err
-	}
-	shift, err := s.shiftOn(ctx, tx, g.TenantID, g.EmployeeProfileID, g.AttendanceDate)
+	rec, err := s.setWindow(ctx, tx, g.TenantID, g.EmployeeProfileID, g.AttendanceDate, g.RequestedPunchIn, g.RequestedPunchOut, models.SourceRegularization)
 	if err != nil {
 		return err
 	}
-	seed := &models.AttendanceRecord{TenantID: g.TenantID, EmployeeProfileID: g.EmployeeProfileID,
-		AttendanceDate: g.AttendanceDate, Status: models.StatusAbsent, Source: models.SourceRegularization}
-	if shift != nil {
-		seed.ShiftID = &shift.ID
-	}
-	rec, err := s.Repos.Records.FindOrCreate(ctx, tx, seed)
-	if err != nil {
-		return err
-	}
-	if err := s.Repos.Punches.SupersedeForRecord(ctx, tx, g.TenantID, rec.ID); err != nil {
-		return err
-	}
-	ins := []*models.AttendancePunch{
-		{TenantID: g.TenantID, AttendanceRecordID: rec.ID, EmployeeProfileID: g.EmployeeProfileID, PunchTime: g.RequestedPunchIn, PunchType: models.PunchIn, Source: models.SourceRegularization},
-		{TenantID: g.TenantID, AttendanceRecordID: rec.ID, EmployeeProfileID: g.EmployeeProfileID, PunchTime: g.RequestedPunchOut, PunchType: models.PunchOut, Source: models.SourceRegularization},
-	}
-	for _, p := range ins {
-		if err := s.Repos.Punches.Create(ctx, tx, p); err != nil {
-			return err
-		}
-	}
-	rec.IsRegularized = true
 	g.AttendanceRecordID = &rec.ID
-	recShift, err := s.shiftByID(ctx, tx, g.TenantID, rec.ShiftID)
-	if err != nil {
-		return err
-	}
-	return s.recompute(ctx, tx, rec, recShift, s.Now().UTC())
+	return nil
 }
 
 // Reject closes a pending request with a mandatory comment (AT-016).

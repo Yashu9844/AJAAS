@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/hr/attendance"
+	attendanceOps "github.com/jaas/jaas/internal/hr/attendance/ops"
 	"github.com/jaas/jaas/internal/hr/compensation"
 	"github.com/jaas/jaas/internal/hr/core"
 	"github.com/jaas/jaas/internal/hr/employee"
@@ -52,6 +53,7 @@ type Module struct {
 	core        *core.Module
 	comp        *compensation.Module
 	onb         *onboarding.Module
+	attOps      *attendanceOps.Module
 }
 
 // New builds and prepares every HR context.
@@ -66,6 +68,8 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	m.recruitment = recruitment.NewModule(o.DB, recruitment.Ports{Employees: emp, Users: o.Identity.Users(),
 		Departments: m.org.DepartmentService(), Designations: m.org.DesignationService(), Audit: o.Identity.Audit(), Publisher: o.Publisher})
 	m.performance = performance.NewModule(o.DB, performance.Ports{Employees: emp, Managers: m.org, Audit: o.Identity.Audit(), Publisher: o.Publisher})
+	m.attOps = attendanceOps.NewModule(o.DB, attendanceOps.Ports{Employees: emp, Reports: m.org, Writer: m.attendance.TimeWriter(),
+		Regs: m.attendance.Regularizations(), Holidays: m.leave.Holidays(), Audit: o.Identity.Audit()})
 	m.core = core.NewModule(o.DB, core.Ports{Employees: emp, Lifecycle: m.employee.Lifecycle(), Org: m.org, Logins: o.Identity.Users(),
 		Audit: o.Identity.Audit(), Publisher: o.Publisher})
 	m.comp = compensation.NewModule(o.DB, compensation.Ports{Employees: emp, Core: m.core.Directory(), Ratings: m.performance.Ratings(),
@@ -96,6 +100,7 @@ func (m *Module) migrate() error {
 	}
 	var all []interface{}
 	for _, ms := range [][]interface{}{m.org.RegisterModels(), m.employee.RegisterModels(), m.attendance.RegisterModels(),
+		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels(), m.comp.RegisterModels(), m.onb.RegisterModels(), m.attOps.RegisterModels()} {
 		all = append(all, ms...)
 	}
 	if err := m.o.DB.AutoMigrate(all...); err != nil {
@@ -129,6 +134,7 @@ func (m *Module) startRelays() {
 	go m.performance.Relay().Run(m.o.Background)
 	go m.core.Relay().Run(m.o.Background)
 	go m.core.RunEffects(m.o.Background)
+	go m.attOps.RunAutoAbsent(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("attendance auto-absent sweep failed") })
 }
 
 // RegisterRoutes mounts every HR context under rg (the /api/v1/hr group).
@@ -144,6 +150,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	m.core.RegisterRoutes(rg, core.RouteDeps{Identity: idp})
 	m.comp.RegisterRoutes(rg, idp)
 	m.onb.RegisterRoutes(rg, idp)
+	m.attOps.RegisterRoutes(rg, idp)
 }
 
 // roleFacts adapts HR/Employee and HR/Organization to identityport.RoleFacts: employees hold the automatic Employee

@@ -175,3 +175,29 @@ Leave requests/balances/policies (HR/Leave — writes `on_leave` via contract). 
 - A3-05 HR/Leave will write `on_leave` only through contract C10; HR/Attendance never infers leave.
 - A3-06 Dev schema comes from GORM AutoMigrate; SQL migrations 000026–000031 are the production path and must produce the same tables (verified at P7).
 - A3-07 Live tests run on a machine with Docker Desktop + Go 1.27.1 (this machine as of 2026-10-08).
+
+## Parity (2026-10-22): manager inbox, overtime policy, rosters, auto-absent, bulk import
+
+Package `internal/hr/attendance/ops`, routes under `/api/v1/hr/attendance`. Permissions are the existing
+`attendance:read | manage | approve`; the inbox and its decisions need only a login with an employee profile.
+
+| ID | Requirement |
+|---|---|
+| AP-01 | Inbox: `GET /inbox` returns pending regularizations of the caller's direct reports (organization mappings, primary and active). A holder of `attendance:approve` at tenant scope may pass `scope=all` to see every pending request. Never includes the caller's own request. |
+| AP-02 | `POST /inbox/{id}/approve` and `/reject` let a manager decide a report's request through the same rules as AT-016/AT-017 (self-approval refused, reject needs a comment). A request of someone who is not the caller's report is 404 unless the caller holds tenant-scope `attendance:approve`. |
+| AP-03 | Policy: `PUT/GET /policy` (`manage` / `read`): `week_off_days` (weekday numbers 0=Sunday..6, default `[0,6]`), `overtime_min_daily` (minutes, default 30), `overtime_max_daily` (default 240), `overtime_max_monthly` (default 3600), `overtime_rate_weekday` and `overtime_rate_week_off` (hundredths of the hourly rate, default 150 and 200), `auto_absent_enabled` (default false). One row per tenant; `GET` returns the defaults when none was saved. Validation: weekday list distinct 0..6, minimum ≤ daily maximum ≤ 1440, rates 100..500. |
+| AP-04 | Overtime report: `GET /overtime/report?month=YYYY-MM[&employee_id=]` (`read`). Per worker and day, eligible minutes = the record's `overtime_minutes` when ≥ the daily minimum, else 0, capped at the daily maximum. On a week-off day the whole worked time counts as overtime. A worker's month total is capped at the monthly maximum (earliest days first). `weighted_minutes` = Σ eligible × rate / 100 (weekday or week-off rate). Exact integer arithmetic. |
+| AP-05 | Rosters: `POST /rosters` and `PATCH /rosters/{id}` (`manage`), `GET /rosters`, `GET /rosters/{id}` (`read`). A roster has a unique name (case-insensitive), a status `active|archived` and a pattern of 1–12 segments `{shift_id, days}` (days 1–31, the shift must be active). |
+| AP-06 | `POST /rosters/{id}/apply {employee_ids, from, cycles}` (`manage`) lays the pattern end to end from `from` for `cycles` repeats (1–26) as ordinary shift assignments. All or nothing: any overlap with an existing assignment (AT-011) is 409 `ROSTER_OVERLAP` naming the worker; at most 100 workers and 200 assignments per worker. Archived rosters cannot be applied. |
+| AP-07 | Auto-absent: for a date D, every working worker (status active, probation or notice, joined on or before D) with no record for D gets a `system` record: `week_off` on a week-off day, `holiday` on a tenant holiday, otherwise `absent`. Idempotent: a worker with any record (punched, leave, regularized) is untouched, and running twice creates nothing the second time. |
+| AP-08 | `POST /jobs/auto-absent {date?}` (`manage`) runs AP-07 for the caller's tenant (default yesterday; D must be before today and within the last 31 days) and returns `{date, absent, week_off, holiday, skipped}`; the run is logged. A daily background sweep does the same for the previous day in every tenant with `auto_absent_enabled`. |
+| AP-09 | A later punch or approved regularization on a `system` record recomputes it like any other record (AT-021); `summary` counts follow AT-020 unchanged. |
+| AP-10 | Bulk import: `POST /imports {dry_run, rows}` (`manage`), 1–500 rows `{employee_code, date, punch_in, punch_out}` (RFC 3339 instants). Rules per row: worker exists by code; date within the last 90 days and not in the future; out after in, span ≤ 20 h, local date of `in` matches `date` (AT-014 attribution); no duplicate worker/date in the batch; an existing record with punches is an error `EXISTS` unless `overwrite` is true (then AT-017 supersede). |
+| AP-11 | Import is atomic: if any row has an error nothing is written (200 with `applied: 0` and per-row errors); `dry_run` validates only. Applied rows become records with source `import` and `is_regularized = true`, totals recomputed per AT-006..AT-010. Every real import is logged (`GET /imports`, `read`). |
+| AP-12 | Privacy: audit and logs carry ids, dates and counts, never punch times. |
+
+Errors: `ROSTER_OVERLAP` (409), `ROSTER_ARCHIVED` (409), `JOB_WINDOW` (400), `IMPORT_TOO_LARGE` (400).
+
+**Golden tests:** `AG1` inbox shows only reports and a manager cannot decide a stranger's request; `AG2` overtime
+caps and rates are exact; `AG3` a roster lays segments end to end and an overlap changes nothing; `AG4` auto-absent
+is idempotent and respects punches, leave, week-off and holidays; `AG5` an import with one bad row writes nothing.

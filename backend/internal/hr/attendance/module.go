@@ -3,6 +3,7 @@ package attendance
 
 import (
 	"context"
+	"github.com/jaas/jaas/internal/hr/attendance/api"
 	"github.com/jaas/jaas/internal/hr/identityport"
 	"time"
 
@@ -30,6 +31,9 @@ type Module struct {
 	controllers routes.Controllers
 	relay       *services.OutboxRelay
 	leaveSync   services.LeaveSync
+	writer      services.TimeWriter
+	regs        services.RegularizationService
+	records     repositories.RecordRepository
 }
 
 // NewModule wires repositories, services and controllers over Module 0 audit and Module 2 employees.
@@ -55,6 +59,9 @@ func NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeAP
 		},
 		relay:     services.NewOutboxRelay(deps),
 		leaveSync: services.NewLeaveSync(deps),
+		writer:    services.NewTimeWriter(deps),
+		regs:      services.NewRegularizationService(deps),
+		records:   deps.Repos.Records,
 	}
 }
 
@@ -113,4 +120,23 @@ func (d employeeDirectory) CountWorking(ctx context.Context, tenantID uuid.UUID)
 		total += n
 	}
 	return total, nil
+}
+
+// TimeWriter is the write port the parity package (attendance/ops) uses.
+func (m *Module) TimeWriter() services.TimeWriter { return m.writer }
+
+// Regularizations is the regularization service the manager inbox decides through (AP-02).
+func (m *Module) Regularizations() services.RegularizationService { return m.regs }
+
+// Presence is the worked-time port other HR contexts use (attendance/api).
+func (m *Module) Presence() api.Presence { return presence{records: m.records} }
+
+type presence struct{ records repositories.RecordRepository }
+
+func (p presence) WorkedMinutes(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (int, error) {
+	rec, err := p.records.FindByDate(ctx, db, tenantID, employeeID, date)
+	if err != nil || rec == nil {
+		return 0, err
+	}
+	return rec.TotalWorkMinutes, nil
 }

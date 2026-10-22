@@ -230,9 +230,9 @@ product decision. Each is added to its context's specification (with goldens) wh
 | employee | Personal-data change requests with approval (bank, address, name) | P1 | done 2026-10-21 (FR-CR) |
 | employee | Emergency contacts, education, prior employment | P1 | done 2026-10-21 (FR-ER) |
 | employee | Document files (upload/download) | P2 | M8 Documents; metadata exists today |
-| attendance | Manager-scoped approval inbox | P1 | |
-| attendance | Overtime calculation and rosters / shift rotations | P1 | |
-| attendance | Nightly auto-absent job, bulk import | P1 | |
+| attendance | Manager-scoped approval inbox | P1 | done 2026-10-22 (AP-01, AP-02) |
+| attendance | Overtime calculation and rosters / shift rotations | P1 | done 2026-10-22 (AP-03..AP-06) |
+| attendance | Nightly auto-absent job, bulk import | P1 | done 2026-10-22 (AP-07..AP-11) |
 | attendance | Geofence enforcement (coordinates already stored) | P2 | |
 | leave | Manager-routed approvals and team calendar | P1 | multi-step through M7 later |
 | leave | Per-location holiday calendars and weekly-off patterns | P1 | depends on organization locations |

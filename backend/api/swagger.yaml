@@ -3956,6 +3956,141 @@ paths:
       parameters: [{name: kind, in: query, schema: {type: string, enum: [onboarding, offboarding]}}]
       responses:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/attendance/inbox:
+    get:
+      summary: 'Pending regularizations of my direct reports (scope=all needs attendance:approve at tenant scope)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: scope, in: query, schema: {type: string, enum: [team, all]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+  /hr/attendance/inbox/{id}/approve:
+    post:
+      summary: 'Approve a reports regularization (same rules as AT-016)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/AttReviewInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REGULARIZATION_NOT_PENDING'}
+  /hr/attendance/inbox/{id}/reject:
+    post:
+      summary: 'Reject a reports regularization (same rules as AT-016)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/AttReviewInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REGULARIZATION_NOT_PENDING'}
+  /hr/attendance/policy:
+    put:
+      summary: 'Save the attendance policy: week-off days, overtime rules, auto-absent switch (attendance:manage)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttPolicyInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    get:
+      summary: 'The attendance policy, or the defaults (attendance:read)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/attendance/overtime/report:
+    get:
+      summary: 'Eligible and rate-weighted overtime minutes per worker for a month (attendance:read)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: month, in: query, required: true, schema: {type: string, example: '2026-06'}}, {name: employee_id, in: query, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/attendance/rosters:
+    post:
+      summary: 'Create a roster: a repeating pattern of shift segments (attendance:manage)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttRosterInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT / INACTIVE_REFERENCE'}
+    get:
+      summary: 'List rosters (attendance:read)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, archived]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/attendance/rosters/{id}:
+    get:
+      summary: 'Get a roster (attendance:read)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit or archive a roster (attendance:manage)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttRosterInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /hr/attendance/rosters/{id}/apply:
+    post:
+      summary: 'Lay a roster over workers as shift assignments, all or nothing (attendance:manage)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttRosterApply'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND / EMPLOYEE_NOT_FOUND'}
+        '409': {description: 'ROSTER_OVERLAP / ROSTER_ARCHIVED'}
+  /hr/attendance/jobs/auto-absent:
+    post:
+      summary: 'Mark workers without a record absent, week_off or holiday for a past day (attendance:manage)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/AttAutoAbsentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'JOB_WINDOW'}
+  /hr/attendance/jobs/runs:
+    get:
+      summary: 'Recent auto-absent runs (attendance:read)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/attendance/imports:
+    post:
+      summary: 'Bulk import punches atomically; dry_run validates only (attendance:manage)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttImportInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'IMPORT_TOO_LARGE / VALIDATION_ERROR'}
+    get:
+      summary: 'Recent applied imports (attendance:read)'
+      tags: [Attendance operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
 components:
   securitySchemes:
     BearerAuth:
@@ -5105,3 +5240,40 @@ components:
       type: object
       required: [answers]
       properties: {answers: {type: object, additionalProperties: {type: string, maxLength: 2000}}}
+    AttReviewInput:
+      type: object
+      properties: {comment: {type: string, maxLength: 500}}
+    AttPolicyInput:
+      type: object
+      required: [week_off_days, overtime_min_daily, overtime_max_daily, overtime_max_monthly, overtime_rate_weekday, overtime_rate_week_off]
+      properties: {week_off_days: {type: array, items: {type: integer, minimum: 0, maximum: 6}}, overtime_min_daily: {type: integer}, overtime_max_daily: {type: integer}, overtime_max_monthly: {type: integer}, overtime_rate_weekday: {type: integer, minimum: 100, maximum: 500}, overtime_rate_week_off: {type: integer, minimum: 100, maximum: 500}, auto_absent_enabled: {type: boolean}}
+    AttRosterInput:
+      type: object
+      properties:
+        name: {type: string, maxLength: 100}
+        status: {type: string, enum: [active, archived]}
+        pattern:
+          type: array
+          items:
+            type: object
+            required: [shift_id, days]
+            properties: {shift_id: {type: string, format: uuid}, days: {type: integer, minimum: 1, maximum: 31}}
+    AttRosterApply:
+      type: object
+      required: [employee_ids, from, cycles]
+      properties: {employee_ids: {type: array, items: {type: string, format: uuid}}, from: {type: string, format: date}, cycles: {type: integer, minimum: 1, maximum: 26}}
+    AttAutoAbsentInput:
+      type: object
+      properties: {date: {type: string, format: date}}
+    AttImportInput:
+      type: object
+      required: [rows]
+      properties:
+        dry_run: {type: boolean}
+        overwrite: {type: boolean}
+        rows:
+          type: array
+          items:
+            type: object
+            required: [employee_code, date, punch_in, punch_out]
+            properties: {employee_code: {type: string}, date: {type: string, format: date}, punch_in: {type: string, format: date-time}, punch_out: {type: string, format: date-time}}

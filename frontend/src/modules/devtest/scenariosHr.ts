@@ -103,6 +103,67 @@ export const S_ATTENDANCE: Scenario[] = [
       await r.call("attendance:read cannot create shifts → 403", tn(reader, "POST", "/hr/shifts", { name: "X", start_time: "09:00", end_time: "18:00" }), 403);
     },
   },
+  {
+    key: "hr.att.ops",
+    module: "attendance",
+    title: "Manager inbox, policy, overtime, roster, auto-absent and bulk import (AG1–AG5)",
+    description:
+      "A manager (no HR permission) sees and decides a report's regularization while a stranger cannot; HR saves the policy and reads the overtime report; a two-segment roster is laid over a worker and an overlapping apply changes nothing; the auto-absent job marks only workers without a record and is idempotent; a bulk import with one bad row writes nothing, a clean one applies, a repeat is refused until overwrite.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const w = await member(r, A, uid, "ao");
+      const boss = await member(r, A, uid, "ab");
+      const peer = await member(r, A, uid, "ap");
+      const d = await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Att ${uid}`, code: `AT${uid}`.toUpperCase() }), 201);
+      await r.call("Worker reports to the manager", tn(A, "POST", "/hr/mappings", { user_id: w.userId, department_id: str(d, "data.id"), manager_user_id: boss.userId, is_primary: true }), 201);
+      const day = ymd(addDays(new Date(), -1));
+      const reg = await r.call("Worker requests a regularization", tn(w.S, "POST", "/hr/attendance/regularizations", {
+        attendance_date: day, requested_punch_in: `${day}T09:00:00Z`, requested_punch_out: `${day}T18:00:00Z`, reason: "forgot" }), 201);
+      const rid = str(reg, "data.id");
+      await r.call("Manager inbox shows it", tn(boss.S, "GET", "/hr/attendance/inbox"), 200, (e) => (list(e).length === 1 ? null : "expected 1 item"));
+      await r.call("Stranger inbox is empty", tn(peer.S, "GET", "/hr/attendance/inbox"), 200, (e) => (list(e).length === 0 ? null : "expected none"));
+      await r.call("scope=all needs attendance:approve → 403", tn(boss.S, "GET", "/hr/attendance/inbox", undefined, { scope: "all" }), 403);
+      await r.call("Stranger cannot decide → 404", tn(peer.S, "POST", `/hr/attendance/inbox/${rid}/approve`), 404);
+      await r.call("Manager approves", tn(boss.S, "POST", `/hr/attendance/inbox/${rid}/approve`, { comment: "ok" }), 200);
+      await r.call("Deciding again → 409", tn(boss.S, "POST", `/hr/attendance/inbox/${rid}/reject`, { comment: "late" }), 409);
+
+      await r.call("Save the policy", tn(A, "PUT", "/hr/attendance/policy", { week_off_days: [0, 6], overtime_min_daily: 30, overtime_max_daily: 240,
+        overtime_max_monthly: 3600, overtime_rate_weekday: 150, overtime_rate_week_off: 200, auto_absent_enabled: true }), 200);
+      await r.call("Overtime report for the month", tn(A, "GET", "/hr/attendance/overtime/report", undefined, { month: day.slice(0, 7), employee_id: w.empId }), 200, (e) =>
+        list(e, "data.lines").length === 1 ? null : "expected one line",
+      );
+
+      const mk = async (name: string, start: string, end: string) =>
+        str(await r.call(`Shift ${name}`, tn(A, "POST", "/hr/shifts", { name: `${name} ${uid}`, start_time: start, end_time: end, grace_period_mins: 0, break_duration_mins: 0 }), 201), "data.id");
+      const [early, late] = [await mk("Early", "06:00", "14:00"), await mk("Late", "14:00", "22:00")];
+      const ro = await r.call("Roster: 7 early, 7 late", tn(A, "POST", "/hr/attendance/rosters", { name: `Rotation ${uid}`, pattern: [{ shift_id: early, days: 7 }, { shift_id: late, days: 7 }] }), 201);
+      const from = ymd(addDays(new Date(), 60));
+      await r.call("Apply for 2 cycles → 4 assignments", tn(A, "POST", `/hr/attendance/rosters/${str(ro, "data.id")}/apply`, { employee_ids: [w.empId], from, cycles: 2 }), 200, (e) =>
+        num(e, "data.assignments") === 4 ? null : "expected 4",
+      );
+      await r.call("Overlapping apply → 409 ROSTER_OVERLAP", tn(A, "POST", `/hr/attendance/rosters/${str(ro, "data.id")}/apply`, { employee_ids: [boss.empId, w.empId], from, cycles: 1 }), 409);
+
+      await r.call("Auto-absent for yesterday", tn(A, "POST", "/hr/attendance/jobs/auto-absent", { date: day }), 200);
+      await r.call("Again → nothing new", tn(A, "POST", "/hr/attendance/jobs/auto-absent", { date: day }), 200, (e) =>
+        num(e, "data.absent") === 0 && num(e, "data.week_off") === 0 ? null : "expected idempotent run",
+      );
+      await r.call("Today is outside the window → 400", tn(A, "POST", "/hr/attendance/jobs/auto-absent", { date: ymd(new Date()) }), 400);
+
+      const d5 = ymd(addDays(new Date(), -5));
+      const good = { employee_code: `ao-${uid}`.toUpperCase().slice(0, 30), date: d5, punch_in: `${d5}T09:00:00Z`, punch_out: `${d5}T18:00:00Z` };
+      await r.call("Import with an unknown code writes nothing", tn(A, "POST", "/hr/attendance/imports", { rows: [good, { ...good, employee_code: "NOPE-0" }] }), 200, (e) =>
+        num(e, "data.applied") === 0 && list(e, "data.errors").length === 1 ? null : "expected one row error and nothing applied",
+      );
+      await r.call("Dry run is clean", tn(A, "POST", "/hr/attendance/imports", { dry_run: true, rows: [good] }), 200, (e) => (list(e, "data.errors").length === 0 ? null : "expected no errors"));
+      await r.call("Import applies", tn(A, "POST", "/hr/attendance/imports", { rows: [good] }), 200, (e) => (num(e, "data.applied") === 1 ? null : "expected 1 applied"));
+      await r.call("Repeat is refused (EXISTS)", tn(A, "POST", "/hr/attendance/imports", { rows: [good] }), 200, (e) =>
+        str(e, "data.errors.0.code") === "EXISTS" ? null : "expected EXISTS",
+      );
+      await r.call("Overwrite replaces", tn(A, "POST", "/hr/attendance/imports", { overwrite: true, rows: [good] }), 200, (e) => (num(e, "data.applied") === 1 ? null : "expected 1 applied"));
+      await r.call("Import log", tn(A, "GET", "/hr/attendance/imports"), 200, (e) => (list(e).length === 2 ? null : "expected 2 imports"));
+      await r.call("Worker cannot import → 403", tn(w.S, "POST", "/hr/attendance/imports", { rows: [good] }), 403);
+    },
+  },
 ];
 
 export const S_LEAVE: Scenario[] = [

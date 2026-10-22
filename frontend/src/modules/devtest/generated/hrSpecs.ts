@@ -3,6 +3,151 @@ import type { OpSpec } from "../types";
 
 export const HR_ATTENDANCE: OpSpec[] = [
   {
+    "key": "hr.attendance.post.hr.attendance.imports",
+    "label": "Bulk import punches atomically; dry_run validates only (attendance:manage)",
+    "method": "POST",
+    "path": "/hr/attendance/imports",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "dry_run",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "overwrite",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "rows",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 IMPORT_TOO_LARGE / VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.attendance.get.hr.attendance.imports",
+    "label": "Recent applied imports (attendance:read)",
+    "method": "GET",
+    "path": "/hr/attendance/imports",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.attendance.get.hr.attendance.inbox",
+    "label": "Pending regularizations of my direct reports (scope=all needs attendance:approve at tenant scope)",
+    "method": "GET",
+    "path": "/hr/attendance/inbox",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "scope",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "team",
+          "all"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN"
+  },
+  {
+    "key": "hr.attendance.post.hr.attendance.inbox.id.approve",
+    "label": "Approve a reports regularization (same rules as AT-016)",
+    "method": "POST",
+    "path": "/hr/attendance/inbox/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attendanceInboxId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REGULARIZATION_NOT_PENDING"
+  },
+  {
+    "key": "hr.attendance.post.hr.attendance.inbox.id.reject",
+    "label": "Reject a reports regularization (same rules as AT-016)",
+    "method": "POST",
+    "path": "/hr/attendance/inbox/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attendanceInboxId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 SELF_APPROVAL_FORBIDDEN; 404 NOT_FOUND; 409 REGULARIZATION_NOT_PENDING"
+  },
+  {
+    "key": "hr.attendance.post.hr.attendance.jobs.auto.absent",
+    "label": "Mark workers without a record absent, week_off or holiday for a past day (attendance:manage)",
+    "method": "POST",
+    "path": "/hr/attendance/jobs/auto-absent",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "date",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 JOB_WINDOW"
+  },
+  {
+    "key": "hr.attendance.get.hr.attendance.jobs.runs",
+    "label": "Recent auto-absent runs (attendance:read)",
+    "method": "GET",
+    "path": "/hr/attendance/jobs/runs",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
     "key": "hr.attendance.get.hr.attendance.me",
     "label": "Caller's own records (max 62 days, default last 7)",
     "method": "GET",
@@ -35,6 +180,96 @@ export const HR_ATTENDANCE: OpSpec[] = [
       200
     ],
     "note": "Errors: 404 EMPLOYEE_NOT_FOUND"
+  },
+  {
+    "key": "hr.attendance.get.hr.attendance.overtime.report",
+    "label": "Eligible and rate-weighted overtime minutes per worker for a month (attendance:read)",
+    "method": "GET",
+    "path": "/hr/attendance/overtime/report",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "month",
+        "where": "query",
+        "required": true
+      },
+      {
+        "name": "employee_id",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.attendance.get.hr.attendance.policy",
+    "label": "The attendance policy, or the defaults (attendance:read)",
+    "method": "GET",
+    "path": "/hr/attendance/policy",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.attendance.put.hr.attendance.policy",
+    "label": "Save the attendance policy: week-off days, overtime rules, auto-absent switch (attendance:manage)",
+    "method": "PUT",
+    "path": "/hr/attendance/policy",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "week_off_days",
+        "where": "body",
+        "type": "json",
+        "required": true
+      },
+      {
+        "name": "overtime_min_daily",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "overtime_max_daily",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "overtime_max_monthly",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "overtime_rate_weekday",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "overtime_rate_week_off",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "auto_absent_enabled",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
   },
   {
     "key": "hr.attendance.post.hr.attendance.punch",
@@ -347,6 +582,165 @@ export const HR_ATTENDANCE: OpSpec[] = [
       200
     ],
     "note": "Errors: 400 VALIDATION_ERROR (comment required); 403 SELF_APPROVAL_FORBIDDEN | FORBIDDEN"
+  },
+  {
+    "key": "hr.attendance.post.hr.attendance.rosters",
+    "label": "Create a roster: a repeating pattern of shift segments (attendance:manage)",
+    "method": "POST",
+    "path": "/hr/attendance/rosters",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      },
+      {
+        "name": "pattern",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "attendanceRostersId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT / INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.attendance.get.hr.attendance.rosters",
+    "label": "List rosters (attendance:read)",
+    "method": "GET",
+    "path": "/hr/attendance/rosters",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.attendance.get.hr.attendance.rosters.id",
+    "label": "Get a roster (attendance:read)",
+    "method": "GET",
+    "path": "/hr/attendance/rosters/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attendanceRostersId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.attendance.patch.hr.attendance.rosters.id",
+    "label": "Edit or archive a roster (attendance:manage)",
+    "method": "PATCH",
+    "path": "/hr/attendance/rosters/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attendanceRostersId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      },
+      {
+        "name": "pattern",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "hr.attendance.post.hr.attendance.rosters.id.apply",
+    "label": "Lay a roster over workers as shift assignments, all or nothing (attendance:manage)",
+    "method": "POST",
+    "path": "/hr/attendance/rosters/:id/apply",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attendanceRostersId"
+      },
+      {
+        "name": "employee_ids",
+        "where": "body",
+        "type": "list",
+        "required": true
+      },
+      {
+        "name": "from",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "cycles",
+        "where": "body",
+        "type": "number",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND / EMPLOYEE_NOT_FOUND; 409 ROSTER_OVERLAP / ROSTER_ARCHIVED"
   },
   {
     "key": "hr.attendance.get.hr.attendance.summary",

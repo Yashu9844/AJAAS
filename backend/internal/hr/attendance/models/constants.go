@@ -19,6 +19,8 @@ const (
 	SourceMobile         = "mobile"
 	SourceRegularization = "regularization"
 	SourceLeave          = "leave"
+	SourceImport         = "import" // bulk import (AP-10)
+	SourceSystem         = "system" // auto-absent job (AP-07)
 )
 
 // Attendance record statuses (AT-010). on_leave/holiday/week_off are reserved for Module 4 writers.

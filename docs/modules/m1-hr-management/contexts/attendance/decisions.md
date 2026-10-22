@@ -38,3 +38,23 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 2026-10-09 — P7 DONE: live goldens G1, G2, G6–G9, G11–G13 PASS on Docker Postgres; migrations up/down/up clean; AutoMigrate↔SQL parity fixed (D3-14: integer columns, partial/expression unique indexes, pending backstop); AT-004 precedence clarified (D3-13); suite-level login limiter reset (D3-15, also unblocks HR/Organization TestOrgRBAC in full runs). Impact: dev DBs created before this need 3 indexes dropped once (see D3-14).
 2026-10-09 — P9 DONE (backend CLOSED): DoD §24 walked with evidence; 5 functions refactored to params ≤4 (D3-16); routes↔swagger 19/19; threat→evidence map; live AS-T6 concurrency test (10 parallel INs → 1 session). P8 frontend BLOCKED (no identity shell).
 2026-10-09 — Integrated onto M0 Identity, HR/Organization, HR/Employee hardening (branch integrate/m3-m4-on-hardening): migrations renumbered 000026–000037, app wiring, error normalization, integration tests ported; 59/59 PASS.
+
+## Parity decisions (2026-10-22)
+
+- **DA-P1** The parity features live in `attendance/ops` and write through `attendance/services.TimeWriter`, so the
+  punch, regularization and import paths share one recompute (AT-006..AT-010). Regularization approval was refactored onto the
+  same `setWindow`; its goldens did not change.
+- **DA-P2** The inbox decides through the existing regularization service. Managers do not get tenant-scope
+  `attendance:approve`; reach is by organization mapping (primary, active, `manager_user_id`), and the routes need only a
+  login. A stranger gets 404, not 403, so ids do not leak.
+- **DA-P3** Rosters generate ordinary shift assignments instead of a second scheduling model. Punch resolution (AT-005)
+  and AT-011 stay untouched. The cost is one assignment row per segment, bounded at 200 per worker per apply.
+- **DA-P4** Auto-absent is opt-in per tenant (`auto_absent_enabled`, default off) so no tenant gets absent records it
+  did not ask for. Each worker commits on its own, which makes the run resumable and idempotent; the daily sweep
+  skips a tenant/day that already has a run logged.
+- **DA-P5** Holidays come from HR/Leave through `leave/api.Holidays` (non-optional tenant holidays only). Per-location
+  calendars arrive with the leave parity work and plug in behind the same port.
+- **DA-P6** Overtime is a report computed from stored records, not a ledger: policy changes re-price history on the
+  next read. Payroll will consume the report through a port in the payroll parity work (decision there).
+- **DA-P7** Bulk import takes instants (RFC 3339) and requires `punch_in` within a day of `date`, so offsets of any
+  timezone pass. It is all-or-nothing and logs counts only (AP-12).

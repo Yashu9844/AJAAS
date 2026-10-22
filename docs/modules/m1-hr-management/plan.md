@@ -9,7 +9,7 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 |---|---|---|---|
 | organization | done (28 ops incl. locations, 2026-10-20) | `/dev-test/hr/organization` (Locations tab, `s1.loc`) | |
 | employee | done (14 + 31 parity ops, 2026-10-21) | `/dev-test/hr/employee` (records tab, `hr.emp.records`) | |
-| attendance | done (19 ops) | `/dev-test/hr/attendance`, 3 scenarios | |
+| attendance | done (19 + 15 parity ops, 2026-10-22) | `/dev-test/hr/attendance`, 4 scenarios | `attendance/ops`: inbox, overtime policy, rosters, auto-absent, bulk import |
 | leave | done (20 ops) | `/dev-test/hr/leave`, 2 scenarios | |
 | payroll | done (20 ops) | `/dev-test/hr/payroll`, 2 scenarios | |
 | recruitment | done (20 ops) | `/dev-test/hr/recruitment`, 1 scenario | last-seat concurrent hire can orphan a profile (documented, untested) |
