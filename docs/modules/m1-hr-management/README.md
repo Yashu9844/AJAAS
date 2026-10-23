@@ -21,7 +21,7 @@ lives in the pre-restructure layout until Phase C (see `plan.md`).
 | `core` | job architecture, positions and headcount, effective-dated job history, lifecycle business processes | planned | `specification.md` §4 |
 | `onboarding` | onboarding and offboarding plans, tasks, document requirements, exit clearance | planned | `specification.md` §5 |
 | `compensation` | pay grades and ranges, salary change history, merit / increment cycles | planned | `specification.md` §6 |
-| `learning` | course catalogue (external links / documents with thumbnails), assignments, completions, learning plans | planned | `specification.md` §7 |
+| `learning` | course catalogue (external links / documents with thumbnails), assignments, completions, learning plans | built 2026-10-23 | `contexts/learning/` |
 | `benefits` | tenant-defined benefit plans, eligibility, enrolment windows, enrolments and dependants | planned | `specification.md` §8 |
 
 ## Files in this bundle

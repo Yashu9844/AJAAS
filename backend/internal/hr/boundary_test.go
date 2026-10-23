@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// TestImportBoundaries enforces docs/modules/m1-hr-management/design.md §2–4:
+// TestImportBoundaries enforces docs/modules/m1-hr-management/design.md Â§2â€“4:
 //   - HR never imports M0 internals; only identityport/inprocess may, and every HR package may use the published
 //     contract package internal/identity/access;
 //   - a context reaches another context only through that context's dto or api package;
@@ -18,7 +18,7 @@ import (
 func TestImportBoundaries(t *testing.T) {
 	const mod = "github.com/jaas/jaas/internal/"
 	contexts := map[string]bool{"organization": true, "employee": true, "attendance": true, "leave": true,
-		"payroll": true, "recruitment": true, "performance": true, "core": true, "compensation": true, "onboarding": true}
+		"payroll": true, "recruitment": true, "performance": true, "core": true, "compensation": true, "onboarding": true, "learning": true}
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") {
 			return err

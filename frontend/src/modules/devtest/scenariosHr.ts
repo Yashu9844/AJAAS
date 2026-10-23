@@ -919,3 +919,76 @@ export const S_ONBOARDING: Scenario[] = [
     },
   },
 ];
+
+export const S_LEARNING: Scenario[] = [
+  {
+    key: "hr.learning.flow",
+    module: "learning",
+    title: "Course → assignment → manager-verified completion → correction → retire (LG2, LG4, LG5)",
+    description:
+      "Refuses unsafe course links, publishes a course that needs verification and versions it, assigns it to a worker, who completes it: the completion stays pending, nobody verifies their own, HR rejects once (a comment is required) then verifies, corrects the score (the old completion is superseded) and retires the course, which keeps the transcript. The worker also self-enrols in an open course, a plan reports its progress, and the compliance report, settings and the recurrence run respond.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const B = "/hr/learning";
+      const w = await member(r, A, uid, "lrn");
+      await r.call("Default time zone", tn(A, "GET", `${B}/settings`), 200, (e) => (str(e, "data.time_zone") === "Asia/Kolkata" ? null : "expected the default zone"));
+      await r.call("Unknown zone → 400", tn(A, "PUT", `${B}/settings`, { time_zone: "Mars/Base" }), 400);
+      for (const bad of ["javascript:alert(1)", "http://learn.example.com/x", "data:text/html,x", "https://user:pw@learn.example.com/x"]) {
+        await r.call(`Unsafe link ${bad.slice(0, 18)} → 400`, tn(A, "POST", `${B}/courses`, { title: "Bad", content_kind: "link", content_url: bad }), 400);
+      }
+      const c = await r.call("Course needing manager verification", tn(A, "POST", `${B}/courses`, { title: `Fire safety ${uid}`, content_kind: "link", content_url: "https://learn.example.com/fire", verification: "manager", self_enrol: true }), 201);
+      const cid = str(c, "data.id");
+      await r.call("Publish", tn(A, "POST", `${B}/courses/${cid}/publish`), 200);
+      await r.call("A content change makes version 2", tn(A, "PATCH", `${B}/courses/${cid}`, { duration_mins: 30 }), 200, (e) => (getPath(e.resBody, "data.version") === 2 ? null : "expected version 2"));
+      await r.call("Two snapshots", tn(A, "GET", `${B}/courses/${cid}/versions`), 200, (e) => (list(e).length === 2 ? null : "expected 2"));
+      await r.call("A learner browses the catalogue", tn(w.S, "GET", `${B}/catalog`), 200, (e) => (list(e).some((x) => x.id === cid) ? null : "course missing"));
+      await r.call("A learner cannot create courses → 403", tn(w.S, "POST", `${B}/courses`, { title: "x" }), 403);
+
+      const asn = await r.call("Assign to the worker (due in 14 days)", tn(A, "POST", `${B}/assignments`, { target_kind: "employee", target_id: w.empId, course_id: cid, due_in_days: 14 }), 201, (e) =>
+        getPath(e.resBody, "data.created") === 1 ? null : "expected one enrolment",
+      );
+      const mine = await r.call("The worker sees it", tn(w.S, "GET", `${B}/enrolments/me`), 200, (e) => (list(e).length === 1 ? null : "expected 1"));
+      const eid = String(list(mine)[0].id);
+      await r.call("Start", tn(w.S, "POST", `${B}/enrolments/${eid}/start`), 200);
+      const done = await r.call("Complete → pending verification", tn(w.S, "POST", `${B}/enrolments/${eid}/complete`, { score: 90, evidence_ref: "certs/a.pdf" }), 200, (e) =>
+        str(e, "data.completion.status") === "pending" && str(e, "data.status") === "in_progress" ? null : "should stay pending",
+      );
+      await r.call("Second submission → 409", tn(w.S, "POST", `${B}/enrolments/${eid}/complete`), 409);
+      const comp = str(done, "data.completion.id");
+      await r.call("Verifying your own completion → 403", tn(w.S, "POST", `${B}/completions/${comp}/verify`), 403);
+      await r.call("HR sees it pending", tn(A, "GET", `${B}/completions/pending`), 200, (e) => (list(e).length >= 1 ? null : "expected one"));
+      await r.call("Reject needs a comment → 400", tn(A, "POST", `${B}/completions/${comp}/reject`, {}), 400);
+      await r.call("Reject with a comment", tn(A, "POST", `${B}/completions/${comp}/reject`, { comment: "needs the signed sheet" }), 200);
+      const again = await r.call("Resubmit", tn(w.S, "POST", `${B}/enrolments/${eid}/complete`, { evidence_ref: "certs/b.pdf" }), 200);
+      await r.call("HR verifies → completed", tn(A, "POST", `${B}/completions/${str(again, "data.completion.id")}/verify`), 200, (e) =>
+        str(e, "data.status") === "completed" ? null : "should be completed",
+      );
+      await r.call("Correct the score; the old completion is superseded", tn(A, "POST", `${B}/enrolments/${eid}/correct`, { reason: "score typo", score: 95 }), 200, (e) =>
+        str(e, "data.completion.supersedes_id") ? null : "supersedes_id missing",
+      );
+      await r.call("Retire the course", tn(A, "POST", `${B}/courses/${cid}/retire`), 200);
+      await r.call("The transcript keeps the completion", tn(w.S, "GET", `${B}/transcript/me`), 200, (e) => (list(e).length === 1 ? null : "expected 1"));
+      await r.call("Retired course cannot be self-enrolled → 409", tn(w.S, "POST", `${B}/enrolments/self`, { course_id: cid }), 409);
+      await r.call("The assignment can be cancelled", tn(A, "POST", `${B}/assignments/${str(asn, "data.assignment.id")}/cancel`), 200);
+
+      const open = await r.call("Open course (self-attested)", tn(A, "POST", `${B}/courses`, { title: `Data privacy ${uid}`, content_kind: "document", document_ref: `docs/privacy-${uid}.pdf`, self_enrol: true }), 201);
+      const oid = str(open, "data.id");
+      await r.call("Publish it", tn(A, "POST", `${B}/courses/${oid}/publish`), 200);
+      const se = await r.call("The worker self-enrols", tn(w.S, "POST", `${B}/enrolments/self`, { course_id: oid }), 201);
+      await r.call("Self-enrolling again → 409", tn(w.S, "POST", `${B}/enrolments/self`, { course_id: oid }), 409);
+      const plan = await r.call("Plan", tn(A, "POST", `${B}/plans`, { name: `Basics ${uid}` }), 201);
+      const pid = str(plan, "data.id");
+      await r.call("Plan items", tn(A, "PUT", `${B}/plans/${pid}/items`, { items: [{ course_id: oid }] }), 200);
+      await r.call("Not complete yet", tn(w.S, "GET", `${B}/plans/${pid}/progress`), 200, (e) => (getPath(e.resBody, "data.complete") === false ? null : "should not be complete"));
+      await r.call("Self-attested completion is verified at once", tn(w.S, "POST", `${B}/enrolments/${String(list(se)[0].id)}/complete`), 200, (e) =>
+        str(e, "data.completion.status") === "verified" ? null : "should be verified",
+      );
+      await r.call("Plan complete", tn(w.S, "GET", `${B}/plans/${pid}/progress`), 200, (e) => (getPath(e.resBody, "data.complete") === true ? null : "should be complete"));
+
+      await r.call("Compliance report", tn(A, "GET", `${B}/reports/compliance`), 200, (e) => (list(e).length >= 2 ? null : "expected rows"));
+      await r.call("A learner cannot read the report → 403", tn(w.S, "GET", `${B}/reports/compliance`), 403);
+      await r.call("Set the tenant time zone", tn(A, "PUT", `${B}/settings`, { time_zone: "Asia/Kolkata" }), 200);
+      await r.call("Run recurrence", tn(A, "POST", `${B}/recurrence/run`), 200);
+    },
+  },
+];

@@ -167,7 +167,7 @@ matrix: performance rating × compa-ratio band → recommended % range, status `
 **Golden candidates:** budget never exceeded without override; applying a cycle twice is a no-op; payroll CTC from the
 effective date only; compa-ratio exact; manager cannot see non-reports.
 
-## 7. Context `learning` (planned)
+## 7. Context `learning` (built 2026-10-23; contract in `contexts/learning/specification.md`)
 
 Content is **not hosted**: a course points to an external URL or a document (metadata here, file in M8 later), with a
 thumbnail image reference. No video streaming or SCORM in scope.

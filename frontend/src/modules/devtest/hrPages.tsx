@@ -1,8 +1,8 @@
 "use client";
 import { Checklist, OpGroup, ScenarioCard } from "./components";
-import { HR_ATTENDANCE, HR_COMPENSATION, HR_CORE, HR_LEAVE, HR_ONBOARDING, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
+import { HR_ATTENDANCE, HR_COMPENSATION, HR_CORE, HR_LEARNING, HR_LEAVE, HR_ONBOARDING, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
 import type { Scenario } from "./runner";
-import { S_ATTENDANCE, S_COMPENSATION, S_CORE, S_LEAVE, S_ONBOARDING, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
+import { S_ATTENDANCE, S_COMPENSATION, S_CORE, S_LEARNING, S_LEAVE, S_ONBOARDING, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
 import { Tabs } from "./shell";
 import type { ChecklistItem, OpSpec } from "./types";
 
@@ -76,6 +76,7 @@ export const HR_CHECKLISTS: Record<string, ChecklistItem[]> = {
   core: items(S_CORE),
   compensation: items(S_COMPENSATION),
   onboarding: items(S_ONBOARDING),
+  learning: items(S_LEARNING),
 };
 
 export function HrPerformance() {
@@ -170,6 +171,18 @@ export function HrOnboarding() {
       ops={HR_ONBOARDING}
       scenarios={S_ONBOARDING}
       checklist={HR_CHECKLISTS.onboarding}
+    />
+  );
+}
+
+export function HrLearning() {
+  return (
+    <ContextPage
+      title="HR / Learning"
+      intro="Courses are metadata plus an external https link or document reference (nothing is hosted), with versions. Plans, rule and individual assignments with due dates and recurrence, self-enrolment, completions verified by the manager or HR, corrections that supersede, waivers and a compliance report. learning:read | manage; catalogue, own enrolments and transcript for everyone."
+      ops={HR_LEARNING}
+      scenarios={S_LEARNING}
+      checklist={HR_CHECKLISTS.learning}
     />
   );
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/core"
 	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/hr/learning"
 	"github.com/jaas/jaas/internal/hr/leave"
 	leavePlus "github.com/jaas/jaas/internal/hr/leave/plus"
 	"github.com/jaas/jaas/internal/hr/onboarding"
@@ -55,6 +56,7 @@ type Module struct {
 	core        *core.Module
 	comp        *compensation.Module
 	onb         *onboarding.Module
+	learning    *learning.Module
 	attOps      *attendanceOps.Module
 }
 
@@ -79,12 +81,14 @@ func New(ctx context.Context, o Options) (*Module, error) {
 		Payroll: m.payroll.CTC(), Audit: o.Identity.Audit()})
 	m.onb = onboarding.NewModule(o.DB, onboarding.Ports{Employees: emp, Core: m.core.Directory(), Documents: m.employee.Documents(),
 		Audit: o.Identity.Audit()})
+	m.learning = learning.NewModule(o.DB, learning.Ports{Employees: emp, Core: m.core.Directory(), Reports: m.org, Audit: o.Identity.Audit()})
 	m.recruitment.SetPositions(m.core.Positions())                             // RP-02: requisitions read core positions
 	m.leave.SetLocations(leavePlus.FromCore(m.core.Directory()))               // LP-05: employee location for calendars
 	m.payroll.SetStates(payrollPlus.StatesFromCore(m.core.Directory(), m.org)) // PP-02: work state for professional tax
 	m.payroll.SetClearance(m.onb.Clearance())                                  // PP-07: exit clearance before settlement approval
 	// OB-03: core actions and recruitment hires start onboarding/offboarding inside their own transactions.
 	m.core.OnActionCompleted(m.onb.Service().CoreHook)
+	m.core.OnActionCompleted(m.learning.Service().CoreHook) // LN-C07: joiners and movers are enrolled in rule assignments
 	m.recruitment.OnHired(m.onb.Service().RecruitmentHook)
 
 	// FR-M005 / FR-EV001: deactivating a login converges org mappings and the employee profile in the same transaction.
@@ -107,7 +111,7 @@ func (m *Module) migrate() error {
 	}
 	var all []interface{}
 	for _, ms := range [][]interface{}{m.org.RegisterModels(), m.employee.RegisterModels(), m.attendance.RegisterModels(),
-		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels(), m.comp.RegisterModels(), m.onb.RegisterModels(), m.attOps.RegisterModels()} {
+		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels(), m.comp.RegisterModels(), m.onb.RegisterModels(), m.learning.RegisterModels(), m.attOps.RegisterModels()} {
 		all = append(all, ms...)
 	}
 	if err := m.o.DB.AutoMigrate(all...); err != nil {
@@ -121,7 +125,7 @@ func (m *Module) registerPermissions(ctx context.Context) error {
 	for name, defs := range map[string][]access.PermissionDef{
 		"organization": organization.Catalogue(), "employee": employee.Catalogue(), "attendance": attendance.Catalogue(),
 		"leave": leave.Catalogue(), "payroll": payroll.Catalogue(), "recruitment": recruitment.Catalogue(),
-		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(), "recruitment_parity": recruitment.ParityCatalogue(), "onboarding": onboarding.Catalogue(),
+		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(), "recruitment_parity": recruitment.ParityCatalogue(), "onboarding": onboarding.Catalogue(), "learning": learning.Catalogue(),
 	} {
 		if err := m.o.Identity.RegisterPermissions(ctx, defs); err != nil {
 			return fmt.Errorf("%s permission catalogue: %w", name, err)
@@ -141,6 +145,7 @@ func (m *Module) startRelays() {
 	go m.performance.Relay().Run(m.o.Background)
 	go m.core.Relay().Run(m.o.Background)
 	go m.core.RunEffects(m.o.Background)
+	go m.learning.RunRecurrence(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("learning recurrence run failed") })
 	go m.leave.RunCompOffExpiry(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("leave comp-off expiry sweep failed") })
 	go m.attOps.RunAutoAbsent(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("attendance auto-absent sweep failed") })
 }
@@ -158,6 +163,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	m.core.RegisterRoutes(rg, core.RouteDeps{Identity: idp})
 	m.comp.RegisterRoutes(rg, idp)
 	m.onb.RegisterRoutes(rg, idp)
+	m.learning.RegisterRoutes(rg, idp)
 	m.attOps.RegisterRoutes(rg, idp)
 }
 

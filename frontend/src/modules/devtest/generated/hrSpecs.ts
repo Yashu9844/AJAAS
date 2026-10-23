@@ -7922,6 +7922,1074 @@ export const HR_ONBOARDING: OpSpec[] = [
   }
 ];
 
+export const HR_LEARNING: OpSpec[] = [
+  {
+    "key": "hr.learning.post.hr.learning.assignments",
+    "label": "Assign a course or plan to a worker or a rule; enrols today's matches (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/assignments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "target_kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "employee",
+          "department",
+          "job_profile",
+          "location",
+          "all"
+        ],
+        "required": true
+      },
+      {
+        "name": "target_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "course_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "plan_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "mandatory",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "due_date",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "due_in_days",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "recurrence_days",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "learningAssignmentsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 COURSE_STATE / PLAN_STATE"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.assignments",
+    "label": "List assignments (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/assignments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "cancelled"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.assignments.id",
+    "label": "Get an assignment (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/assignments/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningAssignmentsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.assignments.id.cancel",
+    "label": "Stop future enrolments and recurrence; idempotent (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/assignments/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningAssignmentsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.catalog",
+    "label": "Published courses for any learner",
+    "method": "GET",
+    "path": "/hr/learning/catalog",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.learning.get.hr.learning.completions.pending",
+    "label": "Completions I can verify: my reports' on manager-verified courses, all with learning:manage",
+    "method": "GET",
+    "path": "/hr/learning/completions/pending",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.learning.post.hr.learning.completions.id.reject",
+    "label": "Send a pending completion back; a comment is required",
+    "method": "POST",
+    "path": "/hr/learning/completions/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningCompletionsId"
+      },
+      {
+        "name": "comment",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 LEARNING_SELF_VERIFY; 404 NOT_FOUND; 409 COMPLETION_STATE"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.completions.id.verify",
+    "label": "Verify a pending completion; never your own",
+    "method": "POST",
+    "path": "/hr/learning/completions/:id/verify",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningCompletionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 LEARNING_SELF_VERIFY; 404 NOT_FOUND; 409 COMPLETION_STATE"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.courses",
+    "label": "Create a draft course: an https link or a document reference, never hosted content (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/courses",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "provider",
+        "where": "body"
+      },
+      {
+        "name": "content_kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "link",
+          "document"
+        ]
+      },
+      {
+        "name": "content_url",
+        "where": "body",
+        "placeholder": "https only; no user-info"
+      },
+      {
+        "name": "document_ref",
+        "where": "body",
+        "placeholder": "opaque reference, never a URL"
+      },
+      {
+        "name": "thumbnail_ref",
+        "where": "body"
+      },
+      {
+        "name": "duration_mins",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "tags",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "verification",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "self",
+          "manager",
+          "hr"
+        ]
+      },
+      {
+        "name": "self_enrol",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "learningCoursesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.courses",
+    "label": "List courses (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/courses",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "draft",
+          "published",
+          "retired"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.courses.id",
+    "label": "Get a course (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/courses/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningCoursesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.learning.patch.hr.learning.courses.id",
+    "label": "Edit a draft or published course; a content change increments the version (learning:manage)",
+    "method": "PATCH",
+    "path": "/hr/learning/courses/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningCoursesId"
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "provider",
+        "where": "body"
+      },
+      {
+        "name": "content_kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "link",
+          "document"
+        ]
+      },
+      {
+        "name": "content_url",
+        "where": "body",
+        "placeholder": "https only; no user-info"
+      },
+      {
+        "name": "document_ref",
+        "where": "body",
+        "placeholder": "opaque reference, never a URL"
+      },
+      {
+        "name": "thumbnail_ref",
+        "where": "body"
+      },
+      {
+        "name": "duration_mins",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "tags",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "verification",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "self",
+          "manager",
+          "hr"
+        ]
+      },
+      {
+        "name": "self_enrol",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 COURSE_STATE"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.courses.id.publish",
+    "label": "Publish a draft course (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/courses/:id/publish",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningCoursesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 COURSE_STATE"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.courses.id.retire",
+    "label": "Retire a course; enrolments and completions are kept (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/courses/:id/retire",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningCoursesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 COURSE_STATE"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.courses.id.versions",
+    "label": "Content snapshots of a course, newest first (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/courses/:id/versions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningCoursesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.enrolments",
+    "label": "All enrolments (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/enrolments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "course_id",
+        "where": "query"
+      },
+      {
+        "name": "assignment_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "not_started",
+          "in_progress",
+          "completed",
+          "waived",
+          "overdue"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.enrolments.me",
+    "label": "My enrolments",
+    "method": "GET",
+    "path": "/hr/learning/enrolments/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "not_started",
+          "in_progress",
+          "completed",
+          "waived",
+          "overdue"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.enrolments.self",
+    "label": "Enrol myself in a self-enrol course, or every course of a plan",
+    "method": "POST",
+    "path": "/hr/learning/enrolments/self",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "course_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "plan_id",
+        "where": "body",
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "learningEnrolmentsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 COURSE_STATE / SELF_ENROL_OFF / ALREADY_ENROLLED"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.enrolments.team",
+    "label": "Enrolments of my direct reports",
+    "method": "GET",
+    "path": "/hr/learning/enrolments/team",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "not_started",
+          "in_progress",
+          "completed",
+          "waived",
+          "overdue"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.enrolments.id",
+    "label": "An enrolment with its live completion: the learner, their manager or learning:read",
+    "method": "GET",
+    "path": "/hr/learning/enrolments/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningEnrolmentsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.enrolments.id.complete",
+    "label": "Submit my completion; verified at once on a self-attested course, else pending verification",
+    "method": "POST",
+    "path": "/hr/learning/enrolments/:id/complete",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningEnrolmentsId"
+      },
+      {
+        "name": "score",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "evidence_ref",
+        "where": "body"
+      },
+      {
+        "name": "certificate_ref",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 ENROLMENT_STATE / COMPLETION_PENDING"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.enrolments.id.correct",
+    "label": "Write a verified HR completion that supersedes the live one, or completes on the worker's behalf (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/enrolments/:id/correct",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningEnrolmentsId"
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "score",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "evidence_ref",
+        "where": "body"
+      },
+      {
+        "name": "certificate_ref",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 ENROLMENT_STATE"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.enrolments.id.start",
+    "label": "Start my not-started enrolment",
+    "method": "POST",
+    "path": "/hr/learning/enrolments/:id/start",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningEnrolmentsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 ENROLMENT_STATE"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.enrolments.id.waive",
+    "label": "Excuse a live enrolment with a reason (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/enrolments/:id/waive",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningEnrolmentsId"
+      },
+      {
+        "name": "reason",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 ENROLMENT_STATE / COMPLETION_PENDING"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.plans",
+    "label": "Create a learning plan (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/plans",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "learningPlansId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.plans",
+    "label": "List plans (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/plans",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.plans.id",
+    "label": "Get a plan with its ordered items (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/plans/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningPlansId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.learning.patch.hr.learning.plans.id",
+    "label": "Rename, describe or archive a plan (learning:manage)",
+    "method": "PATCH",
+    "path": "/hr/learning/plans/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningPlansId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "hr.learning.put.hr.learning.plans.id.items",
+    "label": "Replace the ordered items, 1 to 50 distinct non-retired courses (learning:manage)",
+    "method": "PUT",
+    "path": "/hr/learning/plans/:id/items",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningPlansId"
+      },
+      {
+        "name": "items",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 PLAN_STATE / COURSE_STATE"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.plans.id.progress",
+    "label": "Progress through a plan: own, or employee_id with learning:read",
+    "method": "GET",
+    "path": "/hr/learning/plans/:id/progress",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "learningPlansId"
+      },
+      {
+        "name": "employee_id",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.learning.post.hr.learning.recurrence.run",
+    "label": "Start the next cycle of every due recurring assignment now (learning:manage)",
+    "method": "POST",
+    "path": "/hr/learning/recurrence/run",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.learning.get.hr.learning.reports.compliance",
+    "label": "Counts per department and course (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/reports/compliance",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "department_id",
+        "where": "query"
+      },
+      {
+        "name": "course_id",
+        "where": "query"
+      },
+      {
+        "name": "mandatory",
+        "where": "query",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.settings",
+    "label": "The learning settings: the tenant time zone (learning:read)",
+    "method": "GET",
+    "path": "/hr/learning/settings",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.learning.put.hr.learning.settings",
+    "label": "Set the tenant time zone used for due dates (learning:manage)",
+    "method": "PUT",
+    "path": "/hr/learning/settings",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "time_zone",
+        "where": "body",
+        "required": true,
+        "placeholder": "IANA name, for example Asia/Kolkata"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.learning.get.hr.learning.transcript.me",
+    "label": "My completed enrolments with their completion",
+    "method": "GET",
+    "path": "/hr/learning/transcript/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ]
+  }
+];
+
 export const HR_EMPLOYEE_RECORDS: OpSpec[] = [
   {
     "key": "hr.employee_records.get.hr.employee.change.requests",

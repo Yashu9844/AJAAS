@@ -4647,6 +4647,341 @@ paths:
       responses:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
         '404': {description: 'NOT_FOUND'}
+  /hr/learning/courses:
+    post:
+      summary: 'Create a draft course: an https link or a document reference, never hosted content (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningCourseInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    get:
+      summary: 'List courses (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [draft, published, retired]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/learning/courses/{id}:
+    get:
+      summary: 'Get a course (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit a draft or published course; a content change increments the version (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningCourseInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'COURSE_STATE'}
+  /hr/learning/courses/{id}/publish:
+    post:
+      summary: 'Publish a draft course (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'COURSE_STATE'}
+  /hr/learning/courses/{id}/retire:
+    post:
+      summary: 'Retire a course; enrolments and completions are kept (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'COURSE_STATE'}
+  /hr/learning/courses/{id}/versions:
+    get:
+      summary: 'Content snapshots of a course, newest first (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/learning/catalog:
+    get:
+      summary: 'Published courses for any learner'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/learning/plans:
+    post:
+      summary: 'Create a learning plan (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningPlanInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'List plans (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, archived]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/learning/plans/{id}:
+    get:
+      summary: 'Get a plan with its ordered items (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Rename, describe or archive a plan (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningPlanInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /hr/learning/plans/{id}/items:
+    put:
+      summary: 'Replace the ordered items, 1 to 50 distinct non-retired courses (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningPlanItemsInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'PLAN_STATE / COURSE_STATE'}
+  /hr/learning/plans/{id}/progress:
+    get:
+      summary: 'Progress through a plan: own, or employee_id with learning:read'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: employee_id, in: query, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /hr/learning/assignments:
+    post:
+      summary: 'Assign a course or plan to a worker or a rule; enrols today''s matches (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningAssignmentInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'COURSE_STATE / PLAN_STATE'}
+    get:
+      summary: 'List assignments (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, cancelled]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/learning/assignments/{id}:
+    get:
+      summary: 'Get an assignment (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/learning/assignments/{id}/cancel:
+    post:
+      summary: 'Stop future enrolments and recurrence; idempotent (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/learning/enrolments/self:
+    post:
+      summary: 'Enrol myself in a self-enrol course, or every course of a plan'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningSelfEnrolInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'COURSE_STATE / SELF_ENROL_OFF / ALREADY_ENROLLED'}
+  /hr/learning/enrolments/me:
+    get:
+      summary: 'My enrolments'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [not_started, in_progress, completed, waived, overdue]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/learning/enrolments/team:
+    get:
+      summary: 'Enrolments of my direct reports'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [not_started, in_progress, completed, waived, overdue]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/learning/enrolments:
+    get:
+      summary: 'All enrolments (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: course_id, in: query, schema: {type: string, format: uuid}}, {name: assignment_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [not_started, in_progress, completed, waived, overdue]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/learning/enrolments/{id}:
+    get:
+      summary: 'An enrolment with its live completion: the learner, their manager or learning:read'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/learning/enrolments/{id}/start:
+    post:
+      summary: 'Start my not-started enrolment'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'ENROLMENT_STATE'}
+  /hr/learning/enrolments/{id}/complete:
+    post:
+      summary: 'Submit my completion; verified at once on a self-attested course, else pending verification'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LearningCompleteInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'ENROLMENT_STATE / COMPLETION_PENDING'}
+  /hr/learning/enrolments/{id}/waive:
+    post:
+      summary: 'Excuse a live enrolment with a reason (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningReasonInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'ENROLMENT_STATE / COMPLETION_PENDING'}
+  /hr/learning/enrolments/{id}/correct:
+    post:
+      summary: 'Write a verified HR completion that supersedes the live one, or completes on the worker''s behalf (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningCorrectInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'ENROLMENT_STATE'}
+  /hr/learning/transcript/me:
+    get:
+      summary: 'My completed enrolments with their completion'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/learning/completions/pending:
+    get:
+      summary: 'Completions I can verify: my reports'' on manager-verified courses, all with learning:manage'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/learning/completions/{id}/verify:
+    post:
+      summary: 'Verify a pending completion; never your own'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'LEARNING_SELF_VERIFY'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'COMPLETION_STATE'}
+  /hr/learning/completions/{id}/reject:
+    post:
+      summary: 'Send a pending completion back; a comment is required'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningRejectInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'LEARNING_SELF_VERIFY'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'COMPLETION_STATE'}
+  /hr/learning/recurrence/run:
+    post:
+      summary: 'Start the next cycle of every due recurring assignment now (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/learning/reports/compliance:
+    get:
+      summary: 'Counts per department and course (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: department_id, in: query, schema: {type: string, format: uuid}}, {name: course_id, in: query, schema: {type: string, format: uuid}}, {name: mandatory, in: query, schema: {type: boolean}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/learning/settings:
+    get:
+      summary: 'The learning settings: the tenant time zone (learning:read)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+    put:
+      summary: 'Set the tenant time zone used for due dates (learning:manage)'
+      tags: [Learning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LearningSettingsInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
 components:
   securitySchemes:
     BearerAuth:
@@ -5905,3 +6240,63 @@ components:
       type: object
       required: [required_approvals]
       properties: {required_approvals: {type: integer, minimum: 0, maximum: 3}, threshold_ctc: {type: number, minimum: 0}}
+    LearningCourseInput:
+      type: object
+      properties:
+        title: {type: string, maxLength: 150}
+        description: {type: string, maxLength: 2000}
+        provider: {type: string, maxLength: 100}
+        content_kind: {type: string, enum: [link, document]}
+        content_url: {type: string, maxLength: 500, description: 'https only; no user-info'}
+        document_ref: {type: string, maxLength: 200, description: 'opaque reference, never a URL'}
+        thumbnail_ref: {type: string, maxLength: 500}
+        duration_mins: {type: integer, minimum: 0, maximum: 10000}
+        tags: {type: array, maxItems: 10, items: {type: string, maxLength: 30}}
+        verification: {type: string, enum: [self, manager, hr]}
+        self_enrol: {type: boolean}
+    LearningPlanInput:
+      type: object
+      properties: {name: {type: string, maxLength: 150}, description: {type: string, maxLength: 1000}, status: {type: string, enum: [active, archived]}}
+    LearningPlanItemsInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: object, required: [course_id], properties: {course_id: {type: string, format: uuid}, mandatory: {type: boolean}}}
+    LearningAssignmentInput:
+      type: object
+      required: [target_kind]
+      properties:
+        target_kind: {type: string, enum: [employee, department, job_profile, location, all]}
+        target_id: {type: string, format: uuid}
+        course_id: {type: string, format: uuid}
+        plan_id: {type: string, format: uuid}
+        mandatory: {type: boolean}
+        due_date: {type: string, format: date}
+        due_in_days: {type: integer, minimum: 1, maximum: 1000}
+        recurrence_days: {type: integer, minimum: 30, maximum: 3650}
+    LearningSelfEnrolInput:
+      type: object
+      properties: {course_id: {type: string, format: uuid}, plan_id: {type: string, format: uuid}}
+    LearningCompleteInput:
+      type: object
+      properties: {score: {type: integer, minimum: 0, maximum: 100}, evidence_ref: {type: string, maxLength: 300}, certificate_ref: {type: string, maxLength: 300}}
+    LearningCorrectInput:
+      type: object
+      required: [reason]
+      properties: {reason: {type: string, maxLength: 500}, score: {type: integer, minimum: 0, maximum: 100}, evidence_ref: {type: string, maxLength: 300}, certificate_ref: {type: string, maxLength: 300}}
+    LearningReasonInput:
+      type: object
+      required: [reason]
+      properties: {reason: {type: string, maxLength: 500}}
+    LearningRejectInput:
+      type: object
+      required: [comment]
+      properties: {comment: {type: string, maxLength: 500}}
+    LearningSettingsInput:
+      type: object
+      required: [time_zone]
+      properties: {time_zone: {type: string, maxLength: 64, description: 'IANA name, for example Asia/Kolkata'}}
