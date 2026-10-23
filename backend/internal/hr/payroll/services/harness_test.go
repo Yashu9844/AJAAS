@@ -88,7 +88,7 @@ func newHarness() *harness {
 		emps: &fakeEmployees{byUser: map[uuid.UUID]*employeeDTO.EmployeeResponse{}, byID: map[uuid.UUID]*employeeDTO.EmployeeResponse{}},
 		now:  time.Date(2026, 10, 9, 9, 0, 0, 0, time.UTC), tenant: uuid.New()}
 	h.deps = Deps{Tx: fakeRunner{h.st}, Repos: Repos{Structures: fakeStructures{h.st}, Assignments: fakeAssignments{h.st},
-		Runs: fakeRuns{h.st}, Payslips: fakePayslips{h.st}, Outbox: fakeOutbox{h.st}},
+		Runs: fakeRuns{h.st}, Payslips: fakePayslips{h.st}, Arrears: fakeArrears{h.st}, Outbox: fakeOutbox{h.st}},
 		Employees: h.emps, Leave: h.lop, Audit: h.audit, Publisher: h.pub, Now: func() time.Time { return h.now }}
 	return h
 }

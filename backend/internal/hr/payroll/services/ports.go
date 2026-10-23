@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/kernel"
+	"github.com/jaas/jaas/internal/hr/payroll/calc"
 	"github.com/jaas/jaas/internal/hr/payroll/repositories"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
@@ -27,6 +28,25 @@ type LeaveLOP interface {
 // AuditLogger is Module 5's view of the Module 0 AuditService.
 type AuditLogger interface {
 	Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error
+}
+
+// PTSource resolves a worker state and the professional-tax slabs to use (PP-02). A nil source keeps the single default slab.
+type PTSource interface {
+	// StateOf returns the two-letter state code of the worker work location on the date, or "".
+	StateOf(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (string, error)
+	// Slabs returns the tenant slabs of the state, else the built-in defaults, else nil.
+	Slabs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, state string) ([]calc.PTSlab, error)
+}
+
+// BenefitLine is one benefit deduction for a worker and period (PP-05).
+type BenefitLine struct {
+	Code, Name string
+	Amount     calc.Money
+}
+
+// BenefitDeductions supplies benefit deductions per worker and period (PP-05); nil means none.
+type BenefitDeductions interface {
+	Deductions(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) ([]BenefitLine, error)
 }
 
 // TxRunner opens database transactions.
@@ -50,6 +70,7 @@ type Repos struct {
 	Assignments repositories.AssignmentRepository
 	Runs        repositories.RunRepository
 	Payslips    repositories.PayslipRepository
+	Arrears     repositories.ArrearsRepository
 	Outbox      repositories.OutboxRepository
 }
 
@@ -59,6 +80,8 @@ type Deps struct {
 	Repos     Repos
 	Employees EmployeeDirectory
 	Leave     LeaveLOP
+	PT        PTSource
+	Benefits  BenefitDeductions
 	Audit     AuditLogger
 	Publisher queue.EventPublisher
 	Now       Clock

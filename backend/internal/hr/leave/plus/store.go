@@ -72,6 +72,11 @@ type Store interface {
 	EncashedDays(ctx context.Context, db *gorm.DB, tenantID, employeeID, typeID uuid.UUID, year int, statuses ...string) (calc.Days, error)
 	Encashments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f EncashFilter, limit int) ([]Encashment, error)
 
+	// LatestBalances returns, per encashable leave type, the latest available days of the worker (payroll settlement).
+	LatestBalances(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]TypeDays, error)
+	UnpaidEncashments(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]Encashment, error)
+	MarkPaid(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID, at time.Time) (int64, error)
+
 	// Event stores an outbox event for the existing leave relay (ids and day counts only).
 	Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error
 }
@@ -272,4 +277,31 @@ func (s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key stri
 	}
 	return tx.WithContext(ctx).Exec(`INSERT INTO leave_events_outbox (id, tenant_id, event_id, event_type, routing_key, payload) VALUES (?, ?, ?, ?, ?, ?)`,
 		uuid.New(), t, id, key, key, string(raw)).Error
+}
+
+// TypeDays is a leave type with a day count.
+type TypeDays struct {
+	LeaveTypeID uuid.UUID
+	Days        calc.Days
+}
+
+func (s gormStore) LatestBalances(ctx context.Context, db *gorm.DB, t, emp uuid.UUID) ([]TypeDays, error) {
+	var out []TypeDays
+	err := db.WithContext(ctx).Raw(`SELECT DISTINCT ON (b.leave_type_id) b.leave_type_id AS leave_type_id,
+		(b.opening + b.accrued + b.adjusted - b.used - b.reserved) AS days
+		FROM leave_balances b JOIN leave_encashment_rules r ON r.tenant_id = b.tenant_id AND r.leave_type_id = b.leave_type_id
+		WHERE b.tenant_id = ? AND b.employee_profile_id = ? ORDER BY b.leave_type_id, b.year DESC`, t, emp).Scan(&out).Error
+	return out, err
+}
+
+func (s gormStore) UnpaidEncashments(ctx context.Context, db *gorm.DB, t, emp uuid.UUID) ([]Encashment, error) {
+	var out []Encashment
+	return out, db.WithContext(ctx).Where("tenant_id = ? AND employee_profile_id = ? AND status = ? AND paid_out_at IS NULL", t, emp, StatusApproved).
+		Order("created_at, id").Find(&out).Error
+}
+
+func (s gormStore) MarkPaid(ctx context.Context, tx *gorm.DB, t uuid.UUID, ids []uuid.UUID, at time.Time) (int64, error) {
+	res := tx.WithContext(ctx).Model(&Encashment{}).Where("tenant_id = ? AND id IN ? AND status = ? AND paid_out_at IS NULL", t, ids, StatusApproved).
+		Updates(map[string]interface{}{"paid_out_at": at, "updated_at": at})
+	return res.RowsAffected, res.Error
 }

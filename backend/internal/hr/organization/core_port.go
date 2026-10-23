@@ -2,6 +2,7 @@ package organization
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/hr/organization/models"
@@ -79,4 +80,14 @@ func (m *Module) ProjectPrimaryMapping(ctx context.Context, tx *gorm.DB, tenantI
 		}
 	}
 	return err
+}
+
+// LocationStateCode returns the state code of the location, upper-cased ("" when it does not exist); payroll uses it for
+// state professional tax.
+func (m *Module) LocationStateCode(ctx context.Context, tenantID, id uuid.UUID) (string, error) {
+	l, err := m.locRepo.FindByID(ctx, m.db, tenantID, id)
+	if err != nil || l == nil {
+		return "", err
+	}
+	return strings.ToUpper(l.StateCode), nil
 }

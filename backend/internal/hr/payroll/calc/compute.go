@@ -12,6 +12,7 @@ type Input struct {
 type Result struct {
 	Lines                  []Line
 	Gross, Deductions, Net Money
+	EmployerCost           Money // employer contributions (PP-01); not part of gross, deductions or net
 	Capped                 bool
 }
 
@@ -41,7 +42,7 @@ func Compute(in Input) (Result, error) {
 			basic = earned.Amount
 		}
 	}
-	r.Lines = append(r.Lines, statutory(in.Spec, statutoryBase{basic, fullGross, r.Gross, fullTaxable})...)
+	r.Lines = append(r.Lines, statutory(in.Spec, statutoryBase{basic, fullGross, r.Gross, fullTaxable}, PT(r.Gross))...)
 	for _, l := range r.Lines {
 		if l.Kind == Deduction {
 			r.Deductions += l.Amount
@@ -55,7 +56,7 @@ func Compute(in Input) (Result, error) {
 type statutoryBase struct{ earnedBasic, fullGross, earnedGross, fullTaxable Money }
 
 // statutory returns the enabled, non-zero statutory deduction lines in fixed order PF, ESI, PT, TDS.
-func statutory(s StructureSpec, b statutoryBase) []Line {
+func statutory(s StructureSpec, b statutoryBase, pt Money) []Line {
 	candidates := []struct {
 		on   bool
 		code string
@@ -64,7 +65,7 @@ func statutory(s StructureSpec, b statutoryBase) []Line {
 	}{
 		{s.PF, "PF", "Provident Fund", PF(b.earnedBasic)},
 		{s.ESI, "ESI", "Employee State Insurance", ESI(b.fullGross, b.earnedGross)},
-		{s.PT, "PT", "Professional Tax", PT(b.earnedGross)},
+		{s.PT, "PT", "Professional Tax", pt},
 		{s.TDS, "TDS", "Income Tax (TDS)", MonthlyTDS(b.fullTaxable)},
 	}
 	var out []Line

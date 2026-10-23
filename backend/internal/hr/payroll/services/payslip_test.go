@@ -109,7 +109,7 @@ func TestCalculateSkipsOutsideWindow(t *testing.T) {
 
 // Every repository/port failure inside a command surfaces and rolls back.
 func TestPayrollFaultInjection(t *testing.T) {
-	ops := []string{"run.lock", "run.update", "outbox.create", "assignment.eligible", "payslip.delete", "payslip.create", "structure.components"}
+	ops := []string{"run.lock", "run.update", "outbox.create", "assignment.period", "payslip.delete", "payslip.create", "structure.components"}
 	for _, op := range ops {
 		l := setupSeptember(t)
 		l.h.st.fail[op] = errors.New("boom:" + op)

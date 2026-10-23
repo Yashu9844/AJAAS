@@ -21,6 +21,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/onboarding"
 	"github.com/jaas/jaas/internal/hr/organization"
 	"github.com/jaas/jaas/internal/hr/payroll"
+	payrollPlus "github.com/jaas/jaas/internal/hr/payroll/plus"
 	"github.com/jaas/jaas/internal/hr/performance"
 	"github.com/jaas/jaas/internal/hr/recruitment"
 	"github.com/jaas/jaas/internal/identity/access"
@@ -66,7 +67,7 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	m.attendance = attendance.NewModule(o.DB, o.Publisher, emp, o.Identity.Audit())
 	m.leave = leave.NewModule(o.DB, leave.Ports{Employees: emp, Audit: o.Identity.Audit(), Attendance: m.attendance.LeaveSync(), Reports: m.org,
 		Presence: m.attendance.Presence(), Publisher: o.Publisher})
-	m.payroll = payroll.NewModule(o.DB, payroll.Ports{Employees: emp, Leave: m.leave.UnpaidLeave(), Audit: o.Identity.Audit(), Publisher: o.Publisher})
+	m.payroll = payroll.NewModule(o.DB, payroll.Ports{Employees: emp, Leave: m.leave.UnpaidLeave(), Settle: m.leave.Settlement(), Audit: o.Identity.Audit(), Publisher: o.Publisher})
 	m.recruitment = recruitment.NewModule(o.DB, recruitment.Ports{Employees: emp, Users: o.Identity.Users(),
 		Departments: m.org.DepartmentService(), Designations: m.org.DesignationService(), Audit: o.Identity.Audit(), Publisher: o.Publisher})
 	m.performance = performance.NewModule(o.DB, performance.Ports{Employees: emp, Managers: m.org, Audit: o.Identity.Audit(), Publisher: o.Publisher})
@@ -78,7 +79,9 @@ func New(ctx context.Context, o Options) (*Module, error) {
 		Payroll: m.payroll.CTC(), Audit: o.Identity.Audit()})
 	m.onb = onboarding.NewModule(o.DB, onboarding.Ports{Employees: emp, Core: m.core.Directory(), Documents: m.employee.Documents(),
 		Audit: o.Identity.Audit()})
-	m.leave.SetLocations(leavePlus.FromCore(m.core.Directory())) // LP-05: employee location for calendars
+	m.leave.SetLocations(leavePlus.FromCore(m.core.Directory()))               // LP-05: employee location for calendars
+	m.payroll.SetStates(payrollPlus.StatesFromCore(m.core.Directory(), m.org)) // PP-02: work state for professional tax
+	m.payroll.SetClearance(m.onb.Clearance())                                  // PP-07: exit clearance before settlement approval
 	// OB-03: core actions and recruitment hires start onboarding/offboarding inside their own transactions.
 	m.core.OnActionCompleted(m.onb.Service().CoreHook)
 	m.recruitment.OnHired(m.onb.Service().RecruitmentHook)

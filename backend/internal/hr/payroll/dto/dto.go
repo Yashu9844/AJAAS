@@ -138,6 +138,7 @@ type RunResponse struct {
 	GrossTotal         calc.Money `json:"gross_total"`
 	DeductionTotal     calc.Money `json:"deduction_total"`
 	NetTotal           calc.Money `json:"net_total"`
+	EmployerTotal      calc.Money `json:"employer_total"`
 	Warnings           []string   `json:"warnings"`
 	CalculatedByUserID *uuid.UUID `json:"calculated_by_user_id,omitempty"`
 	ApprovedByUserID   *uuid.UUID `json:"approved_by_user_id,omitempty"`
@@ -164,6 +165,7 @@ type PayslipResponse struct {
 	Gross        calc.Money     `json:"gross"`
 	Deductions   calc.Money     `json:"deductions"`
 	Net          calc.Money     `json:"net"`
+	EmployerCost calc.Money     `json:"employer_cost"`
 	Lines        []LineResponse `json:"lines"`
 	CreatedAt    time.Time      `json:"created_at"`
 }

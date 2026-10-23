@@ -4344,6 +4344,105 @@ paths:
         '403': {description: 'SELF_APPROVAL_FORBIDDEN'}
         '404': {description: 'NOT_FOUND'}
         '409': {description: 'REQUEST_STATE / INSUFFICIENT_BALANCE / ENCASH_LIMIT'}
+  /hr/payroll/pt-slabs:
+    get:
+      summary: 'Tenant professional-tax slabs per state plus the built-in defaults (payroll:read)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/payroll/pt-slabs/{state}:
+    put:
+      summary: 'Replace a state slabs (payroll:manage); slabs ascending, non-overlapping, generic series from 0'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: state, in: path, required: true, schema: {type: string, minLength: 2, maxLength: 2}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PayrollPtSlabsInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR / INVALID_SLABS'}
+    delete:
+      summary: 'Remove a state tenant slabs, back to the defaults (payroll:manage)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: state, in: path, required: true, schema: {type: string, minLength: 2, maxLength: 2}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+  /hr/payroll/settlements:
+    post:
+      summary: 'Calculate (or refresh) a leaver final settlement draft (payroll:manage)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PayrollSettlementInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'EMPLOYEE_NOT_FOUND'}
+        '409': {description: 'NOT_A_LEAVER / NO_ASSIGNMENT / CONFLICT'}
+    get:
+      summary: 'List settlements (payroll:read)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [draft, approved, paid, cancelled]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/payroll/settlements/me:
+    get:
+      summary: 'My paid settlements'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/payroll/settlements/{id}:
+    get:
+      summary: 'A settlement with its lines (payroll:read)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/payroll/settlements/{id}/recalculate:
+    post:
+      summary: 'Recalculate a draft (payroll:manage)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'SETTLEMENT_STATE'}
+  /hr/payroll/settlements/{id}/approve:
+    post:
+      summary: 'Approve: a user other than the calculator, after exit clearance (payroll:approve)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '403': {description: 'PAY_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'SETTLEMENT_STATE / CLEARANCE_PENDING'}
+  /hr/payroll/settlements/{id}/pay:
+    post:
+      summary: 'Mark paid and settle the worker approved encashments in HR/Leave (payroll:manage)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'SETTLEMENT_STATE'}
+  /hr/payroll/settlements/{id}/cancel:
+    post:
+      summary: 'Cancel a draft or approved settlement (payroll:manage)'
+      tags: [Payroll operations]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'SETTLEMENT_STATE'}
 components:
   securitySchemes:
     BearerAuth:
@@ -5557,3 +5656,17 @@ components:
       type: object
       required: [leave_type_id, days]
       properties: {leave_type_id: {type: string, format: uuid}, days: {type: number, minimum: 0.5}, reason: {type: string, maxLength: 500}}
+    PayrollPtSlabsInput:
+      type: object
+      required: [slabs]
+      properties:
+        slabs:
+          type: array
+          items:
+            type: object
+            required: [min_gross, amount]
+            properties: {min_gross: {type: number, minimum: 0}, max_gross: {type: number}, amount: {type: number, minimum: 0}, month: {type: integer, minimum: 1, maximum: 12}}
+    PayrollSettlementInput:
+      type: object
+      required: [employee_id]
+      properties: {employee_id: {type: string, format: uuid}}

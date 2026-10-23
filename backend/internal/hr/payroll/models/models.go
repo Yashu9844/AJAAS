@@ -102,6 +102,7 @@ type Run struct {
 	GrossTotal         calc.Money `gorm:"type:numeric(14,2);not null"`
 	DeductionTotal     calc.Money `gorm:"type:numeric(14,2);not null"`
 	NetTotal           calc.Money `gorm:"type:numeric(14,2);not null"`
+	EmployerTotal      calc.Money `gorm:"type:numeric(14,2);not null"`
 	Warnings           string     `gorm:"type:jsonb;not null"`
 	CreatedByUserID    uuid.UUID  `gorm:"type:uuid;not null"`
 	CalculatedByUserID *uuid.UUID `gorm:"type:uuid"`
@@ -121,22 +122,24 @@ func (r *Run) BeforeCreate(tx *gorm.DB) error { return assignID(&r.ID) }
 
 // Payslip is one employee's result in a run, with an employee snapshot (FR-PS001, D5-09).
 type Payslip struct {
-	ID                uuid.UUID     `gorm:"type:uuid;primaryKey"`
-	TenantID          uuid.UUID     `gorm:"type:uuid;not null;index:idx_payroll_payslips_employee,priority:1"`
-	RunID             uuid.UUID     `gorm:"type:uuid;not null;uniqueIndex:uq_payroll_payslips_run_employee,priority:1"`
-	EmployeeProfileID uuid.UUID     `gorm:"type:uuid;not null;uniqueIndex:uq_payroll_payslips_run_employee,priority:2;index:idx_payroll_payslips_employee,priority:2"`
-	EmployeeCode      string        `gorm:"type:varchar(50);not null"`
-	EmployeeName      string        `gorm:"type:varchar(200);not null"`
-	StructureID       uuid.UUID     `gorm:"type:uuid;not null"`
-	AnnualCTC         calc.Money    `gorm:"column:annual_ctc;type:numeric(14,2);not null"`
-	DaysInMonth       int           `gorm:"type:integer;not null"`
-	PayableDays       kernel.Days   `gorm:"type:numeric(7,2);not null"`
-	LopDays           kernel.Days   `gorm:"type:numeric(7,2);not null"`
-	Gross             calc.Money    `gorm:"type:numeric(14,2);not null"`
-	Deductions        calc.Money    `gorm:"type:numeric(14,2);not null"`
-	Net               calc.Money    `gorm:"type:numeric(14,2);not null"`
-	Lines             []PayslipLine `gorm:"foreignKey:PayslipID"`
-	CreatedAt         time.Time     `gorm:"not null"`
+	ID                uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TenantID          uuid.UUID      `gorm:"type:uuid;not null;index:idx_payroll_payslips_employee,priority:1"`
+	RunID             uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:uq_payroll_payslips_run_employee,priority:1"`
+	EmployeeProfileID uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:uq_payroll_payslips_run_employee,priority:2;index:idx_payroll_payslips_employee,priority:2"`
+	EmployeeCode      string         `gorm:"type:varchar(50);not null"`
+	EmployeeName      string         `gorm:"type:varchar(200);not null"`
+	StructureID       uuid.UUID      `gorm:"type:uuid;not null"`
+	AnnualCTC         calc.Money     `gorm:"column:annual_ctc;type:numeric(14,2);not null"`
+	DaysInMonth       int            `gorm:"type:integer;not null"`
+	PayableDays       kernel.Days    `gorm:"type:numeric(7,2);not null"`
+	LopDays           kernel.Days    `gorm:"type:numeric(7,2);not null"`
+	Gross             calc.Money     `gorm:"type:numeric(14,2);not null"`
+	Deductions        calc.Money     `gorm:"type:numeric(14,2);not null"`
+	Net               calc.Money     `gorm:"type:numeric(14,2);not null"`
+	EmployerCost      calc.Money     `gorm:"type:numeric(14,2);not null"`
+	Segments          SegmentRecords `gorm:"type:jsonb;not null"`
+	Lines             []PayslipLine  `gorm:"foreignKey:PayslipID"`
+	CreatedAt         time.Time      `gorm:"not null"`
 }
 
 // TableName maps to payroll_payslips (migration 000042).

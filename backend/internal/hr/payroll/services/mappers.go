@@ -43,7 +43,7 @@ func mapRun(r *models.Run) dto.RunResponse {
 	warnings := []string{}
 	_ = json.Unmarshal([]byte(r.Warnings), &warnings)
 	return dto.RunResponse{ID: r.ID, Month: r.Month, Year: r.Year, Status: r.Status, EmployeeCount: r.EmployeeCount,
-		GrossTotal: r.GrossTotal, DeductionTotal: r.DeductionTotal, NetTotal: r.NetTotal, Warnings: warnings,
+		GrossTotal: r.GrossTotal, DeductionTotal: r.DeductionTotal, NetTotal: r.NetTotal, EmployerTotal: r.EmployerTotal, Warnings: warnings,
 		CalculatedByUserID: r.CalculatedByUserID, ApprovedByUserID: r.ApprovedByUserID, CalculatedAt: r.CalculatedAt,
 		ApprovedAt: r.ApprovedAt, FinalizedAt: r.FinalizedAt, CreatedAt: r.CreatedAt}
 }
@@ -52,7 +52,7 @@ func mapPayslip(p *models.Payslip, run *models.Run) dto.PayslipResponse {
 	out := dto.PayslipResponse{ID: p.ID, RunID: p.RunID, Month: run.Month, Year: run.Year, EmployeeID: p.EmployeeProfileID,
 		EmployeeCode: p.EmployeeCode, EmployeeName: p.EmployeeName, StructureID: p.StructureID, AnnualCTC: p.AnnualCTC,
 		DaysInMonth: p.DaysInMonth, PayableDays: p.PayableDays, LopDays: p.LopDays, Gross: p.Gross, Deductions: p.Deductions,
-		Net: p.Net, Lines: []dto.LineResponse{}, CreatedAt: p.CreatedAt}
+		Net: p.Net, EmployerCost: p.EmployerCost, Lines: []dto.LineResponse{}, CreatedAt: p.CreatedAt}
 	for _, l := range p.Lines {
 		out.Lines = append(out.Lines, dto.LineResponse{Code: l.Code, Name: l.Name, Kind: l.Kind, Amount: l.Amount})
 	}

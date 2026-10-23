@@ -35,6 +35,10 @@ type AssignmentRepository interface {
 	ListByEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, page dto.Page) ([]models.Assignment, int64, error)
 	// EligibleFor returns, per employee, the latest assignment overlapping the period (D5-10).
 	EligibleFor(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, p Period) ([]models.Assignment, error)
+	// PeriodAssignments returns every assignment overlapping the period, ordered by employee then start (PP-03).
+	PeriodAssignments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, p Period) ([]models.Assignment, error)
+	// ForEmployee returns one employee assignments overlapping the period, ordered by start.
+	ForEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, p Period) ([]models.Assignment, error)
 }
 
 // RunRepository persists payroll runs (FR-RN).
@@ -56,6 +60,8 @@ type PayslipRepository interface {
 	ListByRun(ctx context.Context, db *gorm.DB, tenantID, runID uuid.UUID, page dto.Page) ([]models.Payslip, int64, error)
 	AllByRun(ctx context.Context, db *gorm.DB, tenantID, runID uuid.UUID) ([]models.Payslip, error)
 	// ListFinalizedForEmployee returns the employee's payslips of finalized runs only (PY-013).
+	// FinalizedBefore returns the employee payslips of finalized runs in the months before (year, month) (PP-04).
+	FinalizedBefore(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, year, month, months int) ([]PastPayslip, error)
 	ListFinalizedForEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, page dto.Page) ([]models.Payslip, int64, error)
 }
 

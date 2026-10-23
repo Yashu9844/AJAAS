@@ -19,6 +19,7 @@ type store struct {
 	runs        map[uuid.UUID]models.Run
 	payslips    map[uuid.UUID]models.Payslip
 	outbox      map[uuid.UUID]models.OutboxEvent
+	arrears     []models.Arrear
 	locks       int
 	fail        map[string]error
 }
@@ -43,7 +44,7 @@ type fakeRunner struct{ st *store }
 func (f fakeRunner) InTx(_ context.Context, fn func(*gorm.DB) error) error {
 	snap := store{structures: cloneMap(f.st.structures), components: append([]models.Component(nil), f.st.components...),
 		assignments: cloneMap(f.st.assignments), runs: cloneMap(f.st.runs), payslips: cloneMap(f.st.payslips),
-		outbox: cloneMap(f.st.outbox), locks: f.st.locks, fail: f.st.fail}
+		outbox: cloneMap(f.st.outbox), arrears: append([]models.Arrear(nil), f.st.arrears...), locks: f.st.locks, fail: f.st.fail}
 	if err := fn(nil); err != nil {
 		*f.st = snap
 		return err

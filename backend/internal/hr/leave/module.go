@@ -127,3 +127,6 @@ func (m *Module) SetLocations(l plus.Locations) { m.cal.SetLocations(l) }
 func (m *Module) RunCompOffExpiry(ctx context.Context, onError func(error)) {
 	m.plus.RunCompOffExpiry(ctx, onError)
 }
+
+// Settlement is the port payroll final settlement uses to read encashable balances and mark encashments paid.
+func (m *Module) Settlement() api.Settlement { return m.plus.Settlement() }
