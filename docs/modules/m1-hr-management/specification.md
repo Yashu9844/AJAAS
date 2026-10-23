@@ -238,9 +238,9 @@ product decision. Each is added to its context's specification (with goldens) wh
 | leave | Per-location holiday calendars and weekly-off patterns | P1 | done 2026-10-22 (LP-03..LP-05) |
 | leave | Comp-off, encashment, non-calendar leave year | P1 | done 2026-10-22 (LP-01, LP-02, LP-08..LP-15) |
 | leave | Proof attachments | P2 | M8 Documents |
-| payroll | Employer PF/ESI contributions, state-wise PT slabs | P1 | |
-| payroll | Arrears and mid-month CTC change split | P1 | needed by compensation and core |
-| payroll | Benefits deductions, final settlement (gratuity, leave encashment) | P1 | needed by benefits and offboarding |
+| payroll | Employer PF/ESI contributions, state-wise PT slabs | P1 | done 2026-10-23 (PP-01, PP-02, PP-09) |
+| payroll | Arrears and mid-month CTC change split | P1 | done 2026-10-23 (PP-03, PP-04) |
+| payroll | Benefits deductions, final settlement (gratuity, leave encashment) | P1 | final settlement done 2026-10-23 (PP-06..PP-08); benefit deductions port ready (PP-05), source arrives with HR/Benefits |
 | payroll | Investment declarations, old tax regime, payslip PDF | P2 | |
 | recruitment | Requisitions tied to positions (headcount) | P1 | depends on core |
 | recruitment | Competency scorecards, multi-step offer approval | P1 | |

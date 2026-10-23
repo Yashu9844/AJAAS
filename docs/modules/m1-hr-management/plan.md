@@ -11,7 +11,7 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 | employee | done (14 + 31 parity ops, 2026-10-21) | `/dev-test/hr/employee` (records tab, `hr.emp.records`) | |
 | attendance | done (19 + 15 parity ops, 2026-10-22) | `/dev-test/hr/attendance`, 4 scenarios | `attendance/ops`: inbox, overtime policy, rosters, auto-absent, bulk import |
 | leave | done (20 + 27 parity ops, 2026-10-22) | `/dev-test/hr/leave`, 3 scenarios | `leave/plus`: leave year, location calendars, inbox, comp-off, encashment |
-| payroll | done (20 ops) | `/dev-test/hr/payroll`, 2 scenarios | |
+| payroll | done (20 + 11 parity ops, 2026-10-23) | `/dev-test/hr/payroll`, 3 scenarios | `payroll/plus`: PT slabs, settlements; employer lines, segments, arrears in the run |
 | recruitment | done (20 ops) | `/dev-test/hr/recruitment`, 1 scenario | last-seat concurrent hire can orphan a profile (documented, untested) |
 | performance | done (33 ops incl. calibration + continuous feedback), 2026-10-20 | `/dev-test/hr/performance`, 4 scenarios | P2: templates per role, peer nomination |
 | core | done (32 ops), 2026-10-21 | `/dev-test/hr/core`, 2 scenarios (live run pending) | `contexts/core/` |

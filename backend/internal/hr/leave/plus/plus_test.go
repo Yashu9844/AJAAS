@@ -30,7 +30,7 @@ var errBoom = errors.New("boom")
 type fakeStore struct {
 	policy      *Policy
 	balances    bool
-	types       map[uuid.UUID]bool // id → active
+	types       map[uuid.UUID]bool // id â†’ active
 	locHolidays map[uuid.UUID]LocationHoliday
 	weekOffs    map[uuid.UUID]WeekOff
 	tenantHols  []TenantHoliday
@@ -38,6 +38,7 @@ type fakeStore struct {
 	compOffs    map[uuid.UUID]CompOff
 	rules       map[uuid.UUID]EncashmentRule
 	encash      map[uuid.UUID]Encashment
+	typeDays    []TypeDays
 	events      []string
 	fail        map[string]error
 }

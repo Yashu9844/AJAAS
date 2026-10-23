@@ -2542,6 +2542,64 @@ export const HR_PAYROLL: OpSpec[] = [
     "note": "Errors: 404 NOT_FOUND"
   },
   {
+    "key": "hr.payroll.get.hr.payroll.pt.slabs",
+    "label": "Tenant professional-tax slabs per state plus the built-in defaults (payroll:read)",
+    "method": "GET",
+    "path": "/hr/payroll/pt-slabs",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.payroll.put.hr.payroll.pt.slabs.state",
+    "label": "Replace a state slabs (payroll:manage); slabs ascending, non-overlapping, generic series from 0",
+    "method": "PUT",
+    "path": "/hr/payroll/pt-slabs/:state",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "state",
+        "where": "path",
+        "required": true,
+        "ref": "payrollPtSlabsId"
+      },
+      {
+        "name": "slabs",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR / INVALID_SLABS"
+  },
+  {
+    "key": "hr.payroll.delete.hr.payroll.pt.slabs.state",
+    "label": "Remove a state tenant slabs, back to the defaults (payroll:manage)",
+    "method": "DELETE",
+    "path": "/hr/payroll/pt-slabs/:state",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "state",
+        "where": "path",
+        "required": true,
+        "ref": "payrollPtSlabsId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
     "key": "hr.payroll.post.hr.payroll.runs",
     "label": "Create a payroll run for a month (payroll:manage)",
     "method": "POST",
@@ -2736,6 +2794,173 @@ export const HR_PAYROLL: OpSpec[] = [
     "expect": [
       200
     ]
+  },
+  {
+    "key": "hr.payroll.post.hr.payroll.settlements",
+    "label": "Calculate (or refresh) a leaver final settlement draft (payroll:manage)",
+    "method": "POST",
+    "path": "/hr/payroll/settlements",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "payrollSettlementsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 404 EMPLOYEE_NOT_FOUND; 409 NOT_A_LEAVER / NO_ASSIGNMENT / CONFLICT"
+  },
+  {
+    "key": "hr.payroll.get.hr.payroll.settlements",
+    "label": "List settlements (payroll:read)",
+    "method": "GET",
+    "path": "/hr/payroll/settlements",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "draft",
+          "approved",
+          "paid",
+          "cancelled"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.payroll.get.hr.payroll.settlements.me",
+    "label": "My paid settlements",
+    "method": "GET",
+    "path": "/hr/payroll/settlements/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.payroll.get.hr.payroll.settlements.id",
+    "label": "A settlement with its lines (payroll:read)",
+    "method": "GET",
+    "path": "/hr/payroll/settlements/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "payrollSettlementsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.payroll.post.hr.payroll.settlements.id.approve",
+    "label": "Approve: a user other than the calculator, after exit clearance (payroll:approve)",
+    "method": "POST",
+    "path": "/hr/payroll/settlements/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "payrollSettlementsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 PAY_SELF_APPROVAL; 404 NOT_FOUND; 409 SETTLEMENT_STATE / CLEARANCE_PENDING"
+  },
+  {
+    "key": "hr.payroll.post.hr.payroll.settlements.id.cancel",
+    "label": "Cancel a draft or approved settlement (payroll:manage)",
+    "method": "POST",
+    "path": "/hr/payroll/settlements/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "payrollSettlementsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 SETTLEMENT_STATE"
+  },
+  {
+    "key": "hr.payroll.post.hr.payroll.settlements.id.pay",
+    "label": "Mark paid and settle the worker approved encashments in HR/Leave (payroll:manage)",
+    "method": "POST",
+    "path": "/hr/payroll/settlements/:id/pay",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "payrollSettlementsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 SETTLEMENT_STATE"
+  },
+  {
+    "key": "hr.payroll.post.hr.payroll.settlements.id.recalculate",
+    "label": "Recalculate a draft (payroll:manage)",
+    "method": "POST",
+    "path": "/hr/payroll/settlements/:id/recalculate",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "payrollSettlementsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 SETTLEMENT_STATE"
   },
   {
     "key": "hr.payroll.post.hr.payroll.structures",

@@ -354,6 +354,32 @@ export const S_PAYROLL: Scenario[] = [
       await r.call("payroll:read cannot create a run → 403", tn(reader, "POST", "/hr/payroll/runs", { month: 1, year: 2026 }), 403);
     },
   },
+  {
+    key: "hr.payroll.plus",
+    module: "payroll",
+    title: "State PT slabs and final-settlement rules (PG2, PG5, PG6)",
+    description:
+      "Saves a state's professional-tax slabs (a February override included), refuses slabs that overlap or do not start at 0, lists tenant slabs next to the built-in defaults and removes them again. A final settlement is refused for a worker who has not left, and a plain employee can neither calculate nor pay one but can read their own settlements.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const w = await member(r, A, uid, "pw");
+      const P = "/hr/payroll";
+      const slabs = { slabs: [{ min_gross: 0, max_gross: 9999, amount: 0 }, { min_gross: 10000, amount: 150 }, { min_gross: 10000, amount: 250, month: 2 }] };
+      await r.call("Save Karnataka slabs", tn(A, "PUT", `${P}/pt-slabs/KA`, slabs), 200);
+      await r.call("Slabs must start at 0 → 400", tn(A, "PUT", `${P}/pt-slabs/KA`, { slabs: [{ min_gross: 500, amount: 1 }] }), 400);
+      await r.call("Overlapping slabs → 400", tn(A, "PUT", `${P}/pt-slabs/KA`, { slabs: [{ min_gross: 0, max_gross: 100, amount: 0 }, { min_gross: 100, amount: 5 }] }), 400);
+      await r.call("State must be two letters → 400", tn(A, "PUT", `${P}/pt-slabs/KAR`, slabs), 400);
+      await r.call("Tenant slabs and defaults are listed", tn(A, "GET", `${P}/pt-slabs`), 200, (e) =>
+        list(e, "data.tenant.KA").length === 3 && getPath(e.resBody, "data.defaults.MH") ? null : "expected 3 tenant slabs and MH defaults",
+      );
+      await r.call("Delete the tenant slabs", tn(A, "DELETE", `${P}/pt-slabs/KA`), 204);
+      await r.call("Delete again → 404", tn(A, "DELETE", `${P}/pt-slabs/KA`), 404);
+      await r.call("Settlement for a worker who has not left → 409", tn(A, "POST", `${P}/settlements`, { employee_id: w.empId }), 409);
+      await r.call("Employee cannot calculate a settlement → 403", tn(w.S, "POST", `${P}/settlements`, { employee_id: w.empId }), 403);
+      await r.call("Employee cannot save slabs → 403", tn(w.S, "PUT", `${P}/pt-slabs/KA`, slabs), 403);
+      await r.call("Employee reads own settlements (none)", tn(w.S, "GET", `${P}/settlements/me`), 200, (e) => (list(e).length === 0 ? null : "expected none"));
+    },
+  },
 ];
 
 export const S_RECRUITMENT: Scenario[] = [

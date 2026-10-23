@@ -90,3 +90,20 @@ Money is a JSON number in rupees with at most 2 decimals (for example `1200000` 
 - [ ] Exact-grant RBAC: `payroll:read` can view but not calculate; a member gets `403` on admin endpoints.
 
 ---
+
+## Parity evidence (2026-10-23)
+
+| # | Behaviour | Location |
+|---|---|---|
+| PG1 | Employer PF/ESI are exact at the ceiling edges and never touch net pay | `calc/parity_test.go`, `services/parity_test.go`, `TestPayrollParity` |
+| PG2 | State PT picks the right slab; February overrides; tenant slabs replace defaults; invalid slabs refused | `calc/parity_test.go`, `services/parity_test.go`, `plus` unit, `TestPayrollParity` |
+| PG3 | A mid-month change prices each segment; one segment equals the original pipeline | `calc/parity_test.go`, `services/parity_test.go` |
+| PG4 | Arrears are settled exactly once and recalculation never doubles them | `services/parity_test.go`, `TestPayrollParity` |
+| PG5 | Gratuity eligibility, rounding and cap; leave, encashment and notice arithmetic | `plus/settle_test.go`, `TestPayrollParity` |
+| PG6 | A settlement cannot be approved by its calculator or before clearance, and marks encashments paid once | `plus` unit, `TestPayrollParity` |
+
+- Migrations hr/000077–000080 (up/down/up verified); existing payroll goldens pass unchanged (only the fault-injection key
+  for the renamed repository call was updated).
+- `payroll/services` 92% and `payroll/plus` 89% unit coverage.
+- Contract: 11 new operations in `backend/api/swagger.yaml` (tag Payroll operations).
+- Console: the payroll page lists 31 operations; scenario `hr.payroll.plus`.
