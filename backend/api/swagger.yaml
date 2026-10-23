@@ -4443,6 +4443,210 @@ paths:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
         '404': {description: 'NOT_FOUND'}
         '409': {description: 'SETTLEMENT_STATE'}
+  /hr/recruitment/candidates/{id}/hire/release:
+    post:
+      summary: 'Give back the seat a failed hire holds; idempotent (recruitment:hire)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: OK}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'HIRE_COMPLETED'}
+  /hr/recruitment/requisitions:
+    post:
+      summary: 'Request seats of an open core position (recruitment:manage)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentRequisitionInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'NO_VACANCY / INACTIVE_REFERENCE'}
+    get:
+      summary: 'List requisitions (recruitment:read)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [draft, submitted, approved, rejected, cancelled]}}, {name: position_id, in: query, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/recruitment/requisitions/{id}:
+    get:
+      summary: 'Get a requisition (recruitment:read)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/recruitment/requisitions/{id}/submit:
+    post:
+      summary: 'Submit my draft requisition for approval (recruitment:manage)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUISITION_STATE / NO_VACANCY'}
+  /hr/recruitment/requisitions/{id}/cancel:
+    post:
+      summary: 'Cancel my draft or submitted requisition (recruitment:manage)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUISITION_STATE'}
+  /hr/recruitment/requisitions/{id}/approve:
+    post:
+      summary: 'Approve a submitted requisition, never ones own; creates a draft job (recruitment:approve)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'RECRUITMENT_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUISITION_STATE'}
+  /hr/recruitment/requisitions/{id}/reject:
+    post:
+      summary: 'Reject a submitted requisition, never ones own; comment required (recruitment:approve)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'RECRUITMENT_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'REQUISITION_STATE'}
+  /hr/recruitment/scorecards:
+    post:
+      summary: 'Create a competency scorecard; weights total exactly 100 (recruitment:manage)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentScorecardInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'SCORECARD_INVALID / VALIDATION_ERROR'}
+    get:
+      summary: 'List scorecards (recruitment:read)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, archived]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/recruitment/scorecards/{id}:
+    get:
+      summary: 'Get a scorecard (recruitment:read)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Rename, re-weight or archive a scorecard (recruitment:manage)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentScorecardInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'SCORECARD_INVALID'}
+        '404': {description: 'NOT_FOUND'}
+  /hr/recruitment/jobs/{id}/scorecard:
+    put:
+      summary: 'Assign an active scorecard to a job (recruitment:manage)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentJobScorecardInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'INACTIVE_REFERENCE / JOB_NOT_OPEN'}
+  /hr/recruitment/interviews/{id}/scores:
+    put:
+      summary: 'The assigned interviewer scores every competency of the job scorecard, 1 to 5; replaces earlier scores'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentScoresInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'SCORECARD_INVALID / VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'INTERVIEW_STATE / NO_SCORECARD'}
+  /hr/recruitment/candidates/{id}/scorecard:
+    get:
+      summary: 'Exact per-competency averages and the weighted overall score of a candidate (recruitment:read)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'NO_SCORECARD'}
+  /hr/recruitment/offer-policy:
+    put:
+      summary: 'Set how many approvals offers above a CTC threshold need, 0 to 3 (recruitment:manage)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentOfferPolicyInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    get:
+      summary: 'The offer approval policy, or none required (recruitment:read)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/recruitment/offers/{id}/approve:
+    post:
+      summary: 'Approve an offer waiting for approval, never ones own; the last distinct approval releases it (recruitment:approve)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'RECRUITMENT_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OFFER_STATE / ALREADY_DECIDED'}
+  /hr/recruitment/offers/{id}/reject:
+    post:
+      summary: 'Reject an offer waiting for approval, never ones own; withdraws the offer (recruitment:approve)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/RecruitmentCommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'RECRUITMENT_SELF_APPROVAL'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'OFFER_STATE / ALREADY_DECIDED'}
+  /hr/recruitment/offers/{id}/approvals:
+    get:
+      summary: 'Decisions recorded on an offer (recruitment:read)'
+      tags: [Recruitment]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
 components:
   securitySchemes:
     BearerAuth:
@@ -5670,3 +5874,34 @@ components:
       type: object
       required: [employee_id]
       properties: {employee_id: {type: string, format: uuid}}
+    RecruitmentRequisitionInput:
+      type: object
+      required: [position_id, headcount, justification]
+      properties: {position_id: {type: string, format: uuid}, headcount: {type: integer, minimum: 1, maximum: 100}, justification: {type: string, maxLength: 1000}}
+    RecruitmentCommentInput:
+      type: object
+      properties: {comment: {type: string, maxLength: 500}}
+    RecruitmentScorecardInput:
+      type: object
+      properties:
+        name: {type: string, maxLength: 150}
+        status: {type: string, enum: [active, archived]}
+        competencies:
+          type: array
+          description: Weights are percentages and total exactly 100.
+          items: {type: object, required: [name, weight_pct], properties: {name: {type: string, maxLength: 100}, weight_pct: {type: number, exclusiveMinimum: 0}}}
+    RecruitmentJobScorecardInput:
+      type: object
+      required: [scorecard_id]
+      properties: {scorecard_id: {type: string, format: uuid}}
+    RecruitmentScoresInput:
+      type: object
+      required: [scores]
+      properties:
+        scores:
+          type: array
+          items: {type: object, required: [competency, score], properties: {competency: {type: string}, score: {type: integer, minimum: 1, maximum: 5}, note: {type: string, maxLength: 500}}}
+    RecruitmentOfferPolicyInput:
+      type: object
+      required: [required_approvals]
+      properties: {required_approvals: {type: integer, minimum: 0, maximum: 3}, threshold_ctc: {type: number, minimum: 0}}

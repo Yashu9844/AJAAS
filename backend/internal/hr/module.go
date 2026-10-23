@@ -79,6 +79,7 @@ func New(ctx context.Context, o Options) (*Module, error) {
 		Payroll: m.payroll.CTC(), Audit: o.Identity.Audit()})
 	m.onb = onboarding.NewModule(o.DB, onboarding.Ports{Employees: emp, Core: m.core.Directory(), Documents: m.employee.Documents(),
 		Audit: o.Identity.Audit()})
+	m.recruitment.SetPositions(m.core.Positions())                             // RP-02: requisitions read core positions
 	m.leave.SetLocations(leavePlus.FromCore(m.core.Directory()))               // LP-05: employee location for calendars
 	m.payroll.SetStates(payrollPlus.StatesFromCore(m.core.Directory(), m.org)) // PP-02: work state for professional tax
 	m.payroll.SetClearance(m.onb.Clearance())                                  // PP-07: exit clearance before settlement approval
@@ -120,7 +121,7 @@ func (m *Module) registerPermissions(ctx context.Context) error {
 	for name, defs := range map[string][]access.PermissionDef{
 		"organization": organization.Catalogue(), "employee": employee.Catalogue(), "attendance": attendance.Catalogue(),
 		"leave": leave.Catalogue(), "payroll": payroll.Catalogue(), "recruitment": recruitment.Catalogue(),
-		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(), "onboarding": onboarding.Catalogue(),
+		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(), "recruitment_parity": recruitment.ParityCatalogue(), "onboarding": onboarding.Catalogue(),
 	} {
 		if err := m.o.Identity.RegisterPermissions(ctx, defs); err != nil {
 			return fmt.Errorf("%s permission catalogue: %w", name, err)

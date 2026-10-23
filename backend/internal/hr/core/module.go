@@ -38,6 +38,7 @@ type Module struct {
 	effects    *services.EffectsService
 	dir        directory
 	hooks      *services.Hooks
+	positions  *services.PositionService
 }
 
 // NewModule wires repositories, services and the controller.
@@ -45,8 +46,10 @@ func NewModule(db *gorm.DB, p Ports) *Module {
 	d := services.Deps{Tx: services.NewTxRunner(db), Repo: repositories.New(), Employees: p.Employees, Lifecycle: p.Lifecycle, Org: p.Org,
 		Logins: p.Logins, Audit: p.Audit, Publisher: p.Publisher, Now: time.Now, Hooks: &services.Hooks{}}
 	effects := services.NewEffectsService(d)
+	positions := services.NewPositionService(d)
 	return &Module{
-		controller: controllers.New(controllers.Services{Architecture: services.NewArchitectureService(d), Positions: services.NewPositionService(d),
+		positions: positions,
+		controller: controllers.New(controllers.Services{Architecture: services.NewArchitectureService(d), Positions: positions,
 			Actions: services.NewActionService(d), Workers: services.NewWorkerService(d), Effects: effects}),
 		relay:   services.NewOutboxRelay(d),
 		effects: effects,

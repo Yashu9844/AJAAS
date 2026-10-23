@@ -96,3 +96,21 @@ Job statuses: `draft → open ⇄ on_hold`, and any non-final status → `closed
 - [ ] Another tenant's job or candidate id returns `404`.
 
 ---
+
+---
+
+## Parity evidence (2026-10-23)
+
+| # | Behaviour | Location |
+|---|---|---|
+| RG1 | Two hires racing for the last seat: one wins, no orphan user or profile, seats add up | `plus` unit (`TestReleaseHire`), `services` hire tests, `TestRecruitmentParity` |
+| RG2 | A requisition cannot exceed open seats and needs a second person | `plus` unit (`TestRequisitions`), `TestRecruitmentParity` |
+| RG3 | Scorecard weights total 100 and averages and overall are exact | `plus` unit (`TestScorecards`, `TestScores`), `TestRecruitmentParity` |
+| RG4 | An offer above the threshold stays unusable until the required distinct approvers approve | `plus` unit (`TestOfferApproval`), `TestRecruitmentParity` |
+| RG5 | Events and audit carry no scores, notes, justification or amounts | `TestRecruitmentParity` |
+
+- Migrations hr/000081–000084 (up/down/up verified on a scratch database); existing recruitment goldens pass unchanged
+  except the offers unique-index expectation and the model count, updated for the new status and tables.
+- `recruitment/plus` 88% unit coverage; `recruitment/services` stays at 95%.
+- Contract: 20 new operations in `backend/api/swagger.yaml` (tag Recruitment).
+- Console: the recruitment page lists 40 operations; scenario `hr.rec.plus`.

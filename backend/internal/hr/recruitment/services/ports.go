@@ -3,11 +3,14 @@ package services
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/hr/kernel"
+	"github.com/jaas/jaas/internal/hr/recruitment/models"
 	"github.com/jaas/jaas/internal/hr/recruitment/repositories"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
@@ -71,6 +74,36 @@ type Deps struct {
 	Publisher queue.EventPublisher
 	Now       Clock
 	Hooks     *Hooks
+	OfferGate OfferGate
+}
+
+// OfferGate decides an offer's starting status (RP-06); nil keeps every offer `offered`.
+type OfferGate interface {
+	StartingStatus(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ctc kernel.Money) (string, error)
+}
+
+// OfferGateSwitch is an OfferGate installed after construction.
+type OfferGateSwitch struct {
+	mu   sync.RWMutex
+	gate OfferGate
+}
+
+// Set installs the gate.
+func (g *OfferGateSwitch) Set(x OfferGate) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.gate = x
+}
+
+// StartingStatus implements OfferGate.
+func (g *OfferGateSwitch) StartingStatus(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ctc kernel.Money) (string, error) {
+	g.mu.RLock()
+	x := g.gate
+	g.mu.RUnlock()
+	if x == nil {
+		return models.OfferOffered, nil
+	}
+	return x.StartingStatus(ctx, tx, tenantID, ctc)
 }
 
 type gormRunner struct{ db *gorm.DB }

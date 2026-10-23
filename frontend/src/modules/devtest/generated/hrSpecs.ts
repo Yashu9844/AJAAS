@@ -3365,6 +3365,46 @@ export const HR_RECRUITMENT: OpSpec[] = [
     "note": "Errors: 409 NOT_HIREABLE"
   },
   {
+    "key": "hr.recruitment.post.hr.recruitment.candidates.id.hire.release",
+    "label": "Give back the seat a failed hire holds; idempotent (recruitment:hire)",
+    "method": "POST",
+    "path": "/hr/recruitment/candidates/:id/hire/release",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentCandidatesId"
+      }
+    ],
+    "expect": [
+      204
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 HIRE_COMPLETED"
+  },
+  {
+    "key": "hr.recruitment.get.hr.recruitment.candidates.id.scorecard",
+    "label": "Exact per-competency averages and the weighted overall score of a candidate (recruitment:read)",
+    "method": "GET",
+    "path": "/hr/recruitment/candidates/:id/scorecard",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentCandidatesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 NO_SCORECARD"
+  },
+  {
     "key": "hr.recruitment.post.hr.recruitment.candidates.id.stage",
     "label": "Move a candidate along the pipeline (recruitment:manage)",
     "method": "POST",
@@ -3582,6 +3622,32 @@ export const HR_RECRUITMENT: OpSpec[] = [
     "note": "Errors: 404 NOT_FOUND (not your interview); 409 INTERVIEW_STATE"
   },
   {
+    "key": "hr.recruitment.put.hr.recruitment.interviews.id.scores",
+    "label": "The assigned interviewer scores every competency of the job scorecard, 1 to 5; replaces earlier scores",
+    "method": "PUT",
+    "path": "/hr/recruitment/interviews/:id/scores",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentInterviewsId"
+      },
+      {
+        "name": "scores",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 SCORECARD_INVALID / VALIDATION_ERROR; 404 NOT_FOUND; 409 INTERVIEW_STATE / NO_SCORECARD"
+  },
+  {
     "key": "hr.recruitment.post.hr.recruitment.jobs",
     "label": "Create a job opening in draft (recruitment:manage)",
     "method": "POST",
@@ -3773,6 +3839,32 @@ export const HR_RECRUITMENT: OpSpec[] = [
     "note": "Errors: 409 JOB_STATE"
   },
   {
+    "key": "hr.recruitment.put.hr.recruitment.jobs.id.scorecard",
+    "label": "Assign an active scorecard to a job (recruitment:manage)",
+    "method": "PUT",
+    "path": "/hr/recruitment/jobs/:id/scorecard",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentJobsId"
+      },
+      {
+        "name": "scorecard_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 INACTIVE_REFERENCE / JOB_NOT_OPEN"
+  },
+  {
     "key": "hr.recruitment.post.hr.recruitment.jobs.id.status",
     "label": "Change job status; draft→open, open↔on_hold, any non-final→closed; filled is automatic (recruitment:manage)",
     "method": "POST",
@@ -3803,6 +3895,43 @@ export const HR_RECRUITMENT: OpSpec[] = [
       200
     ],
     "note": "Errors: 409 JOB_STATE"
+  },
+  {
+    "key": "hr.recruitment.get.hr.recruitment.offer.policy",
+    "label": "The offer approval policy, or none required (recruitment:read)",
+    "method": "GET",
+    "path": "/hr/recruitment/offer-policy",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.recruitment.put.hr.recruitment.offer.policy",
+    "label": "Set how many approvals offers above a CTC threshold need, 0 to 3 (recruitment:manage)",
+    "method": "PUT",
+    "path": "/hr/recruitment/offer-policy",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "required_approvals",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "threshold_ctc",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
   },
   {
     "key": "hr.recruitment.post.hr.recruitment.offers",
@@ -3877,6 +4006,50 @@ export const HR_RECRUITMENT: OpSpec[] = [
     ]
   },
   {
+    "key": "hr.recruitment.get.hr.recruitment.offers.id.approvals",
+    "label": "Decisions recorded on an offer (recruitment:read)",
+    "method": "GET",
+    "path": "/hr/recruitment/offers/:id/approvals",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentOffersId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.recruitment.post.hr.recruitment.offers.id.approve",
+    "label": "Approve an offer waiting for approval, never ones own; the last distinct approval releases it (recruitment:approve)",
+    "method": "POST",
+    "path": "/hr/recruitment/offers/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentOffersId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 RECRUITMENT_SELF_APPROVAL; 404 NOT_FOUND; 409 OFFER_STATE / ALREADY_DECIDED"
+  },
+  {
     "key": "hr.recruitment.post.hr.recruitment.offers.id.decision",
     "label": "Record the candidate's decision (recruitment:manage)",
     "method": "POST",
@@ -3908,6 +4081,30 @@ export const HR_RECRUITMENT: OpSpec[] = [
     "note": "Errors: 409 OFFER_STATE (not open or expired)"
   },
   {
+    "key": "hr.recruitment.post.hr.recruitment.offers.id.reject",
+    "label": "Reject an offer waiting for approval, never ones own; withdraws the offer (recruitment:approve)",
+    "method": "POST",
+    "path": "/hr/recruitment/offers/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentOffersId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 RECRUITMENT_SELF_APPROVAL; 404 NOT_FOUND; 409 OFFER_STATE / ALREADY_DECIDED"
+  },
+  {
     "key": "hr.recruitment.post.hr.recruitment.offers.id.withdraw",
     "label": "Withdraw an open offer (recruitment:manage)",
     "method": "POST",
@@ -3926,6 +4123,306 @@ export const HR_RECRUITMENT: OpSpec[] = [
       200
     ],
     "note": "Errors: 409 OFFER_STATE"
+  },
+  {
+    "key": "hr.recruitment.post.hr.recruitment.requisitions",
+    "label": "Request seats of an open core position (recruitment:manage)",
+    "method": "POST",
+    "path": "/hr/recruitment/requisitions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "position_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "headcount",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "justification",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "recruitmentRequisitionsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 NO_VACANCY / INACTIVE_REFERENCE"
+  },
+  {
+    "key": "hr.recruitment.get.hr.recruitment.requisitions",
+    "label": "List requisitions (recruitment:read)",
+    "method": "GET",
+    "path": "/hr/recruitment/requisitions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "draft",
+          "submitted",
+          "approved",
+          "rejected",
+          "cancelled"
+        ]
+      },
+      {
+        "name": "position_id",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.recruitment.get.hr.recruitment.requisitions.id",
+    "label": "Get a requisition (recruitment:read)",
+    "method": "GET",
+    "path": "/hr/recruitment/requisitions/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentRequisitionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.recruitment.post.hr.recruitment.requisitions.id.approve",
+    "label": "Approve a submitted requisition, never ones own; creates a draft job (recruitment:approve)",
+    "method": "POST",
+    "path": "/hr/recruitment/requisitions/:id/approve",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentRequisitionsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 RECRUITMENT_SELF_APPROVAL; 404 NOT_FOUND; 409 REQUISITION_STATE"
+  },
+  {
+    "key": "hr.recruitment.post.hr.recruitment.requisitions.id.cancel",
+    "label": "Cancel my draft or submitted requisition (recruitment:manage)",
+    "method": "POST",
+    "path": "/hr/recruitment/requisitions/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentRequisitionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 REQUISITION_STATE"
+  },
+  {
+    "key": "hr.recruitment.post.hr.recruitment.requisitions.id.reject",
+    "label": "Reject a submitted requisition, never ones own; comment required (recruitment:approve)",
+    "method": "POST",
+    "path": "/hr/recruitment/requisitions/:id/reject",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentRequisitionsId"
+      },
+      {
+        "name": "comment",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 RECRUITMENT_SELF_APPROVAL; 404 NOT_FOUND; 409 REQUISITION_STATE"
+  },
+  {
+    "key": "hr.recruitment.post.hr.recruitment.requisitions.id.submit",
+    "label": "Submit my draft requisition for approval (recruitment:manage)",
+    "method": "POST",
+    "path": "/hr/recruitment/requisitions/:id/submit",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentRequisitionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 REQUISITION_STATE / NO_VACANCY"
+  },
+  {
+    "key": "hr.recruitment.post.hr.recruitment.scorecards",
+    "label": "Create a competency scorecard; weights total exactly 100 (recruitment:manage)",
+    "method": "POST",
+    "path": "/hr/recruitment/scorecards",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      },
+      {
+        "name": "competencies",
+        "where": "body",
+        "type": "json",
+        "placeholder": "Weights are percentages and total exactly 100."
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "recruitmentScorecardsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 SCORECARD_INVALID / VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.recruitment.get.hr.recruitment.scorecards",
+    "label": "List scorecards (recruitment:read)",
+    "method": "GET",
+    "path": "/hr/recruitment/scorecards",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.recruitment.get.hr.recruitment.scorecards.id",
+    "label": "Get a scorecard (recruitment:read)",
+    "method": "GET",
+    "path": "/hr/recruitment/scorecards/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentScorecardsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.recruitment.patch.hr.recruitment.scorecards.id",
+    "label": "Rename, re-weight or archive a scorecard (recruitment:manage)",
+    "method": "PATCH",
+    "path": "/hr/recruitment/scorecards/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "recruitmentScorecardsId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "status",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "archived"
+        ]
+      },
+      {
+        "name": "competencies",
+        "where": "body",
+        "type": "json",
+        "placeholder": "Weights are percentages and total exactly 100."
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 SCORECARD_INVALID; 404 NOT_FOUND"
   }
 ];
 

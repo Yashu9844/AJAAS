@@ -1,4 +1,4 @@
-// Package models holds Module 6 (Recruitment) persistence models; migrations 000045–000050 are the SQL twin.
+// Package models holds Module 6 (Recruitment) persistence models; migrations 000045â€“000050 are the SQL twin.
 package models
 
 import (
@@ -15,10 +15,11 @@ const (
 	InterviewCompleted = "completed"
 	InterviewCancelled = "cancelled"
 
-	OfferOffered   = "offered"
-	OfferAccepted  = "accepted"
-	OfferDeclined  = "declined"
-	OfferWithdrawn = "withdrawn"
+	OfferPendingApproval = "pending_approval" // waiting for approvals (RP-06)
+	OfferOffered         = "offered"
+	OfferAccepted        = "accepted"
+	OfferDeclined        = "declined"
+	OfferWithdrawn       = "withdrawn"
 )
 
 // Job is a job opening (FR-JB001).
@@ -30,6 +31,7 @@ type Job struct {
 	DesignationID      *uuid.UUID `gorm:"type:uuid"`
 	Headcount          int        `gorm:"type:integer;not null"`
 	HiredCount         int        `gorm:"type:integer;not null"`
+	ReservedCount      int        `gorm:"type:integer;not null"` // seats reserved by hires in progress (RP-01)
 	Location           *string    `gorm:"type:varchar(100)"`
 	EmploymentType     string     `gorm:"type:varchar(20);not null"`
 	MinExperienceYears int        `gorm:"type:integer;not null"`
@@ -64,6 +66,7 @@ type Candidate struct {
 	Stage            string        `gorm:"type:varchar(20);not null;index:idx_recruitment_candidates_job_stage,priority:3"`
 	HiredUserID      *uuid.UUID    `gorm:"type:uuid"`
 	HiredEmployeeID  *uuid.UUID    `gorm:"type:uuid"`
+	SeatReserved     bool          `gorm:"not null"` // the hire holds a seat of the job (RP-01)
 	CreatedAt        time.Time     `gorm:"not null"`
 	UpdatedAt        time.Time     `gorm:"not null"`
 }
@@ -121,7 +124,7 @@ func (i *Interview) BeforeCreate(tx *gorm.DB) error { return assignID(&i.ID) }
 type Offer struct {
 	ID              uuid.UUID    `gorm:"type:uuid;primaryKey"`
 	TenantID        uuid.UUID    `gorm:"type:uuid;not null"`
-	CandidateID     uuid.UUID    `gorm:"type:uuid;not null;uniqueIndex:uq_recruitment_offers_open,where:status = 'offered';index:idx_recruitment_offers_candidate"`
+	CandidateID     uuid.UUID    `gorm:"type:uuid;not null;uniqueIndex:uq_recruitment_offers_open,where:status IN ('offered'\\, 'pending_approval');index:idx_recruitment_offers_candidate"`
 	OfferedCTC      kernel.Money `gorm:"column:offered_ctc;type:numeric(14,2);not null"`
 	JoiningDate     time.Time    `gorm:"type:date;not null"`
 	ExpiresOn       *time.Time   `gorm:"type:date"`

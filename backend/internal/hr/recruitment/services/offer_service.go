@@ -39,6 +39,11 @@ func (s *OfferService) Create(ctx context.Context, a Actor, req dto.CreateOfferR
 		if err := s.ensureNoLiveOffer(ctx, tx, c); err != nil {
 			return err
 		}
+		if s.OfferGate != nil {
+			if o.Status, err = s.OfferGate.StartingStatus(ctx, tx, a.TenantID, o.OfferedCTC); err != nil {
+				return err
+			}
+		}
 		if err := s.Repos.Offers.Create(ctx, tx, o); err != nil {
 			return err
 		}
@@ -81,7 +86,7 @@ func (s *OfferService) newOffer(a Actor, candID uuid.UUID, req dto.CreateOfferRe
 
 // ensureNoLiveOffer rejects a new offer while one is open or already accepted.
 func (s *OfferService) ensureNoLiveOffer(ctx context.Context, tx *gorm.DB, c *models.Candidate) error {
-	for _, status := range []string{models.OfferOffered, models.OfferAccepted} {
+	for _, status := range []string{models.OfferOffered, models.OfferPendingApproval, models.OfferAccepted} {
 		o, err := s.Repos.Offers.LatestByStatus(ctx, tx, c.TenantID, c.ID, status)
 		if err != nil {
 			return err

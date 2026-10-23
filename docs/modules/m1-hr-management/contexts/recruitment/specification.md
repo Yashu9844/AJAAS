@@ -93,3 +93,27 @@ Public careers portal / candidate self-apply, resume upload & parsing (URL only)
 - A6-01 Interviewers are employees with a working status (active/probation/notice).
 - A6-02 An invited user activates through the M0 Identity invite/reset flow; recruitment sends no email.
 - A6-03 Employee codes on hire are provided by HR (HR/Employee rules apply).
+
+## Parity (2026-10-23): seat reservation, requisitions, scorecards, offer approval
+
+Package `internal/hr/recruitment/plus`, routes under `/api/v1/hr/recruitment`. A new permission `recruitment:approve`
+(sensitive; default `hr_admin`) decides requisitions and offers. Existing flows (RC-001..RC-011) are unchanged when no
+policy is configured.
+
+| ID | Requirement |
+|---|---|
+| RP-01 | Seat reservation (fixes the last-seat orphan): the first hire step locks the job and reserves a seat before any user is invited or profile created. Capacity = `headcount − hired_count − reserved_count`; none left → 409 `JOB_NOT_OPEN` with nothing created. Completing the hire turns the reservation into `hired_count`. A retry of the same candidate reuses its reservation (RC-010). `POST /candidates/{id}/hire/release` (`recruitment:hire`) gives the seat back while no employee profile has been recorded for the candidate (409 `HIRE_COMPLETED` otherwise) and is idempotent. |
+| RP-02 | Requisition: `POST /requisitions {position_id, headcount, justification}` (`manage`) for a core position. The position must exist and be active (404 / 409 `INACTIVE_REFERENCE`); `headcount` ≥ 1 and ≤ the position's open seats (⌊open FTE⌋) minus seats already requested by other requisitions that are submitted or approved (409 `NO_VACANCY`). Statuses `draft → submitted → approved | rejected`, or `cancelled` (draft and submitted only). |
+| RP-03 | `POST /requisitions/{id}/submit` (`manage`, requester); `approve` / `reject` (`recruitment:approve`; never the requester, 403 `RECRUITMENT_SELF_APPROVAL`; reject needs a comment). Approval re-checks RP-02 and creates a **draft** job (title = position title, department = the position's, headcount, employment type `full_time`, description = justification) linked to the requisition (`job_id`). `GET /requisitions` (filters `status`, `position_id`) and `GET /requisitions/{id}` (`read`). |
+| RP-04 | Scorecards: `POST/GET /scorecards`, `GET/PATCH /scorecards/{id}` (`manage` / `read`): a name and 1–10 competencies `{name, weight_pct}` whose weights (percentages, `60` = 60.00%) sum to exactly 100; status `active | archived`. `PUT /jobs/{id}/scorecard {scorecard_id}` (`manage`) assigns an active scorecard to a draft or open job. |
+| RP-05 | Interview scores: `PUT /interviews/{id}/scores {scores:[{competency, score, note?}]}` by the assigned interviewer only (others 404), for a scheduled or completed interview of a candidate whose job has a scorecard. Every competency of the scorecard exactly once, score 1–5 (hundredths not allowed); the call replaces the interviewer's earlier scores. `GET /candidates/{id}/scorecard` (`read`): per competency the average over submitted interviews, the weighted overall (hundredths of a point) and the interview count. Scores and notes never appear in events or audit metadata. |
+| RP-06 | Offer approval policy: `PUT/GET /offer-policy` (`manage` / `read`): `required_approvals` 0–3 and `threshold_ctc` (≥ 0). An offer needs approval when `required_approvals > 0` and `offered_ctc > threshold_ctc`; such an offer is created with status `pending_approval` (one live offer per candidate still holds) and cannot be accepted, declined or hired from. Default policy: 0 approvals, nothing changes. |
+| RP-07 | `POST /offers/{id}/approve` and `/reject` (`recruitment:approve`): each user approves once and never the offer's creator (403 `RECRUITMENT_SELF_APPROVAL`; 409 `ALREADY_DECIDED`); reject needs a comment and ends the offer as `withdrawn` (the candidate's stage is not changed). The offer becomes `offered` when `required_approvals` distinct approvals exist; `GET /offers/{id}/approvals` (`read`) lists the decisions. Events `recruitment.offer.approved` / `rejected` carry ids only. |
+
+Errors added: `NO_VACANCY`, `RECRUITMENT_SELF_APPROVAL`, `HIRE_COMPLETED`, `ALREADY_DECIDED`, `REQUISITION_STATE`,
+`SCORECARD_INVALID`.
+
+**Golden tests:** `RG1` two hires racing for the last seat leave no orphan user or profile; `RG2` requisitions cannot
+exceed the position's open seats and need a second person; `RG3` scorecard weights sum to 100 and overall scores are
+exact; `RG4` an offer above the threshold stays unusable until the required distinct approvers approve; `RG5` events
+carry no scores, notes or amounts.

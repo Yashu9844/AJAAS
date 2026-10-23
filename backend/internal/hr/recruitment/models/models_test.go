@@ -47,7 +47,7 @@ func TestRecruitmentModels_TablesAndIndexes(t *testing.T) {
 		{&StageEvent{}, "idx_recruitment_stage_events_candidate", false, "", []string{"candidate_id"}},
 		{&Interview{}, "idx_recruitment_interviews_interviewer", false, "", []string{"tenant_id", "interviewer_employee_id"}},
 		{&Interview{}, "idx_recruitment_interviews_candidate", false, "", []string{"candidate_id"}},
-		{&Offer{}, "uq_recruitment_offers_open", true, "status = 'offered'", []string{"candidate_id"}},
+		{&Offer{}, "uq_recruitment_offers_open", true, "status IN ('offered', 'pending_approval')", []string{"candidate_id"}},
 		{&Offer{}, "idx_recruitment_offers_candidate", false, "", []string{"candidate_id"}},
 		{&OutboxEvent{}, "uq_recruitment_outbox_event_id", true, "", []string{"event_id"}},
 		{&OutboxEvent{}, "idx_recruitment_outbox_published", false, "published = false", []string{"published"}},

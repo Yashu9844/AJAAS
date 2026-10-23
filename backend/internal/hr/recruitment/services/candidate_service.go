@@ -163,13 +163,21 @@ func (s *CandidateService) closeOpenOffer(ctx context.Context, tx *gorm.DB, c *m
 	if c.Stage != pipeline.Offer {
 		return nil
 	}
-	o, err := s.Repos.Offers.LatestByStatus(ctx, tx, c.TenantID, c.ID, models.OfferOffered)
-	if err != nil || o == nil {
-		return err
+	for _, status := range []string{models.OfferOffered, models.OfferPendingApproval} {
+		o, err := s.Repos.Offers.LatestByStatus(ctx, tx, c.TenantID, c.ID, status)
+		if err != nil {
+			return err
+		}
+		if o == nil {
+			continue
+		}
+		now := s.Now().UTC()
+		o.Status, o.DecidedAt = models.OfferWithdrawn, &now
+		if err := s.Repos.Offers.Update(ctx, tx, o); err != nil {
+			return err
+		}
 	}
-	now := s.Now().UTC()
-	o.Status, o.DecidedAt = models.OfferWithdrawn, &now
-	return s.Repos.Offers.Update(ctx, tx, o)
+	return nil
 }
 
 func applyCandidatePatch(c *models.Candidate, req dto.UpdateCandidateRequest) {

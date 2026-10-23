@@ -424,6 +424,71 @@ export const S_RECRUITMENT: Scenario[] = [
       await r.call("Filled job takes no more candidates → 409", tn(A, "POST", "/hr/recruitment/candidates", { job_id: jid, first_name: "L", last_name: "L", email: `late.${uid}@example.com`, source: "referral" }), 409);
     },
   },
+  {
+    key: "hr.rec.plus",
+    module: "recruitment",
+    title: "Requisitions, scorecards and offer approval (RG1–RG4)",
+    description:
+      "Requests a seat of a core position (more than the open seats is refused, the maker cannot approve), approves it into a draft job, scores a candidate against a weighted scorecard (weights must total 100) and checks the exact weighted average, then requires two distinct approvals before an offer above the threshold is released.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const B = "/hr/recruitment";
+      const approver = await limited(r, A, uid, "rqa", [["recruitment", "approve"], ["recruitment", "read"]]);
+      const second = await limited(r, A, uid, "rqb", [["recruitment", "approve"], ["recruitment", "read"]]);
+      const interviewer = await member(r, A, uid, "rqi");
+      const dept = str(await r.call("Department", tn(A, "POST", "/hr/departments", { name: `Rec ${uid}`, code: `RC${uid}`.toUpperCase() }), 201), "data.id");
+      const fam = str(await r.call("Job family", tn(A, "POST", "/hr/core/job-families", { code: `RF${uid}`, name: `Eng ${uid}` }), 201), "data.id");
+      const grade = await r.call("Grade", tn(A, "POST", "/hr/core/grades", { code: `RG${uid}`, name: "Level R", rank: 9 }), [201, 409]);
+      const gradeId = str(grade, "data.id") || String(list(await r.call("Grades", tn(A, "GET", "/hr/core/grades"), 200)).find((x) => x.rank === 9)?.id ?? "");
+      const prof = str(await r.call("Job profile", tn(A, "POST", "/hr/core/job-profiles", { code: `RP${uid}`, title: "Engineer", family_id: fam, default_grade_id: gradeId, category: "staff", probation_days: 90 }), 201), "data.id");
+      const pos = str(await r.call("Position (single seat)", tn(A, "POST", "/hr/core/positions", { code: `RS${uid}`, title: "Backend seat", job_profile_id: prof, department_id: dept }), 201), "data.id");
+
+      await r.call("Two seats of a one-seat position → 409 NO_VACANCY", tn(A, "POST", `${B}/requisitions`, { position_id: pos, headcount: 2, justification: "scale" }), 409);
+      const rq = await r.call("Requisition", tn(A, "POST", `${B}/requisitions`, { position_id: pos, headcount: 1, justification: "grow the team" }), 201);
+      const rid = str(rq, "data.id");
+      await r.call("Submit", tn(A, "POST", `${B}/requisitions/${rid}/submit`), 200);
+      await r.call("A second requisition finds the seat held → 409", tn(A, "POST", `${B}/requisitions`, { position_id: pos, headcount: 1, justification: "again" }), 409);
+      await r.call("Approving own requisition → 403", tn(A, "POST", `${B}/requisitions/${rid}/approve`), 403);
+      const ap = await r.call("Another approver approves", tn(approver, "POST", `${B}/requisitions/${rid}/approve`, { comment: "ok" }), 200, (e) =>
+        str(e, "data.job_id") ? null : "no job created",
+      );
+      const jid = str(ap, "data.job_id");
+      await r.call("Open the job", tn(A, "POST", `${B}/jobs/${jid}/status`, { status: "open" }), 200);
+
+      await r.call("Weights not totalling 100 → 400", tn(A, "POST", `${B}/scorecards`, { name: `Bad ${uid}`, competencies: [{ name: "A", weight_pct: 50 }] }), 400);
+      const sc = await r.call("Scorecard 60/40", tn(A, "POST", `${B}/scorecards`, { name: `Backend ${uid}`, competencies: [{ name: "Coding", weight_pct: 60 }, { name: "Communication", weight_pct: 40 }] }), 201);
+      await r.call("Assign it to the job", tn(A, "PUT", `${B}/jobs/${jid}/scorecard`, { scorecard_id: str(sc, "data.id") }), 200);
+      const cand = str(await r.call("Candidate", tn(A, "POST", `${B}/candidates`, { job_id: jid, first_name: "Priya", last_name: "Nair", email: `rp.${uid}@example.com`, source: "referral" }), 201), "data.id");
+      await r.call("Stage → screening", tn(A, "POST", `${B}/candidates/${cand}/stage`, { stage: "screening" }), 200);
+      await r.call("Stage → interview", tn(A, "POST", `${B}/candidates/${cand}/stage`, { stage: "interview" }), 200);
+      const iv = await r.call("Schedule interview", tn(A, "POST", `${B}/interviews`, { candidate_id: cand, round_name: "Tech", interviewer_employee_id: interviewer.empId,
+        scheduled_at: new Date(Date.now() + 86400000).toISOString(), duration_mins: 60 }), 201);
+      const scores = { scores: [{ competency: "Coding", score: 4 }, { competency: "communication", score: 3 }] };
+      await r.call("Admin is not the interviewer → 404", tn(A, "PUT", `${B}/interviews/${str(iv, "data.id")}/scores`, scores), 404);
+      await r.call("Interviewer scores", tn(interviewer.S, "PUT", `${B}/interviews/${str(iv, "data.id")}/scores`, scores), 200);
+      await r.call("Weighted overall is exactly 3.60", tn(A, "GET", `${B}/candidates/${cand}/scorecard`), 200, (e) =>
+        getPath(e.resBody, "data.overall") === 360 ? null : "overall mismatch",
+      );
+
+      await r.call("Offers above 10 lakh need two approvals", tn(A, "PUT", `${B}/offer-policy`, { required_approvals: 2, threshold_ctc: 1000000 }), 200);
+      const join = ymd(addDays(new Date(), 30));
+      const off = await r.call("Offer waits for approval", tn(A, "POST", `${B}/offers`, { candidate_id: cand, offered_ctc: 1800000, joining_date: join }), 201, (e) =>
+        str(e, "data.status") === "pending_approval" ? null : "should be pending_approval",
+      );
+      const oid = str(off, "data.id");
+      await r.call("Accepting before approval → 409", tn(A, "POST", `${B}/offers/${oid}/decision`, { decision: "accepted" }), 409);
+      await r.call("The maker cannot approve → 403", tn(A, "POST", `${B}/offers/${oid}/approve`), 403);
+      await r.call("First approval keeps it pending", tn(approver, "POST", `${B}/offers/${oid}/approve`), 200, (e) =>
+        str(e, "data.status") === "pending_approval" ? null : "should stay pending",
+      );
+      await r.call("Same approver again → 409", tn(approver, "POST", `${B}/offers/${oid}/approve`), 409);
+      await r.call("Second distinct approval releases it", tn(second, "POST", `${B}/offers/${oid}/approve`), 200, (e) =>
+        str(e, "data.status") === "offered" ? null : "should be offered",
+      );
+      await r.call("Both decisions are listed", tn(A, "GET", `${B}/offers/${oid}/approvals`), 200, (e) => (list(e).length === 2 ? null : "expected 2"));
+      await r.call("Release of an unreserved seat is a no-op", tn(A, "POST", `${B}/candidates/${cand}/hire/release`), 204);
+    },
+  },
 ];
 
 const isoDay = (offset: number) => ymd(addDays(new Date(), offset));

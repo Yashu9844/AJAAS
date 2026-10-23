@@ -22,3 +22,28 @@
 2026-10-09 — P5 DONE: services, hire saga, events, relay; D6-07..D6-09.
 2026-10-09 — P6 DONE: HTTP, wiring, swagger.
 2026-10-09 — P7 + P9 DONE: integration 63/63; backend CLOSED.
+
+---
+
+## Parity decisions (2026-10-23)
+
+- **DR-01** The seat is reserved in the first hire step, in the same transaction that locks the job, so a failed hire can
+  never leave a user or profile behind for a seat that does not exist. Capacity is `headcount − hired − reserved`. The
+  reservation is turned into `hired_count` when the hire completes, and `POST /candidates/{id}/hire/release` gives it
+  back while no employee profile exists. A retry reuses its own reservation.
+- **DR-02** Requisitions read positions through `core/api.Positions`, a new port beside `Directory` so existing fakes
+  keep compiling. Seats are the whole open FTE today. Seats already requested by submitted requisitions, or approved
+  ones whose job is still live, are subtracted, so two requisitions cannot both claim the last seat.
+- **DR-03** Approving a requisition creates a **draft** job, never an open one: HR still reviews the posting before it is
+  published.
+- **DR-04** Scorecard weights are percentages in the API (`60` means 60.00) and must total exactly 100. Averages are
+  computed in hundredths with integer arithmetic and the overall score is the weighted sum, so there is no float
+  rounding. Competency names match case-insensitively.
+- **DR-05** Only the assigned interviewer scores an interview; anyone else gets 404, as for feedback. A repeated call
+  replaces the earlier scores. Scores and notes never reach events or audit metadata (RG5).
+- **DR-06** Offer approval is a hook on offer creation (`OfferGate`) so a tenant with no policy is unchanged. A
+  `pending_approval` offer counts as a live offer for the one-open-offer rule and is withdrawn when the candidate leaves
+  the pipeline. A rejection withdraws the offer; it does not move the candidate back, because the existing withdrawal
+  rules already decide that when HR acts.
+- **DR-07** `recruitment:approve` is a new sensitive permission, defaulted to the HR admin template only. The creator of
+  a requisition or offer can never approve it, whatever role they hold.

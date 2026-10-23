@@ -20,7 +20,7 @@ func (s orgStub) GetDesignation(context.Context, *gorm.DB, uuid.UUID, uuid.UUID)
 	return &orgDTO.DesignationResponse{}, s.err
 }
 
-// TestOrgDirectory — Module 1 not-found means "does not exist"; other failures propagate (D6-03).
+// TestOrgDirectory â€” Module 1 not-found means "does not exist"; other failures propagate (D6-03).
 func TestOrgDirectory(t *testing.T) {
 	ctx, id := context.Background(), uuid.New()
 	boom := errors.New("db down")
@@ -37,7 +37,7 @@ func TestOrgDirectory(t *testing.T) {
 		}
 	}
 	m := NewModule(nil, Ports{})
-	if len(m.RegisterModels()) != 6 || m.Relay() == nil {
+	if len(m.RegisterModels()) != 12 || m.Relay() == nil {
 		t.Fatal("module wiring")
 	}
 }

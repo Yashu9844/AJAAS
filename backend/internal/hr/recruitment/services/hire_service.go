@@ -57,6 +57,9 @@ func (s *HireService) reserveUser(ctx context.Context, a Actor, candidateID uuid
 			return err
 		}
 		c := plan.candidate
+		if err := s.reserveSeat(ctx, tx, plan); err != nil {
+			return err
+		}
 		if c.HiredUserID != nil {
 			plan.userID = *c.HiredUserID
 			return nil
@@ -70,6 +73,24 @@ func (s *HireService) reserveUser(ctx context.Context, a Actor, candidateID uuid
 		return s.Repos.Candidates.Update(ctx, tx, c)
 	})
 	return plan, err
+}
+
+// reserveSeat takes one seat of the job for this candidate before any user or profile exists (RP-01): capacity is
+// headcount − hired − reserved, so two hires racing for the last seat cannot both proceed. A retry reuses its seat.
+func (s *HireService) reserveSeat(ctx context.Context, tx *gorm.DB, plan *hirePlan) error {
+	c, job := plan.candidate, plan.job
+	if c.SeatReserved {
+		return nil
+	}
+	if job.HiredCount+job.ReservedCount >= job.Headcount {
+		return ErrJobNotOpen
+	}
+	job.ReservedCount++
+	c.SeatReserved = true
+	if err := s.Repos.Jobs.Update(ctx, tx, job); err != nil {
+		return err
+	}
+	return s.Repos.Candidates.Update(ctx, tx, c)
 }
 
 // loadHireable locks candidate and job and checks RC-007/RC-008.
@@ -127,6 +148,10 @@ func (s *HireService) complete(ctx context.Context, a Actor, candidateID, employ
 		}
 		c, job := plan.candidate, plan.job
 		c.HiredEmployeeID = &employeeID
+		if c.SeatReserved {
+			c.SeatReserved = false
+			job.ReservedCount = max(job.ReservedCount-1, 0)
+		}
 		if err := s.moveStage(ctx, tx, a, c, stageChange{to: pipeline.Hired}); err != nil {
 			return err
 		}

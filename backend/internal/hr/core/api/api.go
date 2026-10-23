@@ -41,3 +41,16 @@ type ActionFact struct {
 
 // ActionHook reacts to an action inside core's transaction; an error rolls the action back.
 type ActionHook func(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, fact ActionFact) error
+
+// PositionInfo is what HR/Recruitment needs to know about a position (requisition RP-02).
+type PositionInfo struct {
+	Exists, Active bool
+	Title          string
+	DepartmentID   uuid.UUID
+	OpenSeats      int // whole seats still open today (open FTE rounded down)
+}
+
+// Positions reads positions for other contexts.
+type Positions interface {
+	PositionInfo(ctx context.Context, tenantID, positionID uuid.UUID) (PositionInfo, error)
+}

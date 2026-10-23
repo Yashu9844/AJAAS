@@ -4,8 +4,11 @@ package recruitment
 import (
 	"context"
 	"errors"
+	coreAPI "github.com/jaas/jaas/internal/hr/core/api"
 	"github.com/jaas/jaas/internal/hr/identityport"
 	recruitmentAPI "github.com/jaas/jaas/internal/hr/recruitment/api"
+	"github.com/jaas/jaas/internal/hr/recruitment/plus"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +19,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/recruitment/repositories"
 	"github.com/jaas/jaas/internal/hr/recruitment/routes"
 	"github.com/jaas/jaas/internal/hr/recruitment/services"
+	"github.com/jaas/jaas/internal/identity/access"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
@@ -27,6 +31,9 @@ type Module struct {
 	controller *controllers.Controller
 	relay      *services.OutboxRelay
 	hooks      *services.Hooks
+	plus       *plus.Module
+	gate       *services.OfferGateSwitch
+	positions  *positionsSwitch
 }
 
 // DepartmentReader is the Module 1 department lookup Module 6 needs (D6-03).
@@ -51,19 +58,25 @@ type Ports struct {
 
 // NewModule wires repositories, services and the controller.
 func NewModule(db *gorm.DB, p Ports) *Module {
+	gate, positions := &services.OfferGateSwitch{}, &positionsSwitch{}
 	deps := services.Deps{
 		Tx: services.NewTxRunner(db),
 		Repos: services.Repos{Jobs: repositories.NewJobRepository(), Candidates: repositories.NewCandidateRepository(),
 			Interviews: repositories.NewInterviewRepository(), Offers: repositories.NewOfferRepository(), Outbox: repositories.NewOutboxRepository()},
 		Employees: p.Employees, Users: p.Users, Org: orgDirectory{db: db, depts: p.Departments, desigs: p.Designations},
-		Audit: p.Audit, Publisher: p.Publisher, Now: time.Now, Hooks: &services.Hooks{},
+		Audit: p.Audit, Publisher: p.Publisher, Now: time.Now, Hooks: &services.Hooks{}, OfferGate: gate,
 	}
+	parity := plus.NewModule(db, plus.Ports{Positions: positions, Employees: p.Employees, Audit: p.Audit})
+	gate.Set(parity.Service())
 	return &Module{
 		db: db,
 		controller: controllers.New(controllers.Services{Jobs: services.NewJobService(deps), Candidates: services.NewCandidateService(deps),
 			Hire: services.NewHireService(deps), Interviews: services.NewInterviewService(deps), Offers: services.NewOfferService(deps)}),
-		relay: services.NewOutboxRelay(deps),
-		hooks: deps.Hooks,
+		relay:     services.NewOutboxRelay(deps),
+		hooks:     deps.Hooks,
+		plus:      parity,
+		gate:      gate,
+		positions: positions,
 	}
 }
 
@@ -96,7 +109,8 @@ func exists(err error) (bool, error) {
 
 // RegisterModels lists Module 6 models for legacy AutoMigrate (SQL 000045–000050 is the authority).
 func (m *Module) RegisterModels() []interface{} {
-	return []interface{}{&models.Job{}, &models.Candidate{}, &models.StageEvent{}, &models.Interview{}, &models.Offer{}, &models.OutboxEvent{}}
+	return append([]interface{}{&models.Job{}, &models.Candidate{}, &models.StageEvent{}, &models.Interview{}, &models.Offer{}, &models.OutboxEvent{}},
+		m.plus.RegisterModels()...)
 }
 
 // RouteDeps is the Module 0 infrastructure the routes need.
@@ -110,6 +124,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps) {
 		Require: func(action string) gin.HandlerFunc {
 			return d.Identity.Require("recruitment", action)
 		}}, m.controller)
+	m.plus.RegisterRoutes(rg, d.Identity)
 }
 
 // Relay exposes the outbox relay.
@@ -117,3 +132,29 @@ func (m *Module) Relay() *services.OutboxRelay { return m.relay }
 
 // OnHired registers a hook run inside the hire transaction (onboarding OB-03).
 func (m *Module) OnHired(h recruitmentAPI.HireHook) { m.hooks.Add(h) }
+
+// positionsSwitch is a core/api.Positions installed after construction (HR/Core is built after recruitment).
+type positionsSwitch struct {
+	mu  sync.RWMutex
+	src coreAPI.Positions
+}
+
+func (p *positionsSwitch) PositionInfo(ctx context.Context, tenantID, positionID uuid.UUID) (coreAPI.PositionInfo, error) {
+	p.mu.RLock()
+	src := p.src
+	p.mu.RUnlock()
+	if src == nil {
+		return coreAPI.PositionInfo{}, nil
+	}
+	return src.PositionInfo(ctx, tenantID, positionID)
+}
+
+// SetPositions installs the core position reader (requisitions RP-02).
+func (m *Module) SetPositions(src coreAPI.Positions) {
+	m.positions.mu.Lock()
+	defer m.positions.mu.Unlock()
+	m.positions.src = src
+}
+
+// ParityCatalogue is the permission HR/Recruitment parity adds (recruitment:approve).
+func ParityCatalogue() []access.PermissionDef { return plus.Catalogue() }
