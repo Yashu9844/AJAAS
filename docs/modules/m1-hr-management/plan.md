@@ -96,6 +96,7 @@ Each item runs the standard loop (`docs/ENGINEERING.md`): design → gate → RE
 
 `docs/ARCHITECTURE.md` §9 is labelled a *proposed* checklist, not the owner's canonical one, so this records what is
 actually proven for M1 rather than claiming all 100 items.
+The full item-by-item verdicts are in `acceptance-checklist.md`: 45 met, 25 partial, 24 not met, 6 not applicable.
 
 | Group (§9) | Evidence |
 |---|---|
