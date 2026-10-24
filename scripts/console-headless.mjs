@@ -34,8 +34,6 @@ globalThis.fetch = (url, init = {}) =>
   new Promise((resolve, reject) => {
     const u = new URL(url);
     const headers = { ...(init.headers ?? {}), Host: u.host };
-    // Like a browser, announce the body length: some handlers treat an unknown (chunked) length as "no body".
-    if (init.body) headers["Content-Length"] = Buffer.byteLength(init.body);
     const req = http.request({ host: "127.0.0.1", port: u.port, path: u.pathname + u.search, method: init.method ?? "GET", headers }, (res) => {
       const chunks = [];
       res.on("data", (c) => chunks.push(c));

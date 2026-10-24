@@ -73,9 +73,9 @@ func TestPerformanceCalibrationAndFeedback(t *testing.T) {
 		t.Fatalf("G18 received: %s", r.Raw)
 	}
 
-	// G20 privacy.
+	// G20 privacy: the event data (not the envelope, whose timestamps can contain digits like 4.25).
 	for _, q := range []string{
-		"SELECT count(*) FROM performance_events_outbox WHERE tenant_id = ? AND (payload::text LIKE '%SECRET%' OR payload::text LIKE '%4.25%' OR payload::text LIKE '%potential%')",
+		"SELECT count(*) FROM performance_events_outbox WHERE tenant_id = ? AND ((payload->'payload')::text LIKE '%SECRET%' OR (payload->'payload')::text LIKE '%4.25%' OR (payload->'payload')::text LIKE '%potential%')",
 		"SELECT count(*) FROM audit_logs WHERE tenant_id = ? AND action LIKE 'performance.%' AND (metadata::text LIKE '%SECRET%' OR metadata::text LIKE '%4.25%')",
 	} {
 		if n := sqlStr(t, q, tc.id); n != "0" {

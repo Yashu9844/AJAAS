@@ -91,7 +91,6 @@ Each item runs the standard loop (`docs/ENGINEERING.md`): design → gate → RE
 - Events are produced and published (per-context relays; the shared `kernel.OutboxRelay` serves compensation, onboarding,
   learning and benefits), but nothing consumes them into notifications (M10 not built).
 - The console is the only frontend; the product UI starts with the next module.
-- A few handlers treat a chunked request body (no `Content-Length`) as empty (`optionalBody`); browsers and curl always send the length.
 
 ## 6. HR Definition of Done — evidence (2026-10-24)
 

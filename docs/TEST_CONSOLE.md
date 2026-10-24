@@ -23,10 +23,12 @@ excluded from production builds.
 | `/dev-test/hr/benefits` | HR Benefits | generated (29) | `S_BENEFITS` (`hr.benefits.flow`) |
 
 From now on each feature ships its page in the same phase as its backend (delivery phase P8, `docs/ENGINEERING.md` §3).
-Last full run (2026-10-24, fresh `jaas_console2` DB, headless): **48/48 scenarios passed** (A-only scenarios; the two-tenant
-`AB` scenarios run in the browser). The run found one tooling defect, fixed in `scripts/console-headless.mjs`: it sent bodies
-without `Content-Length`, and handlers that treat an unknown (chunked) length as "no body" dropped the reject comment and the
-auto-absent date. Browsers and curl always send the length. Run scenarios on a fresh tenant: some (import log) count rows.
+Last full run (2026-10-24, fresh database, headless): **48/48 scenarios passed** (A-only scenarios; the two-tenant
+`AB` scenarios run in the browser). The first live run found a real defect: the headless client sends chunked bodies (no
+`Content-Length`) and handlers that read "no body" from an unknown length dropped the reject comment and the auto-absent
+date. It is fixed once, in `middleware.BodyLimit`, which now reads such bodies (bounded) and sets their length
+(`TestBodyLimitGivesChunkedBodiesALength`); the rerun passes with chunked bodies. Run scenarios on a fresh tenant: some
+(import log) count rows.
 
 ## 1. Run it
 

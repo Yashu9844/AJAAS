@@ -61,3 +61,38 @@ func TestSecurityHeaders(t *testing.T) {
 		}
 	}
 }
+
+// A chunked body (no Content-Length) is read once and handed on with its real length, so handlers that treat an unknown
+// length as "no body" still see it.
+func TestBodyLimitGivesChunkedBodiesALength(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(BodyLimit(64))
+	var seen int64
+	var got string
+	r.POST("/x", func(c *gin.Context) {
+		seen = c.Request.ContentLength
+		b, _ := io.ReadAll(c.Request.Body)
+		got = string(b)
+		c.Status(http.StatusOK)
+	})
+	for _, tc := range []struct {
+		body string
+		want int64
+	}{{`{"comment":"late"}`, 18}, {"", 0}} {
+		req := httptest.NewRequest(http.MethodPost, "/x", io.NopCloser(strings.NewReader(tc.body)))
+		req.ContentLength = -1
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != 200 || seen != tc.want || got != tc.body {
+			t.Fatalf("chunked %q: status %d length %d body %q", tc.body, w.Code, seen, got)
+		}
+	}
+	req := httptest.NewRequest(http.MethodPost, "/x", io.NopCloser(strings.NewReader(strings.Repeat("a", 100))))
+	req.ContentLength = -1
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusRequestEntityTooLarge || !strings.Contains(w.Body.String(), "PAYLOAD_TOO_LARGE") {
+		t.Fatalf("oversize chunked body: %d %s", w.Code, w.Body.String())
+	}
+}
