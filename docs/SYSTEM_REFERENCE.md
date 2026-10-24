@@ -47,6 +47,8 @@ in the table above are the pre-split ones.
 
 **Totals on `restructure_architecture` (2026-10-24):** 442 documented operations in `backend/api/swagger.yaml` (M0 plus every HR context); migrations in `migrations/identity` (18) and `migrations/hr` (93). Phase E (full HR) is built: payroll, recruitment, leave, attendance and employee parity, core, compensation, onboarding, learning (35 ops, `lrn_*`) and benefits (29 ops, `ben_*`). Full unit and integration suites green, including `TestSwaggerMatchesRoutes` and `TestImportBoundaries`. Part 2 section A lists only routes registered in controller-style route files; the single-package contexts (compensation, onboarding, learning, benefits and the `plus`/`ops` sub-packages) are listed by operation in their `contexts/<name>/specification.md` and in the contract, and their code appears in section C.
 
+**Totals on `restructure_architecture` (2026-10-24):** 442 documented operations in `backend/api/swagger.yaml` (M0 plus every HR context); migrations in `migrations/identity` (18) and `migrations/hr` (93). Phase E (full HR) is built: payroll, recruitment, leave, attendance and employee parity, core, compensation, onboarding, learning (35 ops, `lrn_*`) and benefits (29 ops, `ben_*`). Full unit and integration suites green, including `TestSwaggerMatchesRoutes` and `TestImportBoundaries`. Part 2 section A lists only routes registered in controller-style route files; the single-package contexts (compensation, onboarding, learning, benefits and the `plus`/`ops` sub-packages) are listed by operation in their `contexts/<name>/specification.md` and in the contract, and their code appears in section C.
+
 **Who built what:**
 - M0 Identity, HR/Organization, HR/Employee existed before this work and were hardened by the partner (`fix/module-0-2-hardening`, now in `main`).
 - HR/Attendance, HR/Leave, HR/Payroll, HR/Recruitment, HR/Performance, the integration onto the hardened base and the architecture restructure were built in this workstream.
@@ -714,7 +716,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/org-chart` | [group: tenantResolver, authMiddleware, read] chartCtrl.Chart |
 | GET | `/api/v1/hr/org-chart/chain` | [group: tenantResolver, authMiddleware, read] chartCtrl.UserChain |
 
-### M1 HR / Employee — 14 routes
+### M1 HR / Employee — 45 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -732,8 +734,39 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/employees/:id/documents` | [group: tenantResolver, authMiddleware] read, docCtrl.List |
 | POST | `/api/v1/hr/employees/:id/documents/:doc_id/verify` | [group: tenantResolver, authMiddleware] admin, auditMW("employee.document_verified", "employee"), docCtrl.Verify |
 | GET | `/api/v1/hr/employees/:id/timeline` | [group: tenantResolver, authMiddleware] read, tlCtrl.List |
+| GET | `/api/v1/hr/employees/me/emergency-contacts` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/me/emergency-contacts` | (employee/records.Register; from the contract) |
+| PUT | `/api/v1/hr/employees/me/emergency-contacts/:rid` | (employee/records.Register; from the contract) |
+| DELETE | `/api/v1/hr/employees/me/emergency-contacts/:rid` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employees/me/education` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/me/education` | (employee/records.Register; from the contract) |
+| PUT | `/api/v1/hr/employees/me/education/:rid` | (employee/records.Register; from the contract) |
+| DELETE | `/api/v1/hr/employees/me/education/:rid` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employees/me/prior-employment` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/me/prior-employment` | (employee/records.Register; from the contract) |
+| PUT | `/api/v1/hr/employees/me/prior-employment/:rid` | (employee/records.Register; from the contract) |
+| DELETE | `/api/v1/hr/employees/me/prior-employment/:rid` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employees/:id/emergency-contacts` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/:id/emergency-contacts` | (employee/records.Register; from the contract) |
+| PUT | `/api/v1/hr/employees/:id/emergency-contacts/:rid` | (employee/records.Register; from the contract) |
+| DELETE | `/api/v1/hr/employees/:id/emergency-contacts/:rid` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employees/:id/education` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/:id/education` | (employee/records.Register; from the contract) |
+| PUT | `/api/v1/hr/employees/:id/education/:rid` | (employee/records.Register; from the contract) |
+| DELETE | `/api/v1/hr/employees/:id/education/:rid` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employees/:id/prior-employment` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/:id/prior-employment` | (employee/records.Register; from the contract) |
+| PUT | `/api/v1/hr/employees/:id/prior-employment/:rid` | (employee/records.Register; from the contract) |
+| DELETE | `/api/v1/hr/employees/:id/prior-employment/:rid` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employees/me/change-requests` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/me/change-requests` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employees/me/change-requests/:rid/cancel` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employee-change-requests` | (employee/records.Register; from the contract) |
+| GET | `/api/v1/hr/employee-change-requests/:rid` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employee-change-requests/:rid/approve` | (employee/records.Register; from the contract) |
+| POST | `/api/v1/hr/employee-change-requests/:rid/reject` | (employee/records.Register; from the contract) |
 
-### M1 HR / Attendance — 19 routes
+### M1 HR / Attendance — 34 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -756,8 +789,23 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | POST | `/api/v1/hr/shifts/:id/deactivate` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Deactivate |
 | POST | `/api/v1/hr/shifts/:id/assignments` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Shift.Assign |
 | GET | `/api/v1/hr/shift-assignments` | mw.TenantResolver, mw.Authenticate, read, ctl.Shift.ListAssignments |
+| GET | `/api/v1/hr/attendance/inbox` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] (inline handler) |
+| POST | `/api/v1/hr/attendance/inbox/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] decide(true |
+| POST | `/api/v1/hr/attendance/inbox/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] decide(false |
+| PUT | `/api/v1/hr/attendance/policy` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/attendance/policy` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] read, (inline handler) |
+| GET | `/api/v1/hr/attendance/overtime/report` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] read, (inline handler) |
+| POST | `/api/v1/hr/attendance/rosters` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/attendance/rosters` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] read, (inline handler) |
+| GET | `/api/v1/hr/attendance/rosters/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] read, (inline handler) |
+| PATCH | `/api/v1/hr/attendance/rosters/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] manage, (inline handler) |
+| POST | `/api/v1/hr/attendance/rosters/:id/apply` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] manage, (inline handler) |
+| POST | `/api/v1/hr/attendance/jobs/auto-absent` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/attendance/jobs/runs` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] read, (inline handler) |
+| POST | `/api/v1/hr/attendance/imports` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/attendance/imports` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("attendance", "approve", flagApprove)] read, (inline handler) |
 
-### M1 HR / Leave — 20 routes
+### M1 HR / Leave — 47 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -781,8 +829,35 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/leave/requests/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Request.Get |
 | POST | `/api/v1/hr/leave/requests/:id/approve` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Request.Approve |
 | POST | `/api/v1/hr/leave/requests/:id/reject` | [group: mw.TenantResolver, mw.Authenticate] approve, ctl.Request.Reject |
+| PUT | `/api/v1/hr/leave/policy` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/leave/policy` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] read, (inline handler) |
+| POST | `/api/v1/hr/leave/location-holidays` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/leave/location-holidays` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] read, (inline handler) |
+| DELETE | `/api/v1/hr/leave/location-holidays/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] manage, (inline handler) |
+| PUT | `/api/v1/hr/leave/week-offs/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/leave/week-offs` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] read, (inline handler) |
+| DELETE | `/api/v1/hr/leave/week-offs/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/leave/inbox` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] (inline handler) |
+| POST | `/api/v1/hr/leave/inbox/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decide(true |
+| POST | `/api/v1/hr/leave/inbox/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decide(false |
+| GET | `/api/v1/hr/leave/team-calendar` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] (inline handler) |
+| POST | `/api/v1/hr/leave/comp-off` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] (inline handler) |
+| GET | `/api/v1/hr/leave/comp-off/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] (inline handler) |
+| GET | `/api/v1/hr/leave/comp-off` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] read, (inline handler) |
+| POST | `/api/v1/hr/leave/comp-off/expire` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] manage, (inline handler) |
+| POST | `/api/v1/hr/leave/comp-off/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decideCompOff(StatusApproved |
+| POST | `/api/v1/hr/leave/comp-off/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decideCompOff(StatusRejected |
+| POST | `/api/v1/hr/leave/comp-off/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decideCompOff(StatusCancelled |
+| PUT | `/api/v1/hr/leave/encashment-rules/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] manage, (inline handler) |
+| GET | `/api/v1/hr/leave/encashment-rules` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] read, (inline handler) |
+| POST | `/api/v1/hr/leave/encashments` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] (inline handler) |
+| GET | `/api/v1/hr/leave/encashments/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] (inline handler) |
+| GET | `/api/v1/hr/leave/encashments` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] read, (inline handler) |
+| POST | `/api/v1/hr/leave/encashments/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decideEncash(StatusApproved |
+| POST | `/api/v1/hr/leave/encashments/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decideEncash(StatusRejected |
+| POST | `/api/v1/hr/leave/encashments/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("leave", "read", flagRead), idp.Flag("leave", "manage", flagManage), idp.Flag("leave", "approve", flagApprove)] decideEncash(StatusCancelled |
 
-### M1 HR / Payroll — 20 routes
+### M1 HR / Payroll — 31 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -806,8 +881,19 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/payroll/payslips/me` | [group: mw.TenantResolver, mw.Authenticate] ctl.Run.MyPayslips |
 | GET | `/api/v1/hr/payroll/payslips/me/:id` | [group: mw.TenantResolver, mw.Authenticate] ctl.Run.MyPayslip |
 | GET | `/api/v1/hr/payroll/payslips/:id` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.Run.GetPayslip |
+| GET | `/api/v1/hr/payroll/pt-slabs` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| PUT | `/api/v1/hr/payroll/pt-slabs/:state` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| DELETE | `/api/v1/hr/payroll/pt-slabs/:state` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| POST | `/api/v1/hr/payroll/settlements` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| GET | `/api/v1/hr/payroll/settlements` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| GET | `/api/v1/hr/payroll/settlements/me` | [group: idp.TenantResolver(), idp.Authenticate()] (inline handler) |
+| GET | `/api/v1/hr/payroll/settlements/:id` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| POST | `/api/v1/hr/payroll/settlements/:id/recalculate` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| POST | `/api/v1/hr/payroll/settlements/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate()] approve, (inline handler) |
+| POST | `/api/v1/hr/payroll/settlements/:id/pay` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| POST | `/api/v1/hr/payroll/settlements/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
 
-### M1 HR / Recruitment — 20 routes
+### M1 HR / Recruitment — 40 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -831,6 +917,26 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/recruitment/offers` | [group: mw.TenantResolver, mw.Authenticate] read, ctl.ListOffers |
 | POST | `/api/v1/hr/recruitment/offers/:id/decision` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.DecideOffer |
 | POST | `/api/v1/hr/recruitment/offers/:id/withdraw` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.WithdrawOffer |
+| POST | `/api/v1/hr/recruitment/candidates/:id/hire/release` | [group: idp.TenantResolver(), idp.Authenticate()] hire, (inline handler) |
+| POST | `/api/v1/hr/recruitment/requisitions` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| GET | `/api/v1/hr/recruitment/requisitions` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| GET | `/api/v1/hr/recruitment/requisitions/:id` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| POST | `/api/v1/hr/recruitment/requisitions/:id/submit` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| POST | `/api/v1/hr/recruitment/requisitions/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| POST | `/api/v1/hr/recruitment/requisitions/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate()] approve, (inline handler) |
+| POST | `/api/v1/hr/recruitment/requisitions/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate()] approve, (inline handler) |
+| POST | `/api/v1/hr/recruitment/scorecards` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| GET | `/api/v1/hr/recruitment/scorecards` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| GET | `/api/v1/hr/recruitment/scorecards/:id` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| PATCH | `/api/v1/hr/recruitment/scorecards/:id` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| PUT | `/api/v1/hr/recruitment/jobs/:id/scorecard` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| PUT | `/api/v1/hr/recruitment/interviews/:id/scores` | [group: idp.TenantResolver(), idp.Authenticate()] (inline handler) |
+| GET | `/api/v1/hr/recruitment/candidates/:id/scorecard` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| PUT | `/api/v1/hr/recruitment/offer-policy` | [group: idp.TenantResolver(), idp.Authenticate()] manage, (inline handler) |
+| GET | `/api/v1/hr/recruitment/offer-policy` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
+| POST | `/api/v1/hr/recruitment/offers/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate()] approve, decide(DecisionApproved |
+| POST | `/api/v1/hr/recruitment/offers/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate()] approve, decide(DecisionRejected |
+| GET | `/api/v1/hr/recruitment/offers/:id/approvals` | [group: idp.TenantResolver(), idp.Authenticate()] read, (inline handler) |
 
 ### M1 HR / Performance & OKRs — 33 routes
 
@@ -907,7 +1013,134 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | POST | `/api/v1/hr/core/backfill` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.Backfill |
 | POST | `/api/v1/hr/core/effects/run` | [group: mw.TenantResolver, mw.Authenticate] manage, ctl.RunEffects |
 
-Total routes registered by module route files: **230** (plus `GET /health`).
+### M1 HR / Compensation — 24 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/hr/compensation/pay-ranges` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/compensation/pay-ranges` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| POST | `/api/v1/hr/compensation/changes` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/compensation/changes` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/compensation/changes/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| POST | `/api/v1/hr/compensation/changes/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] approve, decide(ChangeApproved |
+| POST | `/api/v1/hr/compensation/changes/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] approve, decide(ChangeRejected |
+| POST | `/api/v1/hr/compensation/changes/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] decide(ChangeCancelled |
+| GET | `/api/v1/hr/compensation/workers/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/compensation/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/compensation/merit-cycles` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/compensation/merit-cycles` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/compensation/merit-cycles/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| PATCH | `/api/v1/hr/compensation/merit-cycles/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, (inline handler) |
+| PUT | `/api/v1/hr/compensation/merit-cycles/:id/budgets` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/compensation/merit-cycles/:id/budgets` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| POST | `/api/v1/hr/compensation/merit-cycles/:id/open` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, move(CycleOpen |
+| POST | `/api/v1/hr/compensation/merit-cycles/:id/close` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, move(CycleInReview |
+| POST | `/api/v1/hr/compensation/merit-cycles/:id/approve` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] approve, move(CycleApproved |
+| POST | `/api/v1/hr/compensation/merit-cycles/:id/apply` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] manage, move(CycleApplied |
+| GET | `/api/v1/hr/compensation/merit-cycles/:id/usage` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/compensation/merit-cycles/:id/proposals` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] (inline handler) |
+| GET | `/api/v1/hr/compensation/merit-cycles/:id/proposals/mine` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] (inline handler) |
+| PATCH | `/api/v1/hr/compensation/proposals/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("compensation", "read", flagRead), idp.Flag("compensation", "manage", flagManage)] (inline handler) |
+
+### M1 HR / Onboarding — 19 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/hr/onboarding/templates` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| GET | `/api/v1/hr/onboarding/templates` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] read, (inline handler) |
+| GET | `/api/v1/hr/onboarding/templates/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] read, (inline handler) |
+| PATCH | `/api/v1/hr/onboarding/templates/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| PUT | `/api/v1/hr/onboarding/templates/:id/tasks` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| POST | `/api/v1/hr/onboarding/checklists` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| GET | `/api/v1/hr/onboarding/checklists` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| GET | `/api/v1/hr/onboarding/checklists/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| POST | `/api/v1/hr/onboarding/checklists/:id/complete` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| POST | `/api/v1/hr/onboarding/checklists/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| POST | `/api/v1/hr/onboarding/checklists/:id/clearances/:area/clear` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| PUT | `/api/v1/hr/onboarding/checklists/:id/exit-interview` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| GET | `/api/v1/hr/onboarding/checklists/:id/exit-interview` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| GET | `/api/v1/hr/onboarding/my-tasks` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| POST | `/api/v1/hr/onboarding/tasks/:id/done` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| POST | `/api/v1/hr/onboarding/tasks/:id/skip` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| POST | `/api/v1/hr/onboarding/tasks/:id/reopen` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] manage, (inline handler) |
+| GET | `/api/v1/hr/onboarding/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] (inline handler) |
+| GET | `/api/v1/hr/onboarding/reports/progress` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("onboarding", "read", flagRead), idp.Flag("onboarding", "manage", flagManage), idp.Flag("onboarding", "exit_interview", flagEI)] read, (inline handler) |
+
+### M1 HR / Learning — 35 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/hr/learning/courses` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/learning/courses` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/learning/courses/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| PATCH | `/api/v1/hr/learning/courses/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| POST | `/api/v1/hr/learning/courses/:id/publish` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| POST | `/api/v1/hr/learning/courses/:id/retire` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/learning/courses/:id/versions` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/learning/catalog` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/plans` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/learning/plans` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/learning/plans/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| PATCH | `/api/v1/hr/learning/plans/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| PUT | `/api/v1/hr/learning/plans/:id/items` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/learning/plans/:id/progress` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/assignments` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/learning/assignments` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/learning/assignments/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| POST | `/api/v1/hr/learning/assignments/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| POST | `/api/v1/hr/learning/enrolments/self` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| GET | `/api/v1/hr/learning/enrolments/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| GET | `/api/v1/hr/learning/enrolments/team` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| GET | `/api/v1/hr/learning/enrolments` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/learning/enrolments/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/enrolments/:id/start` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/enrolments/:id/complete` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/enrolments/:id/waive` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| POST | `/api/v1/hr/learning/enrolments/:id/correct` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/learning/transcript/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| GET | `/api/v1/hr/learning/completions/pending` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/completions/:id/verify` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/completions/:id/reject` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] (inline handler) |
+| POST | `/api/v1/hr/learning/recurrence/run` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+| GET | `/api/v1/hr/learning/reports/compliance` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| GET | `/api/v1/hr/learning/settings` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] read, (inline handler) |
+| PUT | `/api/v1/hr/learning/settings` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("learning", "read", flagRead), idp.Flag("learning", "manage", flagManage)] manage, (inline handler) |
+
+### M1 HR / Benefits — 29 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/hr/benefits/plans` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| GET | `/api/v1/hr/benefits/plans` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] read, (inline handler) |
+| GET | `/api/v1/hr/benefits/plans/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] read, (inline handler) |
+| PATCH | `/api/v1/hr/benefits/plans/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| POST | `/api/v1/hr/benefits/plans/:id/versions` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| POST | `/api/v1/hr/benefits/plans/:id/activate` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| POST | `/api/v1/hr/benefits/plans/:id/retire` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| POST | `/api/v1/hr/benefits/windows` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| GET | `/api/v1/hr/benefits/windows` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] read, (inline handler) |
+| POST | `/api/v1/hr/benefits/windows/:id/cancel` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| GET | `/api/v1/hr/benefits/settings` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] read, (inline handler) |
+| PUT | `/api/v1/hr/benefits/settings` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] manage, (inline handler) |
+| GET | `/api/v1/hr/benefits/options` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| GET | `/api/v1/hr/benefits/elections/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| POST | `/api/v1/hr/benefits/elections` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| POST | `/api/v1/hr/benefits/elections/waive` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| POST | `/api/v1/hr/benefits/elections/:id/change` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| POST | `/api/v1/hr/benefits/elections/:id/end` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| GET | `/api/v1/hr/benefits/elections` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] sensitive, (inline handler) |
+| GET | `/api/v1/hr/benefits/deductions/me` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| POST | `/api/v1/hr/benefits/dependants` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| GET | `/api/v1/hr/benefits/dependants` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| PATCH | `/api/v1/hr/benefits/dependants/:id` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| POST | `/api/v1/hr/benefits/dependants/:id/remove` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| GET | `/api/v1/hr/benefits/employees/:id/dependants` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] sensitive, (inline handler) |
+| POST | `/api/v1/hr/benefits/life-events` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| GET | `/api/v1/hr/benefits/life-events` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] (inline handler) |
+| GET | `/api/v1/hr/benefits/employees/:id/life-events` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] sensitive, (inline handler) |
+| GET | `/api/v1/hr/benefits/reports/enrolment` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] read, (inline handler) |
+
+Total routes registered by module route files: **441** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -9168,7 +9401,7 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 - `harness_test.go`: TestMain
 - `identity_test.go`: TestTenantRoutesRequirePlatformKey, TestTenantLifecycle, TestTenantAdminProvisioningIsAtomic, TestPlatformRoutesDisabledWithoutKeyIsCoveredByMiddlewareUnit, TestAuthLoginErrors, TestLoginRateLimitCountsFailuresOnly, TestRefreshRotationReuseAndLogout, TestAccessTokenValidation, TestForgotAndResetPassword, TestAuthMe, TestUserLifecycle, TestDeactivatedUserSessionsAreRevoked, TestAssignAndRemoveRoles, TestRolesAndPermissions, TestRBACEnforcement, TestAuditTrail, TestPaginationIsClampedEverywhere, TestErrorEnvelopeIsUniform, TestCORSHeaders, TestTenantIsolation
 - `invitation_test.go`: TestInvitationLifecycle, TestInvitationRevokeAndEscalation
-- `learning_test.go`: TestLearning
+- `learning_test.go`: TestLearning, TestLearningManagerVerification
 - `leave_plus_test.go`: TestLeaveParity
 - `leave_test.go`: TestLeaveLifecycle, TestLeaveOverlapAndPagination, TestLeaveRBACAndSelfApproval, TestLeaveIsolation, TestLeaveConcurrency
 - `location_test.go`: TestOrganizationLocations
@@ -9182,6 +9415,7 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 - `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
 - `recruitment_plus_test.go`: TestRecruitmentParity
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
+- `relay_test.go`: TestOutboxRelay, TestOutboxRelayRejectsBadTableNames
 - `schema_test.go`: TestMigrationsAreIdempotentAndComplete, TestSchemasAreOwnedAndIsolated, TestBusinessCodesAreTenantScoped
 - `security_test.go`: TestSecurityHeadersAndBodyLimit, TestInjectionAttemptsAreInert, TestPrivilegeEscalationIsBlocked
 - `smoke_test.go`: TestHealth

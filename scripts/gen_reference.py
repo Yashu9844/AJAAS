@@ -90,9 +90,39 @@ def test_files(module):
 
 
 def routes(module):
-    p = os.path.join(module_dir(module), 'routes', 'routes.go')
-    if not os.path.exists(p):
-        return []
+    """Routes of a context: the controller-style routes/routes.go plus every RegisterRoutes in the context's other
+    packages (single-package contexts and the plus/ops/records sub-packages register routes in http.go)."""
+    rows = []
+    main = os.path.join(module_dir(module), 'routes', 'routes.go')
+    if os.path.exists(main):
+        rows += routes_in(module, main)
+    if module in HR:
+        for dirpath, _, files in os.walk(module_dir(module)):
+            for f in sorted(files):
+                p = os.path.join(dirpath, f)
+                if f.endswith('.go') and not f.endswith('_test.go') and os.path.abspath(p) != os.path.abspath(main) and 'RegisterRoutes(' in read(p):
+                    rows += routes_in(module, p)
+    if module == 'employee':
+        rows += records_routes()
+    return rows
+
+
+def records_routes():
+    """employee/records registers its routes from a loop, so they cannot be read statically; list them from the contract,
+    which TestSwaggerMatchesRoutes proves equal to the router."""
+    import yaml
+    doc = yaml.safe_load(read(os.path.join(BACKEND, 'api', 'swagger.yaml')))
+    kinds = ('/emergency-contacts', '/education', '/prior-employment', '/change-requests')
+    out = []
+    for path, item in doc['paths'].items():
+        if path.startswith('/hr/employee-change-requests') or any(path.startswith(b + k) for b in ('/hr/employees/me', '/hr/employees/{id}') for k in kinds):
+            for method in ('get', 'post', 'put', 'patch', 'delete'):
+                if method in item:
+                    out.append((method.upper(), '/api/v1' + re.sub(r'\{(\w+)\}', r':\1', path), '(employee/records.Register; from the contract)'))
+    return out
+
+
+def routes_in(module, p):
     rows = []
     groups = {}
     # Join statements that span lines (e.g. users.POST("",\n mw,\n handler)) so every route keeps its chain.
@@ -123,6 +153,8 @@ def routes(module):
         if r:
             prefix, gmw = groups.get(r.group(1), ('', ''))
             rest = r.group(4).strip().rstrip(')').strip(', ')
+            if 'func(' in rest:  # inline handler: keep only the middleware before it
+                rest = rest.split('func(')[0].strip(', ') + (', ' if rest.split('func(')[0].strip(', ') else '') + '(inline handler)'
             if gmw:
                 rest = f'[group: {gmw}] ' + rest
             base = '/api/v1/hr' if module in HR else '/api/v1'

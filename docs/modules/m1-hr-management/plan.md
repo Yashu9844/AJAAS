@@ -1,6 +1,6 @@
 # M1 HR Management — Plan
 
-Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performance`, which is 4 commits ahead of
+Updated 2026-10-24 (Phase E complete). Branch `restructure_architecture` (from `module_7_performance`, which is 4 commits ahead of
 `main` @ `fe620fa`).
 
 ## 1. Status
@@ -14,7 +14,7 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 | payroll | done (20 + 11 parity ops, 2026-10-23) | `/dev-test/hr/payroll`, 3 scenarios | `payroll/plus`: PT slabs, settlements; employer lines, segments, arrears in the run |
 | recruitment | done (20 + 20 parity ops, 2026-10-23) | `/dev-test/hr/recruitment`, 2 scenarios | `recruitment/plus`: seat reservation, requisitions, scorecards, offer approval |
 | performance | done (33 ops incl. calibration + continuous feedback), 2026-10-20 | `/dev-test/hr/performance`, 4 scenarios | P2: templates per role, peer nomination |
-| core | done (32 ops), 2026-10-21 | `/dev-test/hr/core`, 2 scenarios (live run pending) | `contexts/core/` |
+| core | done (32 ops), 2026-10-21 | `/dev-test/hr/core`, 2 scenarios | `contexts/core/` |
 | compensation | done (24 ops), 2026-10-21 | `/dev-test/hr/compensation`, 1 scenario | `contexts/compensation/` |
 | onboarding | done (19 ops), 2026-10-22 | `/dev-test/hr/onboarding`, 1 scenario | `contexts/onboarding/`; hooks on core and recruitment; `onboarding/api.Clearance` for payroll final settlement |
 | learning | done (35 ops, 2026-10-23) | `/dev-test/hr/learning`, 1 scenario | `contexts/learning/`; core hook enrols joiners and movers |
@@ -30,7 +30,7 @@ Exactly one phase is CURRENT. Phases with a human gate stop for the owner's GO b
 | B | M0 alignment incl. access model (M0 `plan.md` §3–4) | DONE 2026-10-20 | GO given 2026-10-20 |
 | C | HR service boundary (§3 below) | DONE 2026-10-20 | GO given 2026-10-20 |
 | D | Test console for M0 + all built HR contexts | DONE 2026-10-20 (32/32 scenarios, `docs/TEST_CONSOLE.md`) | — |
-| E | Complete HR (§4 below) | CURRENT | per-context design gate |
+| E | Complete HR (§4 below) | DONE 2026-10-24 (48/48 console scenarios live, `docs/TEST_CONSOLE.md`) | per-context design gate |
 
 ## 3. Phase C — HR service boundary (steps)
 
@@ -84,8 +84,28 @@ Each item runs the standard loop (`docs/ENGINEERING.md`): design → gate → RE
 
 ## 5. Known gaps carried in
 
-- Recruitment: concurrent last-seat hires leave an orphan employee profile from the losing request (step E.10).
-- Payroll v1 limits listed in `contexts/payroll/specification.md` §10 (steps E.5, E.9).
-- `internal/app.Build` is 77 lines (> 50 limit) — disappears with the HR composition root (step C.3).
+- ~~Recruitment last-seat orphan~~ fixed in E.10 (seat reservation, `RG1`).
+- Payroll v1 limits listed in `contexts/payroll/specification.md` §10; the parity items they named are built (E.9).
+- ~~`internal/app.Build` length~~ closed with the HR composition root (step C.3).
 - `TestPerformanceBudgets` can flake under host load; p95 for leave apply/preview not measured on a normal host.
-- Events are produced but nothing consumes them into notifications (M10 not built).
+- Events are produced and published (per-context relays; the shared `kernel.OutboxRelay` serves compensation, onboarding,
+  learning and benefits), but nothing consumes them into notifications (M10 not built).
+- The console is the only frontend; the product UI starts with the next module.
+- A few handlers treat a chunked request body (no `Content-Length`) as empty (`optionalBody`); browsers and curl always send the length.
+
+## 6. HR Definition of Done — evidence (2026-10-24)
+
+`docs/ARCHITECTURE.md` §9 is labelled a *proposed* checklist, not the owner's canonical one, so this records what is
+actually proven for M1 rather than claiming all 100 items.
+
+| Group (§9) | Evidence |
+|---|---|
+| Architecture and ownership | per-context `specification.md`/`decisions.md`; `TestImportBoundaries` (no cross-context imports except `dto`/`api`); `TestSchemasAreOwnedAndIsolated` |
+| API and contracts | `backend/api/swagger.yaml` (442 operations, all HR contexts); `TestSwaggerMatchesRoutes` (contract equals router); separate DTOs; allow-listed filters; `ParsePagination` caps `per_page` at 100 |
+| Idempotency and consistency | `Idempotency-Key` middleware (HR-010); advisory locks plus partial unique indexes for the contested aggregates (seat, election, self-enrolment); atomic transactions with rollback tests on every failure injection |
+| Events and outbox | transactional outbox in every context; relays publish and retry (`TestOutboxRelay`); events and audit carry ids only, checked by the leak tests (RG5, LG6, BG4, G12) |
+| Security and privacy | scoped permission model, sensitive actions separate (`employee:read_sensitive`, `compensation:read`, `benefits:read_sensitive`); maker-checker everywhere money or status is approved; tenant isolation on every query |
+| Testing | unit coverage 85-100% per service package; integration ring (`JAAS_REQUIRE_INTEGRATION=1`) green; migrations up/down/up verified for hr/000001-000093; live console run 48/48 on a fresh database |
+| Documentation | `SYSTEM_REFERENCE` Part 2 regenerated with every route (controller-style, `http.go`-style and contract-sourced), table and function; this plan; `TEST_CONSOLE.md` |
+
+Not proven here: load/soak behaviour beyond `TestPerformanceBudgets`, and a human walkthrough of the console (owner task).

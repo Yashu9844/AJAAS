@@ -163,3 +163,46 @@ func TestLearning(t *testing.T) {
 		t.Fatal("events were written")
 	}
 }
+
+// TestLearningManagerVerification — LG5 with a real reporting line: the learner's manager verifies a manager-verified
+// completion without any learning permission, a stranger cannot, and the learner cannot verify their own.
+func TestLearningManagerVerification(t *testing.T) {
+	tc := newTimeTenant(t)
+	const base = "/hr/learning"
+	bossUser, bossEmail := tc.newUser(t, "boss")
+	bossTok := login(t, tc.slug, bossEmail, password).str("data.access_token")
+	_, peerEmail := tc.newUser(t, "peer")
+	peerTok := login(t, tc.slug, peerEmail, password).str("data.access_token")
+	dept := tc.mkDept(t, "Learning")
+	expect(t, tc.do(t, "POST", "/hr/mappings", body(map[string]any{"user_id": tc.memberUser, "department_id": dept, "manager_user_id": bossUser, "is_primary": true})), 201, "reporting line")
+
+	c := tc.do(t, "POST", base+"/courses", body(map[string]any{"title": "Safety " + uniq(), "content_kind": "link", "content_url": "https://learn.example.com/s", "verification": "manager"}))
+	expect(t, c, 201, "course")
+	cid := c.str("data.id")
+	expect(t, tc.do(t, "POST", base+"/courses/"+cid+"/publish"), 200, "publish")
+	expect(t, tc.do(t, "POST", base+"/assignments", body(map[string]any{"target_kind": "employee", "target_id": tc.memberEmp, "course_id": cid})), 201, "assign")
+	eid := tc.as(t, tc.memberTok, "GET", base+"/enrolments/me").list("data")[0].(map[string]any)["id"].(string)
+	done := tc.as(t, tc.memberTok, "POST", base+"/enrolments/"+eid+"/complete", body(map[string]any{"score": 88}))
+	expect(t, done, 200, "complete")
+	comp := done.str("data.completion.id")
+
+	if p := tc.as(t, bossTok, "GET", base+"/completions/pending"); len(p.list("data")) != 1 {
+		t.Fatalf("the manager sees their report's pending completion: %s", p.Raw)
+	}
+	if p := tc.as(t, peerTok, "GET", base+"/completions/pending"); len(p.list("data")) != 0 {
+		t.Fatalf("a stranger sees nothing: %s", p.Raw)
+	}
+	if team := tc.as(t, bossTok, "GET", base+"/enrolments/team"); len(team.list("data")) != 1 {
+		t.Fatalf("team view: %s", team.Raw)
+	}
+	expectErr(t, tc.as(t, peerTok, "POST", base+"/completions/"+comp+"/verify"), 404, "NOT_FOUND", "a stranger cannot verify")
+	expectErr(t, tc.as(t, tc.memberTok, "POST", base+"/completions/"+comp+"/verify"), 403, "LEARNING_SELF_VERIFY", "the learner cannot verify")
+	if g := tc.as(t, bossTok, "GET", base+"/enrolments/"+eid); g.str("data.id") != eid {
+		t.Fatalf("the manager reads the enrolment: %s", g.Raw)
+	}
+	v := tc.as(t, bossTok, "POST", base+"/completions/"+comp+"/verify")
+	if expect(t, v, 200, "manager verifies"); v.str("data.status") != "completed" || v.str("data.completion.status") != "verified" {
+		t.Fatalf("verified: %s", v.Raw)
+	}
+	expectErr(t, tc.as(t, bossTok, "POST", base+"/completions/"+comp+"/verify"), 409, "COMPLETION_STATE", "decided twice")
+}

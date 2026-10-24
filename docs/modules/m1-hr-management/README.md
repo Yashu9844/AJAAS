@@ -4,23 +4,23 @@ One HR service for the whole employee lifecycle — from requisition to exit —
 HCM suite (reference: Workday HCM). It is a single product module and a single deployable service with internal
 bounded contexts. Architecture authority: `docs/ARCHITECTURE.md` (sections 5 "M1", 12, 13).
 
-**Status (2026-10-20):** seven contexts built or in progress; five planned. Restructure Phase A (docs) done; code still
-lives in the pre-restructure layout until Phase C (see `plan.md`).
+**Status (2026-10-24):** all twelve contexts are built and verified (Phase E complete; see `plan.md` and `docs/TEST_CONSOLE.md`).
+The only frontend is the test console; the product UI is a later module.
 
 ## Bounded contexts
 
 | Context | What it owns | Status | Docs |
 |---|---|---|---|
-| `organization` | departments, teams, designations, reporting lines (mappings + manager), org chart | built (backend) | `contexts/organization/` |
-| `employee` | employee profile, employment, contacts, masked statutory and bank data, document metadata, timeline | built (backend) | `contexts/employee/` |
-| `attendance` | shifts, shift assignments, punches, daily attendance records, regularization, summaries | built (backend) | `contexts/attendance/` |
-| `leave` | leave types, holiday calendar, ledger-backed balances, accrual, requests, approvals | built (backend) | `contexts/leave/` |
-| `payroll` | salary structures, CTC assignments, maker-checker payroll runs, statutory deductions (India), payslips, payout CSV | built (backend) | `contexts/payroll/` |
-| `recruitment` | job openings, candidates and stage history, interviews and feedback, offers, hire saga | built (backend) | `contexts/recruitment/` |
-| `performance` | review cycles, goals and key results, check-ins, reviews, 9-box | in progress (models, engines, migrations, validators) | `contexts/performance/` |
-| `core` | job architecture, positions and headcount, effective-dated job history, lifecycle business processes | planned | `specification.md` §4 |
-| `onboarding` | onboarding and offboarding plans, tasks, document requirements, exit clearance | planned | `specification.md` §5 |
-| `compensation` | pay grades and ranges, salary change history, merit / increment cycles | planned | `specification.md` §6 |
+| `organization` | departments, teams, designations, reporting lines (mappings + manager), org chart | built | `contexts/organization/` |
+| `employee` | employee profile, employment, contacts, masked statutory and bank data, document metadata, timeline | built | `contexts/employee/` |
+| `attendance` | shifts, shift assignments, punches, daily attendance records, regularization, summaries | built | `contexts/attendance/` |
+| `leave` | leave types, holiday calendar, ledger-backed balances, accrual, requests, approvals | built | `contexts/leave/` |
+| `payroll` | salary structures, CTC assignments, maker-checker payroll runs, statutory deductions (India), payslips, payout CSV | built | `contexts/payroll/` |
+| `recruitment` | job openings, candidates and stage history, interviews and feedback, offers, hire saga | built | `contexts/recruitment/` |
+| `performance` | review cycles, goals and key results, check-ins, reviews, 9-box | built | `contexts/performance/` |
+| `core` | job architecture, positions and headcount, effective-dated job history, lifecycle business processes | built 2026-10-21 | `contexts/core/` |
+| `onboarding` | onboarding and offboarding plans, tasks, document requirements, exit clearance | built 2026-10-22 | `contexts/onboarding/` |
+| `compensation` | pay grades and ranges, salary change history, merit / increment cycles | built 2026-10-21 | `contexts/compensation/` |
 | `learning` | course catalogue (external links / documents with thumbnails), assignments, completions, learning plans | built 2026-10-23 | `contexts/learning/` |
 | `benefits` | tenant-defined benefit plans, eligibility, enrolment windows, enrolments and dependants | built 2026-10-24 | `contexts/benefits/` |
 
@@ -28,7 +28,7 @@ lives in the pre-restructure layout until Phase C (see `plan.md`).
 
 | File | Holds |
 |---|---|
-| `specification.md` | HR-wide rules, actors and permissions, cross-context contracts, Workday-parity scope for built contexts, and the requirements of the five planned contexts |
+| `specification.md` | HR-wide rules, actors and permissions, cross-context contracts, Workday-parity scope for built contexts, and the requirements the five later contexts (core, onboarding, compensation, learning, benefits) were built from |
 | `design.md` | HR service architecture: package layout, context map, ports, data ownership, routes, events, sagas, concurrency, security |
 | `testing.md` | HR test strategy, golden-test index across contexts, integration suite, test-console scenarios |
 | `plan.md` | phase plan (B–E), per-context status, open gaps |

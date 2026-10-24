@@ -33,6 +33,6 @@
 - **DL-11** Plan progress counts the worker's enrolment in each plan course whatever its source, newest cycle first, so
   completing a plan's course on your own still counts towards the plan. Waived counts as done.
 - **DL-12** Events (`learning.course.published|retired`, `learning.assignment.created|cancelled`,
-  `learning.enrolment.completed|waived`) go to `lrn_events_outbox` with ids and statuses only. There is no relay yet, as for
-  compensation and onboarding; a consumer is added with its first subscriber. Scores, evidence and comments never leave
-  the context (HR-009).
+  `learning.enrolment.completed|waived`) go to `lrn_events_outbox` with ids and statuses only and are published to `jaas.learning.events` by the shared
+  `kernel.OutboxRelay` (30 s tick, claim with `FOR UPDATE SKIP LOCKED`, 10 attempts, `TestOutboxRelay`). Scores, evidence and
+  comments never leave the context (HR-009).

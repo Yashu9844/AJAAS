@@ -2,9 +2,8 @@
 
 > HR-wide contract. Each built context's frozen contract lives in `contexts/<context>/specification.md` and stays
 > authoritative for that context. This file adds what spans contexts: actors and permissions, HR-wide rules,
-> cross-context contracts, the Workday-parity scope for built contexts, and the requirements for the five planned
-> contexts. Planned-context sections are **proposed**: each is frozen (with goldens) at that context's design phase
-> and may be refined then, but not reduced without a recorded decision.
+> cross-context contracts, the Workday-parity scope, and the requirements core, onboarding, compensation, learning and
+> benefits were built from (all five are now built; their frozen contracts are in `contexts/<context>/specification.md`).
 
 ## 1. Purpose and quality bar
 

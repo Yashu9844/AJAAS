@@ -17,6 +17,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/core"
 	"github.com/jaas/jaas/internal/hr/employee"
 	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/learning"
 	"github.com/jaas/jaas/internal/hr/leave"
 	leavePlus "github.com/jaas/jaas/internal/hr/leave/plus"
@@ -150,6 +151,11 @@ func (m *Module) startRelays() {
 	go m.performance.Relay().Run(m.o.Background)
 	go m.core.Relay().Run(m.o.Background)
 	go m.core.RunEffects(m.o.Background)
+	// Single-package contexts publish through the shared relay (their outbox tables have one shape).
+	for _, r := range [][2]string{{"comp_events_outbox", "jaas.compensation.events"}, {"onb_events_outbox", "jaas.onboarding.events"}, {"lrn_events_outbox", "jaas.learning.events"}, {"ben_events_outbox", "jaas.benefits.events"}} {
+		table := r[0]
+		go kernel.NewOutboxRelay(m.o.DB, table, r[1], m.o.Publisher).Run(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Str("outbox", table).Msg("outbox relay failed") })
+	}
 	go m.learning.RunRecurrence(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("learning recurrence run failed") })
 	go m.leave.RunCompOffExpiry(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("leave comp-off expiry sweep failed") })
 	go m.attOps.RunAutoAbsent(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Msg("attendance auto-absent sweep failed") })
