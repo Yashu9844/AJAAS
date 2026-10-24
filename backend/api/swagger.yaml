@@ -4982,6 +4982,268 @@ paths:
       responses:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
         '400': {description: 'VALIDATION_ERROR'}
+  /hr/benefits/plans:
+    post:
+      summary: 'Create a draft plan with its first cost version (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitPlanInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'List plans (benefits:read)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [draft, active, retired]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/benefits/plans/{id}:
+    get:
+      summary: 'A plan with its cost versions (benefits:read)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit name, provider or eligibility; costs change only through a new version (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitPlanInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'PLAN_STATE'}
+  /hr/benefits/plans/{id}/versions:
+    post:
+      summary: 'Add a cost version starting after the current one, never in the past (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitVersionInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'PLAN_STATE'}
+  /hr/benefits/plans/{id}/activate:
+    post:
+      summary: 'Activate a draft plan (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'PLAN_STATE'}
+  /hr/benefits/plans/{id}/retire:
+    post:
+      summary: 'Retire a plan: no new elections, existing ones continue (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'PLAN_STATE'}
+  /hr/benefits/windows:
+    post:
+      summary: 'Open a tenant-wide open-enrolment window of at most 120 days (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitWindowInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    get:
+      summary: 'List open-enrolment windows (benefits:read)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/benefits/windows/{id}/cancel:
+    post:
+      summary: 'Cancel a window; idempotent (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/benefits/settings:
+    get:
+      summary: 'New-hire and life-event window lengths in days (benefits:read)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+    put:
+      summary: 'Set the window lengths, 0 to 365 days (benefits:manage)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitSettingsInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/benefits/options:
+    get:
+      summary: 'Plans offered to me today, the version in force, my election and whether an enrolment window is open'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/benefits/elections/me:
+    get:
+      summary: 'My elections, history included'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/benefits/elections:
+    post:
+      summary: 'Elect a plan level inside an open window; one live election per plan'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitElectInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'NOT_ELIGIBLE / ENROLMENT_WINDOW_CLOSED / PLAN_STATE / ELECTION_EXISTS'}
+    get:
+      summary: 'List elections of anyone (benefits:read_sensitive)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: employee_id, in: query, schema: {type: string, format: uuid}}, {name: plan_id, in: query, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [active, waived, ended]}}, {name: page, in: query, schema: {type: integer, minimum: 1}}, {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/benefits/elections/waive:
+    post:
+      summary: 'Waive a plan explicitly from today; ends an active election; idempotent'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitWaiveInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'NOT_ELIGIBLE / ENROLMENT_WINDOW_CLOSED / PLAN_STATE / ELECTION_EXISTS'}
+  /hr/benefits/elections/{id}/change:
+    post:
+      summary: 'Change level or dependants: ends the current election where the new one starts'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitChangeInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'NOT_ELIGIBLE / ENROLMENT_WINDOW_CLOSED / PLAN_STATE / ELECTION_EXISTS'}
+  /hr/benefits/elections/{id}/end:
+    post:
+      summary: 'End an election today: the owner inside a window, or benefits:manage at any time'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'ELECTION_STATE / ENROLMENT_WINDOW_CLOSED'}
+  /hr/benefits/deductions/me:
+    get:
+      summary: 'My payroll deductions for a month, as payroll will take them'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: month, in: query, schema: {type: string, example: '2026-07'}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /hr/benefits/dependants:
+    post:
+      summary: 'Add a dependant (sensitive; only the worker manages them)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitDependantInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    get:
+      summary: 'My active dependants'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/benefits/dependants/{id}:
+    patch:
+      summary: 'Edit my dependant'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitDependantInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /hr/benefits/dependants/{id}/remove:
+    post:
+      summary: 'Remove my dependant unless a live election covers them'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'DEPENDANT_IN_USE'}
+  /hr/benefits/employees/{id}/dependants:
+    get:
+      summary: 'A worker''s dependants (benefits:read_sensitive)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/benefits/life-events:
+    post:
+      summary: 'Record a life event for me, or for employee_id with benefits:manage; it opens an enrolment window'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BenefitLifeEventInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+    get:
+      summary: 'My life events'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+  /hr/benefits/employees/{id}/life-events:
+    get:
+      summary: 'A worker''s life events (benefits:read_sensitive)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /hr/benefits/reports/enrolment:
+    get:
+      summary: 'Active elections and waivers per plan and level today with the monthly costs; no personal data (benefits:read)'
+      tags: [Benefits]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/CoreObjectEnvelope'}}}}
 components:
   securitySchemes:
     BearerAuth:
@@ -6300,3 +6562,48 @@ components:
       type: object
       required: [time_zone]
       properties: {time_zone: {type: string, maxLength: 64, description: 'IANA name, for example Asia/Kolkata'}}
+    BenefitPlanInput:
+      type: object
+      properties:
+        code: {type: string, maxLength: 30}
+        name: {type: string, maxLength: 150}
+        category: {type: string, enum: [health, life, accident, retirement, wellness, other]}
+        provider: {type: string, maxLength: 100}
+        plan_year: {type: integer, minimum: 2000, maximum: 2100}
+        effective_from: {type: string, format: date}
+        eligibility: {type: object, properties: {worker_types: {type: array, items: {type: string}}, employment_types: {type: array, items: {type: string}}, grade_ids: {type: array, items: {type: string, format: uuid}}, location_ids: {type: array, items: {type: string, format: uuid}}, min_tenure_days: {type: integer, minimum: 0, maximum: 3650}}}
+        levels: {type: array, minItems: 1, maxItems: 10, items: {$ref: '#/components/schemas/BenefitLevel'}}
+    BenefitLevel:
+      type: object
+      required: [code, name]
+      properties: {code: {type: string, maxLength: 30}, name: {type: string, maxLength: 100}, employee_cost: {type: number, minimum: 0, description: per month}, employer_cost: {type: number, minimum: 0, description: per month}, max_dependants: {type: integer, minimum: 0, maximum: 10}}
+    BenefitVersionInput:
+      type: object
+      required: [effective_from, levels]
+      properties: {effective_from: {type: string, format: date}, levels: {type: array, minItems: 1, maxItems: 10, items: {$ref: '#/components/schemas/BenefitLevel'}}}
+    BenefitWindowInput:
+      type: object
+      required: [name, starts_on, ends_on]
+      properties: {name: {type: string, maxLength: 100}, starts_on: {type: string, format: date}, ends_on: {type: string, format: date}}
+    BenefitSettingsInput:
+      type: object
+      properties: {new_hire_days: {type: integer, minimum: 0, maximum: 365}, life_event_days: {type: integer, minimum: 0, maximum: 365}}
+    BenefitElectInput:
+      type: object
+      required: [plan_id, level_code]
+      properties: {plan_id: {type: string, format: uuid}, level_code: {type: string}, dependant_ids: {type: array, items: {type: string, format: uuid}}, effective_from: {type: string, format: date, description: 'today or up to 90 days ahead'}}
+    BenefitChangeInput:
+      type: object
+      required: [level_code]
+      properties: {level_code: {type: string}, dependant_ids: {type: array, items: {type: string, format: uuid}}, effective_from: {type: string, format: date}}
+    BenefitWaiveInput:
+      type: object
+      required: [plan_id]
+      properties: {plan_id: {type: string, format: uuid}}
+    BenefitDependantInput:
+      type: object
+      properties: {name: {type: string, maxLength: 100}, relationship: {type: string, enum: [spouse, child, parent, other]}, date_of_birth: {type: string, format: date}}
+    BenefitLifeEventInput:
+      type: object
+      required: [type, event_date]
+      properties: {type: {type: string, enum: [marriage, birth, adoption, divorce, death, other]}, event_date: {type: string, format: date}, evidence_ref: {type: string, maxLength: 300}, employee_id: {type: string, format: uuid}}

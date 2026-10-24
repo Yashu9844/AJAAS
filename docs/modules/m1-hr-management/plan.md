@@ -18,7 +18,7 @@ Updated 2026-10-20. Branch `restructure_architecture` (from `module_7_performanc
 | compensation | done (24 ops), 2026-10-21 | `/dev-test/hr/compensation`, 1 scenario | `contexts/compensation/` |
 | onboarding | done (19 ops), 2026-10-22 | `/dev-test/hr/onboarding`, 1 scenario | `contexts/onboarding/`; hooks on core and recruitment; `onboarding/api.Clearance` for payroll final settlement |
 | learning | done (35 ops, 2026-10-23) | `/dev-test/hr/learning`, 1 scenario | `contexts/learning/`; core hook enrols joiners and movers |
-| benefits | not started | — | requirements in `specification.md` §8 |
+| benefits | done (29 ops, 2026-10-24) | `/dev-test/hr/benefits`, 1 scenario | `contexts/benefits/`; payroll deductions and termination hook |
 
 ## 2. Phases
 

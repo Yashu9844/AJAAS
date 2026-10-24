@@ -192,7 +192,7 @@ evidence), `Completion` (attestation `self|manager|hr`, optional score, certific
 **Golden candidates:** rule assignment enrolls a new joiner exactly once; retired course keeps completions; overdue
 computed correctly across time zones; unsafe URL rejected.
 
-## 8. Context `benefits` (planned)
+## 8. Context `benefits` (built 2026-10-24; contract in `contexts/benefits/specification.md`)
 
 **Entities (proposed):** `BenefitPlan` (tenant-defined: name, category `health|life|accident|retirement|wellness|other`,
 provider name, coverage levels, employee and employer cost per level in paise per pay period, plan year, status),

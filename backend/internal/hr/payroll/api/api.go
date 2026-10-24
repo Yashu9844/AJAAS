@@ -16,3 +16,15 @@ import (
 type CTC interface {
 	SetCTC(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, annual kernel.Money, from time.Time, actorUserID uuid.UUID) (synced bool, err error)
 }
+
+// BenefitLine is one benefit deduction for a worker and period (payroll PP-05).
+type BenefitLine struct {
+	Code   string       `json:"code"`
+	Name   string       `json:"name"`
+	Amount kernel.Money `json:"amount"`
+}
+
+// BenefitDeductions supplies benefit deductions per worker and period; HR/Benefits implements it (benefits BN-C07).
+type BenefitDeductions interface {
+	Deductions(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) ([]BenefitLine, error)
+}

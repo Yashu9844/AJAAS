@@ -1,8 +1,8 @@
 "use client";
 import { Checklist, OpGroup, ScenarioCard } from "./components";
-import { HR_ATTENDANCE, HR_COMPENSATION, HR_CORE, HR_LEARNING, HR_LEAVE, HR_ONBOARDING, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
+import { HR_ATTENDANCE, HR_BENEFITS, HR_COMPENSATION, HR_CORE, HR_LEARNING, HR_LEAVE, HR_ONBOARDING, HR_PAYROLL, HR_PERFORMANCE, HR_RECRUITMENT } from "./generated/hrSpecs";
 import type { Scenario } from "./runner";
-import { S_ATTENDANCE, S_COMPENSATION, S_CORE, S_LEARNING, S_LEAVE, S_ONBOARDING, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
+import { S_ATTENDANCE, S_BENEFITS, S_COMPENSATION, S_CORE, S_LEARNING, S_LEAVE, S_ONBOARDING, S_PAYROLL, S_PERFORMANCE, S_RECRUITMENT } from "./scenariosHr";
 import { Tabs } from "./shell";
 import type { ChecklistItem, OpSpec } from "./types";
 
@@ -77,6 +77,7 @@ export const HR_CHECKLISTS: Record<string, ChecklistItem[]> = {
   compensation: items(S_COMPENSATION),
   onboarding: items(S_ONBOARDING),
   learning: items(S_LEARNING),
+  benefits: items(S_BENEFITS),
 };
 
 export function HrPerformance() {
@@ -183,6 +184,18 @@ export function HrLearning() {
       ops={HR_LEARNING}
       scenarios={S_LEARNING}
       checklist={HR_CHECKLISTS.learning}
+    />
+  );
+}
+
+export function HrBenefits() {
+  return (
+    <ContextPage
+      title="HR / Benefits"
+      intro="Tenant-defined plans with effective-dated cost versions, eligibility, enrolment windows (open enrolment, new hire, life event), elections with dependants, and the monthly deduction payroll takes. benefits:read | manage | read_sensitive (dependants, life events, others' elections); options, own elections and dependants for everyone."
+      ops={HR_BENEFITS}
+      scenarios={S_BENEFITS}
+      checklist={HR_CHECKLISTS.benefits}
     />
   );
 }

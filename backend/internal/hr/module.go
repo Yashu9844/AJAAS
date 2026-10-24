@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/hr/attendance"
 	attendanceOps "github.com/jaas/jaas/internal/hr/attendance/ops"
+	"github.com/jaas/jaas/internal/hr/benefits"
 	"github.com/jaas/jaas/internal/hr/compensation"
 	"github.com/jaas/jaas/internal/hr/core"
 	"github.com/jaas/jaas/internal/hr/employee"
@@ -57,6 +58,7 @@ type Module struct {
 	comp        *compensation.Module
 	onb         *onboarding.Module
 	learning    *learning.Module
+	benefits    *benefits.Module
 	attOps      *attendanceOps.Module
 }
 
@@ -82,12 +84,15 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	m.onb = onboarding.NewModule(o.DB, onboarding.Ports{Employees: emp, Core: m.core.Directory(), Documents: m.employee.Documents(),
 		Audit: o.Identity.Audit()})
 	m.learning = learning.NewModule(o.DB, learning.Ports{Employees: emp, Core: m.core.Directory(), Reports: m.org, Audit: o.Identity.Audit()})
+	m.benefits = benefits.NewModule(o.DB, benefits.Ports{Employees: emp, Core: m.core.Directory(), Audit: o.Identity.Audit()})
+	m.payroll.SetBenefits(m.benefits.Service())                                // BN-C07: payroll deducts the elected employee costs
 	m.recruitment.SetPositions(m.core.Positions())                             // RP-02: requisitions read core positions
 	m.leave.SetLocations(leavePlus.FromCore(m.core.Directory()))               // LP-05: employee location for calendars
 	m.payroll.SetStates(payrollPlus.StatesFromCore(m.core.Directory(), m.org)) // PP-02: work state for professional tax
 	m.payroll.SetClearance(m.onb.Clearance())                                  // PP-07: exit clearance before settlement approval
 	// OB-03: core actions and recruitment hires start onboarding/offboarding inside their own transactions.
 	m.core.OnActionCompleted(m.onb.Service().CoreHook)
+	m.core.OnActionCompleted(m.benefits.Service().CoreHook) // BN-C08: a termination ends the worker's elections
 	m.core.OnActionCompleted(m.learning.Service().CoreHook) // LN-C07: joiners and movers are enrolled in rule assignments
 	m.recruitment.OnHired(m.onb.Service().RecruitmentHook)
 
@@ -111,7 +116,7 @@ func (m *Module) migrate() error {
 	}
 	var all []interface{}
 	for _, ms := range [][]interface{}{m.org.RegisterModels(), m.employee.RegisterModels(), m.attendance.RegisterModels(),
-		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels(), m.comp.RegisterModels(), m.onb.RegisterModels(), m.learning.RegisterModels(), m.attOps.RegisterModels()} {
+		m.leave.RegisterModels(), m.payroll.RegisterModels(), m.recruitment.RegisterModels(), m.performance.RegisterModels(), m.core.RegisterModels(), m.comp.RegisterModels(), m.onb.RegisterModels(), m.learning.RegisterModels(), m.benefits.RegisterModels(), m.attOps.RegisterModels()} {
 		all = append(all, ms...)
 	}
 	if err := m.o.DB.AutoMigrate(all...); err != nil {
@@ -125,7 +130,7 @@ func (m *Module) registerPermissions(ctx context.Context) error {
 	for name, defs := range map[string][]access.PermissionDef{
 		"organization": organization.Catalogue(), "employee": employee.Catalogue(), "attendance": attendance.Catalogue(),
 		"leave": leave.Catalogue(), "payroll": payroll.Catalogue(), "recruitment": recruitment.Catalogue(),
-		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(), "recruitment_parity": recruitment.ParityCatalogue(), "onboarding": onboarding.Catalogue(), "learning": learning.Catalogue(),
+		"performance": performance.Catalogue(), "core": core.Catalogue(), "compensation": compensation.Catalogue(), "recruitment_parity": recruitment.ParityCatalogue(), "onboarding": onboarding.Catalogue(), "learning": learning.Catalogue(), "benefits": benefits.Catalogue(),
 	} {
 		if err := m.o.Identity.RegisterPermissions(ctx, defs); err != nil {
 			return fmt.Errorf("%s permission catalogue: %w", name, err)
@@ -164,6 +169,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	m.comp.RegisterRoutes(rg, idp)
 	m.onb.RegisterRoutes(rg, idp)
 	m.learning.RegisterRoutes(rg, idp)
+	m.benefits.RegisterRoutes(rg, idp)
 	m.attOps.RegisterRoutes(rg, idp)
 }
 

@@ -22,7 +22,7 @@ lives in the pre-restructure layout until Phase C (see `plan.md`).
 | `onboarding` | onboarding and offboarding plans, tasks, document requirements, exit clearance | planned | `specification.md` §5 |
 | `compensation` | pay grades and ranges, salary change history, merit / increment cycles | planned | `specification.md` §6 |
 | `learning` | course catalogue (external links / documents with thumbnails), assignments, completions, learning plans | built 2026-10-23 | `contexts/learning/` |
-| `benefits` | tenant-defined benefit plans, eligibility, enrolment windows, enrolments and dependants | planned | `specification.md` §8 |
+| `benefits` | tenant-defined benefit plans, eligibility, enrolment windows, enrolments and dependants | built 2026-10-24 | `contexts/benefits/` |
 
 ## Files in this bundle
 

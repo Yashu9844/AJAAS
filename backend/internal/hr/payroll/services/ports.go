@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/kernel"
+	"github.com/jaas/jaas/internal/hr/payroll/api"
 	"github.com/jaas/jaas/internal/hr/payroll/calc"
 	"github.com/jaas/jaas/internal/hr/payroll/repositories"
 	"github.com/jaas/jaas/internal/shared/queue"
@@ -38,16 +39,12 @@ type PTSource interface {
 	Slabs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, state string) ([]calc.PTSlab, error)
 }
 
-// BenefitLine is one benefit deduction for a worker and period (PP-05).
-type BenefitLine struct {
-	Code, Name string
-	Amount     calc.Money
-}
-
-// BenefitDeductions supplies benefit deductions per worker and period (PP-05); nil means none.
-type BenefitDeductions interface {
-	Deductions(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) ([]BenefitLine, error)
-}
+// BenefitLine and BenefitDeductions are published by payroll/api so HR/Benefits can implement the port (PP-05);
+// a nil source means no deductions.
+type (
+	BenefitLine       = api.BenefitLine
+	BenefitDeductions = api.BenefitDeductions
+)
 
 // TxRunner opens database transactions.
 type TxRunner interface {

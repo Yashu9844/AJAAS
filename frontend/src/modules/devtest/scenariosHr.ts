@@ -992,3 +992,50 @@ export const S_LEARNING: Scenario[] = [
     },
   },
 ];
+
+export const S_BENEFITS: Scenario[] = [
+  {
+    key: "hr.benefits.flow",
+    module: "benefits",
+    title: "Plan → window → election → change → waive → payroll preview (BG1, BG2, BG5)",
+    description:
+      "Creates and activates a plan, shows that a worker outside any enrolment window cannot elect (BG1), opens a window, lets the worker add a dependant and elect a level that covers them, refuses a second live election, changes the level, waives another plan and previews the monthly deduction payroll will take. A plan's costs cannot be patched, only versioned, and dependants are invisible without benefits:read_sensitive.",
+    needs: "A",
+    run: async (r, { A, uid }) => {
+      const B = "/hr/benefits";
+      const w = await member(r, A, uid, "ben");
+      const reader = await limited(r, A, uid, "bnr", [["benefits", "read"]]);
+      const today = new Date();
+      const levels = [
+        { code: "SELF", name: "Employee only", employee_cost: 500, employer_cost: 1500, max_dependants: 0 },
+        { code: "FAMILY", name: "Family", employee_cost: 1200, employer_cost: 2800, max_dependants: 2 },
+      ];
+      const p = await r.call("Plan with two coverage levels", tn(A, "POST", `${B}/plans`, { code: `med-${uid}`, name: `Group medical ${uid}`, category: "health", plan_year: today.getFullYear(), effective_from: ymd(addDays(today, -200)), levels }), 201);
+      const pid = str(p, "data.id");
+      await r.call("Duplicate code → 409", tn(A, "POST", `${B}/plans`, { code: `MED-${uid}`, name: "Dup", category: "health", plan_year: today.getFullYear(), effective_from: ymd(today), levels }), 409);
+      await r.call("Costs cannot be patched → 400", tn(A, "PATCH", `${B}/plans/${pid}`, { levels }), 400);
+      await r.call("Activate", tn(A, "POST", `${B}/plans/${pid}/activate`), 200);
+      await r.call("No window open: the worker cannot elect (BG1) → 409", tn(w.S, "POST", `${B}/elections`, { plan_id: pid, level_code: "SELF" }), 409);
+      await r.call("Open an enrolment window", tn(A, "POST", `${B}/windows`, { name: `Annual ${uid}`, starts_on: ymd(addDays(today, -1)), ends_on: ymd(addDays(today, 10)) }), 201);
+      await r.call("Options show the window open", tn(w.S, "GET", `${B}/options`), 200, (e) => (getPath(e.resBody, "data.window.open") === true ? null : "window should be open"));
+      const d = await r.call("Add a dependant", tn(w.S, "POST", `${B}/dependants`, { name: "Asha", relationship: "child", date_of_birth: "2018-04-02" }), 201);
+      const did = str(d, "data.id");
+      await r.call("SELF covers no dependants → 400", tn(w.S, "POST", `${B}/elections`, { plan_id: pid, level_code: "SELF", dependant_ids: [did] }), 400);
+      const el = await r.call("Elect FAMILY covering the dependant", tn(w.S, "POST", `${B}/elections`, { plan_id: pid, level_code: "FAMILY", dependant_ids: [did] }), 201);
+      await r.call("A second live election → 409", tn(w.S, "POST", `${B}/elections`, { plan_id: pid, level_code: "SELF" }), 409);
+      await r.call("A covered dependant cannot be removed → 409", tn(w.S, "POST", `${B}/dependants/${did}/remove`), 409);
+      await r.call("Change to SELF", tn(w.S, "POST", `${B}/elections/${str(el, "data.id")}/change`, { level_code: "SELF" }), 201);
+      const month = `${addDays(today, 31).getFullYear()}-${String(addDays(today, 31).getMonth() + 1).padStart(2, "0")}`;
+      await r.call("Next month's deduction preview is the SELF cost", tn(w.S, "GET", `${B}/deductions/me`, undefined, { month }), 200, (e) =>
+        list(e).length === 1 && list(e)[0].amount === 500 ? null : "expected one 500.00 line",
+      );
+      const q = await r.call("A second plan", tn(A, "POST", `${B}/plans`, { code: `life-${uid}`, name: `Group life ${uid}`, category: "life", plan_year: today.getFullYear(), effective_from: ymd(addDays(today, -200)), levels: [{ code: "BASIC", name: "Basic", employee_cost: 100, employer_cost: 300 }] }), 201);
+      await r.call("Activate it", tn(A, "POST", `${B}/plans/${str(q, "data.id")}/activate`), 200);
+      await r.call("Waive it", tn(w.S, "POST", `${B}/elections/waive`, { plan_id: str(q, "data.id") }), 201);
+      await r.call("Dependants are hidden without read_sensitive → 403", tn(reader, "GET", `${B}/employees/${w.empId}/dependants`), 403);
+      await r.call("HR with read_sensitive sees them", tn(A, "GET", `${B}/employees/${w.empId}/dependants`), 200, (e) => (list(e).length === 1 ? null : "expected 1"));
+      await r.call("The enrolment report names nobody", tn(A, "GET", `${B}/reports/enrolment`), 200, (e) => (list(e).length >= 2 ? null : "expected rows"));
+      await r.call("A new version for next quarter", tn(A, "POST", `${B}/plans/${pid}/versions`, { effective_from: ymd(addDays(today, 60)), levels: [{ code: "SELF", name: "Employee only", employee_cost: 650, employer_cost: 1500 }] }), 201);
+    },
+  },
+];

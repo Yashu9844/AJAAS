@@ -8990,6 +8990,820 @@ export const HR_LEARNING: OpSpec[] = [
   }
 ];
 
+export const HR_BENEFITS: OpSpec[] = [
+  {
+    "key": "hr.benefits.get.hr.benefits.deductions.me",
+    "label": "My payroll deductions for a month, as payroll will take them",
+    "method": "GET",
+    "path": "/hr/benefits/deductions/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "month",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.dependants",
+    "label": "Add a dependant (sensitive; only the worker manages them)",
+    "method": "POST",
+    "path": "/hr/benefits/dependants",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "relationship",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "spouse",
+          "child",
+          "parent",
+          "other"
+        ]
+      },
+      {
+        "name": "date_of_birth",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsDependantsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.dependants",
+    "label": "My active dependants",
+    "method": "GET",
+    "path": "/hr/benefits/dependants",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.benefits.patch.hr.benefits.dependants.id",
+    "label": "Edit my dependant",
+    "method": "PATCH",
+    "path": "/hr/benefits/dependants/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsDependantsId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "relationship",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "spouse",
+          "child",
+          "parent",
+          "other"
+        ]
+      },
+      {
+        "name": "date_of_birth",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.dependants.id.remove",
+    "label": "Remove my dependant unless a live election covers them",
+    "method": "POST",
+    "path": "/hr/benefits/dependants/:id/remove",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsDependantsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 DEPENDANT_IN_USE"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.elections",
+    "label": "Elect a plan level inside an open window; one live election per plan",
+    "method": "POST",
+    "path": "/hr/benefits/elections",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "plan_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "level_code",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "dependant_ids",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "effective_from",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsElectionsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 NOT_ELIGIBLE / ENROLMENT_WINDOW_CLOSED / PLAN_STATE / ELECTION_EXISTS"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.elections",
+    "label": "List elections of anyone (benefits:read_sensitive)",
+    "method": "GET",
+    "path": "/hr/benefits/elections",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "employee_id",
+        "where": "query"
+      },
+      {
+        "name": "plan_id",
+        "where": "query"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "waived",
+          "ended"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.elections.me",
+    "label": "My elections, history included",
+    "method": "GET",
+    "path": "/hr/benefits/elections/me",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.elections.waive",
+    "label": "Waive a plan explicitly from today; ends an active election; idempotent",
+    "method": "POST",
+    "path": "/hr/benefits/elections/waive",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "plan_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsElectionsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 NOT_ELIGIBLE / ENROLMENT_WINDOW_CLOSED / PLAN_STATE / ELECTION_EXISTS"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.elections.id.change",
+    "label": "Change level or dependants: ends the current election where the new one starts",
+    "method": "POST",
+    "path": "/hr/benefits/elections/:id/change",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsElectionsId"
+      },
+      {
+        "name": "level_code",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "dependant_ids",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "effective_from",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsElectionsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 NOT_ELIGIBLE / ENROLMENT_WINDOW_CLOSED / PLAN_STATE / ELECTION_EXISTS"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.elections.id.end",
+    "label": "End an election today: the owner inside a window, or benefits:manage at any time",
+    "method": "POST",
+    "path": "/hr/benefits/elections/:id/end",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsElectionsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 ELECTION_STATE / ENROLMENT_WINDOW_CLOSED"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.employees.id.dependants",
+    "label": "A worker's dependants (benefits:read_sensitive)",
+    "method": "GET",
+    "path": "/hr/benefits/employees/:id/dependants",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsEmployeesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.employees.id.life.events",
+    "label": "A worker's life events (benefits:read_sensitive)",
+    "method": "GET",
+    "path": "/hr/benefits/employees/:id/life-events",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsEmployeesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.life.events",
+    "label": "Record a life event for me, or for employee_id with benefits:manage; it opens an enrolment window",
+    "method": "POST",
+    "path": "/hr/benefits/life-events",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "marriage",
+          "birth",
+          "adoption",
+          "divorce",
+          "death",
+          "other"
+        ],
+        "required": true
+      },
+      {
+        "name": "event_date",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "evidence_ref",
+        "where": "body"
+      },
+      {
+        "name": "employee_id",
+        "where": "body",
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsLifeEventsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.life.events",
+    "label": "My life events",
+    "method": "GET",
+    "path": "/hr/benefits/life-events",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.options",
+    "label": "Plans offered to me today, the version in force, my election and whether an enrolment window is open",
+    "method": "GET",
+    "path": "/hr/benefits/options",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.plans",
+    "label": "Create a draft plan with its first cost version (benefits:manage)",
+    "method": "POST",
+    "path": "/hr/benefits/plans",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "code",
+        "where": "body"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "category",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "health",
+          "life",
+          "accident",
+          "retirement",
+          "wellness",
+          "other"
+        ]
+      },
+      {
+        "name": "provider",
+        "where": "body"
+      },
+      {
+        "name": "plan_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "effective_from",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "eligibility",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "levels",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsPlansId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.plans",
+    "label": "List plans (benefits:read)",
+    "method": "GET",
+    "path": "/hr/benefits/plans",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "draft",
+          "active",
+          "retired"
+        ]
+      },
+      {
+        "name": "page",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "per_page",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.plans.id",
+    "label": "A plan with its cost versions (benefits:read)",
+    "method": "GET",
+    "path": "/hr/benefits/plans/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsPlansId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "hr.benefits.patch.hr.benefits.plans.id",
+    "label": "Edit name, provider or eligibility; costs change only through a new version (benefits:manage)",
+    "method": "PATCH",
+    "path": "/hr/benefits/plans/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsPlansId"
+      },
+      {
+        "name": "code",
+        "where": "body"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "category",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "health",
+          "life",
+          "accident",
+          "retirement",
+          "wellness",
+          "other"
+        ]
+      },
+      {
+        "name": "provider",
+        "where": "body"
+      },
+      {
+        "name": "plan_year",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "effective_from",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "eligibility",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "levels",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 PLAN_STATE"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.plans.id.activate",
+    "label": "Activate a draft plan (benefits:manage)",
+    "method": "POST",
+    "path": "/hr/benefits/plans/:id/activate",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsPlansId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 PLAN_STATE"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.plans.id.retire",
+    "label": "Retire a plan: no new elections, existing ones continue (benefits:manage)",
+    "method": "POST",
+    "path": "/hr/benefits/plans/:id/retire",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsPlansId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 PLAN_STATE"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.plans.id.versions",
+    "label": "Add a cost version starting after the current one, never in the past (benefits:manage)",
+    "method": "POST",
+    "path": "/hr/benefits/plans/:id/versions",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsPlansId"
+      },
+      {
+        "name": "effective_from",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "levels",
+        "where": "body",
+        "type": "json",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsPlansId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 PLAN_STATE"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.reports.enrolment",
+    "label": "Active elections and waivers per plan and level today with the monthly costs; no personal data (benefits:read)",
+    "method": "GET",
+    "path": "/hr/benefits/reports/enrolment",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.settings",
+    "label": "New-hire and life-event window lengths in days (benefits:read)",
+    "method": "GET",
+    "path": "/hr/benefits/settings",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.benefits.put.hr.benefits.settings",
+    "label": "Set the window lengths, 0 to 365 days (benefits:manage)",
+    "method": "PUT",
+    "path": "/hr/benefits/settings",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "new_hire_days",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "life_event_days",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.windows",
+    "label": "Open a tenant-wide open-enrolment window of at most 120 days (benefits:manage)",
+    "method": "POST",
+    "path": "/hr/benefits/windows",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "starts_on",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "ends_on",
+        "where": "body",
+        "required": true,
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "benefitsWindowsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "hr.benefits.get.hr.benefits.windows",
+    "label": "List open-enrolment windows (benefits:read)",
+    "method": "GET",
+    "path": "/hr/benefits/windows",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "hr.benefits.post.hr.benefits.windows.id.cancel",
+    "label": "Cancel a window; idempotent (benefits:manage)",
+    "method": "POST",
+    "path": "/hr/benefits/windows/:id/cancel",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "benefitsWindowsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  }
+];
+
 export const HR_EMPLOYEE_RECORDS: OpSpec[] = [
   {
     "key": "hr.employee_records.get.hr.employee.change.requests",
