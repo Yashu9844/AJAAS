@@ -30,6 +30,11 @@ date. It is fixed once, in `middleware.BodyLimit`, which now reads such bodies (
 (`TestBodyLimitGivesChunkedBodiesALength`); the rerun passes with chunked bodies. Run scenarios on a fresh tenant: some
 (import log) count rows.
 
+**Browser run (2026-10-24):** the same console, driven in headless Chrome through the DevTools protocol, signed in through the
+Login form (session A, tenant `tenant_admin`) and pressed every enabled "Run scenario" button: 10/10 identity and 38/38 HR
+scenarios passed as the UI itself reports them (two-tenant scenarios stay disabled without session B). A person should still
+click through it once; see the walkthrough in `plan.md` §6.
+
 ## 1. Run it
 
 ```bash

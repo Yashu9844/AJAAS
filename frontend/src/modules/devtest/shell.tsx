@@ -129,6 +129,10 @@ export function Overview() {
         <Checklist title="M1 HR — Payroll" items={HR_CHECKLISTS.payroll} />
         <Checklist title="M1 HR — Recruitment" items={HR_CHECKLISTS.recruitment} />
         <Checklist title="M1 HR — Performance & OKRs" items={HR_CHECKLISTS.performance} />
+        <Checklist title="M1 HR — Compensation" items={HR_CHECKLISTS.compensation} />
+        <Checklist title="M1 HR — Onboarding" items={HR_CHECKLISTS.onboarding} />
+        <Checklist title="M1 HR — Learning" items={HR_CHECKLISTS.learning} />
+        <Checklist title="M1 HR — Benefits" items={HR_CHECKLISTS.benefits} />
       </div>
       <h3>How to start</h3>
       <ol className="dt-note">
