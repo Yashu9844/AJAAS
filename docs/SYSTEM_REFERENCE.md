@@ -1,6 +1,6 @@
 # JAAS — System Reference (M0 Identity & Access + M1 HR Management)
 
-> Snapshot: 2026-10-18, branch `module_7_performance` (3 commits ahead of `main` @ `fe620fa`).
+> Snapshot: 2026-10-24, branch `restructure_architecture` (Phase E complete; Part 1 narrative predates the restructure, Part 2 is regenerated).
 > **Part 1** (this part) is the hand-written explanation: architecture, how modules depend on each other, the logic of
 > every module, and end-to-end flows.
 > **Part 2** (the appendix) is generated from the source and is exhaustive:
@@ -44,6 +44,8 @@
 into `migrations/identity` (18) and `migrations/hr` (53); full unit and integration suites green, including
 `TestSwaggerMatchesRoutes` (contract ↔ router) and `TestImportBoundaries`; test console 37/37 scenarios. Migration numbers
 in the table above are the pre-split ones.
+
+**Totals on `restructure_architecture` (2026-10-24):** 442 documented operations in `backend/api/swagger.yaml` (M0 plus every HR context); migrations in `migrations/identity` (18) and `migrations/hr` (93). Phase E (full HR) is built: payroll, recruitment, leave, attendance and employee parity, core, compensation, onboarding, learning (35 ops, `lrn_*`) and benefits (29 ops, `ben_*`). Full unit and integration suites green, including `TestSwaggerMatchesRoutes` and `TestImportBoundaries`. Part 2 section A lists only routes registered in controller-style route files; the single-package contexts (compensation, onboarding, learning, benefits and the `plus`/`ops` sub-packages) are listed by operation in their `contexts/<name>/specification.md` and in the contract, and their code appears in section C.
 
 **Who built what:**
 - M0 Identity, HR/Organization, HR/Employee existed before this work and were hardened by the partner (`fix/module-0-2-hardening`, now in `main`).
@@ -2192,6 +2194,803 @@ Total routes registered by module route files: **230** (plus `GET /health`).
 - index `idx_core_outbox_tenant` on `core_events_outbox` (tenant_id)
 - index `idx_core_outbox_published` on `core_events_outbox` (published) WHERE published = FALSE
 
+#### `hr/000054_create_employee_emergency_contacts.up.sql`
+- **table `employee_emergency_contacts`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
+  - `name` VARCHAR(150) — NOT NULL
+  - `relationship` VARCHAR(50) — NOT NULL
+  - `phone` VARCHAR(30) — NOT NULL
+  - `email` VARCHAR(255)
+  - `is_primary` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_employee_emergency_contacts_profile` on `employee_emergency_contacts` (tenant_id, employee_profile_id)
+- UNIQUE index `uq_employee_emergency_contacts_primary` on `employee_emergency_contacts` (employee_profile_id) WHERE is_primary
+
+#### `hr/000055_create_employee_education.up.sql`
+- **table `employee_education`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
+  - `institution` VARCHAR(200) — NOT NULL
+  - `qualification` VARCHAR(150) — NOT NULL
+  - `field_of_study` VARCHAR(150)
+  - `start_year` INT — CHECK (start_year IS NULL OR start_year BETWEEN 1900 AND 2200)
+  - `end_year` INT — CHECK (end_year IS NULL OR end_year BETWEEN 1900 AND 2200)
+  - `grade` VARCHAR(50)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (start_year IS NULL OR end_year IS NULL OR end_year >= start_year)
+- index `idx_employee_education_profile` on `employee_education` (tenant_id, employee_profile_id)
+
+#### `hr/000056_create_employee_prior_employment.up.sql`
+- **table `employee_prior_employment`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
+  - `employer` VARCHAR(200) — NOT NULL
+  - `title` VARCHAR(150) — NOT NULL
+  - `start_date` DATE — NOT NULL
+  - `end_date` DATE — NOT NULL
+  - `reason_for_leaving` VARCHAR(500)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (end_date >= start_date)
+  - _constraint:_ CONSTRAINT ex_employee_prior_employment_overlap EXCLUDE USING gist (
+  - `employee_profile_id` WITH — =, daterange(start_date, end_date, '[]') WITH &&
+  - _constraint:_ )
+- index `idx_employee_prior_employment_profile` on `employee_prior_employment` (tenant_id, employee_profile_id)
+
+#### `hr/000057_create_employee_change_requests.up.sql`
+- **table `employee_change_requests`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id) ON DELETE CASCADE
+  - `type` VARCHAR(20) — NOT NULL CHECK (type IN ('name', 'address', 'bank'))
+  - `payload` JSONB — NOT NULL
+  - `reason` VARCHAR(500)
+  - `status` VARCHAR(20) — NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'approved', 'rejected', 'cancelled'))
+  - `requested_by_user_id` UUID — NOT NULL
+  - `decided_by_user_id` UUID
+  - `decision_comment` VARCHAR(1000)
+  - `decided_at` TIMESTAMPTZ
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_employee_change_requests_open` on `employee_change_requests` (employee_profile_id, type) WHERE status = 'submitted'
+- index `idx_employee_change_requests_status` on `employee_change_requests` (tenant_id, status, created_at DESC)
+
+#### `hr/000058_create_comp_pay_ranges.up.sql`
+- **table `comp_pay_ranges`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `grade_id` UUID — NOT NULL REFERENCES core_grades(id)
+  - `min_amount` NUMERIC(14,2) — NOT NULL CHECK (min_amount > 0)
+  - `mid_amount` NUMERIC(14,2) — NOT NULL
+  - `max_amount` NUMERIC(14,2) — NOT NULL
+  - `effective_from` DATE — NOT NULL
+  - `effective_to` DATE
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (min_amount <= mid_amount AND mid_amount <= max_amount)
+  - _constraint:_ CHECK (effective_to IS NULL OR effective_to > effective_from)
+  - _constraint:_ CONSTRAINT ex_comp_pay_ranges_overlap EXCLUDE USING gist (tenant_id WITH =, grade_id WITH =, daterange(effective_from, effective_to) WITH &&)
+
+#### `hr/000059_create_comp_changes.up.sql`
+- **table `comp_changes`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `annual_base` NUMERIC(14,2) — NOT NULL CHECK (annual_base > 0)
+  - `effective_from` DATE — NOT NULL
+  - `reason` VARCHAR(20) — NOT NULL CHECK (reason IN ('hire', 'promotion', 'market', 'correction'))
+  - `comment` VARCHAR(1000)
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled'))
+  - `requested_by_user_id` UUID — NOT NULL
+  - `decided_by_user_id` UUID
+  - `decision_comment` VARCHAR(1000)
+  - `decided_at` TIMESTAMPTZ
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_comp_changes_pending` on `comp_changes` (employee_profile_id) WHERE status = 'pending'
+- index `idx_comp_changes_tenant` on `comp_changes` (tenant_id, status, created_at DESC)
+
+#### `hr/000060_create_comp_merit_cycles.up.sql`
+- **table `comp_merit_cycles`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `name` VARCHAR(150) — NOT NULL
+  - `effective_date` DATE — NOT NULL
+  - `performance_cycle_id` UUID
+  - `guidelines` JSONB — NOT NULL DEFAULT '[]'::jsonb
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('draft', 'open', 'in_review', 'approved', 'applied'))
+  - `created_by_user_id` UUID — NOT NULL
+  - `opened_by_user_id` UUID
+  - `approved_by_user_id` UUID
+  - `opened_at` TIMESTAMPTZ
+  - `approved_at` TIMESTAMPTZ
+  - `applied_at` TIMESTAMPTZ
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `comp_merit_budgets`**
+  - `tenant_id` UUID — NOT NULL
+  - `cycle_id` UUID — NOT NULL REFERENCES comp_merit_cycles(id) ON DELETE CASCADE
+  - `department_id` UUID — NOT NULL REFERENCES departments(id)
+  - `amount` NUMERIC(14,2) — NOT NULL CHECK (amount >= 0)
+  - _constraint:_ PRIMARY KEY (cycle_id, department_id)
+- **table `comp_merit_proposals`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `cycle_id` UUID — NOT NULL REFERENCES comp_merit_cycles(id) ON DELETE CASCADE
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `department_id` UUID — NOT NULL REFERENCES departments(id)
+  - `manager_employee_id` UUID — REFERENCES employee_profiles(id)
+  - `current_base` NUMERIC(14,2) — NOT NULL
+  - `compa_ratio` NUMERIC(6,2)
+  - `compa_band` VARCHAR(10) — NOT NULL
+  - `rating_band` VARCHAR(10) — NOT NULL
+  - `increase_pct` NUMERIC(5,2) — NOT NULL DEFAULT 0 CHECK (increase_pct >= 0 AND increase_pct <= 50)
+  - `amount` NUMERIC(14,2) — NOT NULL DEFAULT 0
+  - `justification` VARCHAR(1000)
+  - `outside_guideline` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `override_budget` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `updated_by_user_id` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ UNIQUE (cycle_id, employee_profile_id)
+- index `idx_comp_merit_cycles_tenant` on `comp_merit_cycles` (tenant_id, status)
+- index `idx_comp_merit_proposals_manager` on `comp_merit_proposals` (tenant_id, cycle_id, manager_employee_id)
+
+#### `hr/000061_create_comp_records.up.sql`
+- **table `comp_records`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `annual_base` NUMERIC(14,2) — NOT NULL CHECK (annual_base > 0)
+  - `effective_from` DATE — NOT NULL
+  - `effective_to` DATE
+  - `reason` VARCHAR(20) — NOT NULL CHECK (reason IN ('hire', 'promotion', 'market', 'correction', 'merit'))
+  - `change_id` UUID — REFERENCES comp_changes(id)
+  - `merit_cycle_id` UUID — REFERENCES comp_merit_cycles(id)
+  - `payroll_synced` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (effective_to IS NULL OR effective_to > effective_from)
+  - _constraint:_ CONSTRAINT ex_comp_records_overlap EXCLUDE USING gist (tenant_id WITH =, employee_profile_id WITH =, daterange(effective_from, effective_to) WITH &&)
+
+#### `hr/000062_create_comp_events_outbox.up.sql`
+- **table `comp_events_outbox`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `event_id` UUID — NOT NULL UNIQUE
+  - `routing_key` VARCHAR(100) — NOT NULL
+  - `payload` JSONB — NOT NULL
+  - `published` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `published_at` TIMESTAMPTZ
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `last_error` TEXT
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_comp_outbox_published` on `comp_events_outbox` (published) WHERE published = FALSE
+
+#### `hr/000063_create_onb_templates.up.sql`
+- **table `onb_templates`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `kind` VARCHAR(20) — NOT NULL CHECK (kind IN ('onboarding', 'offboarding'))
+  - `name` VARCHAR(150) — NOT NULL
+  - `department_id` UUID — REFERENCES departments(id)
+  - `job_profile_id` UUID — REFERENCES core_job_profiles(id)
+  - `location_id` UUID
+  - `worker_type` VARCHAR(20)
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('active', 'archived'))
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `onb_template_tasks`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `template_id` UUID — NOT NULL REFERENCES onb_templates(id) ON DELETE CASCADE
+  - `position` INT — NOT NULL
+  - `title` VARCHAR(200) — NOT NULL
+  - `description` VARCHAR(2000)
+  - `owner_role` VARCHAR(20) — NOT NULL CHECK (owner_role IN ('employee', 'manager', 'hr', 'it', 'finance'))
+  - `due_offset_days` INT — NOT NULL CHECK (due_offset_days BETWEEN -90 AND 365)
+  - `document_type` VARCHAR(50)
+  - `blocking` BOOLEAN — NOT NULL DEFAULT FALSE
+  - _constraint:_ UNIQUE (template_id, position)
+- index `idx_onb_templates_tenant` on `onb_templates` (tenant_id, kind, status)
+
+#### `hr/000064_create_onb_checklists.up.sql`
+- **table `onb_checklists`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `kind` VARCHAR(20) — NOT NULL CHECK (kind IN ('onboarding', 'offboarding'))
+  - `source` VARCHAR(20) — NOT NULL CHECK (source IN ('core_action', 'recruitment', 'manual'))
+  - `source_id` UUID
+  - `anchor_date` DATE — NOT NULL
+  - `department_id` UUID
+  - `manager_employee_id` UUID — REFERENCES employee_profiles(id)
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('open', 'completed', 'cancelled'))
+  - `clearance_completed_at` TIMESTAMPTZ
+  - `completed_at` TIMESTAMPTZ
+  - `closed_by_user_id` UUID
+  - `close_reason` VARCHAR(500)
+  - `created_by_user_id` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_onb_checklists_open` on `onb_checklists` (employee_profile_id, kind) WHERE status = 'open'
+- UNIQUE index `uq_onb_checklists_source` on `onb_checklists` (tenant_id, kind, source_id) WHERE source_id IS NOT NULL
+- index `idx_onb_checklists_tenant` on `onb_checklists` (tenant_id, kind, status)
+- index `idx_onb_checklists_manager` on `onb_checklists` (tenant_id, manager_employee_id)
+
+#### `hr/000065_create_onb_tasks.up.sql`
+- **table `onb_tasks`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `checklist_id` UUID — NOT NULL REFERENCES onb_checklists(id) ON DELETE CASCADE
+  - `position` INT — NOT NULL
+  - `title` VARCHAR(200) — NOT NULL
+  - `description` VARCHAR(2000)
+  - `owner_role` VARCHAR(20) — NOT NULL CHECK (owner_role IN ('employee', 'manager', 'hr', 'it', 'finance'))
+  - `assignee_employee_id` UUID — REFERENCES employee_profiles(id)
+  - `due_date` DATE — NOT NULL
+  - `document_type` VARCHAR(50)
+  - `blocking` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('open', 'done', 'skipped'))
+  - `evidence_document_id` UUID
+  - `note` VARCHAR(1000)
+  - `done_by_user_id` UUID
+  - `done_at` TIMESTAMPTZ
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ UNIQUE (checklist_id, position)
+- index `idx_onb_tasks_assignee` on `onb_tasks` (tenant_id, assignee_employee_id, status)
+- index `idx_onb_tasks_pool` on `onb_tasks` (tenant_id, status) WHERE assignee_employee_id IS NULL
+
+#### `hr/000066_create_onb_clearances.up.sql`
+- **table `onb_clearances`**
+  - `tenant_id` UUID — NOT NULL
+  - `checklist_id` UUID — NOT NULL REFERENCES onb_checklists(id) ON DELETE CASCADE
+  - `area` VARCHAR(20) — NOT NULL CHECK (area IN ('manager', 'hr', 'it', 'finance'))
+  - `cleared_by_user_id` UUID
+  - `cleared_at` TIMESTAMPTZ
+  - `note` VARCHAR(1000)
+  - _constraint:_ PRIMARY KEY (checklist_id, area)
+
+#### `hr/000067_create_onb_exit_interviews.up.sql`
+- **table `onb_exit_interviews`**
+  - `checklist_id` UUID — PRIMARY KEY REFERENCES onb_checklists(id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
+  - `answers` JSONB — NOT NULL
+  - `submitted_by_user_id` UUID — NOT NULL
+  - `submitted_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+#### `hr/000068_create_onb_events_outbox.up.sql`
+- **table `onb_events_outbox`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `event_id` UUID — NOT NULL UNIQUE
+  - `routing_key` VARCHAR(100) — NOT NULL
+  - `payload` JSONB — NOT NULL
+  - `published` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `published_at` TIMESTAMPTZ
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `last_error` TEXT
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_onb_outbox_published` on `onb_events_outbox` (published) WHERE published = FALSE
+
+#### `hr/000069_create_attendance_policies.up.sql`
+- **table `attendance_policies`**
+  - `tenant_id` UUID — PRIMARY KEY
+  - `week_off_mask` SMALLINT — NOT NULL DEFAULT 65 CHECK (week_off_mask BETWEEN 0 AND 127), -- bit n = weekday n (0 = Sunday)
+  - `overtime_min_daily` INT — NOT NULL DEFAULT 30 CHECK (overtime_min_daily BETWEEN 0 AND 1440)
+  - `overtime_max_daily` INT — NOT NULL DEFAULT 240 CHECK (overtime_max_daily BETWEEN 0 AND 1440)
+  - `overtime_max_monthly` INT — NOT NULL DEFAULT 3600 CHECK (overtime_max_monthly >= 0)
+  - `overtime_rate_weekday` INT — NOT NULL DEFAULT 150 CHECK (overtime_rate_weekday BETWEEN 100 AND 500)
+  - `overtime_rate_week_off` INT — NOT NULL DEFAULT 200 CHECK (overtime_rate_week_off BETWEEN 100 AND 500)
+  - `auto_absent_enabled` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `updated_by_user_id` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (overtime_min_daily <= overtime_max_daily)
+
+#### `hr/000070_create_attendance_rosters.up.sql`
+- **table `attendance_rosters`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `name` VARCHAR(100) — NOT NULL
+  - `pattern` JSONB — NOT NULL
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('active', 'archived'))
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_attendance_rosters_name` on `attendance_rosters` (tenant_id, lower(name))
+
+#### `hr/000071_create_attendance_imports.up.sql`
+- **table `attendance_imports`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `rows_total` INT — NOT NULL
+  - `rows_applied` INT — NOT NULL
+  - `overwrite` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_attendance_imports_tenant` on `attendance_imports` (tenant_id, created_at DESC)
+
+#### `hr/000072_create_attendance_job_runs.up.sql`
+- **table `attendance_job_runs`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `kind` VARCHAR(30) — NOT NULL
+  - `run_date` DATE — NOT NULL
+  - `absent` INT — NOT NULL
+  - `week_off` INT — NOT NULL
+  - `holiday` INT — NOT NULL
+  - `skipped` INT — NOT NULL
+  - `triggered_by_user_id` UUID
+  - `ran_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_attendance_job_runs_tenant` on `attendance_job_runs` (tenant_id, kind, run_date DESC)
+
+#### `hr/000073_create_leave_policies.up.sql`
+- **table `leave_policies`**
+  - `tenant_id` UUID — PRIMARY KEY
+  - `year_start_month` SMALLINT — NOT NULL DEFAULT 1 CHECK (year_start_month BETWEEN 1 AND 12)
+  - `comp_off_leave_type_id` UUID — REFERENCES leave_types(id)
+  - `comp_off_expiry_days` INT — NOT NULL DEFAULT 90 CHECK (comp_off_expiry_days BETWEEN 1 AND 365)
+  - `updated_by_user_id` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+#### `hr/000074_create_leave_location_calendars.up.sql`
+- **table `leave_location_holidays`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `location_id` UUID — NOT NULL REFERENCES locations(id)
+  - `holiday_date` DATE — NOT NULL
+  - `name` VARCHAR(100) — NOT NULL
+  - `is_optional` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ UNIQUE (tenant_id, location_id, holiday_date)
+- **table `leave_week_offs`**
+  - `tenant_id` UUID — NOT NULL
+  - `location_id` UUID — NOT NULL REFERENCES locations(id)
+  - `week_off_mask` SMALLINT — NOT NULL CHECK (week_off_mask BETWEEN 0 AND 127), -- bit n = weekday n (0 = Sunday)
+  - `updated_by_user_id` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (tenant_id, location_id)
+- index `idx_leave_location_holidays_range` on `leave_location_holidays` (tenant_id, location_id, holiday_date)
+
+#### `hr/000075_create_leave_comp_offs.up.sql`
+- **table `leave_comp_offs`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `worked_date` DATE — NOT NULL
+  - `days` NUMERIC(7,2) — NOT NULL CHECK (days IN (0.5, 1))
+  - `reason` VARCHAR(500) — NOT NULL
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled'))
+  - `requested_by_user_id` UUID — NOT NULL
+  - `decided_by_user_id` UUID
+  - `decision_comment` VARCHAR(500)
+  - `decided_at` TIMESTAMPTZ
+  - `expires_on` DATE
+  - `expired_days` NUMERIC(7,2)
+  - `expired_at` TIMESTAMPTZ
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_leave_comp_offs_day` on `leave_comp_offs` (employee_profile_id, worked_date) WHERE status IN ('pending', 'approved')
+- index `idx_leave_comp_offs_tenant` on `leave_comp_offs` (tenant_id, status, created_at DESC)
+- index `idx_leave_comp_offs_expiry` on `leave_comp_offs` (expires_on) WHERE status = 'approved' AND expired_at IS NULL
+
+#### `hr/000076_create_leave_encashments.up.sql`
+- **table `leave_encashment_rules`**
+  - `tenant_id` UUID — NOT NULL
+  - `leave_type_id` UUID — NOT NULL REFERENCES leave_types(id)
+  - `max_days_per_year` NUMERIC(7,2) — NOT NULL CHECK (max_days_per_year BETWEEN 0 AND 365)
+  - `min_balance_after` NUMERIC(7,2) — NOT NULL DEFAULT 0 CHECK (min_balance_after >= 0)
+  - `updated_by_user_id` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (tenant_id, leave_type_id)
+- **table `leave_encashments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `leave_type_id` UUID — NOT NULL REFERENCES leave_types(id)
+  - `year` INT — NOT NULL
+  - `days` NUMERIC(7,2) — NOT NULL CHECK (days > 0)
+  - `reason` VARCHAR(500)
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled'))
+  - `requested_by_user_id` UUID — NOT NULL
+  - `decided_by_user_id` UUID
+  - `decision_comment` VARCHAR(500)
+  - `decided_at` TIMESTAMPTZ
+  - `paid_out_at` TIMESTAMPTZ
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_leave_encashments_pending` on `leave_encashments` (employee_profile_id, leave_type_id) WHERE status = 'pending'
+- index `idx_leave_encashments_tenant` on `leave_encashments` (tenant_id, status, created_at DESC)
+- index `idx_leave_encashments_payout` on `leave_encashments` (tenant_id, employee_profile_id) WHERE status = 'approved' AND paid_out_at IS NULL
+
+#### `hr/000077_alter_payroll_parity.up.sql`
+- ALTER `payroll_payslip_lines` DROP CONSTRAINT IF EXISTS payroll_payslip_lines_kind_check
+- ALTER `payroll_payslip_lines` ADD CONSTRAINT payroll_payslip_lines_kind_check CHECK (kind IN ('earning', 'deduction', 'employer'))
+- ALTER `payroll_payslips` ADD COLUMN employer_cost NUMERIC(14,2) NOT NULL DEFAULT 0
+- ALTER `payroll_payslips` ADD COLUMN segments JSONB NOT NULL DEFAULT '[]'::jsonb
+- ALTER `payroll_runs` ADD COLUMN employer_total NUMERIC(14,2) NOT NULL DEFAULT 0
+
+#### `hr/000078_create_payroll_arrears.up.sql`
+- **table `payroll_arrears`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `run_id` UUID — NOT NULL REFERENCES payroll_runs(id) ON DELETE CASCADE
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `source_payslip_id` UUID — NOT NULL REFERENCES payroll_payslips(id) ON DELETE CASCADE
+  - `amount` NUMERIC(14,2) — NOT NULL CHECK (amount <> 0)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ UNIQUE (run_id, source_payslip_id)
+- index `idx_payroll_arrears_source` on `payroll_arrears` (tenant_id, source_payslip_id)
+
+#### `hr/000079_create_payroll_pt_slabs.up.sql`
+- **table `payroll_pt_slabs`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `state_code` VARCHAR(2) — NOT NULL
+  - `min_gross` NUMERIC(14,2) — NOT NULL CHECK (min_gross >= 0)
+  - `max_gross` NUMERIC(14,2) — CHECK (max_gross IS NULL OR max_gross >= min_gross)
+  - `amount` NUMERIC(14,2) — NOT NULL CHECK (amount >= 0)
+  - `month` SMALLINT — CHECK (month IS NULL OR month BETWEEN 1 AND 12)
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_payroll_pt_slabs_state` on `payroll_pt_slabs` (tenant_id, state_code)
+
+#### `hr/000080_create_payroll_settlements.up.sql`
+- **table `payroll_settlements`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL REFERENCES employee_profiles(id)
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('draft', 'approved', 'paid', 'cancelled'))
+  - `last_working_day` DATE — NOT NULL
+  - `service_years` INT — NOT NULL
+  - `monthly_basic` NUMERIC(14,2) — NOT NULL
+  - `gratuity` NUMERIC(14,2) — NOT NULL DEFAULT 0
+  - `leave_encashment` NUMERIC(14,2) — NOT NULL DEFAULT 0
+  - `encashments` NUMERIC(14,2) — NOT NULL DEFAULT 0
+  - `notice_recovery` NUMERIC(14,2) — NOT NULL DEFAULT 0
+  - `recovery_shortfall` NUMERIC(14,2) — NOT NULL DEFAULT 0
+  - `net` NUMERIC(14,2) — NOT NULL CHECK (net >= 0)
+  - `encashment_ids` JSONB — NOT NULL DEFAULT '[]'::jsonb
+  - `calculated_by_user_id` UUID — NOT NULL
+  - `approved_by_user_id` UUID
+  - `calculated_at` TIMESTAMPTZ — NOT NULL
+  - `approved_at` TIMESTAMPTZ
+  - `paid_at` TIMESTAMPTZ
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `payroll_settlement_lines`**
+  - `id` UUID — PRIMARY KEY
+  - `settlement_id` UUID — NOT NULL REFERENCES payroll_settlements(id) ON DELETE CASCADE
+  - `code` VARCHAR(30) — NOT NULL
+  - `name` VARCHAR(100) — NOT NULL
+  - `kind` VARCHAR(10) — NOT NULL CHECK (kind IN ('earning', 'deduction'))
+  - `amount` NUMERIC(14,2) — NOT NULL CHECK (amount >= 0)
+  - `position` INT — NOT NULL
+- UNIQUE index `uq_payroll_settlements_open` on `payroll_settlements` (employee_profile_id) WHERE status IN ('draft', 'approved')
+- index `idx_payroll_settlements_tenant` on `payroll_settlements` (tenant_id, status, created_at DESC)
+- index `idx_payroll_settlement_lines` on `payroll_settlement_lines` (settlement_id)
+
+#### `hr/000081_alter_recruitment_parity.up.sql`
+- UNIQUE index `uq_recruitment_offers_open` on `recruitment_offers` (candidate_id) WHERE status IN ('offered', 'pending_approval')
+- ALTER `recruitment_jobs` ADD COLUMN reserved_count INT NOT NULL DEFAULT 0 CHECK (reserved_count >= 0)
+- ALTER `recruitment_candidates` ADD COLUMN seat_reserved BOOLEAN NOT NULL DEFAULT FALSE
+- ALTER `recruitment_offers` DROP CONSTRAINT IF EXISTS recruitment_offers_status_check
+- ALTER `recruitment_offers` ADD CONSTRAINT recruitment_offers_status_check CHECK (status IN ('pending_approval', 'offered', 'accepted', 'declined', 'withdrawn'))
+
+#### `hr/000082_create_recruitment_requisitions.up.sql`
+- **table `recruitment_requisitions`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `position_id` UUID — NOT NULL REFERENCES core_positions(id)
+  - `title` VARCHAR(150) — NOT NULL
+  - `department_id` UUID — NOT NULL
+  - `headcount` INT — NOT NULL CHECK (headcount BETWEEN 1 AND 100)
+  - `justification` VARCHAR(1000) — NOT NULL
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled'))
+  - `requested_by_user_id` UUID — NOT NULL
+  - `decided_by_user_id` UUID
+  - `decision_comment` VARCHAR(500)
+  - `decided_at` TIMESTAMPTZ
+  - `job_id` UUID — REFERENCES recruitment_jobs(id)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_recruitment_requisitions_tenant` on `recruitment_requisitions` (tenant_id, status, created_at DESC)
+- index `idx_recruitment_requisitions_position` on `recruitment_requisitions` (tenant_id, position_id)
+
+#### `hr/000083_create_recruitment_scorecards.up.sql`
+- **table `recruitment_scorecards`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `name` VARCHAR(150) — NOT NULL
+  - `competencies` JSONB — NOT NULL
+  - `status` VARCHAR(20) — NOT NULL CHECK (status IN ('active', 'archived'))
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `recruitment_job_scorecards`**
+  - `tenant_id` UUID — NOT NULL
+  - `job_id` UUID — PRIMARY KEY REFERENCES recruitment_jobs(id) ON DELETE CASCADE
+  - `scorecard_id` UUID — NOT NULL REFERENCES recruitment_scorecards(id)
+- **table `recruitment_interview_scores`**
+  - `tenant_id` UUID — NOT NULL
+  - `interview_id` UUID — NOT NULL REFERENCES recruitment_interviews(id) ON DELETE CASCADE
+  - `competency` VARCHAR(100) — NOT NULL
+  - `score` INT — NOT NULL CHECK (score BETWEEN 1 AND 5)
+  - `note` VARCHAR(500)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (interview_id, competency)
+- index `idx_recruitment_scorecards_tenant` on `recruitment_scorecards` (tenant_id, status)
+
+#### `hr/000084_create_recruitment_offer_approvals.up.sql`
+- **table `recruitment_offer_policies`**
+  - `tenant_id` UUID — PRIMARY KEY
+  - `required_approvals` INT — NOT NULL CHECK (required_approvals BETWEEN 0 AND 3)
+  - `threshold_ctc` NUMERIC(14,2) — NOT NULL DEFAULT 0 CHECK (threshold_ctc >= 0)
+  - `updated_by_user_id` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `recruitment_offer_approvals`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `offer_id` UUID — NOT NULL REFERENCES recruitment_offers(id) ON DELETE CASCADE
+  - `approver_user_id` UUID — NOT NULL
+  - `decision` VARCHAR(10) — NOT NULL CHECK (decision IN ('approved', 'rejected'))
+  - `comment` VARCHAR(500)
+  - `decided_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ UNIQUE (offer_id, approver_user_id)
+
+#### `hr/000085_create_lrn_courses.up.sql`
+- **table `lrn_settings`**
+  - `tenant_id` UUID — PRIMARY KEY
+  - `time_zone` VARCHAR(64) — NOT NULL
+  - `updated_by_user_id` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `lrn_courses`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `title` VARCHAR(150) — NOT NULL
+  - `description` VARCHAR(2000)
+  - `provider` VARCHAR(100)
+  - `content_kind` VARCHAR(10) — NOT NULL CHECK (content_kind IN ('link', 'document'))
+  - `content_url` VARCHAR(500)
+  - `document_ref` VARCHAR(200)
+  - `thumbnail_ref` VARCHAR(500)
+  - `duration_mins` INT — NOT NULL DEFAULT 0 CHECK (duration_mins BETWEEN 0 AND 10000)
+  - `tags` JSONB — NOT NULL DEFAULT '[]'
+  - `verification` VARCHAR(10) — NOT NULL DEFAULT 'self' CHECK (verification IN ('self', 'manager', 'hr'))
+  - `self_enrol` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `status` VARCHAR(10) — NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'retired'))
+  - `version` INT — NOT NULL DEFAULT 1
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT lrn_courses_content CHECK (
+  - _constraint:_ (content_kind = 'link' AND content_url IS NOT NULL AND document_ref IS NULL) OR
+  - _constraint:_ (content_kind = 'document' AND document_ref IS NOT NULL AND content_url IS NULL))
+- **table `lrn_course_versions`**
+  - `tenant_id` UUID — NOT NULL
+  - `course_id` UUID — NOT NULL REFERENCES lrn_courses(id) ON DELETE CASCADE
+  - `version` INT — NOT NULL
+  - `snapshot` JSONB — NOT NULL
+  - `changed_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (course_id, version)
+- index `idx_lrn_courses_tenant` on `lrn_courses` (tenant_id, status)
+
+#### `hr/000086_create_lrn_plans.up.sql`
+- **table `lrn_plans`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `name` VARCHAR(150) — NOT NULL
+  - `description` VARCHAR(1000)
+  - `status` VARCHAR(10) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived'))
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `lrn_plan_items`**
+  - `tenant_id` UUID — NOT NULL
+  - `plan_id` UUID — NOT NULL REFERENCES lrn_plans(id) ON DELETE CASCADE
+  - `course_id` UUID — NOT NULL REFERENCES lrn_courses(id)
+  - `position` INT — NOT NULL
+  - `mandatory` BOOLEAN — NOT NULL DEFAULT TRUE
+  - _constraint:_ PRIMARY KEY (plan_id, course_id)
+  - _constraint:_ UNIQUE (plan_id, position)
+- UNIQUE index `uq_lrn_plans_name` on `lrn_plans` (tenant_id, lower(name))
+
+#### `hr/000087_create_lrn_enrolments.up.sql`
+- **table `lrn_assignments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `target_kind` VARCHAR(12) — NOT NULL CHECK (target_kind IN ('employee', 'department', 'job_profile', 'location', 'all'))
+  - `target_id` UUID
+  - `course_id` UUID — REFERENCES lrn_courses(id)
+  - `plan_id` UUID — REFERENCES lrn_plans(id)
+  - `mandatory` BOOLEAN — NOT NULL DEFAULT TRUE
+  - `due_date` DATE
+  - `due_in_days` INT — CHECK (due_in_days BETWEEN 1 AND 1000)
+  - `recurrence_days` INT — CHECK (recurrence_days BETWEEN 30 AND 3650)
+  - `status` VARCHAR(10) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled'))
+  - `cycle` INT — NOT NULL DEFAULT 0
+  - `next_cycle_on` DATE
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT lrn_assignments_one_content CHECK ((course_id IS NULL) <> (plan_id IS NULL))
+  - _constraint:_ CONSTRAINT lrn_assignments_target CHECK ((target_kind = 'all') = (target_id IS NULL))
+  - _constraint:_ CONSTRAINT lrn_assignments_due CHECK (due_date IS NULL OR due_in_days IS NULL)
+  - _constraint:_ CONSTRAINT lrn_assignments_recurrence CHECK (recurrence_days IS NULL OR (due_date IS NULL AND next_cycle_on IS NOT NULL))
+- **table `lrn_enrolments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL
+  - `course_id` UUID — NOT NULL REFERENCES lrn_courses(id)
+  - `plan_id` UUID — REFERENCES lrn_plans(id)
+  - `assignment_id` UUID — REFERENCES lrn_assignments(id)
+  - `source` VARCHAR(10) — NOT NULL CHECK (source IN ('assigned', 'self'))
+  - `mandatory` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `cycle` INT — NOT NULL DEFAULT 0
+  - `status` VARCHAR(12) — NOT NULL DEFAULT 'not_started' CHECK (status IN ('not_started', 'in_progress', 'completed', 'waived'))
+  - `due_date` DATE
+  - `department_id` UUID
+  - `dedupe_key` VARCHAR(120) — NOT NULL
+  - `started_at` TIMESTAMPTZ
+  - `completed_at` TIMESTAMPTZ
+  - `waive_reason` VARCHAR(500)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT uq_lrn_enrolments_dedupe UNIQUE (tenant_id, employee_profile_id, dedupe_key)
+- **table `lrn_completions`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `enrolment_id` UUID — NOT NULL REFERENCES lrn_enrolments(id)
+  - `attestation` VARCHAR(10) — NOT NULL CHECK (attestation IN ('self', 'manager', 'hr'))
+  - `status` VARCHAR(12) — NOT NULL CHECK (status IN ('pending', 'verified', 'rejected', 'superseded'))
+  - `score` INT — CHECK (score BETWEEN 0 AND 100)
+  - `evidence_ref` VARCHAR(300)
+  - `certificate_ref` VARCHAR(300)
+  - `completed_on` DATE — NOT NULL
+  - `submitted_by_user_id` UUID — NOT NULL
+  - `decided_by_user_id` UUID
+  - `decision_comment` VARCHAR(500)
+  - `supersedes_id` UUID — REFERENCES lrn_completions(id)
+  - `correction_reason` VARCHAR(500)
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `decided_at` TIMESTAMPTZ
+- index `idx_lrn_assignments_tenant` on `lrn_assignments` (tenant_id, status)
+- UNIQUE index `uq_lrn_enrolments_live_self` on `lrn_enrolments` (tenant_id, employee_profile_id, course_id) WHERE source = 'self' AND status IN ('not_started', 'in_progress')
+- index `idx_lrn_enrolments_employee` on `lrn_enrolments` (tenant_id, employee_profile_id, status)
+- index `idx_lrn_enrolments_course` on `lrn_enrolments` (tenant_id, course_id, status)
+- UNIQUE index `uq_lrn_completions_live` on `lrn_completions` (enrolment_id) WHERE status IN ('pending', 'verified')
+- index `idx_lrn_completions_pending` on `lrn_completions` (tenant_id) WHERE status = 'pending'
+
+#### `hr/000088_create_lrn_events_outbox.up.sql`
+- **table `lrn_events_outbox`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `event_id` UUID — NOT NULL UNIQUE
+  - `routing_key` VARCHAR(100) — NOT NULL
+  - `payload` JSONB — NOT NULL
+  - `published` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `published_at` TIMESTAMPTZ
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `last_error` TEXT
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_lrn_outbox_published` on `lrn_events_outbox` (published) WHERE published = FALSE
+
+#### `hr/000089_create_ben_plans.up.sql`
+- **table `ben_plans`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `code` VARCHAR(30) — NOT NULL
+  - `name` VARCHAR(150) — NOT NULL
+  - `category` VARCHAR(12) — NOT NULL CHECK (category IN ('health', 'life', 'accident', 'retirement', 'wellness', 'other'))
+  - `provider` VARCHAR(100)
+  - `plan_year` INT — NOT NULL CHECK (plan_year BETWEEN 2000 AND 2100)
+  - `eligibility` JSONB — NOT NULL DEFAULT '{}'
+  - `status` VARCHAR(10) — NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'retired'))
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `ben_plan_versions`**
+  - `tenant_id` UUID — NOT NULL
+  - `plan_id` UUID — NOT NULL REFERENCES ben_plans(id) ON DELETE CASCADE
+  - `version` INT — NOT NULL
+  - `effective_from` DATE — NOT NULL
+  - `effective_to` DATE
+  - `levels` JSONB — NOT NULL
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (plan_id, version)
+  - _constraint:_ UNIQUE (plan_id, effective_from)
+  - _constraint:_ CHECK (effective_to IS NULL OR effective_to > effective_from)
+- UNIQUE index `uq_ben_plans_code` on `ben_plans` (tenant_id, lower(code))
+- index `idx_ben_plans_tenant` on `ben_plans` (tenant_id, status)
+
+#### `hr/000090_create_ben_windows.up.sql`
+- **table `ben_windows`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `name` VARCHAR(100) — NOT NULL
+  - `starts_on` DATE — NOT NULL
+  - `ends_on` DATE — NOT NULL
+  - `status` VARCHAR(10) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled'))
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CHECK (ends_on >= starts_on)
+- **table `ben_settings`**
+  - `tenant_id` UUID — PRIMARY KEY
+  - `new_hire_days` INT — NOT NULL CHECK (new_hire_days BETWEEN 0 AND 365)
+  - `life_event_days` INT — NOT NULL CHECK (life_event_days BETWEEN 0 AND 365)
+  - `updated_by_user_id` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_ben_windows_tenant` on `ben_windows` (tenant_id, starts_on)
+
+#### `hr/000091_create_ben_dependants.up.sql`
+- **table `ben_dependants`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL
+  - `name` VARCHAR(100) — NOT NULL
+  - `relationship` VARCHAR(10) — NOT NULL CHECK (relationship IN ('spouse', 'child', 'parent', 'other'))
+  - `date_of_birth` DATE — NOT NULL
+  - `status` VARCHAR(10) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'removed'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `ben_life_events`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL
+  - `event_type` VARCHAR(10) — NOT NULL CHECK (event_type IN ('marriage', 'birth', 'adoption', 'divorce', 'death', 'other'))
+  - `event_date` DATE — NOT NULL
+  - `evidence_ref` VARCHAR(300)
+  - `recorded_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_ben_dependants_employee` on `ben_dependants` (tenant_id, employee_profile_id, status)
+- index `idx_ben_life_events_employee` on `ben_life_events` (tenant_id, employee_profile_id, event_date DESC)
+
+#### `hr/000092_create_ben_elections.up.sql`
+- **table `ben_elections`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `employee_profile_id` UUID — NOT NULL
+  - `plan_id` UUID — NOT NULL REFERENCES ben_plans(id)
+  - `level_code` VARCHAR(30)
+  - `dependant_ids` JSONB — NOT NULL DEFAULT '[]'
+  - `status` VARCHAR(10) — NOT NULL CHECK (status IN ('active', 'waived', 'ended'))
+  - `effective_from` DATE — NOT NULL
+  - `effective_to` DATE
+  - `end_reason` VARCHAR(12) — CHECK (end_reason IN ('changed', 'ended', 'waived', 'replaced', 'termination'))
+  - `end_action_id` UUID
+  - `created_by_user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT ben_elections_level CHECK (status <> 'active' OR level_code IS NOT NULL)
+  - _constraint:_ CHECK (effective_to IS NULL OR effective_to >= effective_from)
+- UNIQUE index `uq_ben_elections_live` on `ben_elections` (tenant_id, employee_profile_id, plan_id) WHERE effective_to IS NULL
+- index `idx_ben_elections_employee` on `ben_elections` (tenant_id, employee_profile_id)
+- index `idx_ben_elections_plan` on `ben_elections` (tenant_id, plan_id, status)
+
+#### `hr/000093_create_ben_events_outbox.up.sql`
+- **table `ben_events_outbox`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `event_id` UUID — NOT NULL UNIQUE
+  - `routing_key` VARCHAR(100) — NOT NULL
+  - `payload` JSONB — NOT NULL
+  - `published` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `published_at` TIMESTAMPTZ
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `last_error` TEXT
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_ben_outbox_published` on `ben_events_outbox` (published) WHERE published = FALSE
+
 ## C. Code inventory — every file, type and function
 
 
@@ -3263,19 +4062,21 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 ### M1 HR / Organization
 
 
-#### `internal/hr/organization/access_facts.go` (37 lines)
+#### `internal/hr/organization/access_facts.go` (46 lines)
 - **func** `(m *Module) ManagerUserIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)` — ManagerUserIDs lists the users of the tenant who currently have at least one active direct report (automatic Manager role, docs/ARCHITECTURE.md §17).
 - **func** `(m *Module) HasDirectReports(ctx context.Context, tenantID, userID uuid.UUID) (bool, error)` — HasDirectReports reports whether the user manages at least one active mapping in the tenant.
 - **func** `(m *Module) DirectManager(ctx context.Context, tenantID, userID uuid.UUID) (*uuid.UUID, error)` — DirectManager returns the manager_user_id of the user's primary active mapping, or nil (HR/Performance D7-03).
+- **func** `(m *Module) DirectReportUserIDs(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)` — DirectReportUserIDs lists the users whose primary active mapping reports to the manager (attendance AP-01).
 
 #### `internal/hr/organization/catalogue.go` (16 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Organization's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/organization/core_port.go` (82 lines)
+#### `internal/hr/organization/core_port.go` (93 lines)
 - **func** `(m *Module) DepartmentState(ctx context.Context, tenantID, id uuid.UUID) (exists, active bool, err error)` — DepartmentState reports whether the department exists in the tenant and whether it is active.
 - **func** `(m *Module) LocationState(ctx context.Context, tenantID, id uuid.UUID) (exists, active bool, err error)` — LocationState reports whether the location exists in the tenant and whether it is active (FR-L).
 - **func** `(m *Module) PrimaryPlacement(ctx context.Context, tenantID, userID uuid.UUID) (dept, location, managerUser *uuid.UUID, err error)` — PrimaryPlacement returns the department, location and manager user of the user's active primary mapping (all nil when there is none). HR/Core back-fill reads it (CO-042).
 - **func** `(m *Module) ProjectPrimaryMapping(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, dept, location, managerUser *uuid.UUID) error` — ProjectPrimaryMapping makes the user's active primary mapping reflect HR/Core's assignment (core CO-040): it updates department, location and manager of the existing primary mapping (dropping a team that belongs to another department) or creates one. Without a department and without a mapping there is nothing to project. It runs in the caller's transaction and drops the cached org chart.
+- **func** `(m *Module) LocationStateCode(ctx context.Context, tenantID, id uuid.UUID) (string, error)` — LocationStateCode returns the state code of the location, upper-cased ("" when it does not exist); payroll uses it for state professional tax.
 
 #### `internal/hr/organization/module.go` (156 lines)
 - **type** `Module struct` — Module encapsulates the Module 1 Organization domain.
@@ -3687,10 +4488,15 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(m *Module) EmployedUserIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)` — EmployedUserIDs lists the users of the tenant with a current employee record.
 - **func** `(m *Module) IsEmployed(ctx context.Context, tenantID, userID uuid.UUID) (bool, error)` — IsEmployed reports whether the user has a current employee record in the tenant.
 
-#### `internal/hr/employee/catalogue.go` (24 lines)
+#### `internal/hr/employee/catalogue.go` (26 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Employee's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/employee/module.go` (133 lines)
+#### `internal/hr/employee/documents_port.go` (30 lines)
+- **type** `documentsPort struct{}` — documentsPort implements employee/api.Documents.
+- **func** `(documentsPort) VerifiedDocument(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, documentType string) (*uuid.UUID, error)`
+- **func** `(m *Module) Documents() api.Documents { return documentsPort{} }` — Documents is the document-verification port other HR contexts use (employee/api).
+
+#### `internal/hr/employee/module.go` (146 lines)
 - **type** `Module struct` — Module encapsulates the Module 2 Employee domain.
 - **func** `NewModule(`
 - **func** `(m *Module) RegisterModels() []interface{}`
@@ -3703,7 +4509,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(c userDeactivationConverger) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, _ uuid.UUID) error`
 - **func** `(m *Module) UserDeactivationConverger() identityport.DeactivationHook` — UserDeactivationConverger returns the hook that keeps employee profiles in step with Module 0 user deactivation.
 
-#### `internal/hr/employee/api/api.go` (36 lines)
+#### `internal/hr/employee/api/api.go` (42 lines)
 _Package:_ Package api is what HR/Employee publishes to the other HR contexts: the employee directory. Other contexts depend on this package and on employee/dto only, never on employee services, repositories or models (import-boundary test in internal/hr).
 - **type** `Directory interface` — Directory reads and creates employee records.
 - **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dto.EmployeeResponse, error)`
@@ -3713,6 +4519,8 @@ _Package:_ Package api is what HR/Employee publishes to the other HR contexts: t
 - **type** `StatusChange struct` — StatusChange is a worker status set by HR/Core when an HR action takes effect (core DC-07).
 - **type** `Lifecycle interface` — Lifecycle lets HR/Core project worker status changes. Unlike the manual status matrix it may leave a final status (rehire, rescinded termination). It runs inside the caller's transaction.
 - **method** `Lifecycle.ApplyCoreStatus(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, change StatusChange) (previous string, err error)`
+- **type** `Documents interface` — Documents reads employee document verification for other contexts (onboarding OB-05).
+- **method** `Documents.VerifiedDocument(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, documentType string) (*uuid.UUID, error)` — VerifiedDocument returns the id of a verified document of the type, or nil.
 
 #### `internal/hr/employee/controllers/document_controller.go` (99 lines)
 - **type** `DocumentController struct`
@@ -3808,6 +4616,130 @@ _Package:_ Package api is what HR/Employee publishes to the other HR contexts: t
 #### `internal/hr/employee/models/timeline.go` (22 lines)
 - **type** `EmployeeTimeline struct` — EmployeeTimeline records chronological career, status, and org transitions.
 - **func** `(EmployeeTimeline) TableName() string`
+
+#### `internal/hr/employee/records/http.go` (246 lines)
+- **type** `Handler struct{ svc *Service }` — Handler is the HTTP edge of FR-ER and FR-CR.
+- **func** `NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }` — NewHandler builds the handler.
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `param(c *gin.Context, name string) (*uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `ids(c *gin.Context) (Actor, *uuid.UUID, *uuid.UUID, bool)` — ids reads the actor, the optional :id (employee) and the optional :rid (record).
+- **func** `recordRoutes[In any, Out any](g gin.IRoutes, path string, readGuard, writeGuard []gin.HandlerFunc,` — recordRoutes mounts list / create / replace / delete for one record kind under g.
+- **func** `(h *Handler) Register(me, byID, approvals *gin.RouterGroup, idp identityport.HTTP)` — Register mounts the 31 operations: self-service under /employees/me, HR under /employees/:id (employee:read for reads, employee:update for writes) and the approval queue under /employee-change-requests (employee:approve_changes). The groups must already resolve the tenant and authenticate.
+- **func** `list(c *gin.Context, rows []ChangeRequest, page, perPage int, total int64, err error)`
+
+#### `internal/hr/employee/records/models.go` (189 lines)
+_Package:_ Package records is HR/Employee's structured worker records (emergency contacts, education, prior employment) and approval-gated personal-data change requests (specification.md FR-ER, FR-CR; migrations hr/000054–000057).
+- **type** `EmergencyContact struct` — EmergencyContact is FR-ER001.
+- **func** `(EmergencyContact) TableName() string { return "employee_emergency_contacts" }` — TableName maps to employee_emergency_contacts.
+- **func** `(r *EmergencyContact) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Education struct` — Education is FR-ER002.
+- **func** `(Education) TableName() string { return "employee_education" }` — TableName maps to employee_education.
+- **func** `(r *Education) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `PriorEmployment struct` — PriorEmployment is FR-ER003.
+- **func** `(PriorEmployment) TableName() string { return "employee_prior_employment" }` — TableName maps to employee_prior_employment.
+- **func** `(r *PriorEmployment) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Payload struct` — Payload is the requested change (fields per type, FR-CR001).
+- **func** `(p Payload) Value() (driver.Value, error)` — Value encodes the payload as JSON.
+- **func** `(p *Payload) Scan(src interface{}) error` — Scan decodes the payload from JSON.
+- **type** `ChangeRequest struct` — ChangeRequest is FR-CR001..FR-CR005.
+- **func** `(ChangeRequest) TableName() string { return "employee_change_requests" }` — TableName maps to employee_change_requests.
+- **func** `(r *ChangeRequest) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d *Date) UnmarshalJSON(b []byte) error` — UnmarshalJSON parses YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+- **func** `assignID(id *uuid.UUID) error`
+
+#### `internal/hr/employee/records/service.go` (688 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Actor struct` — Actor is the authenticated caller; Sensitive is employee:read_sensitive (unmasks bank numbers, FR-CR005).
+- **type** `Service struct` — Service implements FR-ER and FR-CR.
+- **func** `NewService(store Store, audit identityport.Auditor, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) owner(ctx context.Context, a Actor, employeeID *uuid.UUID) (*Worker, error)` — owner resolves the worker: the caller (employeeID nil) or an employee of the tenant.
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, id string, meta map[string]string)`
+- **func** `text(field, v string, max int) (string, error)`
+- **func** `optional(field string, v *string, max int) (*string, error)`
+- **type** `ContactInput struct` — ContactInput is a contact body.
+- **func** `(in ContactInput) apply(c *EmergencyContact) error`
+- **func** `(s *Service) Contacts(ctx context.Context, a Actor, employeeID *uuid.UUID) ([]EmergencyContact, error)` — Contacts lists the worker's emergency contacts (primary first).
+- **func** `(s *Service) SaveContact(ctx context.Context, a Actor, employeeID, id *uuid.UUID, in ContactInput) (*EmergencyContact, error)` — SaveContact creates (id nil) or replaces a contact; the first or an explicit primary becomes the only primary.
+- **func** `(s *Service) DeleteContact(ctx context.Context, a Actor, employeeID *uuid.UUID, id uuid.UUID) error` — DeleteContact removes a contact; when it was primary, the oldest remaining one becomes primary.
+- **func** `pick[T any](rows []T, id *uuid.UUID, idOf func(T) uuid.UUID) (*T, error)` — pick returns the row with id (nil id → nil row) or NOT_FOUND.
+- **type** `EducationInput struct` — EducationInput is an education body.
+- **func** `(s *Service) applyEducation(in EducationInput, e *Education) error`
+- **func** `(s *Service) Educations(ctx context.Context, a Actor, employeeID *uuid.UUID) ([]Education, error)` — Educations lists education history.
+- **func** `(s *Service) SaveEducation(ctx context.Context, a Actor, employeeID, id *uuid.UUID, in EducationInput) (*Education, error)` — SaveEducation creates (id nil) or replaces an education record.
+- **func** `(s *Service) DeleteEducation(ctx context.Context, a Actor, employeeID *uuid.UUID, id uuid.UUID) error` — DeleteEducation removes an education record.
+- **func** `(s *Service) deleteOne(ctx context.Context, a Actor, employeeID *uuid.UUID, id uuid.UUID, action string, find func(*gorm.DB, *Worker) (interface{}, error)) error`
+- **type** `PriorInput struct` — PriorInput is a prior-employment body.
+- **func** `(s *Service) applyPrior(in PriorInput, p *PriorEmployment) error`
+- **func** `(s *Service) Priors(ctx context.Context, a Actor, employeeID *uuid.UUID) ([]PriorEmployment, error)` — Priors lists prior employment, latest first.
+- **func** `(s *Service) SavePrior(ctx context.Context, a Actor, employeeID, id *uuid.UUID, in PriorInput) (*PriorEmployment, error)` — SavePrior creates (id nil) or replaces a prior employment; periods never overlap (FR-ER003).
+- **func** `(s *Service) DeletePrior(ctx context.Context, a Actor, employeeID *uuid.UUID, id uuid.UUID) error` — DeletePrior removes a prior employment.
+- **type** `ChangeInput struct` — ChangeInput is a change-request body.
+- **func** `validate(typ string, p Payload) (Payload, error)` — validate is FR-CR001: required fields per type; other fields are dropped.
+- **func** `(s *Service) Submit(ctx context.Context, a Actor, in ChangeInput) (*ChangeRequest, error)` — Submit is FR-CR002: the caller asks to change their own data.
+- **func** `eventOf(r *ChangeRequest) map[string]string`
+- **func** `(s *Service) masked(r *ChangeRequest, a Actor) *ChangeRequest` — masked hides the bank account number unless the caller may read sensitive data (FR-CR005).
+- **func** `(s *Service) Mine(ctx context.Context, a Actor, status string, page, perPage int) ([]ChangeRequest, int64, error)` — Mine lists the caller's requests.
+- **func** `(s *Service) List(ctx context.Context, a Actor, f RequestFilter, page, perPage int) ([]ChangeRequest, int64, error)` — List is FR-CR003 for approvers.
+- **func** `(s *Service) list(ctx context.Context, a Actor, f RequestFilter, page, perPage int) ([]ChangeRequest, int64, error)`
+- **func** `(s *Service) Get(ctx context.Context, a Actor, id uuid.UUID) (*ChangeRequest, error)` — Get returns one request (approvers).
+- **func** `(s *Service) Cancel(ctx context.Context, a Actor, id uuid.UUID) (*ChangeRequest, error)` — Cancel withdraws the caller's own submitted request.
+- **func** `(s *Service) Approve(ctx context.Context, a Actor, id uuid.UUID, comment *string) (*ChangeRequest, error)` — Approve is FR-CR003/FR-CR004: applies the change in the same transaction.
+- **func** `(s *Service) Reject(ctx context.Context, a Actor, id uuid.UUID, comment *string) (*ChangeRequest, error)` — Reject is FR-CR003.
+- **func** `(s *Service) notSelf(ctx context.Context, a Actor) func(*ChangeRequest) error` — notSelf refuses decisions on the approver's own requests (EMPLOYEE_SELF_APPROVAL).
+- **func** `(s *Service) decide(ctx context.Context, a Actor, id uuid.UUID, to string, comment *string, check func(*ChangeRequest) error) (*ChangeRequest, error)`
+
+#### `internal/hr/employee/records/store.go` (196 lines)
+- **type** `Worker struct` — Worker is the slice of an employee profile records need.
+- **type** `RequestFilter struct` — RequestFilter narrows change-request lists.
+- **type** `Store interface` — Store is the records data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.WorkerByUser(ctx context.Context, tenantID, userID uuid.UUID) (*Worker, error)`
+- **method** `Store.Worker(ctx context.Context, tenantID, id uuid.UUID) (*Worker, error)`
+- **method** `Store.Contacts(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]EmergencyContact, error)`
+- **method** `Store.Educations(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]Education, error)`
+- **method** `Store.Priors(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]PriorEmployment, error)`
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Delete(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.ClearPrimary(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID) error` — ClearPrimary unsets the worker's primary emergency contact (FR-ER001).
+- **method** `Store.Request(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*ChangeRequest, error)`
+- **method** `Store.LockRequest(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (*ChangeRequest, error)`
+- **method** `Store.OpenRequest(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, typ string) (bool, error)`
+- **method** `Store.Requests(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f RequestFilter, page, perPage int) ([]ChangeRequest, int64, error)`
+- **method** `Store.Apply(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, typ string, p Payload) error` — Apply writes an approved change to the profile, contact or statutory record and the timeline (FR-CR004).
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event (ids and type only, FR-CR005).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) worker(ctx context.Context, where string, args ...interface{}) (*Worker, error)`
+- **func** `(s gormStore) WorkerByUser(ctx context.Context, tenantID, userID uuid.UUID) (*Worker, error)`
+- **func** `(s gormStore) Worker(ctx context.Context, tenantID, id uuid.UUID) (*Worker, error)`
+- **func** `ofWorker[T any](ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, order string) ([]T, error)`
+- **func** `(s gormStore) Contacts(ctx context.Context, db *gorm.DB, t, e uuid.UUID) ([]EmergencyContact, error)`
+- **func** `(s gormStore) Educations(ctx context.Context, db *gorm.DB, t, e uuid.UUID) ([]Education, error)`
+- **func** `(s gormStore) Priors(ctx context.Context, db *gorm.DB, t, e uuid.UUID) ([]PriorEmployment, error)`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Delete(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) ClearPrimary(ctx context.Context, tx *gorm.DB, t, e uuid.UUID) error`
+- **func** `firstRequest(q *gorm.DB) (*ChangeRequest, error)`
+- **func** `(s gormStore) Request(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*ChangeRequest, error)`
+- **func** `(s gormStore) LockRequest(ctx context.Context, tx *gorm.DB, t, id uuid.UUID) (*ChangeRequest, error)`
+- **func** `(s gormStore) OpenRequest(ctx context.Context, tx *gorm.DB, t, e uuid.UUID, typ string) (bool, error)`
+- **func** `(s gormStore) Requests(ctx context.Context, db *gorm.DB, t uuid.UUID, f RequestFilter, page, perPage int) ([]ChangeRequest, int64, error)`
+- **func** `(s gormStore) Apply(ctx context.Context, tx *gorm.DB, t, e uuid.UUID, typ string, p Payload) error`
+- **func** `upsert(db *gorm.DB, table string, t, e uuid.UUID, up map[string]interface{}) error` — upsert updates the worker's row of a 1:1 table or creates it.
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
 
 #### `internal/hr/employee/repositories/document_repository.go` (60 lines)
 - **type** `employeeDocumentRepository struct`
@@ -3951,7 +4883,7 @@ _Package:_ Package api is what HR/Employee publishes to the other HR contexts: t
 #### `internal/hr/attendance/catalogue.go` (19 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Attendance's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/attendance/module.go` (116 lines)
+#### `internal/hr/attendance/module.go` (142 lines)
 _Package:_ Package attendance wires Module 3 (Attendance, Shifts & Time Tracking) into the application.
 - **type** `Module struct` — Module is the Module 3 DI container.
 - **func** `NewModule(db *gorm.DB, publisher queue.EventPublisher, employees employeeAPI.Directory, audit identityport.Auditor) *Module` — NewModule wires repositories, services and controllers over Module 0 audit and Module 2 employees.
@@ -3964,6 +4896,16 @@ _Package:_ Package attendance wires Module 3 (Attendance, Shifts & Time Tracking
 - **func** `(d employeeDirectory) GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **func** `(d employeeDirectory) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
 - **func** `(d employeeDirectory) CountWorking(ctx context.Context, tenantID uuid.UUID) (int64, error)` — CountWorking sums Module 2 list totals for the statuses allowed to work (AT-002, AT-020).
+- **func** `(m *Module) TimeWriter() services.TimeWriter { return m.writer }` — TimeWriter is the write port the parity package (attendance/ops) uses.
+- **func** `(m *Module) Regularizations() services.RegularizationService { return m.regs }` — Regularizations is the regularization service the manager inbox decides through (AP-02).
+- **func** `(m *Module) Presence() api.Presence { return presence{records: m.records} }` — Presence is the worked-time port other HR contexts use (attendance/api).
+- **type** `presence struct{ records repositories.RecordRepository }`
+- **func** `(p presence) WorkedMinutes(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (int, error)`
+
+#### `internal/hr/attendance/api/api.go` (17 lines)
+_Package:_ Package api is what HR/Attendance publishes to the other HR contexts. Other contexts depend on this package only (import-boundary test in internal/hr).
+- **type** `Presence interface` — Presence reads worked time (leave comp-off LP-08).
+- **method** `Presence.WorkedMinutes(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (int, error)` — WorkedMinutes returns the work minutes recorded for the worker on the date (0 when no record).
 
 #### `internal/hr/attendance/calc/time.go` (118 lines)
 _Package:_ Package calc holds Module 3's pure time math (spec AT-005..AT-010). No I/O, no dependencies.
@@ -4076,13 +5018,154 @@ _Package:_ Package events defines Module 3 produced events (FR-EV001). Payloads 
 - **func** `(OutboxEvent) TableName() string { return "attendance_events_outbox" }` — TableName maps to attendance_events_outbox (migration 000031).
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
 
-#### `internal/hr/attendance/models/constants.go` (40 lines)
+#### `internal/hr/attendance/models/constants.go` (42 lines)
 _Package:_ Package models holds Module 3 attendance persistence models (specification.md §8).
 
 #### `internal/hr/attendance/models/shift.go` (48 lines)
 - **type** `Shift struct` — Shift is a tenant work-time template; times are minutes from midnight in Timezone (D3-03). FR-SH001. Integer fields carry no GORM default so an explicit 0 (e.g. zero grace) is stored as 0.
 - **type** `ShiftAssignment struct` — ShiftAssignment binds an employee to a shift for an inclusive date range (AT-011). FR-SA001.
 - **func** `(a *ShiftAssignment) BeforeCreate(tx *gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
+
+#### `internal/hr/attendance/ops/http.go` (226 lines)
+- **type** `Module struct{ svc *Service }` — Module is the parity container.
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires the store and service.
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `(m *Module) Service() *Service { return m.svc }` — Service exposes the service (background sweep).
+- **func** `(m *Module) RunAutoAbsent(ctx context.Context, onError func(error))` — RunAutoAbsent runs the daily auto-absent sweep until ctx is cancelled (AP-08).
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `optionalBody(c *gin.Context, dst interface{}) bool`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 15 operations under rg (/attendance).
+
+#### `internal/hr/attendance/ops/imports.go` (167 lines)
+- **type** `ImportRow struct` — ImportRow is one worker-day to import (AP-10).
+- **type** `ImportInput struct` — ImportInput is the batch.
+- **type** `RowError struct` — RowError explains why a row cannot be imported.
+- **type** `ImportResult struct` — ImportResult is the outcome (AP-11): nothing is written unless Errors is empty and DryRun is false.
+- **type** `planned struct`
+- **func** `(s *Service) Import(ctx context.Context, a Actor, in ImportInput) (*ImportResult, error)` — Import is AP-10/AP-11: validate every row, then apply all of them in one transaction or none.
+- **func** `(s *Service) byCode(ctx context.Context, tenantID uuid.UUID, code string) (*employeeDTO.EmployeeResponse, error)` — byCode finds a worker by exact employee code (case-insensitive), or nil.
+- **func** `(s *Service) Imports(ctx context.Context, a Actor) ([]ImportLog, error)` — Imports lists recent applied imports.
+
+#### `internal/hr/attendance/ops/jobs.go` (188 lines)
+- **type** `AutoAbsentResult struct` — AutoAbsentResult is one run's counts (AP-08).
+- **func** `(s *Service) RunAutoAbsent(ctx context.Context, tenantID uuid.UUID, date time.Time, by *uuid.UUID) (*AutoAbsentResult, error)` — RunAutoAbsent is AP-07: every working worker without a record for the date gets a system record. Each worker commits on its own, so the run is idempotent and safe to repeat or resume.
+- **func** `(s *Service) dayStatus(ctx context.Context, p *Policy, tenantID, employeeID uuid.UUID, date time.Time) (string, error)` — dayStatus is the status a missing record gets: the worker's holiday (tenant or location) wins, then the weekly off (their location's pattern, else the attendance policy), else absent (AP-07).
+- **func** `workedOn(e employeeDTO.EmployeeResponse, date time.Time) bool` — workedOn reports whether the worker was employed on the date (joined by then, not yet exited).
+- **func** `(s *Service) AutoAbsent(ctx context.Context, a Actor, rawDate string) (*AutoAbsentResult, error)` — AutoAbsent is AP-08 for the caller's tenant.
+- **func** `(s *Service) Runs(ctx context.Context, a Actor) ([]JobRun, error)` — Runs lists recent job runs.
+- **func** `(s *Service) Sweep(ctx context.Context) (int, error)` — Sweep marks yesterday for every tenant with auto-absent enabled that has not been run for it (AP-08). It returns the number of tenants processed.
+- **func** `(s *Service) Run(ctx context.Context, interval time.Duration, onError func(error))` — Run ticks Sweep every interval until ctx is cancelled (also once at start).
+
+#### `internal/hr/attendance/ops/models.go` (188 lines)
+_Package:_ Package ops is the HR/Attendance parity package (docs/modules/m1-hr-management/contexts/attendance, AP-01..AP-12): manager inbox, tenant policy with overtime rules, rosters, the auto-absent job and bulk import. It writes attendance data only through attendance/services.TimeWriter.
+- **type** `Policy struct` — Policy is the tenant attendance policy (AP-03).
+- **func** `(Policy) TableName() string { return "attendance_policies" }` — TableName maps to attendance_policies.
+- **func** `defaults(tenantID uuid.UUID) *Policy` — defaults returns the policy a tenant has before it saves one.
+- **func** `(p *Policy) weekOff(d time.Time) bool { return p.WeekOffMask&(1<<uint(d.Weekday())) != 0 }`
+- **func** `(p *Policy) weekOffDays() []int` — weekOffDays lists the week-off weekday numbers, ascending.
+- **type** `Segment struct` — Segment is one run of a roster pattern (AP-05).
+- **type** `Pattern []Segment` — Pattern is a roster's segments, stored as JSON.
+- **func** `(p Pattern) Value() (driver.Value, error)` — Value encodes the pattern.
+- **func** `(p *Pattern) Scan(src interface{}) error` — Scan decodes the pattern.
+- **type** `Roster struct` — Roster is a repeating shift pattern (AP-05).
+- **func** `(Roster) TableName() string { return "attendance_rosters" }` — TableName maps to attendance_rosters.
+- **func** `(r *Roster) BeforeCreate(*gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `ImportLog struct` — ImportLog is one applied bulk import (AP-11).
+- **func** `(ImportLog) TableName() string { return "attendance_imports" }` — TableName maps to attendance_imports.
+- **func** `(r *ImportLog) BeforeCreate(*gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `JobRun struct` — JobRun is one auto-absent run (AP-08).
+- **func** `(JobRun) TableName() string { return "attendance_job_runs" }` — TableName maps to attendance_job_runs.
+- **func** `(r *JobRun) BeforeCreate(*gorm.DB) error` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+
+#### `internal/hr/attendance/ops/service.go` (572 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is ops' view of HR/Employee.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.List(ctx context.Context, tenantID uuid.UUID, filter employeeDTO.EmployeeFilter) ([]employeeDTO.EmployeeResponse, int64, error)`
+- **type** `Reports interface` — Reports resolves a manager's direct reports (HR/Organization mappings).
+- **method** `Reports.DirectReportUserIDs(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)`
+- **type** `Ports struct` — Ports are the collaborators ops consumes.
+- **type** `Actor struct` — Actor is the caller; CanApproveAll is attendance:approve at tenant scope.
+- **type** `Service struct` — Service implements the attendance parity requirements (AP-01..AP-12).
+- **func** `NewService(store Store, p Ports, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) today() time.Time { return day(s.now()) }`
+- **func** `day(t time.Time) time.Time`
+- **func** `parseDate(field, raw string) (time.Time, error)`
+- **func** `orNotFound(err error) error`
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, resource, id string, meta map[string]string)`
+- **func** `(s *Service) self(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — self resolves the caller's employee profile, or nil.
+- **type** `PolicyInput struct` — PolicyInput replaces the policy; every field is required except the switch, which defaults to off.
+- **type** `PolicyView struct` — PolicyView is the policy as the API shows it.
+- **func** `view(p *Policy) *PolicyView { return &PolicyView{Policy: *p, WeekOffDays: p.weekOffDays()} }`
+- **func** `(s *Service) GetPolicy(ctx context.Context, a Actor) (*PolicyView, error)` — GetPolicy returns the saved policy or the defaults.
+- **func** `(s *Service) policy(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (*Policy, error)`
+- **func** `(s *Service) SetPolicy(ctx context.Context, a Actor, in PolicyInput) (*PolicyView, error)` — SetPolicy is AP-03.
+- **type** `InboxItem struct` — InboxItem is one pending regularization for a manager.
+- **func** `(s *Service) reportIDs(ctx context.Context, a Actor) (map[uuid.UUID]bool, error)` — reportIDs resolves the caller's direct reports to employee profile ids.
+- **func** `(s *Service) Inbox(ctx context.Context, a Actor, all bool) ([]InboxItem, error)` — Inbox is AP-01: pending requests of the caller's reports, or every pending one for tenant-scope approvers.
+- **func** `(s *Service) Decide(ctx context.Context, a Actor, id uuid.UUID, approve bool, comment *string) (*attDTO.RegularizationResponse, error)` — Decide is AP-02: the report's manager (or a tenant-scope approver) approves or rejects through the AT-016 rules.
+- **type** `OvertimeDay struct` — OvertimeDay is one eligible day.
+- **type** `OvertimeLine struct` — OvertimeLine is one worker's month.
+- **type** `OvertimeReport struct` — OvertimeReport is the month report.
+- **func** `(s *Service) Overtime(ctx context.Context, a Actor, month string, employeeID *uuid.UUID) (*OvertimeReport, error)` — Overtime is AP-04: threshold, daily cap, monthly cap (earliest days first) and rate-weighted minutes, in integers.
+- **type** `RosterInput struct` — RosterInput creates or edits a roster.
+- **func** `(s *Service) fillRoster(ctx context.Context, tenantID uuid.UUID, r *Roster, in RosterInput) error`
+- **func** `(s *Service) CreateRoster(ctx context.Context, a Actor, in RosterInput) (*Roster, error)` — CreateRoster is AP-05.
+- **func** `(s *Service) UpdateRoster(ctx context.Context, a Actor, id uuid.UUID, in RosterInput) (*Roster, error)` — UpdateRoster edits a roster.
+- **func** `(s *Service) GetRoster(ctx context.Context, a Actor, id uuid.UUID) (*Roster, error)` — GetRoster returns one roster.
+- **func** `(s *Service) Rosters(ctx context.Context, a Actor, status string) ([]Roster, error)` — Rosters lists rosters.
+- **type** `ApplyInput struct` — ApplyInput lays a roster over workers.
+- **type** `ApplyResult struct` — ApplyResult counts what was created.
+- **func** `(s *Service) ApplyRoster(ctx context.Context, a Actor, id uuid.UUID, in ApplyInput) (*ApplyResult, error)` — ApplyRoster is AP-06: segments end to end as ordinary shift assignments, all or nothing.
+
+#### `internal/hr/attendance/ops/store.go` (147 lines)
+- **type** `OTRow struct` — OTRow is one worker-day with overtime-relevant minutes (AP-04).
+- **type** `Store interface` — Store is parity data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Policy(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (*Policy, error)`
+- **method** `Store.SavePolicy(ctx context.Context, tx *gorm.DB, p *Policy) error`
+- **method** `Store.AutoAbsentTenants(ctx context.Context, db *gorm.DB) ([]uuid.UUID, error)`
+- **method** `Store.Roster(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*Roster, error)`
+- **method** `Store.Rosters(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string) ([]Roster, error)`
+- **method** `Store.RosterNameTaken(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, name string, except *uuid.UUID) (bool, error)`
+- **method** `Store.Regularization(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*attModels.Regularization, error)`
+- **method** `Store.PendingRegularizations(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, employeeIDs []uuid.UUID, all bool, limit int) ([]attModels.Regularization, error)`
+- **method** `Store.OvertimeRows(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, from, to time.Time, employeeID *uuid.UUID) ([]OTRow, error)`
+- **method** `Store.Imports(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, limit int) ([]ImportLog, error)`
+- **method** `Store.JobRuns(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, limit int) ([]JobRun, error)`
+- **method** `Store.JobRan(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, kind string, date time.Time) (bool, error)`
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Policy(ctx context.Context, db *gorm.DB, t uuid.UUID) (*Policy, error)`
+- **func** `(s gormStore) SavePolicy(ctx context.Context, tx *gorm.DB, p *Policy) error`
+- **func** `(s gormStore) AutoAbsentTenants(ctx context.Context, db *gorm.DB) ([]uuid.UUID, error)`
+- **func** `(s gormStore) Roster(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*Roster, error)`
+- **func** `(s gormStore) Rosters(ctx context.Context, db *gorm.DB, t uuid.UUID, status string) ([]Roster, error)`
+- **func** `(s gormStore) RosterNameTaken(ctx context.Context, db *gorm.DB, t uuid.UUID, name string, except *uuid.UUID) (bool, error)`
+- **func** `(s gormStore) Regularization(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*attModels.Regularization, error)`
+- **func** `(s gormStore) PendingRegularizations(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID, all bool, limit int) ([]attModels.Regularization, error)`
+- **func** `(s gormStore) OvertimeRows(ctx context.Context, db *gorm.DB, t uuid.UUID, from, to time.Time, emp *uuid.UUID) ([]OTRow, error)`
+- **func** `(s gormStore) Imports(ctx context.Context, db *gorm.DB, t uuid.UUID, limit int) ([]ImportLog, error)`
+- **func** `(s gormStore) JobRuns(ctx context.Context, db *gorm.DB, t uuid.UUID, limit int) ([]JobRun, error)`
+- **func** `(s gormStore) JobRan(ctx context.Context, db *gorm.DB, t uuid.UUID, kind string, date time.Time) (bool, error)`
 
 #### `internal/hr/attendance/repositories/interfaces.go` (98 lines)
 _Package:_ Package repositories is Module 3 data access: tenant_id on every scoped query, `db`/`tx` passed per call.
@@ -4297,7 +5380,7 @@ _Package:_ Package services holds Module 3 business rules (specification.md AT-0
 - **func** `(s *queryService) Detail(ctx context.Context, tenantID, id uuid.UUID) (*dto.RecordDetailResponse, error)`
 - **func** `(s *queryService) Summary(ctx context.Context, tenantID uuid.UUID, date string) (*dto.SummaryResponse, error)` — Summary computes AT-020 from one aggregate query plus the Module 2 workforce count.
 
-#### `internal/hr/attendance/services/regularization_review.go` (123 lines)
+#### `internal/hr/attendance/services/regularization_review.go` (94 lines)
 - **func** `(s *regularizationService) Approve(ctx context.Context, a Actor, id uuid.UUID, req dto.ReviewRequest) (*dto.RegularizationResponse, error)` — Approve applies the requested window to the record in one transaction (AT-016, AT-017).
 - **func** `(s *regularizationService) applyToRecord(ctx context.Context, tx *gorm.DB, g *models.Regularization) error` — applyToRecord supersedes existing punches and inserts the requested in/out (AT-017, AT-019).
 - **func** `(s *regularizationService) Reject(ctx context.Context, a Actor, id uuid.UUID, req dto.ReviewRequest) (*dto.RegularizationResponse, error)` — Reject closes a pending request with a mandatory comment (AT-016).
@@ -4341,6 +5424,22 @@ _Package:_ Package services holds Module 3 business rules (specification.md AT-0
 - **func** `(s *shiftService) Update(ctx context.Context, a Actor, id uuid.UUID, req dto.UpdateShiftRequest) (*dto.ShiftResponse, error)` — Update applies PATCH fields; code is immutable (FR-SH005); existing records are untouched (AT-021).
 - **func** `(s *shiftService) Deactivate(ctx context.Context, a Actor, id uuid.UUID) (*dto.ShiftResponse, error)` — Deactivate is blocked while assignments cover today (shift zone) or later (AT-012).
 
+#### `internal/hr/attendance/services/timewriter.go` (120 lines)
+- **type** `TimeWriter interface` — TimeWriter is the write port HR/Attendance's parity package (attendance/ops) uses; every method runs on the caller's transaction under the per-employee lock (AT-022).
+- **method** `TimeWriter.SetWindow(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, date, in, out time.Time, source string) error` — SetWindow replaces the day's punches with one in/out pair of the given source and recomputes totals (AT-017).
+- **method** `TimeWriter.MarkDay(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time, status string) (bool, error)` — MarkDay creates a punch-less record with the status when the day has none (AP-07); it reports whether it did.
+- **method** `TimeWriter.AssignShift(ctx context.Context, tx *gorm.DB, tenantID, employeeID, shiftID uuid.UUID, from, to time.Time, actor uuid.UUID) error` — AssignShift appends a shift assignment over [from, to]; overlap is ErrAssignmentOverlap (AT-011).
+- **method** `TimeWriter.ShiftState(ctx context.Context, db *gorm.DB, tenantID, shiftID uuid.UUID) (exists, active bool, err error)` — ShiftState reports whether the shift exists in the tenant and is active.
+- **method** `TimeWriter.HasRecord(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (exists, punched bool, err error)` — HasRecord reports whether the day has any record, and whether it carries punches.
+- **type** `timeWriter struct{ base }`
+- **func** `NewTimeWriter(d Deps) TimeWriter { return &timeWriter{base{d}} }` — NewTimeWriter builds the TimeWriter port.
+- **func** `(b base) setWindow(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, date, in, out time.Time, source string) (*models.AttendanceRecord, error)` — setWindow is AT-017 without the request bookkeeping: lock, find or create the record, supersede its punches, insert the pair, recompute and flag it regularized.
+- **func** `(t *timeWriter) SetWindow(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, date, in, out time.Time, source string) error`
+- **func** `(t *timeWriter) MarkDay(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time, status string) (bool, error)`
+- **func** `(t *timeWriter) AssignShift(ctx context.Context, tx *gorm.DB, tenantID, employeeID, shiftID uuid.UUID, from, to time.Time, actor uuid.UUID) error`
+- **func** `(t *timeWriter) ShiftState(ctx context.Context, db *gorm.DB, tenantID, shiftID uuid.UUID) (bool, bool, error)`
+- **func** `(t *timeWriter) HasRecord(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (bool, bool, error)`
+
 #### `internal/hr/attendance/validators/validators.go` (86 lines)
 _Package:_ Package validators holds Module 3 field rules that struct tags cannot express (AT-013, spec §5).
 - **func** `ValidateShiftCode(code string) error` — ValidateShiftCode checks the optional shift code format (FR-SH001).
@@ -4355,7 +5454,7 @@ _Package:_ Package validators holds Module 3 field rules that struct tags cannot
 #### `internal/hr/leave/catalogue.go` (19 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Leave's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/leave/module.go` (84 lines)
+#### `internal/hr/leave/module.go` (132 lines)
 _Package:_ Package leave wires Module 4 (Leave & Absence Management) into the application.
 - **type** `Module struct` — Module is the Module 4 DI container.
 - **type** `Ports struct` — Ports are the cross-module collaborators Module 4 consumes (connections C2, C3, C8).
@@ -4365,13 +5464,34 @@ _Package:_ Package leave wires Module 4 (Leave & Absence Management) into the ap
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts Module 4 under rg using Module 0 tenant/auth/RBAC middleware.
 - **func** `(m *Module) UnpaidLeave() services.UnpaidLeave { return m.unpaid }` — UnpaidLeave exposes the read-only loss-of-pay port for Module 5 (D5-03).
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay; cmd/main.go runs it until shutdown.
+- **func** `(m *Module) Holidays() api.Holidays { return holidayPort{repo: m.holidays, cal: m.cal} }` — Holidays is the holiday-calendar port other HR contexts use (leave/api).
+- **type** `holidayPort struct`
+- **func** `(h holidayPort) IsHolidayFor(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (bool, *bool, error)`
+- **func** `(h holidayPort) IsHoliday(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, date time.Time) (bool, error)`
+- **func** `(m *Module) SetLocations(l plus.Locations) { m.cal.SetLocations(l) }` — SetLocations installs the employee-location source once HR/Core exists (LP-05).
+- **func** `(m *Module) RunCompOffExpiry(ctx context.Context, onError func(error))` — RunCompOffExpiry runs the daily comp-off expiry sweep until ctx is cancelled (LP-10).
+- **func** `(m *Module) Settlement() api.Settlement { return m.plus.Settlement() }` — Settlement is the port payroll final settlement uses to read encashable balances and mark encashments paid.
 
-#### `internal/hr/leave/calc/accrual.go` (50 lines)
+#### `internal/hr/leave/api/api.go` (44 lines)
+_Package:_ Package api is what HR/Leave publishes to the other HR contexts. Other contexts depend on this package only (import-boundary test in internal/hr).
+- **type** `Holidays interface` — Holidays reads the tenant holiday calendar (attendance AP-07).
+- **method** `Holidays.IsHoliday(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, date time.Time) (bool, error)` — IsHoliday reports whether the date is a (non-optional) holiday for the tenant.
+- **method** `Holidays.IsHolidayFor(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (holiday bool, weekOff *bool, err error)` — verdict when it has a pattern (nil otherwise, so callers keep their own default).
+- **type** `EncashableBalance struct` — EncashableBalance is the days a worker still holds in a leave type that has an encashment rule.
+- **type** `UnpaidEncashment struct` — UnpaidEncashment is an approved encashment that payroll has not paid yet.
+- **type** `Settlement interface` — Settlement is what payroll final settlement reads from HR/Leave (payroll PP-06).
+- **method** `Settlement.EncashableBalances(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]EncashableBalance, error)` — EncashableBalances returns the latest available days per encashable leave type (read only, no accrual top-up).
+- **method** `Settlement.UnpaidEncashments(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]UnpaidEncashment, error)` — UnpaidEncashments returns the worker approved encashments with no payout yet.
+- **method** `Settlement.MarkEncashmentsPaid(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID, at time.Time) error` — encashment of the tenant is an error and nothing is stamped.
+
+#### `internal/hr/leave/calc/accrual.go` (68 lines)
 - **type** `Policy struct` — Policy is the accrual part of a leave type.
 - **func** `Accrued(p Policy, joining *time.Time, year int, asOf time.Time) Days` — Accrued is the entitlement earned in leave year `year` as of asOf (FR-BL002): allowance × creditedMonths / 12 in hundredths. Annual credits every month from the joining month (or January) through December up front; monthly credits only through asOf's month. The cumulative formula makes month 12 land exactly on the allowance, so December absorbs the rounding remainder.
+- **func** `AccruedFrom(p Policy, joining *time.Time, year, startMonth int, asOf time.Time) Days` — AccruedFrom is Accrued for a leave year that starts in startMonth (1–12) of `year` and runs twelve months (LP-02). Months are credited from the later of the year start and the joining month through the year end (annual) or through asOf's month (monthly); the cumulative formula still lands month 12 exactly on the allowance.
+- **func** `YearOf(d time.Time, startMonth int) int` — YearOf labels the leave year of a date by the calendar year in which it starts (LP-02).
 - **func** `CarryForward(prevAvailable, limit Days) Days` — CarryForward is the opening balance moved into a new year: previous available clamped to [0, limit] (FR-BL003).
 
-#### `internal/hr/leave/calc/count.go` (64 lines)
+#### `internal/hr/leave/calc/count.go` (70 lines)
 - **func** `DateOf(t time.Time) time.Time` — DateOf returns the UTC calendar date of t at midnight (A4-03).
 - **func** `IsWeekend(day time.Time) bool` — IsWeekend reports Saturday/Sunday — the fixed v1 weekly off (D4-05).
 - **func** `DaysBetween(a, b time.Time) int { return int(b.Sub(a).Hours() / 24) }` — DaysBetween counts whole days from a to b (dates at midnight UTC).
@@ -4484,6 +5604,224 @@ _Package:_ Package models holds Module 4 (Leave) persistence models; migrations 
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
+#### `internal/hr/leave/plus/compoff.go` (294 lines)
+- **type** `CompOffInput struct` — CompOffInput requests a comp-off credit (LP-08).
+- **func** `(s *Service) nonWorking(ctx context.Context, empID, tenantID uuid.UUID, d time.Time) (bool, error)` — nonWorking reports whether the date is a holiday or weekly off for the employee (their location's calendar).
+- **func** `(s *Service) RequestCompOff(ctx context.Context, a Actor, in CompOffInput) (*CompOff, error)` — RequestCompOff is LP-08.
+- **func** `(s *Service) DecideCompOff(ctx context.Context, a Actor, id uuid.UUID, to string, comment *string) (*CompOff, error)` — DecideCompOff is LP-09: approve (credit the balance), reject (comment required) or cancel (own pending).
+- **func** `(s *Service) MyCompOffs(ctx context.Context, a Actor) ([]CompOff, error)` — MyCompOffs lists the caller's requests.
+- **func** `(s *Service) CompOffs(ctx context.Context, a Actor, employeeID *uuid.UUID, status string) ([]CompOff, error)` — CompOffs lists requests (leave:read).
+- **type** `ExpireResult struct` — ExpireResult counts what one expiry run did.
+- **func** `(s *Service) ExpireCompOffs(ctx context.Context, tenantID, by uuid.UUID) (*ExpireResult, error)` — ExpireCompOffs is LP-10 for one tenant: each overdue credit is debited by min(credit, available) (never below zero) and marked, so a second run finds nothing.
+- **func** `(s *Service) Expire(ctx context.Context, a Actor) (*ExpireResult, error)` — Expire is LP-10 for the caller's tenant.
+- **func** `(s *Service) Sweep(ctx context.Context) (int, error)` — Sweep expires comp-off credits for every tenant that configured a comp-off type.
+- **func** `(s *Service) Run(ctx context.Context, interval time.Duration, onError func(error))` — Run ticks Sweep every interval until ctx is cancelled (also once at start).
+
+#### `internal/hr/leave/plus/encash.go` (234 lines)
+- **type** `RuleInput struct` — RuleInput sets a leave type's encashment rule (LP-12).
+- **func** `(s *Service) SetRule(ctx context.Context, a Actor, typeID string, in RuleInput) (*EncashmentRule, error)` — SetRule is LP-12.
+- **func** `(s *Service) Rules(ctx context.Context, a Actor) ([]EncashmentRule, error)` — Rules lists the rules.
+- **type** `EncashInput struct` — EncashInput requests an encashment (LP-13).
+- **func** `(s *Service) check(ctx context.Context, tx *gorm.DB, a Actor, employeeID, typeID uuid.UUID, year int, days calc.Days, includePending bool) error` — check applies LP-13's limits for `days` of one worker and type; pendingOthers is the days already reserved by other pending requests of the same worker and type that the check must respect.
+- **func** `(s *Service) RequestEncashment(ctx context.Context, a Actor, in EncashInput) (*Encashment, error)` — RequestEncashment is LP-13.
+- **func** `(s *Service) yearOfToday(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) (int, error)`
+- **func** `(s *Service) DecideEncashment(ctx context.Context, a Actor, id uuid.UUID, to string, comment *string) (*Encashment, error)` — DecideEncashment is LP-14: approve (re-check and debit), reject (comment required) or cancel (own pending).
+- **func** `(s *Service) MyEncashments(ctx context.Context, a Actor) ([]Encashment, error)` — MyEncashments lists the caller's requests.
+- **func** `(s *Service) Encashments(ctx context.Context, a Actor, employeeID, typeID *uuid.UUID, status string) ([]Encashment, error)` — Encashments lists requests (leave:read).
+
+#### `internal/hr/leave/plus/http.go` (320 lines)
+- **type** `Module struct` — Module is the parity container.
+- **func** `NewModule(db *gorm.DB, cal *Calendar, p Ports) *Module` — NewModule wires the store, calendar and service.
+- **func** `NewCalendarFor(db *gorm.DB) *Calendar { return NewCalendar(NewStore(db)) }` — NewCalendarFor builds the calendar over a database handle (the leave module needs it before its services exist).
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `(m *Module) Service() *Service { return m.svc }` — Service exposes the service (background sweep and tests).
+- **func** `(m *Module) RunCompOffExpiry(ctx context.Context, onError func(error))` — RunCompOffExpiry runs the daily comp-off expiry sweep until ctx is cancelled (LP-10).
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `optionalBody(c *gin.Context, dst interface{}) bool`
+- **func** `optionalUUID(c *gin.Context, name string) (*uuid.UUID, bool)`
+- **type** `commentBody struct`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 27 operations under rg (/leave).
+- **func** `(m *Module) Settlement() api.Settlement { return SettlementPort(m.svc.store) }` — Settlement is the leave/api.Settlement port (payroll final settlement).
+
+#### `internal/hr/leave/plus/inbox.go` (168 lines)
+- **type** `InboxItem struct` — InboxItem is one pending leave request for a manager (LP-06).
+- **func** `(s *Service) name(ctx context.Context, tenantID, id uuid.UUID, cache map[uuid.UUID]string) (string, error)`
+- **func** `(s *Service) Inbox(ctx context.Context, a Actor, all bool) ([]InboxItem, error)` — Inbox is LP-06: pending requests of the caller's reports, or every pending one for tenant-scope approvers.
+- **func** `(s *Service) Decide(ctx context.Context, a Actor, id uuid.UUID, approve bool, comment *string) (*leaveDTO.LeaveRequestResponse, error)` — Decide is LP-06: the report's manager (or a tenant-scope approver) decides through LV-010.
+- **type** `CalendarEntry struct` — CalendarEntry is one leave on the team calendar; reasons are never shown (LP-07).
+- **type** `TeamCalendar struct` — TeamCalendar is LP-07's response.
+- **func** `(s *Service) Calendar(ctx context.Context, a Actor, rawFrom, rawTo string) (*TeamCalendar, error)` — Calendar is LP-07: the caller's reports (every worker for leave:read) and the tenant's blocked dates.
+
+#### `internal/hr/leave/plus/models.go` (187 lines)
+_Package:_ Package plus is the HR/Leave parity package (docs/modules/m1-hr-management/contexts/leave, LP-01..LP-18): leave year and policy, per-location calendars, manager routing and team calendar, comp-off and encashment. It adjusts balances only through leave/services.BalanceMover.
+- **type** `Policy struct` — Policy is the tenant leave policy (LP-01).
+- **func** `(Policy) TableName() string { return "leave_policies" }` — TableName maps to leave_policies.
+- **func** `defaults(tenantID uuid.UUID) *Policy`
+- **type** `LocationHoliday struct` — LocationHoliday is a holiday of one organization location (LP-03).
+- **func** `(LocationHoliday) TableName() string { return "leave_location_holidays" }` — TableName maps to leave_location_holidays.
+- **func** `(r *LocationHoliday) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `WeekOff struct` — WeekOff is a location's weekly-off pattern (LP-04).
+- **func** `(WeekOff) TableName() string { return "leave_week_offs" }` — TableName maps to leave_week_offs.
+- **func** `(w WeekOff) days() []int { return maskDays(w.WeekOffMask) }`
+- **func** `maskDays(mask int) []int`
+- **func** `maskOf(mask int) func(time.Time) bool`
+- **type** `CompOff struct` — CompOff is a comp-off credit request (LP-08..LP-11).
+- **func** `(CompOff) TableName() string { return "leave_comp_offs" }` — TableName maps to leave_comp_offs.
+- **func** `(r *CompOff) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `EncashmentRule struct` — EncashmentRule makes a leave type encashable (LP-12).
+- **func** `(EncashmentRule) TableName() string { return "leave_encashment_rules" }` — TableName maps to leave_encashment_rules.
+- **type** `Encashment struct` — Encashment is an encashment request (LP-13..LP-15).
+- **func** `(Encashment) TableName() string { return "leave_encashments" }` — TableName maps to leave_encashments.
+- **func** `(r *Encashment) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `assignID(id *uuid.UUID) error`
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+
+#### `internal/hr/leave/plus/service.go` (511 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is plus' view of HR/Employee.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `Reports interface` — Reports resolves a manager's direct reports (HR/Organization mappings).
+- **method** `Reports.DirectReportUserIDs(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)`
+- **type** `Locations interface` — Locations resolves an employee's organization location on a date (HR/Core assignment).
+- **method** `Locations.LocationOn(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (*uuid.UUID, error)`
+- **func** `FromCore(d coreAPI.Directory) Locations { return coreLocations{d} }` — FromCore adapts core/api.Directory to Locations.
+- **type** `coreLocations struct{ d coreAPI.Directory }`
+- **func** `(c coreLocations) LocationOn(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (*uuid.UUID, error)`
+- **type** `Ports struct` — Ports are the collaborators plus consumes.
+- **type** `Actor struct` — Actor is the caller; the flags are leave:read, leave:manage and leave:approve at tenant scope.
+- **func** `(a Actor) leaveActor() services.Actor`
+- **type** `Calendar struct` — Calendar is services.CalendarSource over policy, location holidays and week-off patterns (LP-02..LP-05).
+- **func** `NewCalendar(store Store) *Calendar { return &Calendar{store: store} }` — NewCalendar builds the calendar; locations arrive later through SetLocations (core is built after leave).
+- **func** `(c *Calendar) SetLocations(l Locations)` — SetLocations installs the location source.
+- **func** `(c *Calendar) locations() Locations`
+- **func** `(c *Calendar) YearStartMonth(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (int, error)` — YearStartMonth implements services.CalendarSource.
+- **func** `(c *Calendar) For(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, from, to time.Time) ([]time.Time, func(time.Time) bool, error)` — For implements services.CalendarSource: the employee's location on `from` decides the extra holidays and weekly off.
+- **func** `(c *Calendar) DayKind(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (bool, *bool, error)` — DayKind implements leave/api.Holidays for one worker and date: tenant or location holiday, and the location's weekly off when it has a pattern (nil otherwise).
+- **type** `Service struct` — Service implements the leave parity requirements (LP-01..LP-18).
+- **func** `NewService(store Store, p Ports, cal *Calendar, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) today() time.Time { return day(s.now()) }`
+- **func** `day(t time.Time) time.Time`
+- **func** `parseDate(field, raw string) (time.Time, error)`
+- **func** `text(field, v string, max int) (string, error)`
+- **func** `optionalText(field string, v *string, max int) (*string, error)`
+- **func** `orNotFound(err error) error`
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, resource, id string, meta map[string]string)`
+- **func** `(s *Service) self(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — self resolves the caller's employee profile, or nil.
+- **func** `(s *Service) worker(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)` — worker resolves the caller as a working employee (comp-off and encashment requests).
+- **func** `(s *Service) reportIDs(ctx context.Context, a Actor) (map[uuid.UUID]bool, error)` — reportIDs resolves the caller's direct reports to employee profile ids.
+- **func** `(s *Service) mayDecide(ctx context.Context, a Actor, employeeID uuid.UUID) (bool, error)` — mayDecide reports whether the caller may decide a request of the employee: tenant-scope approvers, or the manager.
+- **type** `PolicyInput struct` — PolicyInput replaces the policy.
+- **func** `(s *Service) GetPolicy(ctx context.Context, a Actor) (*Policy, error)` — GetPolicy returns the saved policy or the defaults.
+- **func** `(s *Service) SetPolicy(ctx context.Context, a Actor, in PolicyInput) (*Policy, error)` — SetPolicy is LP-01.
+- **type** `LocationHolidayInput struct` — LocationHolidayInput creates a location holiday.
+- **func** `isForeignKey(err error) bool`
+- **func** `(s *Service) CreateLocationHoliday(ctx context.Context, a Actor, in LocationHolidayInput) (*LocationHoliday, error)` — CreateLocationHoliday is LP-03.
+- **func** `(s *Service) LocationHolidays(ctx context.Context, a Actor, locationID, year string) ([]LocationHoliday, error)` — LocationHolidays lists holidays in a year of a location (default: the current year, all locations).
+- **func** `(s *Service) DeleteLocationHoliday(ctx context.Context, a Actor, id uuid.UUID) error` — DeleteLocationHoliday removes a location holiday; existing requests keep their snapshot (LV-012).
+- **type** `WeekOffView struct` — WeekOffView is a location's pattern.
+- **func** `weekOffView(w *WeekOff) *WeekOffView`
+- **func** `(s *Service) SetWeekOff(ctx context.Context, a Actor, locationID string, days []int) (*WeekOffView, error)` — SetWeekOff is LP-04.
+- **func** `(s *Service) WeekOffs(ctx context.Context, a Actor) ([]WeekOffView, error)` — WeekOffs lists every location pattern.
+- **func** `(s *Service) DeleteWeekOff(ctx context.Context, a Actor, locationID string) error` — DeleteWeekOff removes a location pattern (the default Saturday/Sunday applies again).
+
+#### `internal/hr/leave/plus/settlement.go` (54 lines)
+- **type** `settlementPort struct{ store Store }` — settlementPort implements leave/api.Settlement over the parity store.
+- **func** `SettlementPort(store Store) api.Settlement { return settlementPort{store: store} }` — SettlementPort builds the port payroll final settlement uses.
+- **func** `(p settlementPort) EncashableBalances(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]api.EncashableBalance, error)`
+- **func** `(p settlementPort) UnpaidEncashments(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]api.UnpaidEncashment, error)`
+- **func** `(p settlementPort) MarkEncashmentsPaid(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID, at time.Time) error`
+
+#### `internal/hr/leave/plus/store.go` (307 lines)
+- **type** `TenantHoliday struct` — TenantHoliday is a tenant calendar entry shown on the team calendar.
+- **type** `CompOffFilter struct` — CompOffFilter and EncashFilter narrow list endpoints.
+- **type** `EncashFilter struct` — EncashFilter narrows encashment lists.
+- **type** `Store interface` — Store is parity data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Delete(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Policy(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (*Policy, error)`
+- **method** `Store.SavePolicy(ctx context.Context, tx *gorm.DB, p *Policy) error`
+- **method** `Store.BalancesExist(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (bool, error)`
+- **method** `Store.TypeState(ctx context.Context, db *gorm.DB, tenantID, typeID uuid.UUID) (exists, active bool, err error)`
+- **method** `Store.CompOffTenants(ctx context.Context, db *gorm.DB) ([]uuid.UUID, error)`
+- **method** `Store.LocationHoliday(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*LocationHoliday, error)`
+- **method** `Store.LocationHolidays(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, locationID *uuid.UUID, from, to time.Time) ([]LocationHoliday, error)`
+- **method** `Store.HolidayTaken(ctx context.Context, db *gorm.DB, tenantID, locationID uuid.UUID, date time.Time) (bool, error)`
+- **method** `Store.WeekOff(ctx context.Context, db *gorm.DB, tenantID, locationID uuid.UUID) (*WeekOff, error)`
+- **method** `Store.WeekOffs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]WeekOff, error)`
+- **method** `Store.SaveWeekOff(ctx context.Context, tx *gorm.DB, w *WeekOff) error`
+- **method** `Store.TenantHolidays(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, from, to time.Time) ([]TenantHoliday, error)`
+- **method** `Store.PendingRequests(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, employeeIDs []uuid.UUID, all bool, limit int) ([]leaveModels.Request, error)`
+- **method** `Store.Request(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*leaveModels.Request, error)`
+- **method** `Store.RequestsOverlapping(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, employeeIDs []uuid.UUID, all bool, from, to time.Time) ([]leaveModels.Request, error)`
+- **method** `Store.CompOff(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*CompOff, error)`
+- **method** `Store.CompOffOnDay(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, date time.Time) (*CompOff, error)`
+- **method** `Store.CompOffs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f CompOffFilter, limit int) ([]CompOff, error)`
+- **method** `Store.ExpiredCompOffs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, today time.Time) ([]CompOff, error)`
+- **method** `Store.EncashmentRule(ctx context.Context, db *gorm.DB, tenantID, typeID uuid.UUID) (*EncashmentRule, error)`
+- **method** `Store.EncashmentRules(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]EncashmentRule, error)`
+- **method** `Store.SaveEncashmentRule(ctx context.Context, tx *gorm.DB, r *EncashmentRule) error`
+- **method** `Store.Encashment(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Encashment, error)`
+- **method** `Store.PendingEncashment(ctx context.Context, db *gorm.DB, tenantID, employeeID, typeID uuid.UUID) (*Encashment, error)`
+- **method** `Store.EncashedDays(ctx context.Context, db *gorm.DB, tenantID, employeeID, typeID uuid.UUID, year int, statuses ...string) (calc.Days, error)`
+- **method** `Store.Encashments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f EncashFilter, limit int) ([]Encashment, error)`
+- **method** `Store.LatestBalances(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]TypeDays, error)` — LatestBalances returns, per encashable leave type, the latest available days of the worker (payroll settlement).
+- **method** `Store.UnpaidEncashments(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]Encashment, error)`
+- **method** `Store.MarkPaid(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID, at time.Time) (int64, error)`
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event for the existing leave relay (ids and day counts only).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Delete(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `take[T any](q *gorm.DB) (*T, error)`
+- **func** `scoped(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) *gorm.DB`
+- **func** `(s gormStore) Policy(ctx context.Context, db *gorm.DB, t uuid.UUID) (*Policy, error)`
+- **func** `(s gormStore) SavePolicy(ctx context.Context, tx *gorm.DB, p *Policy) error`
+- **func** `(s gormStore) BalancesExist(ctx context.Context, db *gorm.DB, t uuid.UUID) (bool, error)`
+- **func** `(s gormStore) TypeState(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (bool, bool, error)`
+- **func** `(s gormStore) CompOffTenants(ctx context.Context, db *gorm.DB) ([]uuid.UUID, error)`
+- **func** `(s gormStore) LocationHoliday(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*LocationHoliday, error)`
+- **func** `(s gormStore) LocationHolidays(ctx context.Context, db *gorm.DB, t uuid.UUID, loc *uuid.UUID, from, to time.Time) ([]LocationHoliday, error)`
+- **func** `(s gormStore) HolidayTaken(ctx context.Context, db *gorm.DB, t, loc uuid.UUID, date time.Time) (bool, error)`
+- **func** `(s gormStore) WeekOff(ctx context.Context, db *gorm.DB, t, loc uuid.UUID) (*WeekOff, error)`
+- **func** `(s gormStore) WeekOffs(ctx context.Context, db *gorm.DB, t uuid.UUID) ([]WeekOff, error)`
+- **func** `(s gormStore) SaveWeekOff(ctx context.Context, tx *gorm.DB, w *WeekOff) error`
+- **func** `(s gormStore) TenantHolidays(ctx context.Context, db *gorm.DB, t uuid.UUID, from, to time.Time) ([]TenantHoliday, error)`
+- **func** `(s gormStore) PendingRequests(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID, all bool, limit int) ([]leaveModels.Request, error)`
+- **func** `(s gormStore) Request(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*leaveModels.Request, error)`
+- **func** `(s gormStore) RequestsOverlapping(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID, all bool, from, to time.Time) ([]leaveModels.Request, error)`
+- **func** `(s gormStore) CompOff(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*CompOff, error)`
+- **func** `(s gormStore) CompOffOnDay(ctx context.Context, db *gorm.DB, t, emp uuid.UUID, date time.Time) (*CompOff, error)`
+- **func** `(s gormStore) CompOffs(ctx context.Context, db *gorm.DB, t uuid.UUID, f CompOffFilter, limit int) ([]CompOff, error)`
+- **func** `(s gormStore) ExpiredCompOffs(ctx context.Context, db *gorm.DB, t uuid.UUID, today time.Time) ([]CompOff, error)`
+- **func** `(s gormStore) EncashmentRule(ctx context.Context, db *gorm.DB, t, typ uuid.UUID) (*EncashmentRule, error)`
+- **func** `(s gormStore) EncashmentRules(ctx context.Context, db *gorm.DB, t uuid.UUID) ([]EncashmentRule, error)`
+- **func** `(s gormStore) SaveEncashmentRule(ctx context.Context, tx *gorm.DB, r *EncashmentRule) error`
+- **func** `(s gormStore) Encashment(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Encashment, error)`
+- **func** `(s gormStore) PendingEncashment(ctx context.Context, db *gorm.DB, t, emp, typ uuid.UUID) (*Encashment, error)`
+- **func** `(s gormStore) EncashedDays(ctx context.Context, db *gorm.DB, t, emp, typ uuid.UUID, year int, statuses ...string) (calc.Days, error)`
+- **func** `(s gormStore) Encashments(ctx context.Context, db *gorm.DB, t uuid.UUID, f EncashFilter, limit int) ([]Encashment, error)`
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
+- **type** `TypeDays struct` — TypeDays is a leave type with a day count.
+- **func** `(s gormStore) LatestBalances(ctx context.Context, db *gorm.DB, t, emp uuid.UUID) ([]TypeDays, error)`
+- **func** `(s gormStore) UnpaidEncashments(ctx context.Context, db *gorm.DB, t, emp uuid.UUID) ([]Encashment, error)`
+- **func** `(s gormStore) MarkPaid(ctx context.Context, tx *gorm.DB, t uuid.UUID, ids []uuid.UUID, at time.Time) (int64, error)`
+
 #### `internal/hr/leave/repositories/balance_repository.go` (65 lines)
 - **type** `balanceRepository struct{}`
 - **func** `NewBalanceRepository() BalanceRepository { return &balanceRepository{} }` — NewBalanceRepository builds a BalanceRepository.
@@ -4575,7 +5913,7 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **type** `Controllers struct` — Controllers groups Module 4 handlers.
 - **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl Controllers)` — RegisterRoutes mounts all 20 Module 4 operations; self endpoints and type/holiday reads need authentication only.
 
-#### `internal/hr/leave/services/balance_service.go` (137 lines)
+#### `internal/hr/leave/services/balance_service.go` (145 lines)
 - **type** `LedgerQuery struct` — LedgerQuery is B4's filter; employee_id is required.
 - **type** `BalanceService interface` — BalanceService serves balances, HR adjustments and the ledger (FR-BL001..BL005).
 - **method** `BalanceService.Mine(ctx context.Context, a Actor) ([]dto.BalanceResponse, error)`
@@ -4594,13 +5932,16 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
 - **func** `invalid(field, msg string) *sharedErrors.AppError` — invalid builds a 400 VALIDATION_ERROR naming the offending field.
 
-#### `internal/hr/leave/services/helpers.go` (120 lines)
+#### `internal/hr/leave/services/helpers.go` (147 lines)
 - **type** `base struct{ Deps }` — base carries Deps plus helpers shared by all services.
 - **func** `(b base) today() time.Time { return calc.DateOf(b.Now()) }`
 - **func** `(b base) employeeFor(ctx context.Context, a Actor, requireWorking bool) (*employeeDTO.EmployeeResponse, error)` — employeeFor resolves the caller's profile (LV-001); requireWorking enforces status.
 - **func** `(b base) employeeByID(ctx context.Context, tenantID uuid.UUID, raw string) (*employeeDTO.EmployeeResponse, error)` — employeeByID resolves a profile by id in the caller's tenant (B2/B3/B4).
 - **func** `checkEmployee(emp *employeeDTO.EmployeeResponse, err error, requireWorking bool) (*employeeDTO.EmployeeResponse, error)`
 - **func** `joiningOf(emp *employeeDTO.EmployeeResponse) *time.Time` — joiningOf returns the employee's joining date, nil when unknown (A4-02).
+- **func** `(b base) leaveYear(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, d time.Time) (int, error)` — leaveYear labels the leave year of a date (LP-02).
+- **func** `(b base) yearStartMonth(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (int, error)` — yearStartMonth is the tenant's leave-year start month (1 without a calendar source).
+- **func** `(b base) calendarFor(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, from, to time.Time) ([]time.Time, func(time.Time) bool, error)` — calendarFor returns the blocked dates and weekly-off test for one employee's range (LP-05).
 - **func** `(b base) typeByID(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, raw string) (*models.LeaveType, error)` — typeByID loads a leave type in the caller's tenant; unknown → 404.
 - **func** `(b base) writeOutbox(ctx context.Context, tx *gorm.DB, a Actor, routingKey string, payload interface{}) (*models.OutboxEvent, error)` — writeOutbox stores the event inside the business transaction (FR-EV002).
 - **type** `auditEntry struct` — auditEntry is one audit row: action, resource type, resource id, metadata (positional order).
@@ -4619,7 +5960,7 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **func** `(s *holidayService) List(ctx context.Context, tenantID uuid.UUID, year string) ([]dto.HolidayResponse, error)` — List returns one year's holidays (default: current year).
 - **func** `(s *holidayService) Delete(ctx context.Context, a Actor, id uuid.UUID) (*dto.HolidayResponse, error)` — Delete soft-deletes a holiday; existing requests keep their snapshot (LV-012).
 
-#### `internal/hr/leave/services/ledger.go` (88 lines)
+#### `internal/hr/leave/services/ledger.go` (92 lines)
 - **type** `movement struct` — movement is one balance change; it always becomes exactly one ledger row (LV-013).
 - **func** `(b base) move(ctx context.Context, tx *gorm.DB, bal *models.Balance, m movement) error` — move applies a movement to the projection column for its kind and appends the ledger row (architecture §4).
 - **type** `entitlement struct` — entitlement is the employee-side input to balance materialization.
@@ -4635,13 +5976,23 @@ _Package:_ Package routes mounts Module 4 endpoints (specification.md §5) behin
 - **func** `requestPayload(r *models.Request, t *models.LeaveType) events.RequestPayload` — requestPayload whitelists event fields (FR-EV003: no reason/comment).
 - **func** `requestMeta(r *models.Request) map[string]string` — requestMeta is the audit metadata for request actions: ids, dates and days only (LS-T6).
 
+#### `internal/hr/leave/services/mover.go` (64 lines)
+- **type** `BalanceMover interface` — BalanceMover is the transactional balance port the leave parity package uses (comp-off credit and expiry, encashment): every method runs on the caller's transaction under the per-employee lock (LV-014) and writes ledger rows (LV-013).
+- **method** `BalanceMover.AvailableTx(ctx context.Context, tx *gorm.DB, a Actor, employeeID, leaveTypeID uuid.UUID) (calc.Days, error)` — AvailableTx returns the days available now in the current leave year, after the lazy accrual top-up.
+- **method** `BalanceMover.AdjustTx(ctx context.Context, tx *gorm.DB, a Actor, employeeID, leaveTypeID uuid.UUID, days calc.Days, note string) (calc.Days, error)` — AdjustTx appends one adjustment row (days may be negative) and returns the available days afterwards.
+- **type** `balanceMover struct{ base }`
+- **func** `NewBalanceMover(d Deps) BalanceMover { return &balanceMover{base{d}} }` — NewBalanceMover builds the BalanceMover port.
+- **func** `(m *balanceMover) balance(ctx context.Context, tx *gorm.DB, a Actor, employeeID, leaveTypeID uuid.UUID) (*models.Balance, error)`
+- **func** `(m *balanceMover) AvailableTx(ctx context.Context, tx *gorm.DB, a Actor, employeeID, leaveTypeID uuid.UUID) (calc.Days, error)`
+- **func** `(m *balanceMover) AdjustTx(ctx context.Context, tx *gorm.DB, a Actor, employeeID, leaveTypeID uuid.UUID, days calc.Days, note string) (calc.Days, error)`
+
 #### `internal/hr/leave/services/outbox_relay.go` (59 lines)
 - **type** `OutboxRelay struct` — OutboxRelay republishes outbox rows the request path could not publish (FR-EV002).
 - **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the module dependencies.
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled (started by cmd/main.go, stopped on shutdown).
 
-#### `internal/hr/leave/services/ports.go` (80 lines)
+#### `internal/hr/leave/services/ports.go` (90 lines)
 _Package:_ Package services holds Module 4 business rules (specification.md LV-001..LV-017).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is Module 4's view of Module 2 (connections C2).
 - **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
@@ -4651,6 +6002,9 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **type** `AttendanceSync interface` — AttendanceSync is Module 4's view of Module 3 services.LeaveSync (connections C8, D4-08).
 - **method** `AttendanceSync.MarkLeave(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, dates []time.Time) error`
 - **method** `AttendanceSync.ClearLeave(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, dates []time.Time) error`
+- **type** `CalendarSource interface` — CalendarSource is the leave parity package's contribution to pricing and the leave year (LP-02..LP-05). A nil source keeps the tenant calendar, Saturday/Sunday weekly off and calendar-year leave year.
+- **method** `CalendarSource.YearStartMonth(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (int, error)` — YearStartMonth returns the month (1–12) in which the tenant's leave year starts.
+- **method** `CalendarSource.For(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, from, to time.Time) (holidays []time.Time, weekOff func(time.Time) bool, err error)` — For returns the extra blocked dates of the employee's location in [from, to] and its weekly-off test (nil = default).
 - **type** `TxRunner interface` — TxRunner opens database transactions; controllers never see *gorm.DB.
 - **method** `TxRunner.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **method** `TxRunner.DB() *gorm.DB`
@@ -4671,7 +6025,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `(s *requestService) typeCodes(ctx context.Context, tenantID uuid.UUID) (map[uuid.UUID]string, error)` — typeCodes maps type id → code in one query (no N+1, NFR-P002).
 - **func** `requestFilter(q RequestQuery) (repositories.RequestFilter, error)`
 
-#### `internal/hr/leave/services/request_review.go` (186 lines)
+#### `internal/hr/leave/services/request_review.go` (190 lines)
 - **type** `transition struct` — transition is one locked state change of a request; apply mutates balance/attendance and the request.
 - **func** `(s *requestService) run(ctx context.Context, a Actor, tr transition) (*dto.LeaveRequestResponse, error)` — run loads, locks and re-reads the request, applies the transition and writes the outbox row (LV-014).
 - **func** `(s *requestService) lockedRequest(ctx context.Context, tx *gorm.DB, a Actor, tr transition) (*models.Request, error)`
@@ -4684,7 +6038,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **func** `(s *requestService) leaveDates(ctx context.Context, tx *gorm.DB, r *models.Request) ([]time.Time, error)` — leaveDates are the full working days of a request for attendance (LV-015); half days mark nothing (D4-09).
 - **func** `(s *requestService) review(r *models.Request, a Actor, status string, comment *string)`
 
-#### `internal/hr/leave/services/request_service.go` (223 lines)
+#### `internal/hr/leave/services/request_service.go` (240 lines)
 - **type** `RequestQuery struct` — RequestQuery is R5's filter.
 - **type** `RequestService interface` — RequestService runs the leave request lifecycle (FR-LR001..LR006).
 - **method** `RequestService.Preview(ctx context.Context, a Actor, req dto.ApplyLeaveRequest) (*dto.PreviewResponse, error)`
@@ -4703,7 +6057,7 @@ _Package:_ Package services holds Module 4 business rules (specification.md LV-0
 - **type** `quoteInput struct`
 - **func** `(s *requestService) quote(ctx context.Context, tx *gorm.DB, a Actor, in quoteInput) (*quote, error)` — quote validates LV-002..LV-009 under the employee lock (LV-014) and prices the range.
 - **func** `(s *requestService) applicableType(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in quoteInput) (*models.LeaveType, error)`
-- **func** `(s *requestService) parseRange(q *quote, req dto.ApplyLeaveRequest) error` — parseRange applies LV-003, LV-004 and LV-005.
+- **func** `(s *requestService) parseRange(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, q *quote, req dto.ApplyLeaveRequest) error` — parseRange applies LV-003, LV-004 and LV-005.
 - **func** `(s *requestService) price(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, q *quote) (calc.Count, error)` — price counts days with the tenant calendar (LV-006, LV-007).
 - **func** `(b base) blockingHolidays(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, from, to time.Time) ([]time.Time, error)` — blockingHolidays returns non-optional holiday dates in range (optional ones are working days, D4-05).
 - **func** `(s *requestService) checkOverlap(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, q *quote) error` — checkOverlap applies LV-008: opposite halves of the same single day may coexist.
@@ -4758,7 +6112,7 @@ _Package:_ Package validators holds Module 4 field rules that struct tags cannot
 #### `internal/hr/payroll/catalogue.go` (19 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Payroll's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/payroll/module.go` (71 lines)
+#### `internal/hr/payroll/module.go` (106 lines)
 _Package:_ Package payroll wires Module 5 (Payroll & Statutory Compliance) into the application.
 - **type** `Module struct` — Module is the Module 5 DI container.
 - **type** `Ports struct` — Ports are the cross-module collaborators Module 5 consumes (connections C2–C4).
@@ -4767,14 +6121,30 @@ _Package:_ Package payroll wires Module 5 (Payroll & Statutory Compliance) into 
 - **type** `RouteDeps struct` — RouteDeps is the Module 0 infrastructure the routes need.
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts Module 5 under rg.
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
+- **func** `(m *Module) CTC() api.CTC { return m.ctc }` — CTC is the port HR/Compensation uses to set CTC from a date (payroll/api).
+- **func** `(m *Module) SetStates(s plus.States) { m.pt.SetStates(s) }` — SetStates installs the worker-state lookup once HR/Core exists (PP-02).
+- **func** `(m *Module) SetBenefits(b services.BenefitDeductions) { m.benefits.Set(b) }` — SetBenefits installs the benefit-deduction source once HR/Benefits exists (PP-05). Calculations built afterwards use it.
+- **func** `(m *Module) SetClearance(c onboardingAPI.Clearance) { m.plus.SetClearance(c) }` — SetClearance installs the exit-clearance port once HR/Onboarding exists (PP-07).
 
-#### `internal/hr/payroll/calc/compute.go` (95 lines)
+#### `internal/hr/payroll/api/api.go` (30 lines)
+_Package:_ Package api is what HR/Payroll publishes to the other HR contexts. Other contexts depend on this package only, never on payroll services, repositories or models (import-boundary test in internal/hr).
+- **type** `CTC interface` — CTC lets HR/Compensation set a worker's annual CTC from a date (compensation CO-C11). The worker keeps their current salary structure; without a payroll assignment nothing changes and synced is false.
+- **method** `CTC.SetCTC(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, annual kernel.Money, from time.Time, actorUserID uuid.UUID) (synced bool, err error)`
+- **type** `BenefitLine struct` — BenefitLine is one benefit deduction for a worker and period (payroll PP-05).
+- **type** `BenefitDeductions interface` — BenefitDeductions supplies benefit deductions per worker and period; HR/Benefits implements it (benefits BN-C07).
+- **method** `BenefitDeductions.Deductions(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) ([]BenefitLine, error)`
+
+#### `internal/hr/payroll/calc/compute.go` (96 lines)
 - **type** `Input struct` — Input is everything needed to compute one payslip; PayableHundredths is payable days × 100 (half days allowed).
 - **type** `Result struct` — Result is a computed payslip; Capped reports that deductions were trimmed to gross (PY-009).
 - **func** `Compute(in Input) (Result, error)` — Compute runs the PY-001..PY-009 pipeline: breakdown → proration → statutory → net with cap.
 - **type** `statutoryBase struct{ earnedBasic, fullGross, earnedGross, fullTaxable Money }`
-- **func** `statutory(s StructureSpec, b statutoryBase) []Line` — statutory returns the enabled, non-zero statutory deduction lines in fixed order PF, ESI, PT, TDS.
+- **func** `statutory(s StructureSpec, b statutoryBase, pt Money) []Line` — statutory returns the enabled, non-zero statutory deduction lines in fixed order PF, ESI, PT, TDS.
 - **func** `(r *Result) capDeductions()` — capDeductions trims deduction lines from the last one backwards so deductions never exceed gross (PY-009).
+
+#### `internal/hr/payroll/calc/employer.go` (38 lines)
+- **func** `EmployerPF(earnedBasic Money) []Line` — EmployerPF returns the employer PF lines on the earned BASIC (PP-01): EPF is the 12% total minus EPS, so the three pieces always add up to exactly the rounded 12%. Wages above the ceiling are capped like the employee share (PY-005).
+- **func** `EmployerESI(fullGross, earnedGross Money) Money` — EmployerESI is 3.25% of earned gross rounded up to the rupee when full-month gross is within the ceiling (PP-01), computed exactly like the employee share (PY-006).
 
 #### `internal/hr/payroll/calc/money.go` (20 lines)
 _Package:_ Package calc is HR/Payroll's pure payroll arithmetic: structure breakdown, proration and Indian statutory deductions. No I/O; every rule is golden-tested. The Money amount type lives in the HR kernel; the aliases keep this package's API unchanged.
@@ -4783,6 +6153,19 @@ _Package:_ Package calc is HR/Payroll's pure payroll arithmetic: structure break
 - **func** `ParseMoney(s string) (Money, error) { return kernel.ParseMoney(s) }` — ParseMoney parses a decimal amount with at most two decimals.
 - **func** `Min(a, b Money) Money { return kernel.Min(a, b) }` — Min returns the smaller amount.
 - **func** `divRound(n, d int64) Money { return kernel.DivRound(n, d) }`
+
+#### `internal/hr/payroll/calc/pt.go` (106 lines)
+- **type** `PTSlab struct` — PTSlab is one professional-tax slab (PP-02): amount applies when MinGross ≤ earned gross ≤ MaxGross (MaxGross 0 = unbounded); a non-zero Month makes it apply to that calendar month only and wins over the generic slab.
+- **func** `PTFromSlabs(slabs []PTSlab, month int, earnedGross Money) Money` — PTFromSlabs picks the slab for the month and earned gross; a month-specific slab beats the generic one (PP-02).
+- **func** `ValidatePTSlabs(slabs []PTSlab) error` — ValidatePTSlabs enforces ascending, non-overlapping slabs per series (the generic series and each month override), with the generic series starting at 0 (PP-09).
+- **func** `monthsOf(slabs []PTSlab) []int`
+- **func** `DefaultPTSlabs(state string) []PTSlab` — DefaultPTSlabs returns built-in monthly slabs for a state, or nil. They are configuration data that must be checked against current state law before production use (PP-02); tenants override them per state.
+
+#### `internal/hr/payroll/calc/segments.go` (115 lines)
+- **type** `Segment struct` — Segment is one slice of a pay window priced at one structure and CTC (PP-03).
+- **type** `SegmentsInput struct` — SegmentsInput is one payslip: its segments (in date order), the month, the state PT slabs (nil keeps the default slab of PY-007), benefit deduction lines (PP-05) and the signed arrears amount (PP-04).
+- **func** `ComputeSegments(in SegmentsInput) (Result, error)` — ComputeSegments runs the PY-001..PY-009 pipeline over one or more segments and adds employer lines (PP-01..PP-05). Earned amounts are summed per component code; PF and PT use the merged earned figures, ESI eligibility and TDS the last segment full-month figures. One segment without extras equals Compute plus the employer lines.
+- **func** `employerLines(s StructureSpec, earnedBasic, fullGross, earnedGross Money) []Line` — employerLines returns the enabled, non-zero employer contribution lines (PP-01).
 
 #### `internal/hr/payroll/calc/statutory.go` (77 lines)
 - **type** `slab struct` — slab is an upper bound (exclusive of the next) and its rate in hundredths of a percent.
@@ -4848,7 +6231,7 @@ _Package:_ Package controllers is Module 5's thin HTTP edge: parse → validate 
 - **func** `(ctl *SetupController) MyAssignment(c *gin.Context)` — MyAssignment handles GET /payroll/assignments/me (P8); the employee comes from the JWT only.
 - **func** `(ctl *SetupController) Preview(c *gin.Context)` — Preview handles POST /payroll/assignments/preview (P9).
 
-#### `internal/hr/payroll/dto/dto.go` (207 lines)
+#### `internal/hr/payroll/dto/dto.go` (209 lines)
 _Package:_ Package dto holds Module 5 request/response shapes (specification.md §5); never GORM models.
 - **type** `ComponentRequest struct` — ComponentRequest is one structure line (FR-ST001); Value is rupees (fixed) or a percent (percent_*).
 - **type** `CreateStructureRequest struct` — CreateStructureRequest is P1; statutory flags default to true.
@@ -4877,7 +6260,7 @@ _Package:_ Package events defines Module 5 event types and the shared envelope (
 - **func** `New(routingKey string, src Source, payload interface{}) Envelope` — New wraps a payload in the envelope.
 - **type** `RunPayload struct` — RunPayload carries run identity, period, counts and totals only — never per-employee amounts (FR-EV002).
 
-#### `internal/hr/payroll/models/models.go` (191 lines)
+#### `internal/hr/payroll/models/models.go` (194 lines)
 _Package:_ Package models holds Module 5 (Payroll) persistence models; migrations 000038–000044 are the SQL twin.
 - **type** `Structure struct` — Structure is a salary template with statutory switches (FR-ST001).
 - **func** `(Structure) TableName() string { return "payroll_structures" }` — TableName maps to payroll_structures (migration 000038).
@@ -4902,7 +6285,140 @@ _Package:_ Package models holds Module 5 (Payroll) persistence models; migration
 - **func** `(o *OutboxEvent) BeforeCreate(tx *gorm.DB) error { return assignID(&o.ID) }` — BeforeCreate assigns a UUID v4 when unset.
 - **func** `assignID(id *uuid.UUID) error`
 
-#### `internal/hr/payroll/repositories/interfaces.go` (92 lines)
+#### `internal/hr/payroll/models/parity.go` (98 lines)
+- **type** `SegmentRecord struct` — SegmentRecord is one priced slice of a payslip (PP-03); From and To are inclusive dates.
+- **type** `SegmentRecords []SegmentRecord` — SegmentRecords is a payslip's segments, stored as JSON.
+- **func** `(s SegmentRecords) Value() (driver.Value, error)` — Value encodes the segments.
+- **func** `(s *SegmentRecords) Scan(src interface{}) error` — Scan decodes the segments.
+- **type** `Arrear struct` — Arrear is the amount a run settled for an earlier finalized payslip (PP-04).
+- **func** `(Arrear) TableName() string { return "payroll_arrears" }` — TableName maps to payroll_arrears (migration 000078).
+- **func** `(a *Arrear) BeforeCreate(*gorm.DB) error { return assignID(&a.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `PTSlab struct` — PTSlab is a tenant professional-tax slab of a state (PP-02, PP-09). Zero MaxGross and Month mean unbounded / every month.
+- **func** `(PTSlab) TableName() string { return "payroll_pt_slabs" }` — TableName maps to payroll_pt_slabs (migration 000079).
+- **func** `(s *PTSlab) BeforeCreate(*gorm.DB) error { return assignID(&s.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `(s PTSlab) Calc() calc.PTSlab` — Calc converts the stored slab to the pure calculation type.
+
+#### `internal/hr/payroll/plus/http.go` (191 lines)
+- **type** `Module struct` — Module is the payroll parity container.
+- **func** `NewModule(db *gorm.DB, pt *PT, p Ports) *Module` — NewModule wires the store, PT source and service.
+- **func** `NewPTFor(db *gorm.DB) *PT { return NewPT(NewStore(db)) }` — NewPTFor builds the PT source over a database handle (payroll needs it before its services exist).
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `(m *Module) SetClearance(c onboardingAPI.Clearance) { m.svc.p.Clearance = c }` — SetClearance installs the exit-clearance port once HR/Onboarding exists (PP-07).
+- **func** `(m *Module) Service() *Service { return m.svc }` — Service exposes the service (tests).
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 11 operations under rg (/payroll).
+
+#### `internal/hr/payroll/plus/models.go` (129 lines)
+- **type** `UUIDList []uuid.UUID` — UUIDList is a JSON array of ids.
+- **func** `(l UUIDList) Value() (driver.Value, error)` — Value encodes the list.
+- **func** `(l *UUIDList) Scan(src interface{}) error` — Scan decodes the list.
+- **type** `SettlementLine struct` — SettlementLine is one line of a settlement.
+- **func** `(SettlementLine) TableName() string { return "payroll_settlement_lines" }` — TableName maps to payroll_settlement_lines.
+- **func** `(l *SettlementLine) BeforeCreate(*gorm.DB) error { return assignID(&l.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Settlement struct` — Settlement is a leaver final settlement (PP-06..PP-08).
+- **func** `(Settlement) TableName() string { return "payroll_settlements" }` — TableName maps to payroll_settlements.
+- **func** `(s *Settlement) BeforeCreate(*gorm.DB) error { return assignID(&s.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `assignID(id *uuid.UUID) error`
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+
+#### `internal/hr/payroll/plus/service.go` (566 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is plus' view of HR/Employee.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `States interface` — States resolves a worker work state (two-letter code) on a date; "" when unknown.
+- **method** `States.StateOf(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (string, error)`
+- **type** `LocationStates interface` — LocationStates reads the state code of an organization location.
+- **method** `LocationStates.LocationStateCode(ctx context.Context, tenantID, id uuid.UUID) (string, error)`
+- **func** `StatesFromCore(core coreAPI.Directory, locs LocationStates) States` — StatesFromCore resolves the state through the worker core assignment and its organization location (PP-02).
+- **type** `coreStates struct`
+- **func** `(c coreStates) StateOf(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (string, error)`
+- **type** `PT struct` — PT implements payroll services.PTSource: the worker state and the tenant or built-in slabs (PP-02).
+- **func** `NewPT(store Store) *PT { return &PT{store: store} }` — NewPT builds the source; states arrive later through SetStates (core is built after payroll).
+- **func** `(p *PT) SetStates(s States)` — SetStates installs the state lookup.
+- **func** `(p *PT) StateOf(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (string, error)` — StateOf implements services.PTSource.
+- **func** `(p *PT) Slabs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, state string) ([]calc.PTSlab, error)` — Slabs implements services.PTSource: tenant slabs of the state, else the built-in defaults, else nil.
+- **type** `Ports struct` — Ports are the collaborators plus consumes.
+- **type** `Actor struct` — Actor is the caller.
+- **type** `Service struct` — Service implements PP-02 and PP-06..PP-09.
+- **func** `NewService(store Store, p Ports, pt *PT, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) today() time.Time`
+- **func** `dateOnly(t time.Time) time.Time`
+- **func** `orNotFound(err error) error`
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, id string)`
+- **type** `SlabInput struct` — SlabInput is one slab of a state.
+- **type** `SlabView struct` — SlabView is a slab as the API shows it.
+- **type** `SlabsResponse struct` — SlabsResponse lists tenant slabs and the built-in defaults per state.
+- **func** `viewOf(c calc.PTSlab) SlabView`
+- **func** `(s *Service) PTSlabs(ctx context.Context, a Actor) (*SlabsResponse, error)` — PTSlabs is PP-09: the tenant slabs and the defaults.
+- **func** `(s *Service) SetPTSlabs(ctx context.Context, a Actor, state string, in []SlabInput) ([]SlabView, error)` — SetPTSlabs replaces a state slabs (PP-09).
+- **func** `(s *Service) DeletePTSlabs(ctx context.Context, a Actor, state string) error` — DeletePTSlabs removes a state tenant slabs, back to the defaults (PP-09).
+- **type** `computed struct`
+- **func** `(s *Service) employee(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **func** `(s *Service) monthly(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, as *models.Assignment) (basic, gross kernel.Money, err error)` — monthly returns the BASIC and gross of the structure at the CTC (full month).
+- **func** `(s *Service) compute(ctx context.Context, db *gorm.DB, a Actor, e *employeeDTO.EmployeeResponse) (*computed, error)` — compute builds a settlement for a leaver from the current data (PP-06).
+- **func** `(s *Service) withLines(ctx context.Context, set *Settlement) (*Settlement, error)`
+- **func** `(s *Service) Calculate(ctx context.Context, a Actor, rawEmployee string) (*Settlement, error)` — Calculate is PP-06: a new draft, or a refreshed draft when one is open.
+- **func** `(s *Service) Recalculate(ctx context.Context, a Actor, id uuid.UUID) (*Settlement, error)` — Recalculate refreshes a draft (PP-07).
+- **func** `(s *Service) transition(ctx context.Context, a Actor, id uuid.UUID, verb string, fn func(tx *gorm.DB, set *Settlement) error) (*Settlement, error)`
+- **func** `(s *Service) Approve(ctx context.Context, a Actor, id uuid.UUID) (*Settlement, error)` — Approve is PP-07: a user other than the calculator, after the exit clearance.
+- **func** `(s *Service) Pay(ctx context.Context, a Actor, id uuid.UUID) (*Settlement, error)` — Pay is PP-07: stamp paid and mark the worker approved encashments paid in HR/Leave in the same transaction.
+- **func** `(s *Service) Cancel(ctx context.Context, a Actor, id uuid.UUID) (*Settlement, error)` — Cancel withdraws a draft or approved settlement (PP-07).
+- **func** `(s *Service) Get(ctx context.Context, a Actor, id uuid.UUID) (*Settlement, error)` — Get returns one settlement with its lines.
+- **func** `(s *Service) List(ctx context.Context, a Actor, employeeID *uuid.UUID, status string) ([]Settlement, error)` — List is PP-08.
+- **func** `(s *Service) Mine(ctx context.Context, a Actor) ([]Settlement, error)` — Mine is PP-08: the caller own paid settlements.
+
+#### `internal/hr/payroll/plus/settle.go` (96 lines)
+_Package:_ Package plus is the HR/Payroll parity package (docs/modules/m1-hr-management/contexts/payroll, PP-02, PP-06..PP-09): professional-tax slab management, the worker state lookup and final settlements.
+- **type** `SettleInput struct` — SettleInput is everything the settlement arithmetic needs; money is exact paise, leave days are hundredths.
+- **type** `SettleResult struct` — SettleResult is the computed settlement (PP-06).
+- **func** `serviceYears(joining, lastDay time.Time) (years, months int)` — serviceYears returns the completed years of service and the whole months beyond them, counting the last day.
+- **func** `Settle(in SettleInput) SettleResult` — Settle computes the final settlement (PP-06): gratuity from five completed years (a remainder of six months or more rounds the years up, capped at â‚¹20,00,000), leave and encashment payouts at BASIC Ã· 26 per day, and notice recovery.
+
+#### `internal/hr/payroll/plus/store.go` (129 lines)
+- **type** `Store interface` — Store is parity data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.PTSlabs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, state string) ([]models.PTSlab, error)`
+- **method** `Store.AllPTSlabs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]models.PTSlab, error)`
+- **method** `Store.ReplacePTSlabs(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, state string, rows []models.PTSlab) error`
+- **method** `Store.DeletePTSlabs(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, state string) (int64, error)`
+- **method** `Store.Settlement(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Settlement, error)`
+- **method** `Store.OpenSettlement(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) (*Settlement, error)`
+- **method** `Store.Settlements(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, employeeID *uuid.UUID, status string, limit int) ([]Settlement, error)`
+- **method** `Store.ReplaceLines(ctx context.Context, tx *gorm.DB, settlementID uuid.UUID, lines []SettlementLine) error`
+- **method** `Store.Lines(ctx context.Context, db *gorm.DB, settlementID uuid.UUID) ([]SettlementLine, error)`
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event for the payroll relay (ids only).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `take[T any](q *gorm.DB) (*T, error)`
+- **func** `(s gormStore) PTSlabs(ctx context.Context, db *gorm.DB, t uuid.UUID, state string) ([]models.PTSlab, error)`
+- **func** `(s gormStore) AllPTSlabs(ctx context.Context, db *gorm.DB, t uuid.UUID) ([]models.PTSlab, error)`
+- **func** `(s gormStore) ReplacePTSlabs(ctx context.Context, tx *gorm.DB, t uuid.UUID, state string, rows []models.PTSlab) error`
+- **func** `(s gormStore) DeletePTSlabs(ctx context.Context, tx *gorm.DB, t uuid.UUID, state string) (int64, error)`
+- **func** `(s gormStore) Settlement(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Settlement, error)`
+- **func** `(s gormStore) OpenSettlement(ctx context.Context, db *gorm.DB, t, emp uuid.UUID) (*Settlement, error)`
+- **func** `(s gormStore) Settlements(ctx context.Context, db *gorm.DB, t uuid.UUID, emp *uuid.UUID, status string, limit int) ([]Settlement, error)`
+- **func** `(s gormStore) ReplaceLines(ctx context.Context, tx *gorm.DB, id uuid.UUID, lines []SettlementLine) error`
+- **func** `(s gormStore) Lines(ctx context.Context, db *gorm.DB, id uuid.UUID) ([]SettlementLine, error)`
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
+
+#### `internal/hr/payroll/repositories/interfaces.go` (98 lines)
 _Package:_ Package repositories is Module 5 data access: tenant_id on every scoped query, `db`/`tx` passed per call.
 - **type** `StructureRepository interface` — StructureRepository persists structures and their immutable components (FR-ST).
 - **method** `StructureRepository.Create(ctx context.Context, tx *gorm.DB, s *models.Structure, comps []models.Component) error`
@@ -4919,6 +6435,8 @@ _Package:_ Package repositories is Module 5 data access: tenant_id on every scop
 - **method** `AssignmentRepository.Current(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) (*models.Assignment, error)` — Current returns the open (effective_to IS NULL) assignment, or nil.
 - **method** `AssignmentRepository.ListByEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, page dto.Page) ([]models.Assignment, int64, error)`
 - **method** `AssignmentRepository.EligibleFor(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, p Period) ([]models.Assignment, error)` — EligibleFor returns, per employee, the latest assignment overlapping the period (D5-10).
+- **method** `AssignmentRepository.PeriodAssignments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, p Period) ([]models.Assignment, error)` — PeriodAssignments returns every assignment overlapping the period, ordered by employee then start (PP-03).
+- **method** `AssignmentRepository.ForEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, p Period) ([]models.Assignment, error)` — ForEmployee returns one employee assignments overlapping the period, ordered by start.
 - **type** `RunRepository interface` — RunRepository persists payroll runs (FR-RN).
 - **method** `RunRepository.Create(ctx context.Context, tx *gorm.DB, r *models.Run) error`
 - **method** `RunRepository.Update(ctx context.Context, tx *gorm.DB, r *models.Run) error`
@@ -4932,7 +6450,8 @@ _Package:_ Package repositories is Module 5 data access: tenant_id on every scop
 - **method** `PayslipRepository.FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Payslip, error)`
 - **method** `PayslipRepository.ListByRun(ctx context.Context, db *gorm.DB, tenantID, runID uuid.UUID, page dto.Page) ([]models.Payslip, int64, error)`
 - **method** `PayslipRepository.AllByRun(ctx context.Context, db *gorm.DB, tenantID, runID uuid.UUID) ([]models.Payslip, error)`
-- **method** `PayslipRepository.ListFinalizedForEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, page dto.Page) ([]models.Payslip, int64, error)` — ListFinalizedForEmployee returns the employee's payslips of finalized runs only (PY-013).
+- **method** `PayslipRepository.FinalizedBefore(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, year, month, months int) ([]PastPayslip, error)` — FinalizedBefore returns the employee payslips of finalized runs in the months before (year, month) (PP-04).
+- **method** `PayslipRepository.ListFinalizedForEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, page dto.Page) ([]models.Payslip, int64, error)`
 - **type** `OutboxRepository interface` — OutboxRepository persists outbox rows; relay methods are cross-tenant by design.
 - **method** `OutboxRepository.Create(ctx context.Context, tx *gorm.DB, e *models.OutboxEvent) error`
 - **method** `OutboxRepository.MarkPublished(ctx context.Context, db *gorm.DB, id uuid.UUID, at time.Time) error`
@@ -4941,6 +6460,19 @@ _Package:_ Package repositories is Module 5 data access: tenant_id on every scop
 - **func** `day(t time.Time) string { return t.Format("2006-01-02") }`
 - **func** `first[T any](q *gorm.DB) (*T, error)`
 - **func** `paged[T any](q *gorm.DB, order string, page dto.Page) ([]T, int64, error)`
+
+#### `internal/hr/payroll/repositories/parity_repository.go` (88 lines)
+- **type** `PastPayslip struct` — PastPayslip is a finalized payslip with its run month and the ARREARS earning it already carried (PP-04).
+- **type** `ArrearsRepository interface` — ArrearsRepository persists settled arrears (PP-04).
+- **method** `ArrearsRepository.PaidFor(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, sourceIDs []uuid.UUID, exceptRun uuid.UUID) (map[uuid.UUID]calc.Money, error)` — PaidFor sums, per source payslip, what runs other than exceptRun already settled.
+- **method** `ArrearsRepository.ReplaceForRun(ctx context.Context, tx *gorm.DB, tenantID, runID uuid.UUID, rows []models.Arrear) error` — ReplaceForRun replaces a run's own arrears rows (recalculation, PY-011).
+- **type** `arrearsRepository struct{}`
+- **func** `NewArrearsRepository() ArrearsRepository { return &arrearsRepository{} }` — NewArrearsRepository builds an ArrearsRepository.
+- **func** `(r *arrearsRepository) PaidFor(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID, exceptRun uuid.UUID) (map[uuid.UUID]calc.Money, error)`
+- **func** `(r *arrearsRepository) ReplaceForRun(ctx context.Context, tx *gorm.DB, tenantID, runID uuid.UUID, rows []models.Arrear) error`
+- **func** `(r *assignmentRepository) PeriodAssignments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, p Period) ([]models.Assignment, error)` — PeriodAssignments returns every assignment overlapping the period, ordered by employee then start (PP-03).
+- **func** `(r *assignmentRepository) ForEmployee(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, p Period) ([]models.Assignment, error)` — ForEmployee returns one employee assignments overlapping the period, ordered by start.
+- **func** `(r *payslipRepository) FinalizedBefore(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, year, month, months int) ([]PastPayslip, error)` — FinalizedBefore returns the employee payslips of finalized runs in the `months` months before (year, month) (PP-04).
 
 #### `internal/hr/payroll/repositories/run_repository.go` (113 lines)
 - **type** `runRepository struct{}`
@@ -5006,17 +6538,37 @@ _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behin
 - **func** `(s *assignmentService) Preview(ctx context.Context, tenantID uuid.UUID, req dto.PreviewRequest) (*dto.BreakdownResponse, error)` — Preview prices a CTC on a structure without saving (P9).
 - **func** `(s *assignmentService) breakdown(ctx context.Context, tenantID, structureID uuid.UUID, ctc calc.Money) (*dto.BreakdownResponse, error)`
 
-#### `internal/hr/payroll/services/calculate.go` (160 lines)
+#### `internal/hr/payroll/services/benefits_switch.go` (34 lines)
+- **type** `BenefitsSwitch struct` — BenefitsSwitch is a BenefitDeductions whose source is installed after construction (HR/Benefits is built after payroll). Without a source it yields no deductions (PP-05).
+- **func** `(b *BenefitsSwitch) Set(s BenefitDeductions)` — Set installs the source.
+- **func** `(b *BenefitsSwitch) Deductions(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) ([]BenefitLine, error)` — Deductions implements BenefitDeductions.
+
+#### `internal/hr/payroll/services/calculate.go` (377 lines)
 - **type** `monthPeriod struct` — period is the run month as dates.
 - **func** `periodOf(run *models.Run) monthPeriod`
+- **type** `runCache struct` — runCache holds per-run lookups so a large tenant does not repeat them per employee.
 - **func** `(s *runService) calculate(ctx context.Context, tx *gorm.DB, a Actor, run *models.Run) error` — calculate replaces the run's payslips (PY-011) and stores totals and warnings.
+- **func** `groupByEmployee(all []models.Assignment) [][]models.Assignment` — groupByEmployee splits assignments (ordered by employee, then start) into one slice per employee.
 - **func** `(s *runService) totals(run *models.Run, slips []models.Payslip, warnings []string, calculator uuid.UUID)`
-- **func** `(s *runService) payslipFor(ctx context.Context, tx *gorm.DB, run *models.Run, p monthPeriod, as models.Assignment, specs map[uuid.UUID]calc.StructureSpec) (*models.Payslip, string, error)` — payslipFor computes one employee (PY-001..PY-009); a nil payslip with a warning means "skipped".
+- **type** `segment struct` — segment is one slice of the pay window under one assignment (PP-03).
+- **func** `(g segment) days() int { return int(g.to.Sub(g.from).Hours()/24) + 1 }`
+- **func** `segmentsOf(assigns []models.Assignment, from, to time.Time) []segment` — segmentsOf clips the employee assignments (ordered by start) to the window.
+- **func** `(s *runService) payslipFor(ctx context.Context, tx *gorm.DB, run *models.Run, p monthPeriod, assigns []models.Assignment, cache *runCache) (*models.Payslip, []models.Arrear, []string, error)` — payslipFor computes one employee (PY-001..PY-009, PP-01..PP-05); a nil payslip with warnings means "skipped".
+- **func** `(s *runService) slabsFor(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, on time.Time, cache *runCache) ([]calc.PTSlab, error)` — slabsFor resolves the professional-tax slabs of the worker state (PP-02); nil keeps the default slab.
+- **func** `(s *runService) benefitLines(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) ([]calc.Line, error)` — benefitLines turns the benefits port output into deduction lines BEN_<code> (PP-05).
+- **func** `(s *runService) arrearsFor(ctx context.Context, tx *gorm.DB, run *models.Run, emp *employeeDTO.EmployeeResponse, cache *runCache) (calc.Money, []models.Arrear, []string, error)` — arrearsFor settles earlier finalized payslips whose month would price differently under the current assignment history (PP-04). It returns the signed total and one row per source payslip with a non-zero difference.
+- **func** `(s *runService) arrearsDue(ctx context.Context, tx *gorm.DB, run *models.Run, emp *employeeDTO.EmployeeResponse, ps repositories.PastPayslip, settled calc.Money, cache *runCache) (calc.Money, bool, error)` — arrearsDue is one source payslip: unchanged history owes nothing; otherwise the recomputed earned gross minus what was paid for the month (ARREARS lines excluded) and what later runs already settled.
+- **func** `sameHistory(stored models.SegmentRecords, segs []segment) bool` — sameHistory reports whether the stored segments equal the current ones (dates, structure and CTC).
 - **func** `(s *runService) specCached(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, cache map[uuid.UUID]calc.StructureSpec) (calc.StructureSpec, error)`
 - **func** `window(p monthPeriod, emp *employeeDTO.EmployeeResponse) (time.Time, time.Time, bool)` — window clips the month to the employment dates (PY-003); ok=false means no payslip.
 - **func** `dateOnly(t time.Time) time.Time`
 - **type** `slipFigures struct`
 - **func** `buildPayslip(run *models.Run, as models.Assignment, emp *employeeDTO.EmployeeResponse, f slipFigures) *models.Payslip`
+
+#### `internal/hr/payroll/services/ctc_port.go` (36 lines)
+- **type** `CTCPort struct{ s *assignmentService }` — CTCPort implements payroll/api.CTC on top of the assignment rules (PY-014): it closes the open assignment and opens a new one with the same structure and the new CTC.
+- **func** `NewCTCPort(d Deps) *CTCPort { return &CTCPort{s: &assignmentService{base{d}}} }` — NewCTCPort builds the port.
+- **func** `(p *CTCPort) SetCTC(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, annual kernel.Money, from time.Time, actor uuid.UUID) (bool, error)` — SetCTC sets the annual CTC from a date inside the caller's transaction; without a payroll assignment it is a no-op.
 
 #### `internal/hr/payroll/services/errors.go` (31 lines)
 - **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
@@ -5066,7 +6618,7 @@ _Package:_ Package routes mounts Module 5 endpoints (specification.md §5) behin
 - **func** `(s *payslipService) MineOne(ctx context.Context, a Actor, id uuid.UUID) (*dto.PayslipResponse, error)` — MineOne returns one of the caller's finalized payslips; anything else is 404 (PS-T1, PS-T2).
 - **func** `(s *payslipService) PayoutCSV(ctx context.Context, tenantID, runID uuid.UUID) ([]byte, error)` — PayoutCSV exports employee_code, employee_name, net_pay for a finalized run (FR-RN005, PS-T8).
 
-#### `internal/hr/payroll/services/ports.go` (76 lines)
+#### `internal/hr/payroll/services/ports.go` (96 lines)
 _Package:_ Package services holds Module 5 business rules (specification.md PY-001..PY-015).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is Module 5's view of Module 2 (connections C2).
 - **method** `EmployeeDirectory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
@@ -5075,6 +6627,9 @@ _Package:_ Package services holds Module 5 business rules (specification.md PY-0
 - **method** `LeaveLOP.UnpaidDays(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (kernel.Days, error)`
 - **type** `AuditLogger interface` — AuditLogger is Module 5's view of the Module 0 AuditService.
 - **method** `AuditLogger.Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
+- **type** `PTSource interface` — PTSource resolves a worker state and the professional-tax slabs to use (PP-02). A nil source keeps the single default slab.
+- **method** `PTSource.StateOf(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (string, error)` — StateOf returns the two-letter state code of the worker work location on the date, or "".
+- **method** `PTSource.Slabs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, state string) ([]calc.PTSlab, error)` — Slabs returns the tenant slabs of the state, else the built-in defaults, else nil.
 - **type** `TxRunner interface` — TxRunner opens database transactions.
 - **method** `TxRunner.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **method** `TxRunner.DB() *gorm.DB`
@@ -5141,7 +6696,7 @@ _Package:_ Package validators holds Module 5 field rules that struct tags cannot
 #### `internal/hr/recruitment/catalogue.go` (19 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Recruitment's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
 
-#### `internal/hr/recruitment/module.go` (113 lines)
+#### `internal/hr/recruitment/module.go` (160 lines)
 _Package:_ Package recruitment wires Module 6 (Recruitment & Applicant Tracking) into the application.
 - **type** `Module struct` — Module is the Module 6 DI container.
 - **type** `DepartmentReader interface` — DepartmentReader is the Module 1 department lookup Module 6 needs (D6-03).
@@ -5158,6 +6713,16 @@ _Package:_ Package recruitment wires Module 6 (Recruitment & Applicant Tracking)
 - **type** `RouteDeps struct` — RouteDeps is the Module 0 infrastructure the routes need.
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts Module 6 under rg.
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
+- **func** `(m *Module) OnHired(h recruitmentAPI.HireHook) { m.hooks.Add(h) }` — OnHired registers a hook run inside the hire transaction (onboarding OB-03).
+- **type** `positionsSwitch struct` — positionsSwitch is a core/api.Positions installed after construction (HR/Core is built after recruitment).
+- **func** `(p *positionsSwitch) PositionInfo(ctx context.Context, tenantID, positionID uuid.UUID) (coreAPI.PositionInfo, error)`
+- **func** `(m *Module) SetPositions(src coreAPI.Positions)` — SetPositions installs the core position reader (requisitions RP-02).
+- **func** `ParityCatalogue() []access.PermissionDef { return plus.Catalogue() }` — ParityCatalogue is the permission HR/Recruitment parity adds (recruitment:approve).
+
+#### `internal/hr/recruitment/api/api.go` (20 lines)
+_Package:_ Package api is what HR/Recruitment publishes to the other HR contexts. Other contexts depend on this package only (import-boundary test in internal/hr).
+- **type** `HireFact struct` — HireFact is a completed recruitment hire (onboarding OB-03).
+- **type** `HireHook func(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, fact HireFact) error` — HireHook reacts to a hire inside recruitment's transaction; an error rolls the hire step back.
 
 #### `internal/hr/recruitment/controllers/controllers.go` (163 lines)
 - **type** `JobService interface` — JobService is the R1–R5 surface the edge needs.
@@ -5260,8 +6825,8 @@ _Package:_ Package events defines Module 6 event types and the shared envelope (
 - **func** `New(routingKey string, src Source, payload interface{}) Envelope` — New wraps a payload in the envelope.
 - **type** `Payload struct` — Payload carries ids and stages only — never candidate PII, CTC or feedback (FR-EV002, RC-011).
 
-#### `internal/hr/recruitment/models/models.go` (167 lines)
-_Package:_ Package models holds Module 6 (Recruitment) persistence models; migrations 000045–000050 are the SQL twin.
+#### `internal/hr/recruitment/models/models.go` (170 lines)
+_Package:_ Package models holds Module 6 (Recruitment) persistence models; migrations 000045â€“000050 are the SQL twin.
 - **type** `Job struct` — Job is a job opening (FR-JB001).
 - **func** `(Job) TableName() string { return "recruitment_jobs" }` — TableName maps to recruitment_jobs (migration 000045).
 - **func** `(j *Job) BeforeCreate(tx *gorm.DB) error { return assignID(&j.ID) }` — BeforeCreate assigns a UUID v4 when unset.
@@ -5290,6 +6855,149 @@ _Package:_ Package pipeline is Module 6's pure state machines: candidate stages 
 - **func** `ValidStage(stage string) bool` — ValidStage reports a known candidate stage.
 - **func** `Editable(status string) bool { return status != JobClosed && status != JobFilled }` — Editable reports whether a job's details may still change (FR-JB002).
 - **func** `contains(list []string, v string) bool`
+
+#### `internal/hr/recruitment/plus/http.go` (273 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is the permission HR/Recruitment parity adds (docs/ARCHITECTURE.md Â§17).
+- **type** `Module struct{ svc *Service }` — Module is the recruitment parity container.
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires the store and service.
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `(m *Module) Service() *Service { return m.svc }` — Service exposes the service (the offer gate and tests).
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `optionalBody(c *gin.Context, dst interface{}) bool`
+- **type** `commentBody struct`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 20 operations under rg (/recruitment).
+- **func** `offerView(o *models.Offer) dto.OfferResponse` — offerView is the public offer shape (the same fields as the base offer endpoints).
+
+#### `internal/hr/recruitment/plus/models.go` (163 lines)
+_Package:_ Package plus is the HR/Recruitment parity package (docs/modules/m1-hr-management/contexts/recruitment, RP-01..RP-07): seat release, position-linked requisitions, competency scorecards and multi-step offer approval.
+- **type** `Requisition struct` — Requisition asks to fill seats of a core position (RP-02).
+- **func** `(Requisition) TableName() string { return "recruitment_requisitions" }` — TableName maps to recruitment_requisitions.
+- **func** `(r *Requisition) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Competency struct` — Competency is one scorecard line; WeightPct is in hundredths of a percent (2500 = 25.00%).
+- **type** `Competencies []Competency` — Competencies is a scorecard's competencies, stored as JSON.
+- **func** `(c Competencies) Value() (driver.Value, error)` — Value encodes the competencies.
+- **func** `(c *Competencies) Scan(src interface{}) error` — Scan decodes the competencies.
+- **type** `Scorecard struct` — Scorecard is a competency template (RP-04).
+- **func** `(Scorecard) TableName() string { return "recruitment_scorecards" }` — TableName maps to recruitment_scorecards.
+- **func** `(r *Scorecard) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `JobScorecard struct` — JobScorecard links a job to its scorecard (RP-04).
+- **func** `(JobScorecard) TableName() string { return "recruitment_job_scorecards" }` — TableName maps to recruitment_job_scorecards.
+- **type** `InterviewScore struct` — InterviewScore is one interviewer score for one competency (RP-05).
+- **func** `(InterviewScore) TableName() string { return "recruitment_interview_scores" }` — TableName maps to recruitment_interview_scores.
+- **type** `OfferPolicy struct` — OfferPolicy is the tenant offer-approval policy (RP-06).
+- **func** `(OfferPolicy) TableName() string { return "recruitment_offer_policies" }` — TableName maps to recruitment_offer_policies.
+- **type** `OfferApproval struct` — OfferApproval is one approver decision on an offer (RP-07).
+- **func** `(OfferApproval) TableName() string { return "recruitment_offer_approvals" }` — TableName maps to recruitment_offer_approvals.
+- **func** `(r *OfferApproval) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `assignID(id *uuid.UUID) error`
+
+#### `internal/hr/recruitment/plus/service.go` (706 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is plus' view of HR/Employee.
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `Ports struct` — Ports are the collaborators plus consumes.
+- **type** `Actor struct` — Actor is the caller.
+- **type** `Service struct` — Service implements RP-01..RP-07.
+- **func** `NewService(store Store, p Ports, now func() time.Time) *Service` — NewService builds the service.
+- **func** `orNotFound(err error) error`
+- **func** `text(field, v string, max int) (string, error)`
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, resource, id string)`
+- **func** `(s *Service) ReleaseHire(ctx context.Context, a Actor, candidateID uuid.UUID) error` — ReleaseHire gives back the seat a stuck hire reserved (RP-01); it is idempotent.
+- **type** `RequisitionInput struct` — RequisitionInput creates a requisition.
+- **func** `(s *Service) checkSeats(ctx context.Context, db *gorm.DB, tenantID, position uuid.UUID, headcount int, except uuid.UUID) (PositionInfo, error)` — checkSeats applies RP-02: the position is active and has enough open seats after other requisitions.
+- **func** `(s *Service) CreateRequisition(ctx context.Context, a Actor, in RequisitionInput) (*Requisition, error)` — CreateRequisition is RP-02 (draft).
+- **func** `(s *Service) moveRequisition(ctx context.Context, a Actor, id uuid.UUID, verb string, fn func(tx *gorm.DB, r *Requisition) error) (*Requisition, error)`
+- **func** `(s *Service) SubmitRequisition(ctx context.Context, a Actor, id uuid.UUID) (*Requisition, error)` — SubmitRequisition is RP-03: the requester sends a draft for approval.
+- **func** `(s *Service) CancelRequisition(ctx context.Context, a Actor, id uuid.UUID) (*Requisition, error)` — CancelRequisition withdraws a draft or submitted requisition (the requester).
+- **func** `(s *Service) ApproveRequisition(ctx context.Context, a Actor, id uuid.UUID, comment *string) (*Requisition, error)` — ApproveRequisition is RP-03: re-check the seats and create the linked draft job.
+- **func** `(s *Service) RejectRequisition(ctx context.Context, a Actor, id uuid.UUID, comment *string) (*Requisition, error)` — RejectRequisition is RP-03 (comment required).
+- **func** `optionalComment(v *string) (*string, error)`
+- **func** `(s *Service) GetRequisition(ctx context.Context, a Actor, id uuid.UUID) (*Requisition, error)` — GetRequisition returns one requisition.
+- **func** `(s *Service) Requisitions(ctx context.Context, a Actor, status, position string) ([]Requisition, error)` — Requisitions lists requisitions.
+- **type** `ScorecardInput struct` — ScorecardInput creates or edits a scorecard.
+- **func** `(in ScorecardInput) apply(sc *Scorecard) error`
+- **func** `(s *Service) CreateScorecard(ctx context.Context, a Actor, in ScorecardInput) (*Scorecard, error)` — CreateScorecard is RP-04.
+- **func** `(s *Service) UpdateScorecard(ctx context.Context, a Actor, id uuid.UUID, in ScorecardInput) (*Scorecard, error)` — UpdateScorecard edits a scorecard (RP-04).
+- **func** `(s *Service) GetScorecard(ctx context.Context, a Actor, id uuid.UUID) (*Scorecard, error)` — GetScorecard returns one scorecard.
+- **func** `(s *Service) Scorecards(ctx context.Context, a Actor, status string) ([]Scorecard, error)` — Scorecards lists scorecards.
+- **func** `(s *Service) AssignScorecard(ctx context.Context, a Actor, jobID uuid.UUID, rawCard string) (*JobScorecard, error)` — AssignScorecard is RP-04: attach an active scorecard to a draft or open job.
+- **type** `ScoreInput struct` — ScoreInput is one competency score.
+- **func** `(s *Service) SubmitScores(ctx context.Context, a Actor, interviewID uuid.UUID, in []ScoreInput) ([]InterviewScore, error)` — SubmitScores is RP-05: the assigned interviewer scores every competency of the job scorecard once.
+- **func** `(s *Service) cardOf(ctx context.Context, tenantID, jobID uuid.UUID) (*Scorecard, error)` — cardOf returns the scorecard of a job, or ErrNoScorecard.
+- **type** `CompetencyResult struct` — CompetencyResult is one competency average (hundredths of a point).
+- **type** `CandidateScorecard struct` — CandidateScorecard is RP-05's aggregate.
+- **func** `(s *Service) Scorecard(ctx context.Context, a Actor, candidateID uuid.UUID) (*CandidateScorecard, error)` — Scorecard aggregates the submitted scores of a candidate (RP-05).
+- **type** `PolicyInput struct` — PolicyInput replaces the offer-approval policy.
+- **func** `(s *Service) GetOfferPolicy(ctx context.Context, a Actor) (*OfferPolicy, error)` — GetOfferPolicy returns the policy, or the default (no approvals).
+- **func** `(s *Service) SetOfferPolicy(ctx context.Context, a Actor, in PolicyInput) (*OfferPolicy, error)` — SetOfferPolicy is RP-06.
+- **func** `(s *Service) StartingStatus(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ctc kernel.Money) (string, error)` — StartingStatus implements the recruitment offer gate (RP-06): pending approval when the policy requires it.
+- **func** `(s *Service) DecideOffer(ctx context.Context, a Actor, offerID uuid.UUID, decision string, comment *string) (*models.Offer, error)` — DecideOffer is RP-07: approve (the last distinct approval releases the offer) or reject (withdraws it).
+- **func** `(s *Service) OfferApprovals(ctx context.Context, a Actor, offerID uuid.UUID) ([]OfferApproval, error)` — OfferApprovals lists the decisions of an offer (RP-07).
+
+#### `internal/hr/recruitment/plus/store.go` (200 lines)
+- **type** `ReqFilter struct` — ReqFilter narrows requisition lists.
+- **type** `Store interface` — Store is parity data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Requisition(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Requisition, error)`
+- **method** `Store.Requisitions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ReqFilter, limit int) ([]Requisition, error)`
+- **method** `Store.RequestedSeats(ctx context.Context, db *gorm.DB, tenantID, positionID uuid.UUID, except uuid.UUID) (int, error)` — RequestedSeats sums the seats other requisitions still hold on the position (RP-02).
+- **method** `Store.CreateJob(ctx context.Context, tx *gorm.DB, job *models.Job) error`
+- **method** `Store.Job(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*models.Job, error)`
+- **method** `Store.SaveJob(ctx context.Context, tx *gorm.DB, job *models.Job) error`
+- **method** `Store.Scorecard(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*Scorecard, error)`
+- **method** `Store.Scorecards(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string) ([]Scorecard, error)`
+- **method** `Store.JobScorecard(ctx context.Context, db *gorm.DB, tenantID, jobID uuid.UUID) (*JobScorecard, error)`
+- **method** `Store.SaveJobScorecard(ctx context.Context, tx *gorm.DB, row *JobScorecard) error`
+- **method** `Store.Interview(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Interview, error)`
+- **method** `Store.Candidate(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*models.Candidate, error)`
+- **method** `Store.SaveCandidate(ctx context.Context, tx *gorm.DB, c *models.Candidate) error`
+- **method** `Store.ReplaceScores(ctx context.Context, tx *gorm.DB, tenantID, interviewID uuid.UUID, rows []InterviewScore) error`
+- **method** `Store.CandidateScores(ctx context.Context, db *gorm.DB, tenantID, candidateID uuid.UUID) ([]ScoredInterview, error)`
+- **method** `Store.OfferPolicy(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (*OfferPolicy, error)`
+- **method** `Store.SaveOfferPolicy(ctx context.Context, tx *gorm.DB, p *OfferPolicy) error`
+- **method** `Store.Offer(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*models.Offer, error)`
+- **method** `Store.SaveOffer(ctx context.Context, tx *gorm.DB, o *models.Offer) error`
+- **method** `Store.Approvals(ctx context.Context, db *gorm.DB, tenantID, offerID uuid.UUID) ([]OfferApproval, error)`
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event for the recruitment relay (ids only).
+- **type** `ScoredInterview struct` — ScoredInterview is one interview with its scores, for the candidate scorecard (RP-05).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `take[T any](q *gorm.DB) (*T, error)`
+- **func** `scoped(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) *gorm.DB`
+- **func** `(s gormStore) Requisition(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Requisition, error)`
+- **func** `(s gormStore) Requisitions(ctx context.Context, db *gorm.DB, t uuid.UUID, f ReqFilter, limit int) ([]Requisition, error)`
+- **func** `(s gormStore) RequestedSeats(ctx context.Context, db *gorm.DB, t, position, except uuid.UUID) (int, error)`
+- **func** `(s gormStore) CreateJob(ctx context.Context, tx *gorm.DB, job *models.Job) error`
+- **func** `(s gormStore) Job(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*models.Job, error)`
+- **func** `(s gormStore) SaveJob(ctx context.Context, tx *gorm.DB, job *models.Job) error`
+- **func** `(s gormStore) Scorecard(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*Scorecard, error)`
+- **func** `(s gormStore) Scorecards(ctx context.Context, db *gorm.DB, t uuid.UUID, status string) ([]Scorecard, error)`
+- **func** `(s gormStore) JobScorecard(ctx context.Context, db *gorm.DB, t, jobID uuid.UUID) (*JobScorecard, error)`
+- **func** `(s gormStore) SaveJobScorecard(ctx context.Context, tx *gorm.DB, row *JobScorecard) error`
+- **func** `(s gormStore) Interview(ctx context.Context, db *gorm.DB, t, id uuid.UUID) (*models.Interview, error)`
+- **func** `(s gormStore) Candidate(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*models.Candidate, error)`
+- **func** `(s gormStore) SaveCandidate(ctx context.Context, tx *gorm.DB, c *models.Candidate) error`
+- **func** `(s gormStore) ReplaceScores(ctx context.Context, tx *gorm.DB, t, interview uuid.UUID, rows []InterviewScore) error`
+- **func** `(s gormStore) CandidateScores(ctx context.Context, db *gorm.DB, t, candidate uuid.UUID) ([]ScoredInterview, error)`
+- **func** `(s gormStore) OfferPolicy(ctx context.Context, db *gorm.DB, t uuid.UUID) (*OfferPolicy, error)`
+- **func** `(s gormStore) SaveOfferPolicy(ctx context.Context, tx *gorm.DB, p *OfferPolicy) error`
+- **func** `(s gormStore) Offer(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*models.Offer, error)`
+- **func** `(s gormStore) SaveOffer(ctx context.Context, tx *gorm.DB, o *models.Offer) error`
+- **func** `(s gormStore) Approvals(ctx context.Context, db *gorm.DB, t, offer uuid.UUID) ([]OfferApproval, error)`
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
 
 #### `internal/hr/recruitment/repositories/interfaces.go` (95 lines)
 _Package:_ Package repositories is Module 6 data access: tenant_id on every scoped query, `db`/`tx` passed per call.
@@ -5374,7 +7082,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **type** `Middleware struct` — Middleware is the Module 0 middleware Module 6 depends on.
 - **func** `RegisterRoutes(rg *gin.RouterGroup, mw Middleware, ctl *controllers.Controller)` — RegisterRoutes mounts all 20 Module 6 operations; interviewer self endpoints need authentication only (NFR-SEC002).
 
-#### `internal/hr/recruitment/services/candidate_service.go` (190 lines)
+#### `internal/hr/recruitment/services/candidate_service.go` (198 lines)
 - **type** `CandidateService struct{ base }` — CandidateService owns candidates and their pipeline (FR-CD).
 - **func** `NewCandidateService(d Deps) *CandidateService { return &CandidateService{base{d}} }` — NewCandidateService builds a CandidateService.
 - **func** `(s *CandidateService) Create(ctx context.Context, a Actor, req dto.CreateCandidateRequest) (*dto.CandidateResponse, error)` — Create is R6: a candidate on an open job, stage applied + first stage event (RC-001, RC-003).
@@ -5406,15 +7114,21 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `orNotFound(err error) error`
 - **func** `strPtr(s string) *string { return &s }`
 
-#### `internal/hr/recruitment/services/hire_service.go` (145 lines)
+#### `internal/hr/recruitment/services/hire_service.go` (174 lines)
 - **type** `HireService struct{ base }` — HireService runs the three-step idempotent hire saga (FR-HR001, D6-04, RC-007/008/010).
 - **func** `NewHireService(d Deps) *HireService { return &HireService{base{d}} }` — NewHireService builds a HireService.
 - **type** `hirePlan struct` — hirePlan is what step 1 resolves for steps 2 and 3.
 - **func** `(s *HireService) Hire(ctx context.Context, a Actor, candidateID uuid.UUID, req dto.HireRequest) (*dto.HireResponse, error)` — Hire is R11.
 - **func** `(s *HireService) reserveUser(ctx context.Context, a Actor, candidateID uuid.UUID) (*hirePlan, error)` — reserveUser is step 1: validate hireability and invite the user once, storing its id on the candidate (RC-010).
+- **func** `(s *HireService) reserveSeat(ctx context.Context, tx *gorm.DB, plan *hirePlan) error` — reserveSeat takes one seat of the job for this candidate before any user or profile exists (RP-01): capacity is headcount − hired − reserved, so two hires racing for the last seat cannot both proceed. A retry reuses its seat.
 - **func** `(s *HireService) loadHireable(ctx context.Context, tx *gorm.DB, tenantID, candidateID uuid.UUID, plan *hirePlan) error` — loadHireable locks candidate and job and checks RC-007/RC-008.
 - **func** `(s *HireService) ensureEmployee(ctx context.Context, tenantID uuid.UUID, plan *hirePlan, req dto.HireRequest) (*employeeDTO.EmployeeResponse, error)` — ensureEmployee is step 2: reuse the user's profile if a previous attempt created it, else create one in Module 2.
 - **func** `(s *HireService) complete(ctx context.Context, a Actor, candidateID, employeeID uuid.UUID) (*models.Job, *models.OutboxEvent, error)` — complete is step 3: candidate hired, job count (+ filled), stage event and outbox in one transaction.
+
+#### `internal/hr/recruitment/services/hooks.go` (39 lines)
+- **type** `Hooks struct` — Hooks holds the hire hooks other contexts register (recruitment/api.HireHook).
+- **func** `(h *Hooks) Add(fn api.HireHook)` — Add registers a hook.
+- **func** `(h *Hooks) run(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, fact api.HireFact) error` — run calls every hook in order; nil Hooks is a no-op.
 
 #### `internal/hr/recruitment/services/interview_service.go` (147 lines)
 - **type** `InterviewService struct{ base }` — InterviewService owns interviews and interviewer self-service (FR-IV).
@@ -5450,7 +7164,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `mapOffer(o *models.Offer) dto.OfferResponse`
 - **func** `mapList[M any, R any](rows []M, fn func(*M) R) []R`
 
-#### `internal/hr/recruitment/services/offer_service.go` (138 lines)
+#### `internal/hr/recruitment/services/offer_service.go` (143 lines)
 - **type** `OfferService struct{ base }` — OfferService owns offers (FR-OF).
 - **func** `NewOfferService(d Deps) *OfferService { return &OfferService{base{d}} }` — NewOfferService builds an OfferService.
 - **func** `(s *OfferService) Create(ctx context.Context, a Actor, req dto.CreateOfferRequest) (*dto.OfferResponse, error)` — Create is R17: one open offer per candidate (RC-006); an interview-stage candidate moves to offer.
@@ -5467,7 +7181,7 @@ _Package:_ Package routes mounts Module 6 endpoints (specification.md §5) behin
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled.
 
-#### `internal/hr/recruitment/services/ports.go` (84 lines)
+#### `internal/hr/recruitment/services/ports.go` (118 lines)
 _Package:_ Package services holds Module 6 business rules (specification.md RC-001..RC-011).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is Module 6's view of Module 2 (connections C5).
 - **method** `EmployeeDirectory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
@@ -5487,6 +7201,11 @@ _Package:_ Package services holds Module 6 business rules (specification.md RC-0
 - **type** `Actor struct` — Actor is the authenticated caller from Module 0 middleware context only.
 - **type** `Repos struct` — Repos bundles the module repositories.
 - **type** `Deps struct` — Deps is everything a Module 6 service needs.
+- **type** `OfferGate interface` — OfferGate decides an offer's starting status (RP-06); nil keeps every offer `offered`.
+- **method** `OfferGate.StartingStatus(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ctc kernel.Money) (string, error)`
+- **type** `OfferGateSwitch struct` — OfferGateSwitch is an OfferGate installed after construction.
+- **func** `(g *OfferGateSwitch) Set(x OfferGate)` — Set installs the gate.
+- **func** `(g *OfferGateSwitch) StartingStatus(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ctc kernel.Money) (string, error)` — StartingStatus implements OfferGate.
 - **type** `gormRunner struct{ db *gorm.DB }`
 - **func** `NewTxRunner(db *gorm.DB) TxRunner { return gormRunner{db: db} }` — NewTxRunner wraps a GORM handle as a TxRunner.
 - **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
@@ -5506,7 +7225,7 @@ _Package:_ Package validators holds Module 6 field rules that struct tags cannot
 #### `internal/hr/performance/catalogue.go` (19 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Performance's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). Self, manager and reviewer access needs no permission (PM-008).
 
-#### `internal/hr/performance/module.go` (68 lines)
+#### `internal/hr/performance/module.go` (74 lines)
 _Package:_ Package performance wires HR/Performance & OKRs (docs/modules/m1-hr-management/contexts/performance) into M1.
 - **type** `Module struct` — Module is the HR/Performance DI container.
 - **type** `Ports struct` — Ports are the collaborators HR/Performance consumes (design.md connections C2–C4).
@@ -5515,6 +7234,12 @@ _Package:_ Package performance wires HR/Performance & OKRs (docs/modules/m1-hr-m
 - **type** `RouteDeps struct` — RouteDeps is the M0 infrastructure the routes need.
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts HR/Performance under rg.
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
+- **func** `(m *Module) Ratings() api.Ratings { return m.ratings }` — Ratings is the final-rating port the other HR contexts use (performance/api).
+
+#### `internal/hr/performance/api/api.go` (15 lines)
+_Package:_ Package api is what HR/Performance publishes to the other HR contexts. Other contexts depend on this package only (import-boundary test in internal/hr).
+- **type** `Ratings interface` — Ratings reads final ratings (PM-020) for other contexts, e.g. compensation merit snapshots (CP-005).
+- **method** `Ratings.FinalBands(ctx context.Context, tenantID, cycleID uuid.UUID) (map[uuid.UUID]string, error)` — FinalBands returns the performance band (low|medium|high) of each rated worker in the cycle; unknown cycle → 404.
 
 #### `internal/hr/performance/controllers/controllers.go` (339 lines)
 - **type** `CycleService interface` — CycleService is the C1–C8 surface the edge needs.
@@ -5972,6 +7697,11 @@ _Package:_ Package services holds HR/Performance business rules (specification.m
 - **func** `(g gormRunner) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
 - **func** `(g gormRunner) DB() *gorm.DB { return g.db }`
 
+#### `internal/hr/performance/services/ratings_port.go` (38 lines)
+- **type** `RatingsPort struct{ base }` — RatingsPort implements performance/api.Ratings from the final ratings (PM-020).
+- **func** `NewRatingsPort(d Deps) *RatingsPort { return &RatingsPort{base{d}} }` — NewRatingsPort builds the port.
+- **func** `(p *RatingsPort) FinalBands(ctx context.Context, tenantID, cycleID uuid.UUID) (map[uuid.UUID]string, error)` — FinalBands returns each rated worker's performance band in the cycle.
+
 #### `internal/hr/performance/services/review_service.go` (243 lines)
 - **type** `ReviewService struct{ base }` — ReviewService implements FR-RV (V1–V6).
 - **func** `NewReviewService(d Deps) *ReviewService { return &ReviewService{base{d}} }` — NewReviewService builds the service.
@@ -6001,7 +7731,17 @@ _Package:_ Package validators holds Module 7 field rules that struct tags cannot
 #### `internal/hr/core/catalogue.go` (19 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Core's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). Approving is separate from initiating (DC-02).
 
-#### `internal/hr/core/module.go` (75 lines)
+#### `internal/hr/core/directory.go` (67 lines)
+- **type** `directory struct` — directory implements core/api.Directory over the core repository.
+- **func** `(d directory) PlacementOn(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (*api.Placement, error)`
+- **func** `(d directory) GradeState(ctx context.Context, tenantID, gradeID uuid.UUID) (bool, bool, error)`
+- **func** `(m *Module) Directory() api.Directory { return m.dir }` — Directory is the read port the other HR contexts use (core/api).
+- **func** `(m *Module) OnActionCompleted(h api.ActionHook) { m.hooks.Add(h) }` — OnActionCompleted registers a hook run when an HR action completes or is rescinded (onboarding OB-03).
+- **type** `positionsPort struct{ svc *services.PositionService }`
+- **func** `(p positionsPort) PositionInfo(ctx context.Context, tenantID, positionID uuid.UUID) (api.PositionInfo, error)` — PositionInfo reports a position and its open whole seats today (requisition RP-02).
+- **func** `(m *Module) Positions() api.Positions { return positionsPort{svc: m.positions} }` — Positions is the position read port other HR contexts use (core/api).
+
+#### `internal/hr/core/module.go` (82 lines)
 _Package:_ Package core wires HR/Core (job architecture, positions, assignments, HR actions) into M1 (docs/modules/m1-hr-management/contexts/core).
 - **type** `Ports struct` — Ports are the collaborators HR/Core consumes (design.md C2–C4).
 - **type** `Module struct` — Module is the HR/Core DI container.
@@ -6011,6 +7751,18 @@ _Package:_ Package core wires HR/Core (job architecture, positions, assignments,
 - **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, d RouteDeps)` — RegisterRoutes mounts HR/Core under rg.
 - **func** `(m *Module) Relay() *services.OutboxRelay { return m.relay }` — Relay exposes the outbox relay.
 - **func** `(m *Module) RunEffects(ctx context.Context) { m.effects.Run(ctx, sweepInterval) }` — RunEffects runs the hourly effective-date sweep until ctx is cancelled (CO-041).
+
+#### `internal/hr/core/api/api.go` (56 lines)
+_Package:_ Package api is what HR/Core publishes to the other HR contexts: read-only facts about job assignments and grades. Other contexts depend on this package only (import-boundary test in internal/hr).
+- **type** `Placement struct` — Placement is the worker's assignment facts on a date (all nil when there is no assignment).
+- **type** `Directory interface` — Directory reads core facts.
+- **method** `Directory.PlacementOn(ctx context.Context, tenantID, employeeID uuid.UUID, on time.Time) (*Placement, error)` — PlacementOn returns the worker's active assignment facts on the date, or nil.
+- **method** `Directory.GradeState(ctx context.Context, tenantID, gradeID uuid.UUID) (exists, active bool, err error)` — GradeState reports whether a grade exists in the tenant and whether it is active.
+- **type** `ActionFact struct` — ActionFact is an HR action that completed or was rescinded (onboarding OB-03).
+- **type** `ActionHook func(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, fact ActionFact) error` — ActionHook reacts to an action inside core's transaction; an error rolls the action back.
+- **type** `PositionInfo struct` — PositionInfo is what HR/Recruitment needs to know about a position (requisition RP-02).
+- **type** `Positions interface` — Positions reads positions for other contexts.
+- **method** `Positions.PositionInfo(ctx context.Context, tenantID, positionID uuid.UUID) (PositionInfo, error)`
 
 #### `internal/hr/core/controllers/controllers.go` (341 lines)
 - **type** `ArchitectureService interface` — ArchitectureService is the job-architecture surface (CO-001..CO-003).
@@ -6278,7 +8030,7 @@ _Package:_ Package routes mounts HR/Core endpoints (specification.md §4) behind
 - **func** `(s *ActionService) List(ctx context.Context, tenantID uuid.UUID, f repositories.ActionFilter, page dto.Page) ([]dto.ActionResponse, dto.PageMeta, error)` — List filters actions by worker, status and type.
 - **func** `actionResponse(a *models.Action) *dto.ActionResponse`
 
-#### `internal/hr/core/services/apply.go` (365 lines)
+#### `internal/hr/core/services/apply.go` (371 lines)
 - **func** `(s *ActionService) Approve(ctx context.Context, a Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)` — Approve completes a submitted action (CO-030, CO-035): re-plan under the worker lock, close and open assignments, and apply the effects at once when they are due (DC-06). The initiator cannot approve (DC-02).
 - **func** `(b base) write(ctx context.Context, tx *gorm.DB, act *models.Action, out *outcome) error` — write closes the current assignment and opens the next one (CO-035, CO-037), remembering what to restore.
 - **func** `(s *ActionService) Rescind(ctx context.Context, a Actor, id uuid.UUID, req dto.DecisionRequest) (*dto.ActionResponse, error)` — Rescind is CO-039: only the worker's latest completed action; assignments and applied effects are restored.
@@ -6341,6 +8093,12 @@ _Package:_ Package routes mounts HR/Core endpoints (specification.md §4) behind
 - **func** `orNotFound(err error) error`
 - **func** `conflictOK(err error) error` — conflictOK swallows the 409 an idempotent login change returns when the login is already in the target state.
 
+#### `internal/hr/core/services/hooks.go` (65 lines)
+- **type** `Hooks struct` — Hooks holds the action hooks other contexts register (core/api.ActionHook).
+- **func** `(h *Hooks) Add(fn api.ActionHook)` — Add registers a hook.
+- **func** `(h *Hooks) list() []api.ActionHook`
+- **func** `(b base) runHooks(ctx context.Context, tx *gorm.DB, act *models.Action, rescinded bool) error` — runHooks tells registered contexts about a completed or rescinded action, inside the same transaction.
+
 #### `internal/hr/core/services/plan.go` (343 lines)
 - **type** `outcome struct` — outcome is what completing an action writes (CO-035..CO-038).
 - **func** `(b base) plan(ctx context.Context, tx *gorm.DB, act *models.Action) (*outcome, error)` — plan validates an action against the worker's state on its effective date and computes the outcome. It runs inside a transaction (submit, approve); seats are checked under the position lock.
@@ -6355,7 +8113,7 @@ _Package:_ Package routes mounts HR/Core endpoints (specification.md §4) behind
 - **func** `(b base) checkNext(ctx context.Context, tx *gorm.DB, act *models.Action, next *models.Assignment, exclude uuid.UUID) error` — checkNext validates the references of the assignment to open (CO-003, CO-014, CO-033).
 - **func** `sameID(a, b *uuid.UUID) bool`
 
-#### `internal/hr/core/services/ports.go` (79 lines)
+#### `internal/hr/core/services/ports.go` (80 lines)
 _Package:_ Package services holds HR/Core business rules (specification.md CO-001..CO-051).
 - **type** `EmployeeDirectory interface` — EmployeeDirectory is core's view of HR/Employee (connection C2); employee/api.Directory satisfies it.
 - **method** `EmployeeDirectory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
@@ -6414,6 +8172,769 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - **func** `NewOutboxRelay(d Deps) *OutboxRelay { return &OutboxRelay{base: base{d}, interval: relayInterval} }` — NewOutboxRelay builds a relay over the context dependencies.
 - **func** `(r *OutboxRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *OutboxRelay) Run(ctx context.Context)` — Run ticks RelayOnce until ctx is cancelled.
+
+### M1 HR / Compensation
+
+
+#### `internal/hr/compensation/http.go` (287 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Compensation's permission catalogue (docs/ARCHITECTURE.md §17).
+- **type** `Module struct{ svc *Service }` — Module is the HR/Compensation container.
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires the store and service.
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)` — withID reads the actor and :id.
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `optionalUUIDQuery(c *gin.Context, name string) (*uuid.UUID, bool)`
+- **func** `paged[T any](c *gin.Context, rows []T, page, perPage int, total int64, err error)`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 24 operations under rg (/compensation).
+
+#### `internal/hr/compensation/merit.go` (459 lines)
+- **type** `CycleInput struct` — CycleInput creates or edits a draft merit cycle (CO-C20).
+- **func** `(in CycleInput) apply(c *Cycle) error`
+- **func** `(s *Service) CreateCycle(ctx context.Context, a Actor, in CycleInput) (*Cycle, error)` — CreateCycle is CO-C20.
+- **func** `(s *Service) UpdateCycle(ctx context.Context, a Actor, id uuid.UUID, in CycleInput) (*Cycle, error)` — UpdateCycle edits a draft (CO-C20).
+- **func** `(s *Service) GetCycle(ctx context.Context, a Actor, id uuid.UUID) (*Cycle, error)` — GetCycle returns one cycle.
+- **func** `(s *Service) Cycles(ctx context.Context, a Actor, status string, page, perPage int) ([]Cycle, int64, error)` — Cycles lists merit cycles.
+- **type** `BudgetInput struct` — BudgetInput is one department budget.
+- **func** `(s *Service) SetBudgets(ctx context.Context, a Actor, id uuid.UUID, in []BudgetInput) ([]Budget, error)` — SetBudgets replaces the cycle's budgets (CO-C21, draft only).
+- **func** `(s *Service) Budgets(ctx context.Context, a Actor, id uuid.UUID) ([]Budget, error)` — Budgets lists the cycle's budgets.
+- **func** `(s *Service) Move(ctx context.Context, a Actor, id uuid.UUID, to string) (*Cycle, error)` — Move advances the cycle (CO-C22, CO-C25): open snapshots proposals; approve needs a user other than the opener; apply writes the records and syncs payroll.
+- **func** `(s *Service) withCycle(ctx context.Context, a Actor, id uuid.UUID, verb string, fn func(*gorm.DB, *Cycle) error) (*Cycle, error)`
+- **func** `(s *Service) snapshot(ctx context.Context, tx *gorm.DB, a Actor, c *Cycle) error` — snapshot is CO-C22: one proposal per worker with a current record and a department on the cycle date.
+- **func** `(s *Service) propose(ctx context.Context, tx *gorm.DB, a Actor, c *Cycle, emp uuid.UUID, on time.Time, ratings map[uuid.UUID]string) error`
+- **func** `(s *Service) applyCycle(ctx context.Context, tx *gorm.DB, a Actor, c *Cycle) error` — applyCycle is CO-C25: one record per proposal with an increase, effective on the cycle date.
+- **func** `(s *Service) self(ctx context.Context, a Actor) (*uuid.UUID, error)` — self resolves the caller's employee profile, or nil.
+- **func** `(s *Service) Proposals(ctx context.Context, a Actor, cycleID uuid.UUID, mine bool) ([]Proposal, error)` — Proposals is CO-C26: read/manage see all; others only proposals they manage, only while open or in review.
+- **type** `ProposalInput struct` — ProposalInput updates a proposal (CO-C23, CO-C24).
+- **func** `(s *Service) UpdateProposal(ctx context.Context, a Actor, id uuid.UUID, in ProposalInput) (*Proposal, error)` — UpdateProposal is CO-C23/CO-C24: the worker's manager or compensation:manage, while the cycle is open.
+- **func** `outside(gs Guidelines, p *Proposal) bool` — outside reports whether a proposal's percentage falls outside its guideline cell (no cell = no limit).
+- **func** `(s *Service) checkBudget(ctx context.Context, tx *gorm.DB, a Actor, p *Proposal) error` — checkBudget is CO-C24 under the cycle lock: Σ amounts of the department ≤ budget unless overridden.
+- **type** `Usage struct` — Usage is a department's live budget usage (CO-C24).
+- **func** `(s *Service) usage(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID, replace *Proposal) (map[uuid.UUID]*Usage, error)` — usage sums amounts per department; replace substitutes one proposal's new values.
+- **func** `(s *Service) Usage(ctx context.Context, a Actor, cycleID uuid.UUID) ([]Usage, error)` — Usage is CO-C24 for HR.
+- **func** `orNotFound(err error) error`
+
+#### `internal/hr/compensation/models.go` (225 lines)
+_Package:_ Package compensation is HR/Compensation (docs/modules/m1-hr-management/contexts/compensation): pay ranges, effective-dated compensation records, off-cycle changes with maker-checker, and merit cycles.
+- **type** `PayRange struct` — PayRange is CO-C01.
+- **func** `(PayRange) TableName() string { return "comp_pay_ranges" }` — TableName maps to comp_pay_ranges.
+- **type** `Record struct` — Record is a worker's annual base over [EffectiveFrom, EffectiveTo) (CO-C11).
+- **func** `(Record) TableName() string { return "comp_records" }` — TableName maps to comp_records.
+- **func** `(r *Record) Covers(d time.Time) bool` — Covers reports whether the record is in effect on d.
+- **type** `Change struct` — Change is an off-cycle change request (CO-C10, CO-C13).
+- **func** `(Change) TableName() string { return "comp_changes" }` — TableName maps to comp_changes.
+- **type** `Guideline struct` — Guideline is one cell of the merit matrix (CO-C20).
+- **type** `Guidelines []Guideline` — Guidelines is the merit matrix, stored as JSON.
+- **func** `(g Guidelines) Value() (driver.Value, error)` — Value encodes the matrix.
+- **func** `(g *Guidelines) Scan(src interface{}) error` — Scan decodes the matrix.
+- **type** `Cycle struct` — Cycle is a merit cycle (CO-C20..CO-C25).
+- **func** `(Cycle) TableName() string { return "comp_merit_cycles" }` — TableName maps to comp_merit_cycles.
+- **type** `Budget struct` — Budget is a department's merit budget (CO-C21).
+- **func** `(Budget) TableName() string { return "comp_merit_budgets" }` — TableName maps to comp_merit_budgets.
+- **type** `Proposal struct` — Proposal is one worker's merit proposal with its snapshots (CO-C22..CO-C24).
+- **func** `(Proposal) TableName() string { return "comp_merit_proposals" }` — TableName maps to comp_merit_proposals.
+- **func** `(r *PayRange) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }` — BeforeCreate hooks assign UUID v4 ids.
+- **func** `(r *Record) BeforeCreate(*gorm.DB) error   { return assignID(&r.ID) }`
+- **func** `(r *Change) BeforeCreate(*gorm.DB) error   { return assignID(&r.ID) }`
+- **func** `(r *Cycle) BeforeCreate(*gorm.DB) error    { return assignID(&r.ID) }`
+- **func** `(r *Proposal) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }`
+- **func** `assignID(id *uuid.UUID) error`
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+
+#### `internal/hr/compensation/service.go` (477 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is compensation's view of HR/Employee.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.List(ctx context.Context, tenantID uuid.UUID, filter employeeDTO.EmployeeFilter) ([]employeeDTO.EmployeeResponse, int64, error)`
+- **type** `Ports struct` — Ports are the collaborators compensation consumes (design.md).
+- **type** `Actor struct` — Actor is the caller; CanRead / CanManage are compensation:read / compensation:manage.
+- **type** `Service struct` — Service implements compensation (CO-C01..CO-C26).
+- **func** `NewService(store Store, p Ports, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) today() time.Time { return day(s.now()) }`
+- **func** `day(t time.Time) time.Time`
+- **func** `parseDate(field, raw string) (Date, error)`
+- **func** `optional(field string, v *string, max int) (*string, error)`
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, resource, id string, meta map[string]string)`
+- **func** `(s *Service) worker(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `RangeInput struct` — RangeInput is a pay-range body.
+- **func** `(s *Service) CreateRange(ctx context.Context, a Actor, in RangeInput) (*PayRange, error)` — CreateRange is CO-C01: the previous open range of the grade closes at the new start.
+- **func** `(s *Service) Ranges(ctx context.Context, a Actor, grade *uuid.UUID) ([]PayRange, error)` — Ranges lists pay ranges, optionally for one grade.
+- **type** `Position struct` — Position is CO-C02: compa-ratio and penetration of a base for the worker's grade on a date.
+- **func** `(s *Service) position(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, base kernel.Money, on time.Time) (Position, error)` — position computes CO-C02 exactly (hundredths, half away from zero).
+- **func** `compaBand(c kernel.Fixed) string`
+- **func** `(s *Service) applyRecord(ctx context.Context, tx *gorm.DB, a Actor, r *Record) error` — applyRecord closes the open record at the new start and inserts the new one, then syncs payroll (CO-C11).
+- **func** `current(rows []Record, d time.Time) *Record` — current returns the record in effect on d, or nil.
+- **type** `ChangeInput struct` — ChangeInput is an off-cycle change body.
+- **func** `(s *Service) CreateChange(ctx context.Context, a Actor, in ChangeInput) (*Change, error)` — CreateChange is CO-C10: first records and raises up to 10% apply at once; everything else waits for approval.
+- **func** `(s *Service) Changes(ctx context.Context, a Actor, f ChangeFilter, page, perPage int) ([]Change, int64, error)` — Changes lists off-cycle changes.
+- **func** `(s *Service) GetChange(ctx context.Context, a Actor, id uuid.UUID) (*Change, error)` — GetChange returns one change.
+- **func** `(s *Service) DecideChange(ctx context.Context, a Actor, id uuid.UUID, to string, comment *string) (*Change, error)` — DecideChange approves (and applies), rejects or cancels a pending change (CO-C13). Approvers are never the requester; only the requester or compensation:manage cancels.
+- **type** `WorkerView struct` — WorkerView is CO-C12.
+- **func** `(s *Service) Worker(ctx context.Context, a Actor, employeeID uuid.UUID) (*WorkerView, error)` — Worker is CO-C12 for compensation:read.
+- **func** `(s *Service) Me(ctx context.Context, a Actor) (*WorkerView, error)` — Me is CO-C12 for the caller.
+
+#### `internal/hr/compensation/store.go` (166 lines)
+- **type** `ChangeFilter struct` — ChangeFilter narrows change lists.
+- **type** `Store interface` — Store is compensation data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Lock(ctx context.Context, tx *gorm.DB, key string) error` — Lock takes a transaction-scoped advisory lock on key.
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Ranges(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, gradeID *uuid.UUID) ([]PayRange, error)`
+- **method** `Store.Records(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]Record, error)`
+- **method** `Store.Change(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Change, error)`
+- **method** `Store.Changes(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ChangeFilter, page, perPage int) ([]Change, int64, error)`
+- **method** `Store.Cycle(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Cycle, error)`
+- **method** `Store.Cycles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page, perPage int) ([]Cycle, int64, error)`
+- **method** `Store.Budgets(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID) ([]Budget, error)`
+- **method** `Store.ReplaceBudgets(ctx context.Context, tx *gorm.DB, tenantID, cycleID uuid.UUID, rows []Budget) error`
+- **method** `Store.Proposals(ctx context.Context, db *gorm.DB, tenantID, cycleID uuid.UUID, manager *uuid.UUID) ([]Proposal, error)`
+- **method** `Store.Proposal(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Proposal, error)`
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event (ids, dates and reasons only).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Lock(ctx context.Context, tx *gorm.DB, key string) error`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Ranges(ctx context.Context, db *gorm.DB, t uuid.UUID, grade *uuid.UUID) ([]PayRange, error)`
+- **func** `(s gormStore) Records(ctx context.Context, db *gorm.DB, t, e uuid.UUID) ([]Record, error)`
+- **func** `take[T any](q *gorm.DB) (*T, error)`
+- **func** `scoped(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) *gorm.DB`
+- **func** `(s gormStore) Change(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Change, error)`
+- **func** `(s gormStore) Changes(ctx context.Context, db *gorm.DB, t uuid.UUID, f ChangeFilter, page, perPage int) ([]Change, int64, error)`
+- **func** `(s gormStore) Cycle(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Cycle, error)`
+- **func** `(s gormStore) Cycles(ctx context.Context, db *gorm.DB, t uuid.UUID, status string, page, perPage int) ([]Cycle, int64, error)`
+- **func** `(s gormStore) Budgets(ctx context.Context, db *gorm.DB, t, c uuid.UUID) ([]Budget, error)`
+- **func** `(s gormStore) ReplaceBudgets(ctx context.Context, tx *gorm.DB, t, c uuid.UUID, rows []Budget) error`
+- **func** `(s gormStore) Proposals(ctx context.Context, db *gorm.DB, t, c uuid.UUID, manager *uuid.UUID) ([]Proposal, error)`
+- **func** `(s gormStore) Proposal(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Proposal, error)`
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
+
+### M1 HR / Onboarding
+
+
+#### `internal/hr/onboarding/checklists.go` (492 lines)
+- **type** `Progress struct` — Progress counts a checklist's tasks (OB-09).
+- **type** `ChecklistView struct` — ChecklistView is a checklist with its tasks, clearance and progress (OB-09).
+- **func** `(s *Service) progress(tasks []Task) Progress`
+- **func** `(s *Service) view(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, c *Checklist) (*ChecklistView, error)`
+- **func** `(s *Service) visible(ctx context.Context, a Actor, id uuid.UUID) (*Checklist, *uuid.UUID, error)` — visible loads a checklist the caller may see: onboarding:read/manage, the worker, or the manager (OB-09).
+- **func** `involves(c *Checklist, me *uuid.UUID) bool`
+- **func** `(s *Service) Get(ctx context.Context, a Actor, id uuid.UUID) (*ChecklistView, error)` — Get is OB-09.
+- **func** `(s *Service) Checklists(ctx context.Context, a Actor, f ChecklistFilter, page, perPage int) ([]Checklist, int64, error)` — Checklists is OB-09: everything for onboarding:read/manage, else checklists where the caller is worker or manager.
+- **func** `(s *Service) Me(ctx context.Context, a Actor) ([]ChecklistView, error)` — Me is OB-09: the caller's own checklists with tasks.
+- **func** `(s *Service) MyTasks(ctx context.Context, a Actor) ([]Task, error)` — MyTasks is OB-09: tasks assigned to me on open checklists, plus pool tasks for onboarding:manage.
+- **func** `(s *Service) withTask(ctx context.Context, a Actor, id uuid.UUID, verb string, fn func(tx *gorm.DB, c *Checklist, t *Task, me *uuid.UUID) error) (*Task, error)` — withTask locks a task and its open checklist and runs fn; the checklist may complete afterwards (OB-06).
+- **func** `(s *Service) Done(ctx context.Context, a Actor, id uuid.UUID, note *string) (*Task, error)` — Done is OB-05: the assignee or onboarding:manage; a document task needs a verified document.
+- **func** `(s *Service) Skip(ctx context.Context, a Actor, id uuid.UUID, reason *string) (*Task, error)` — Skip is OB-05: onboarding:manage, with a reason, never a blocking task.
+- **func** `(s *Service) Reopen(ctx context.Context, a Actor, id uuid.UUID) (*Task, error)` — Reopen is OB-05 (onboarding:manage).
+- **func** `(s *Service) maybeComplete(ctx context.Context, tx *gorm.DB, c *Checklist) error` — maybeComplete closes the checklist when no task is open and (offboarding) clearance is complete (OB-06).
+- **func** `(s *Service) complete(ctx context.Context, tx *gorm.DB, c *Checklist, by *uuid.UUID) error`
+- **func** `(s *Service) withChecklist(ctx context.Context, a Actor, id uuid.UUID, verb string, fn func(tx *gorm.DB, c *Checklist) error) (*ChecklistView, error)` — withChecklist locks an open checklist (onboarding:manage) and runs fn.
+- **func** `(s *Service) Complete(ctx context.Context, a Actor, id uuid.UUID) (*ChecklistView, error)` — Complete is OB-06: no blocking task open and clearance complete; the remaining open tasks are skipped.
+- **func** `(s *Service) Cancel(ctx context.Context, a Actor, id uuid.UUID, reason *string) (*ChecklistView, error)` — Cancel is OB-06 (onboarding:manage, with a reason).
+- **func** `(s *Service) Clear(ctx context.Context, a Actor, id uuid.UUID, area string, note *string) (*ChecklistView, error)` — Clear is OB-07: the manager area by the worker's manager or onboarding:manage, the others by onboarding:manage.
+- **func** `(s *Service) SubmitExit(ctx context.Context, a Actor, id uuid.UUID, answers Answers) (*ExitInterview, error)` — SubmitExit is OB-08: the departing worker, once, on an open offboarding checklist.
+- **func** `(s *Service) GetExit(ctx context.Context, a Actor, id uuid.UUID) (*ExitInterview, error)` — GetExit is OB-08: the worker or onboarding:exit_interview; everyone else gets 404.
+- **func** `(s *Service) Progress(ctx context.Context, a Actor, kind string) ([]ProgressRow, error)` — Progress is OB-10.
+- **func** `(s *Service) ClearanceCompleted(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) (bool, error)` — ClearanceCompleted implements onboarding/api.Clearance for payroll final settlement (OB-07).
+
+#### `internal/hr/onboarding/http.go` (293 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Onboarding's permission catalogue (docs/ARCHITECTURE.md §17).
+- **type** `Module struct{ svc *Service }` — Module is the HR/Onboarding container.
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires the store and service.
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `(m *Module) Clearance() api.Clearance { return m.svc }` — Clearance is the port payroll uses before final settlement (onboarding/api).
+- **func** `(m *Module) Service() *Service { return m.svc }` — CoreHook and RecruitmentHook start and cancel checklists (OB-03); the HR root registers them.
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `optionalBody(c *gin.Context, dst interface{}) bool` — optionalBody binds a body when one was sent.
+- **func** `optionalUUIDQuery(c *gin.Context, name string) (*uuid.UUID, bool)`
+- **type** `reasonBody struct`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 19 operations under rg (/onboarding).
+
+#### `internal/hr/onboarding/models.go` (226 lines)
+_Package:_ Package onboarding is HR/Onboarding (docs/modules/m1-hr-management/contexts/onboarding): checklist templates, onboarding and offboarding checklists started by HR events, tasks, exit clearance and exit interviews.
+- **type** `Template struct` — Template is OB-01.
+- **func** `(Template) TableName() string { return "onb_templates" }` — TableName maps to onb_templates.
+- **func** `(t *Template) specificity() int` — specificity counts the criteria the template sets (OB-02).
+- **type** `TemplateTask struct` — TemplateTask is one task of a template (OB-01).
+- **func** `(TemplateTask) TableName() string { return "onb_template_tasks" }` — TableName maps to onb_template_tasks.
+- **type** `Checklist struct` — Checklist is a worker's onboarding or offboarding checklist (OB-03).
+- **func** `(Checklist) TableName() string { return "onb_checklists" }` — TableName maps to onb_checklists.
+- **type** `Task struct` — Task is one checklist task (OB-04, OB-05).
+- **func** `(Task) TableName() string { return "onb_tasks" }` — TableName maps to onb_tasks.
+- **type** `Clearance struct` — Clearance is one exit sign-off (OB-07).
+- **func** `(Clearance) TableName() string { return "onb_clearances" }` — TableName maps to onb_clearances.
+- **type** `Answers map[string]string` — Answers are exit-interview answers, stored as JSON.
+- **func** `(a Answers) Value() (driver.Value, error)` — Value encodes the answers.
+- **func** `(a *Answers) Scan(src interface{}) error` — Scan decodes the answers.
+- **type** `ExitInterview struct` — ExitInterview is OB-08.
+- **func** `(ExitInterview) TableName() string { return "onb_exit_interviews" }` — TableName maps to onb_exit_interviews.
+- **func** `(r *Template) BeforeCreate(*gorm.DB) error     { return assignID(&r.ID) }` — BeforeCreate hooks assign UUID v4 ids.
+- **func** `(r *TemplateTask) BeforeCreate(*gorm.DB) error { return assignID(&r.ID) }`
+- **func** `(r *Checklist) BeforeCreate(*gorm.DB) error    { return assignID(&r.ID) }`
+- **func** `(r *Task) BeforeCreate(*gorm.DB) error         { return assignID(&r.ID) }`
+- **func** `assignID(id *uuid.UUID) error`
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+
+#### `internal/hr/onboarding/service.go` (515 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is onboarding's view of HR/Employee.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `Ports struct` — Ports are the collaborators onboarding consumes.
+- **type** `Actor struct` — Actor is the caller; the flags are onboarding:read, onboarding:manage and onboarding:exit_interview.
+- **type** `Service struct` — Service implements onboarding (OB-01..OB-10).
+- **func** `NewService(store Store, p Ports, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) today() time.Time { return day(s.now()) }`
+- **func** `day(t time.Time) time.Time`
+- **func** `parseDate(field, raw string) (Date, error)`
+- **func** `text(field, v string, max int) (string, error)`
+- **func** `optional(field string, v *string, max int) (*string, error)`
+- **func** `optionalUUID(field string, v *string) (*uuid.UUID, error)`
+- **func** `orNotFound(err error) error`
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, resource, id string, meta map[string]string)`
+- **func** `(s *Service) self(ctx context.Context, a Actor) (*uuid.UUID, error)` — self resolves the caller's employee profile, or nil.
+- **type** `TemplateInput struct` — TemplateInput creates or edits a template; an empty string clears a criterion.
+- **func** `(in TemplateInput) apply(t *Template) error`
+- **func** `(s *Service) CreateTemplate(ctx context.Context, a Actor, in TemplateInput) (*Template, error)` — CreateTemplate is OB-01.
+- **func** `(s *Service) UpdateTemplate(ctx context.Context, a Actor, id uuid.UUID, in TemplateInput) (*Template, error)` — UpdateTemplate edits a template (the kind never changes).
+- **func** `(s *Service) GetTemplate(ctx context.Context, a Actor, id uuid.UUID) (*Template, error)` — GetTemplate returns a template with its tasks.
+- **func** `(s *Service) Templates(ctx context.Context, a Actor, kind, status string) ([]Template, error)` — Templates lists templates.
+- **type** `TaskInput struct` — TaskInput is one template task.
+- **func** `(s *Service) SetTasks(ctx context.Context, a Actor, id uuid.UUID, in []TaskInput) (*Template, error)` — SetTasks replaces a template's tasks (OB-01).
+- **type** `startSpec struct` — startSpec describes one checklist to start.
+- **func** `matches(t *Template, p *coreAPI.Placement) bool` — matches reports whether a template's criteria all match the placement (OB-02).
+- **func** `(s *Service) start(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, sp startSpec) (*Checklist, error)` — start creates the checklist unless the source already has one or the worker has an open one of the kind; it returns nil, nil when nothing was created (idempotent, OB-03).
+- **func** `(s *Service) CoreHook(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, f coreAPI.ActionFact) error` — CoreHook is the core/api.ActionHook (OB-03): hires start onboarding, terminations offboarding; a rescinded action cancels the checklist it started.
+- **func** `(s *Service) RecruitmentHook(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, f recruitmentAPI.HireFact) error` — RecruitmentHook is the recruitment/api.HireHook (OB-03): a hire starts onboarding from the joining date.
+- **type** `StartInput struct` — StartInput is a manual start.
+- **func** `(s *Service) Start(ctx context.Context, a Actor, in StartInput) (*ChecklistView, error)` — Start is a manual start by onboarding:manage (OB-03): an open checklist of the kind is a conflict.
+
+#### `internal/hr/onboarding/store.go` (227 lines)
+- **type** `ChecklistFilter struct` — ChecklistFilter narrows checklist lists; Involving restricts to checklists where the employee is the worker or the manager (OB-09).
+- **type** `ProgressRow struct` — ProgressRow is one department's line of the progress report (OB-10).
+- **type** `Store interface` — Store is onboarding data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Lock(ctx context.Context, tx *gorm.DB, key string) error` — Lock takes a transaction-scoped advisory lock on key.
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Template(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Template, error)`
+- **method** `Store.Templates(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, kind, status string) ([]Template, error)`
+- **method** `Store.TemplateTasks(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, templateIDs []uuid.UUID) ([]TemplateTask, error)`
+- **method** `Store.ReplaceTemplateTasks(ctx context.Context, tx *gorm.DB, tenantID, templateID uuid.UUID, rows []TemplateTask) error`
+- **method** `Store.Checklist(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Checklist, error)`
+- **method** `Store.ChecklistBySource(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, kind string, sourceID uuid.UUID) (*Checklist, error)`
+- **method** `Store.OpenChecklist(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, kind string) (*Checklist, error)`
+- **method** `Store.LatestOffboarding(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) (*Checklist, error)`
+- **method** `Store.Checklists(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ChecklistFilter, page, perPage int) ([]Checklist, int64, error)`
+- **method** `Store.Tasks(ctx context.Context, db *gorm.DB, tenantID, checklistID uuid.UUID) ([]Task, error)`
+- **method** `Store.Task(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Task, error)`
+- **method** `Store.AssignedTasks(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, employeeID *uuid.UUID, pool bool) ([]Task, error)` — AssignedTasks lists open-checklist tasks assigned to the employee, plus pool tasks when pool is true.
+- **method** `Store.Clearances(ctx context.Context, db *gorm.DB, tenantID, checklistID uuid.UUID) ([]Clearance, error)`
+- **method** `Store.ExitInterview(ctx context.Context, db *gorm.DB, tenantID, checklistID uuid.UUID) (*ExitInterview, error)`
+- **method** `Store.Progress(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, kind string, today time.Time) ([]ProgressRow, error)`
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event (ids, kinds and dates only).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Lock(ctx context.Context, tx *gorm.DB, key string) error`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `take[T any](q *gorm.DB) (*T, error)`
+- **func** `scoped(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) *gorm.DB`
+- **func** `(s gormStore) Template(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Template, error)`
+- **func** `(s gormStore) Templates(ctx context.Context, db *gorm.DB, t uuid.UUID, kind, status string) ([]Template, error)`
+- **func** `(s gormStore) TemplateTasks(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID) ([]TemplateTask, error)`
+- **func** `(s gormStore) ReplaceTemplateTasks(ctx context.Context, tx *gorm.DB, t, id uuid.UUID, rows []TemplateTask) error`
+- **func** `(s gormStore) Checklist(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Checklist, error)`
+- **func** `(s gormStore) ChecklistBySource(ctx context.Context, db *gorm.DB, t uuid.UUID, kind string, src uuid.UUID) (*Checklist, error)`
+- **func** `(s gormStore) OpenChecklist(ctx context.Context, db *gorm.DB, t, e uuid.UUID, kind string) (*Checklist, error)`
+- **func** `(s gormStore) LatestOffboarding(ctx context.Context, db *gorm.DB, t, e uuid.UUID) (*Checklist, error)`
+- **func** `(s gormStore) Checklists(ctx context.Context, db *gorm.DB, t uuid.UUID, f ChecklistFilter, page, perPage int) ([]Checklist, int64, error)`
+- **func** `(s gormStore) Tasks(ctx context.Context, db *gorm.DB, t, c uuid.UUID) ([]Task, error)`
+- **func** `(s gormStore) Task(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Task, error)`
+- **func** `(s gormStore) AssignedTasks(ctx context.Context, db *gorm.DB, t uuid.UUID, e *uuid.UUID, pool bool) ([]Task, error)`
+- **func** `(s gormStore) Clearances(ctx context.Context, db *gorm.DB, t, c uuid.UUID) ([]Clearance, error)`
+- **func** `(s gormStore) ExitInterview(ctx context.Context, db *gorm.DB, t, c uuid.UUID) (*ExitInterview, error)`
+- **func** `(s gormStore) Progress(ctx context.Context, db *gorm.DB, t uuid.UUID, kind string, today time.Time) ([]ProgressRow, error)`
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
+
+#### `internal/hr/onboarding/api/api.go` (15 lines)
+_Package:_ Package api is what HR/Onboarding publishes to the other HR contexts. Other contexts depend on this package only (import-boundary test in internal/hr).
+- **type** `Clearance interface` — Clearance tells payroll whether a leaver's exit clearance is complete (onboarding OB-07, payroll final settlement).
+- **method** `Clearance.ClearanceCompleted(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) (bool, error)`
+
+### M1 HR / Learning
+
+
+#### `internal/hr/learning/assign.go` (453 lines)
+- **type** `AssignmentInput struct` — AssignmentInput is the body of POST /assignments.
+- **type** `AssignResult struct` — AssignResult is what creating an assignment did (LN-C05).
+- **type** `RunResult struct` — RunResult is what a recurrence run did (LN-C14).
+- **type** `target struct` — target is a worker an assignment applies to, with the department they sit in (the report snapshot).
+- **type** `content struct` — content is what an assignment enrols a worker in: the courses (a plan's in order) and the plan, if any.
+- **func** `(s *Service) parseTarget(in AssignmentInput) (kind string, id *uuid.UUID, err error)`
+- **func** `(s *Service) contentOf(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, courseID, planID *uuid.UUID, mandatory bool, strict bool) (*content, error)` — contentOf resolves what an assignment enrols in, keeping only courses that can still be taken (published). strict makes a draft or retired course (or an archived plan) an error, as when the assignment is created.
+- **func** `matches(kind string, id *uuid.UUID, p *coreAPI.Placement) bool`
+- **func** `(s *Service) matchWorkers(ctx context.Context, tenantID uuid.UUID, kind string, id *uuid.UUID, on time.Time) ([]target, error)` — matchWorkers returns the active workers an assignment target covers on a date (LN-C06).
+- **func** `working(status string) bool` — working reports whether an employee status is current workforce: still employed, even on probation, in notice or on leave.
+- **func** `department(p *coreAPI.Placement) *uuid.UUID`
+- **func** `dueFor(a *Assignment, today Date) *Date` — dueFor is the due date of an enrolment created on `today` (LN-C05).
+- **func** `enrolmentRows(tenantID uuid.UUID, a *Assignment, c *content, workers []target, cycle int, today Date) []Enrolment` — enrolmentRows builds the idempotent enrolments of one assignment cycle for the workers (LN-C06).
+- **func** `(s *Service) CreateAssignment(ctx context.Context, a Actor, in AssignmentInput) (*AssignResult, error)` — CreateAssignment is LN-C05: it enrols every matching worker now.
+- **func** `(s *Service) CancelAssignment(ctx context.Context, a Actor, id uuid.UUID) (*Assignment, error)` — CancelAssignment stops future enrolments and recurrence; existing enrolments stay (LN-C05). It is idempotent.
+- **func** `(s *Service) GetAssignment(ctx context.Context, a Actor, id uuid.UUID) (*Assignment, error)` — GetAssignment returns an assignment.
+- **func** `(s *Service) Assignments(ctx context.Context, a Actor, status string, page, perPage int) ([]Assignment, int64, error)` — Assignments lists assignments.
+- **func** `(s *Service) CoreHook(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, fact coreAPI.ActionFact) error` — CoreHook is LN-C07: enrol a joiner or mover in the rule assignments their new placement matches. It runs inside core's transaction but in a savepoint, and never returns an error, so learning can neither block nor undo an HR action.
+- **func** `(s *Service) RunRecurrence(ctx context.Context, tenantID *uuid.UUID) (*RunResult, error)` — RunRecurrence is LN-C14: it starts the next cycle of every recurring assignment that is due. A nil tenant runs for all tenants (the background loop); each assignment advances by one cycle per run.
+- **func** `(s *Service) advance(ctx context.Context, asn *Assignment) (created int, ran bool, err error)` — advance runs one cycle of one assignment if it is due in its tenant's time zone.
+
+#### `internal/hr/learning/enrol.go` (687 lines)
+- **type** `SelfEnrolInput struct` — SelfEnrolInput is the body of POST /enrolments/self: exactly one of the two ids.
+- **type** `CompleteInput struct` — CompleteInput is the learner's completion submission (LN-C10).
+- **type** `CorrectInput struct` — CorrectInput is HR's correction of a completion (LN-C12).
+- **type** `EnrolmentView struct` — EnrolmentView is an enrolment with its live completion.
+- **type** `PendingItem struct` — PendingItem is a completion waiting for the caller to verify.
+- **type** `PlanProgress struct` — PlanProgress is a worker's progress through a plan (LN-C04).
+- **type** `PlanProgressItem struct` — PlanProgressItem is one course of a plan: status is `not_enrolled` before an enrolment exists.
+- **func** `decorate(rows []Enrolment, today Date)`
+- **func** `(s *Service) isManagerOf(ctx context.Context, a Actor, learnerUser uuid.UUID) (bool, error)`
+- **func** `(s *Service) reportIDs(ctx context.Context, a Actor) ([]uuid.UUID, error)` — reportIDs resolves the employee ids of the caller's direct reports.
+- **func** `validStatusFilter(status string) error`
+- **func** `(s *Service) EnrolSelf(ctx context.Context, a Actor, in SelfEnrolInput) ([]Enrolment, error)` — EnrolSelf enrols the caller in a course, or in every course of a plan, when the courses allow it.
+- **func** `(s *Service) own(ctx context.Context, tx *gorm.DB, a Actor, me uuid.UUID, id uuid.UUID) (*Enrolment, error)` — own loads an enrolment the caller owns, locked; anyone else's is 404.
+- **func** `(s *Service) Start(ctx context.Context, a Actor, id uuid.UUID) (*Enrolment, error)` — Start moves the caller's not-started enrolment to in progress.
+- **func** `completionFields(score *int, evidence, certificate *string) (*int, *string, *string, error)`
+- **func** `(s *Service) Complete(ctx context.Context, a Actor, id uuid.UUID, in CompleteInput) (*EnrolmentView, error)` — Complete is LN-C10: the learner attests completion; a course needing verification leaves it pending.
+- **func** `(s *Service) finish(ctx context.Context, tx *gorm.DB, a Actor, e *Enrolment) error` — finish marks an enrolment completed and emits the event.
+- **func** `(s *Service) Verify(ctx context.Context, a Actor, id uuid.UUID) (*EnrolmentView, error)` — Verify approves a pending completion.
+- **func** `(s *Service) Reject(ctx context.Context, a Actor, id uuid.UUID, comment string) (*EnrolmentView, error)` — Reject sends a pending completion back to the learner; the comment is required.
+- **func** `(s *Service) decide(ctx context.Context, a Actor, id uuid.UUID, approve bool, comment *string) (*EnrolmentView, error)`
+- **func** `(s *Service) mayVerify(ctx context.Context, a Actor, comp *Completion, learnerUser uuid.UUID) error` — mayVerify: learning:manage verifies anything; a manager verifies their reports' completions on manager-verified courses. Anyone else sees nothing (404).
+- **func** `(s *Service) Pending(ctx context.Context, a Actor) ([]PendingItem, error)` — Pending lists the completions the caller can verify.
+- **func** `(s *Service) Correct(ctx context.Context, a Actor, id uuid.UUID, in CorrectInput) (*EnrolmentView, error)` — Correct writes a new verified completion that supersedes the live one, or completes on the worker's behalf.
+- **func** `(s *Service) Waive(ctx context.Context, a Actor, id uuid.UUID, reason string) (*Enrolment, error)` — Waive excuses a live enrolment (LN-C13).
+- **func** `(s *Service) list(ctx context.Context, a Actor, f EnrolFilter, page, perPage int) ([]Enrolment, int64, error)`
+- **func** `(s *Service) Mine(ctx context.Context, a Actor, status string, page, perPage int) ([]Enrolment, int64, error)` — Mine lists the caller's enrolments.
+- **func** `(s *Service) Team(ctx context.Context, a Actor, status string, page, perPage int) ([]Enrolment, int64, error)` — Team lists the enrolments of the caller's direct reports.
+- **func** `(s *Service) Enrolments(ctx context.Context, a Actor, f EnrolFilter, page, perPage int) ([]Enrolment, int64, error)` — Enrolments lists every enrolment (learning:read).
+- **func** `(s *Service) GetEnrolment(ctx context.Context, a Actor, id uuid.UUID) (*EnrolmentView, error)` — GetEnrolment returns one enrolment with its live completion: the learner, their manager or learning:read.
+- **func** `(s *Service) Transcript(ctx context.Context, a Actor, page, perPage int) ([]EnrolmentView, int64, error)` — Transcript lists the caller's completed enrolments with their verified completion (LN-C15).
+- **func** `(s *Service) Progress(ctx context.Context, a Actor, planID uuid.UUID, employeeID *uuid.UUID) (*PlanProgress, error)` — Progress is LN-C04: a worker's progress through a plan; employee_id needs learning:read.
+- **func** `(s *Service) Compliance(ctx context.Context, a Actor, f ComplianceFilter) ([]ComplianceRow, error)` — Compliance is LN-C16.
+
+#### `internal/hr/learning/http.go` (436 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Learning's permission catalogue (docs/ARCHITECTURE.md §17).
+- **type** `Module struct{ svc *Service }` — Module is the HR/Learning container.
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires the store and service.
+- **func** `(m *Module) Service() *Service { return m.svc }` — Service exposes the service (the core action hook, recurrence).
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `(m *Module) RunRecurrence(ctx context.Context, onErr func(error))` — RunRecurrence starts recurring cycles every hour until ctx ends (LN-C14).
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `optionalBody(c *gin.Context, dst interface{}) bool` — optionalBody binds a JSON body only when one was sent.
+- **func** `optionalUUIDQuery(c *gin.Context, name string) (*uuid.UUID, bool)`
+- **func** `paged[T any](c *gin.Context, rows []T, page, perPage int, total int64, err error)`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 35 operations under rg (/learning).
+
+#### `internal/hr/learning/models.go` (280 lines)
+_Package:_ Package learning is HR/Learning (docs/modules/m1-hr-management/contexts/learning): a course catalogue with versions, ordered plans, rule and individual assignments with recurrence, enrolments, immutable completions with optional manager or HR verification, and a compliance report. Content is never hosted.
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+- **type** `Tags []string` — Tags is a course's tag list stored as JSON.
+- **func** `(t Tags) Value() (driver.Value, error)` — Value encodes the tags.
+- **func** `(t *Tags) Scan(src interface{}) error` — Scan decodes the tags.
+- **func** `assignID(id *uuid.UUID) error`
+- **type** `Settings struct` — Settings are the tenant's learning settings (LN-C09).
+- **func** `(Settings) TableName() string { return "lrn_settings" }` — TableName maps to lrn_settings.
+- **type** `Course struct` — Course is a catalogue entry (LN-C01).
+- **func** `(Course) TableName() string { return "lrn_courses" }` — TableName maps to lrn_courses.
+- **func** `(c *Course) BeforeCreate(*gorm.DB) error { return assignID(&c.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `CourseVersion struct` — CourseVersion is a snapshot of a course's content at a version (LN-C02).
+- **func** `(CourseVersion) TableName() string { return "lrn_course_versions" }` — TableName maps to lrn_course_versions.
+- **type** `Plan struct` — Plan is an ordered set of courses (LN-C04).
+- **func** `(Plan) TableName() string { return "lrn_plans" }` — TableName maps to lrn_plans.
+- **func** `(p *Plan) BeforeCreate(*gorm.DB) error { return assignID(&p.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `PlanItem struct` — PlanItem is one course of a plan.
+- **func** `(PlanItem) TableName() string { return "lrn_plan_items" }` — TableName maps to lrn_plan_items.
+- **type** `Assignment struct` — Assignment gives a course or plan to a worker or a rule's matches (LN-C05).
+- **func** `(Assignment) TableName() string { return "lrn_assignments" }` — TableName maps to lrn_assignments.
+- **func** `(a *Assignment) BeforeCreate(*gorm.DB) error { return assignID(&a.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Enrolment struct` — Enrolment is one worker's place in one course (LN-C06..LN-C13).
+- **func** `(Enrolment) TableName() string { return "lrn_enrolments" }` — TableName maps to lrn_enrolments.
+- **func** `(e *Enrolment) BeforeCreate(*gorm.DB) error { return assignID(&e.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `(e *Enrolment) Live() bool { return e.Status == EnrolNotStarted || e.Status == EnrolInProgress }` — Live reports whether the enrolment can still be worked on.
+- **type** `Completion struct` — Completion is an immutable attestation of completing an enrolment (LN-C10..LN-C12).
+- **func** `(Completion) TableName() string { return "lrn_completions" }` — TableName maps to lrn_completions.
+- **func** `(c *Completion) BeforeCreate(*gorm.DB) error { return assignID(&c.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+
+#### `internal/hr/learning/service.go` (675 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is learning's view of HR/Employee.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.List(ctx context.Context, tenantID uuid.UUID, filter employeeDTO.EmployeeFilter) ([]employeeDTO.EmployeeResponse, int64, error)`
+- **type** `Reports interface` — Reports resolves a manager's direct reports (HR/Organization mappings).
+- **method** `Reports.DirectReportUserIDs(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)`
+- **type** `Ports struct` — Ports are the collaborators learning consumes.
+- **type** `Actor struct` — Actor is the caller; CanRead / CanManage are learning:read / learning:manage.
+- **type** `Service struct` — Service implements learning (LN-C01..LN-C18).
+- **func** `NewService(store Store, p Ports, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, resource, id string, meta map[string]string)`
+- **func** `orNotFound(err error) error`
+- **func** `parseID(field, raw string) (uuid.UUID, error)`
+- **func** `required(field, v string, max int) (string, error)`
+- **func** `optional(field string, v *string, max int) (*string, error)`
+- **func** `midnight(t time.Time) time.Time`
+- **func** `(s *Service) zone(ctx context.Context, tenantID uuid.UUID) (string, error)` — zone returns the tenant's learning time zone name (LN-C09).
+- **func** `(s *Service) today(ctx context.Context, tenantID uuid.UUID) (Date, error)` — today is the tenant's calendar date now.
+- **func** `(s *Service) me(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)`
+- **func** `(s *Service) worker(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `SettingsInput struct` — SettingsInput is the settings body.
+- **func** `(s *Service) GetSettings(ctx context.Context, a Actor) (*Settings, error)` — GetSettings returns the tenant's settings or the defaults.
+- **func** `(s *Service) PutSettings(ctx context.Context, a Actor, in SettingsInput) (*Settings, error)` — PutSettings sets the tenant's IANA time zone.
+- **func** `httpsURL(field, raw string, max int) (string, error)` — httpsURL accepts only absolute https URLs with a host and no user-info.
+- **func** `itoa(n int) string { b, _ := json.Marshal(n); return string(b) }`
+- **func** `reference(field, raw string, max int, allowURL bool) (string, error)` — reference accepts an https URL or an opaque reference (no scheme, no colon).
+- **type** `CourseInput struct` — CourseInput creates (title and content_kind required) or patches a course.
+- **func** `applyCourse(c *Course, in CourseInput) error` — applyCourse copies the given fields onto c and validates the whole course.
+- **func** `validateCourse(c *Course) error`
+- **func** `contentSnapshot(c *Course) json.RawMessage` — contentSnapshot is the versioned part of a course (LN-C02).
+- **func** `(s *Service) addVersion(ctx context.Context, tx *gorm.DB, a Actor, c *Course) error`
+- **func** `(s *Service) CreateCourse(ctx context.Context, a Actor, in CourseInput) (*Course, error)` — CreateCourse is LN-C01: a draft course at version 1.
+- **func** `(s *Service) UpdateCourse(ctx context.Context, a Actor, id uuid.UUID, in CourseInput) (*Course, error)` — UpdateCourse is LN-C02: content changes bump the version.
+- **func** `(s *Service) moveCourse(ctx context.Context, a Actor, id uuid.UUID, to string, from ...string) (*Course, error)`
+- **func** `(s *Service) PublishCourse(ctx context.Context, a Actor, id uuid.UUID) (*Course, error)` — PublishCourse moves draft → published (LN-C03).
+- **func** `(s *Service) RetireCourse(ctx context.Context, a Actor, id uuid.UUID) (*Course, error)` — RetireCourse moves draft | published → retired; enrolments and completions stay (LN-C03).
+- **func** `(s *Service) Courses(ctx context.Context, a Actor, status string, page, perPage int) ([]Course, int64, error)` — Courses lists the catalogue for managers and readers.
+- **func** `(s *Service) Catalog(ctx context.Context, a Actor, page, perPage int) ([]Course, int64, error)` — Catalog lists published courses for any learner.
+- **func** `(s *Service) GetCourse(ctx context.Context, a Actor, id uuid.UUID) (*Course, error)` — GetCourse returns a course.
+- **func** `(s *Service) Versions(ctx context.Context, a Actor, id uuid.UUID) ([]CourseVersion, error)` — Versions lists a course's content snapshots, newest first.
+- **type** `PlanInput struct` — PlanInput creates or patches a plan.
+- **type** `ItemInput struct` — ItemInput is one plan item.
+- **func** `(s *Service) planWithItems(ctx context.Context, db *gorm.DB, p *Plan) (*Plan, error)`
+- **func** `(s *Service) applyPlan(ctx context.Context, tx *gorm.DB, p *Plan, in PlanInput) error`
+- **func** `(s *Service) CreatePlan(ctx context.Context, a Actor, in PlanInput) (*Plan, error)` — CreatePlan is LN-C04.
+- **func** `(s *Service) UpdatePlan(ctx context.Context, a Actor, id uuid.UUID, in PlanInput) (*Plan, error)` — UpdatePlan renames, re-describes or archives a plan.
+- **func** `(s *Service) SetItems(ctx context.Context, a Actor, id uuid.UUID, in []ItemInput) (*Plan, error)` — SetItems replaces a plan's ordered items.
+- **func** `(s *Service) GetPlan(ctx context.Context, a Actor, id uuid.UUID) (*Plan, error)` — GetPlan returns a plan with its items.
+- **func** `(s *Service) Plans(ctx context.Context, a Actor, status string, page, perPage int) ([]Plan, int64, error)` — Plans lists plans.
+
+#### `internal/hr/learning/store.go` (343 lines)
+- **type** `EnrolFilter struct` — EnrolFilter narrows enrolment lists. Today is the tenant's calendar date, used by the overdue filter.
+- **type** `ComplianceFilter struct` — ComplianceFilter narrows the compliance report.
+- **type** `ComplianceRow struct` — ComplianceRow is one department and course of the compliance report (LN-C16).
+- **type** `Store interface` — Store is learning data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Lock(ctx context.Context, tx *gorm.DB, key string) error` — Lock takes a transaction-scoped advisory lock on key.
+- **method** `Store.Savepoint(ctx context.Context, tx *gorm.DB, fn func(sp *gorm.DB) error) error` — Savepoint runs fn in a savepoint of tx: an error undoes only fn's work and leaves tx usable.
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Settings(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (*Settings, error)`
+- **method** `Store.SaveSettings(ctx context.Context, tx *gorm.DB, row *Settings) error`
+- **method** `Store.Course(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Course, error)`
+- **method** `Store.Courses(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page, perPage int) ([]Course, int64, error)`
+- **method** `Store.CoursesByIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID) ([]Course, error)`
+- **method** `Store.Published(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, page, perPage int) ([]Course, int64, error)`
+- **method** `Store.Versions(ctx context.Context, db *gorm.DB, tenantID, courseID uuid.UUID) ([]CourseVersion, error)`
+- **method** `Store.Plan(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Plan, error)`
+- **method** `Store.Plans(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page, perPage int) ([]Plan, int64, error)`
+- **method** `Store.PlanNameTaken(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, name string, except uuid.UUID) (bool, error)`
+- **method** `Store.PlanItems(ctx context.Context, db *gorm.DB, tenantID, planID uuid.UUID) ([]PlanItem, error)`
+- **method** `Store.ReplaceItems(ctx context.Context, tx *gorm.DB, tenantID, planID uuid.UUID, rows []PlanItem) error`
+- **method** `Store.Assignment(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Assignment, error)`
+- **method** `Store.Assignments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page, perPage int) ([]Assignment, int64, error)`
+- **method** `Store.RuleAssignments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]Assignment, error)` — RuleAssignments lists the tenant's active rule assignments (every kind but employee).
+- **method** `Store.DueRecurring(ctx context.Context, db *gorm.DB, tenantID *uuid.UUID, upTo Date) ([]Assignment, error)` — DueRecurring lists active recurring assignments whose next cycle is on or before upTo; a nil tenant means all.
+- **method** `Store.InsertEnrolments(ctx context.Context, tx *gorm.DB, rows []Enrolment) (int, error)` — InsertEnrolments inserts, skipping rows whose dedupe key exists, and reports how many were created.
+- **method** `Store.Enrolment(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Enrolment, error)`
+- **method** `Store.Enrolments(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f EnrolFilter, page, perPage int) ([]Enrolment, int64, error)`
+- **method** `Store.EnrolmentsByIDs(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID) ([]Enrolment, error)`
+- **method** `Store.CourseEnrolments(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, courseIDs []uuid.UUID) ([]Enrolment, error)` — CourseEnrolments lists the worker's enrolments in the courses, newest cycle first, whatever their source.
+- **method** `Store.LiveSelfEnrolment(ctx context.Context, db *gorm.DB, tenantID, employeeID, courseID uuid.UUID) (*Enrolment, error)`
+- **method** `Store.Compliance(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ComplianceFilter) ([]ComplianceRow, error)`
+- **method** `Store.Completion(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Completion, error)`
+- **method** `Store.LiveCompletion(ctx context.Context, db *gorm.DB, tenantID, enrolmentID uuid.UUID, lock bool) (*Completion, error)` — LiveCompletion is the enrolment's pending or verified completion, if any.
+- **method** `Store.LiveCompletions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, enrolmentIDs []uuid.UUID) ([]Completion, error)`
+- **method** `Store.Pending(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]Completion, error)`
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event (ids and statuses only).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Lock(ctx context.Context, tx *gorm.DB, key string) error`
+- **func** `(s gormStore) Savepoint(ctx context.Context, tx *gorm.DB, fn func(sp *gorm.DB) error) error`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `take[T any](q *gorm.DB) (*T, error)`
+- **func** `scoped(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) *gorm.DB`
+- **func** `paginate[T any](q *gorm.DB, order string, page, perPage int) ([]T, int64, error)`
+- **func** `(s gormStore) Settings(ctx context.Context, db *gorm.DB, t uuid.UUID) (*Settings, error)`
+- **func** `(s gormStore) SaveSettings(ctx context.Context, tx *gorm.DB, row *Settings) error`
+- **func** `(s gormStore) Course(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Course, error)`
+- **func** `(s gormStore) Courses(ctx context.Context, db *gorm.DB, t uuid.UUID, status string, page, perPage int) ([]Course, int64, error)`
+- **func** `(s gormStore) CoursesByIDs(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID) ([]Course, error)`
+- **func** `(s gormStore) Published(ctx context.Context, db *gorm.DB, t uuid.UUID, page, perPage int) ([]Course, int64, error)`
+- **func** `(s gormStore) Versions(ctx context.Context, db *gorm.DB, t, c uuid.UUID) ([]CourseVersion, error)`
+- **func** `(s gormStore) Plan(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Plan, error)`
+- **func** `(s gormStore) Plans(ctx context.Context, db *gorm.DB, t uuid.UUID, status string, page, perPage int) ([]Plan, int64, error)`
+- **func** `(s gormStore) PlanNameTaken(ctx context.Context, db *gorm.DB, t uuid.UUID, name string, except uuid.UUID) (bool, error)`
+- **func** `(s gormStore) PlanItems(ctx context.Context, db *gorm.DB, t, p uuid.UUID) ([]PlanItem, error)`
+- **func** `(s gormStore) ReplaceItems(ctx context.Context, tx *gorm.DB, t, p uuid.UUID, rows []PlanItem) error`
+- **func** `(s gormStore) Assignment(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Assignment, error)`
+- **func** `(s gormStore) Assignments(ctx context.Context, db *gorm.DB, t uuid.UUID, status string, page, perPage int) ([]Assignment, int64, error)`
+- **func** `(s gormStore) RuleAssignments(ctx context.Context, db *gorm.DB, t uuid.UUID) ([]Assignment, error)`
+- **func** `(s gormStore) DueRecurring(ctx context.Context, db *gorm.DB, t *uuid.UUID, upTo Date) ([]Assignment, error)`
+- **func** `(s gormStore) InsertEnrolments(ctx context.Context, tx *gorm.DB, rows []Enrolment) (int, error)`
+- **func** `(s gormStore) Enrolment(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Enrolment, error)`
+- **func** `(s gormStore) Enrolments(ctx context.Context, db *gorm.DB, t uuid.UUID, f EnrolFilter, page, perPage int) ([]Enrolment, int64, error)`
+- **func** `(s gormStore) EnrolmentsByIDs(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID) ([]Enrolment, error)`
+- **func** `(s gormStore) CourseEnrolments(ctx context.Context, db *gorm.DB, t, e uuid.UUID, courses []uuid.UUID) ([]Enrolment, error)`
+- **func** `(s gormStore) LiveSelfEnrolment(ctx context.Context, db *gorm.DB, t, e, c uuid.UUID) (*Enrolment, error)`
+- **func** `(s gormStore) Compliance(ctx context.Context, db *gorm.DB, t uuid.UUID, f ComplianceFilter) ([]ComplianceRow, error)`
+- **func** `(s gormStore) Completion(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Completion, error)`
+- **func** `(s gormStore) LiveCompletion(ctx context.Context, db *gorm.DB, t, e uuid.UUID, lock bool) (*Completion, error)`
+- **func** `(s gormStore) LiveCompletions(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID) ([]Completion, error)`
+- **func** `(s gormStore) Pending(ctx context.Context, db *gorm.DB, t uuid.UUID) ([]Completion, error)`
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
+
+### M1 HR / Benefits
+
+
+#### `internal/hr/benefits/elections.go` (892 lines)
+- **type** `WindowState struct` — WindowState says whether the caller may elect now and why (BN-C04).
+- **type** `Option struct` — Option is one plan offered to the caller, with the version in force and their live election.
+- **type** `Options struct` — Options is GET /options.
+- **type** `ElectInput struct` — ElectInput creates an election.
+- **type** `ChangeInput struct` — ChangeInput changes the level or dependants of an election.
+- **type** `DependantInput struct` — DependantInput creates or patches a dependant.
+- **type** `LifeEventInput struct` — LifeEventInput records a life event; employee_id needs benefits:manage.
+- **type** `ReportRow struct` — ReportRow is one plan and level of the enrolment report (BN-C10); no personal data.
+- **func** `versionOn(vs []PlanVersion, on time.Time) *PlanVersion`
+- **func** `hasStr(list []string, v string) bool`
+- **func** `hasID(list []uuid.UUID, v *uuid.UUID) bool`
+- **func** `eligible(e Eligibility, emp *employeeDTO.EmployeeResponse, pl *coreAPI.Placement, on time.Time) bool` — eligible is BN-C03: every non-empty restriction must be met.
+- **func** `(s *Service) windowFor(ctx context.Context, emp *employeeDTO.EmployeeResponse, on Date) (string, error)` — windowFor is BN-C04: which enrolment window, if any, is open for the worker on the date.
+- **func** `(s *Service) requireWindow(ctx context.Context, emp *employeeDTO.EmployeeResponse, on Date) error`
+- **func** `(s *Service) Options(ctx context.Context, a Actor) (*Options, error)` — Options is GET /options: the plans offered to the caller today and whether they may elect.
+- **func** `(s *Service) choice(ctx context.Context, emp *employeeDTO.EmployeeResponse, p *Plan, levelCode string, depIDs []string, from Date) (IDs, error)` — choice validates a level and dependants for a plan on the start date and returns the covered dependant ids (BN-C05).
+- **func** `(s *Service) startDate(raw *string) (Date, error)`
+- **func** `(s *Service) activePlan(ctx context.Context, tenantID, id uuid.UUID) (*Plan, error)`
+- **func** `end(e *Election, on Date, reason string, now time.Time)`
+- **func** `(s *Service) Elect(ctx context.Context, a Actor, in ElectInput) (*Election, error)` — Elect is BN-C05: a new election for a plan inside an open window.
+- **func** `(s *Service) Change(ctx context.Context, a Actor, id uuid.UUID, in ChangeInput) (*Election, error)` — Change is BN-C06: end the current election on the new one's start date and write the new one.
+- **func** `(s *Service) Waive(ctx context.Context, a Actor, planIDRaw string) (*Election, error)` — Waive is BN-C06: an explicit waived election from today; any active election of the plan ends today. It is idempotent.
+- **func** `(s *Service) End(ctx context.Context, a Actor, id uuid.UUID) (*Election, error)` — End is BN-C06: end an election today (a future one is cancelled). The owner needs an open window; benefits:manage may end anyone's election at any time.
+- **func** `(s *Service) MyElections(ctx context.Context, a Actor) ([]Election, error)` — MyElections lists the caller's elections, history included.
+- **func** `(s *Service) Elections(ctx context.Context, a Actor, f ElectionFilter, page, perPage int) ([]Election, int64, error)` — Elections lists anyone's elections (benefits:read_sensitive).
+- **func** `(s *Service) Deductions(ctx context.Context, tenantID, employeeID uuid.UUID, _, to time.Time) ([]payrollAPI.BenefitLine, error)` — Deductions implements payroll's BenefitDeductions: the employee cost of each election in force on the period's last day, at the level's cost in the version in force that day. A level missing from that version is skipped.
+- **func** `(s *Service) MyDeductions(ctx context.Context, a Actor, month string) ([]payrollAPI.BenefitLine, error)` — MyDeductions previews the caller's deductions for a month ("YYYY-MM", default the current month).
+- **func** `(s *Service) CoreHook(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, fact coreAPI.ActionFact) error` — CoreHook is BN-C08: a termination ends the worker's elections the day after their last working day; rescinding it reinstates exactly those. An error rolls the action back, because a missed end would keep deducting.
+- **func** `(s *Service) EnrolmentReport(ctx context.Context, a Actor) ([]ReportRow, error)` — EnrolmentReport counts active elections and waivers per plan and level today, with the monthly costs they imply.
+- **func** `(s *Service) dependantFields(d *Dependant, in DependantInput) error`
+- **func** `(s *Service) CreateDependant(ctx context.Context, a Actor, in DependantInput) (*Dependant, error)` — CreateDependant adds a dependant to the caller.
+- **func** `(s *Service) UpdateDependant(ctx context.Context, a Actor, id uuid.UUID, in DependantInput) (*Dependant, error)` — UpdateDependant patches the caller's own dependant.
+- **func** `(s *Service) RemoveDependant(ctx context.Context, a Actor, id uuid.UUID) (*Dependant, error)` — RemoveDependant retires a dependant unless a live election covers them.
+- **func** `(s *Service) MyDependants(ctx context.Context, a Actor) ([]Dependant, error)` — MyDependants lists the caller's active dependants.
+- **func** `(s *Service) EmployeeDependants(ctx context.Context, a Actor, employeeID uuid.UUID) ([]Dependant, error)` — EmployeeDependants lists a worker's dependants (benefits:read_sensitive).
+- **func** `(s *Service) RecordLifeEvent(ctx context.Context, a Actor, in LifeEventInput) (*LifeEvent, error)` — RecordLifeEvent records a life event for the caller, or for a worker with benefits:manage.
+- **func** `(s *Service) MyLifeEvents(ctx context.Context, a Actor) ([]LifeEvent, error)` — MyLifeEvents lists the caller's life events.
+- **func** `(s *Service) EmployeeLifeEvents(ctx context.Context, a Actor, employeeID uuid.UUID) ([]LifeEvent, error)` — EmployeeLifeEvents lists a worker's life events (benefits:read_sensitive).
+
+#### `internal/hr/benefits/http.go` (352 lines)
+- **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Benefits' permission catalogue (docs/ARCHITECTURE.md §17).
+- **type** `Module struct{ svc *Service }` — Module is the HR/Benefits container.
+- **func** `NewModule(db *gorm.DB, p Ports) *Module` — NewModule wires the store and service.
+- **func** `(m *Module) Service() *Service { return m.svc }` — Service exposes the service (the core action hook, the payroll deduction source).
+- **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists models for legacy AutoMigrate (the SQL migrations are the authority).
+- **func** `fail(c *gin.Context, err error)`
+- **func** `respond(c *gin.Context, status int, data interface{}, err error)`
+- **func** `actor(c *gin.Context) (Actor, bool)`
+- **func** `badRequest(c *gin.Context, msg string)`
+- **func** `withID(c *gin.Context) (Actor, uuid.UUID, bool)`
+- **func** `bind(c *gin.Context, dst interface{}) bool`
+- **func** `optionalUUIDQuery(c *gin.Context, name string) (*uuid.UUID, bool)`
+- **func** `paged[T any](c *gin.Context, rows []T, page, perPage int, total int64, err error)`
+- **func** `(m *Module) RegisterRoutes(rg *gin.RouterGroup, idp identityport.HTTP)` — RegisterRoutes mounts the 29 operations under rg (/benefits).
+
+#### `internal/hr/benefits/models.go` (290 lines)
+_Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contexts/benefits): tenant-defined plans with effective-dated cost versions, eligibility, enrolment windows, elections with dependants, life events and the monthly deduction hand-off to payroll.
+- **type** `Date struct{ time.Time }` — Date is a calendar date stored as DATE and exchanged as "YYYY-MM-DD".
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return []byte(`"` + d.Format(DateLayout) + `"`), nil }` — MarshalJSON renders YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.Format(DateLayout), nil }` — Value stores the date.
+- **func** `(d *Date) Scan(src interface{}) error` — Scan reads a DATE.
+- **func** `scanJSON(src interface{}, dst interface{}) error`
+- **type** `Eligibility struct` — Eligibility restricts who is offered a plan (BN-C03); an empty list means no restriction.
+- **func** `(e Eligibility) Value() (driver.Value, error)` — Value encodes the eligibility.
+- **func** `(e *Eligibility) Scan(src interface{}) error { return scanJSON(src, e) }` — Scan decodes the eligibility.
+- **type** `Level struct` — Level is one coverage level of a plan version; costs are per month (BN-C02).
+- **type** `Levels []Level` — Levels is a version's coverage levels, stored as JSON.
+- **func** `(l Levels) Value() (driver.Value, error)` — Value encodes the levels.
+- **func** `(l *Levels) Scan(src interface{}) error { return scanJSON(src, l) }` — Scan decodes the levels.
+- **type** `IDs []uuid.UUID` — IDs is a list of ids stored as JSON (an election's covered dependants).
+- **func** `(i IDs) Value() (driver.Value, error)` — Value encodes the ids.
+- **func** `(i *IDs) Scan(src interface{}) error { return scanJSON(src, i) }` — Scan decodes the ids.
+- **func** `assignID(id *uuid.UUID) error`
+- **type** `Plan struct` — Plan is a tenant-defined benefit plan (BN-C01).
+- **func** `(Plan) TableName() string { return "ben_plans" }` — TableName maps to ben_plans.
+- **func** `(p *Plan) BeforeCreate(*gorm.DB) error { return assignID(&p.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `PlanVersion struct` — PlanVersion holds a plan's costs over [EffectiveFrom, EffectiveTo) (BN-C02).
+- **func** `(PlanVersion) TableName() string { return "ben_plan_versions" }` — TableName maps to ben_plan_versions.
+- **func** `(v PlanVersion) In(on time.Time) bool` — In reports whether the version is in force on the date.
+- **func** `(v PlanVersion) Level(code string) (Level, bool)` — Level finds a coverage level by code.
+- **type** `Window struct` — Window is a tenant-wide open-enrolment window (BN-C04).
+- **func** `(Window) TableName() string { return "ben_windows" }` — TableName maps to ben_windows.
+- **func** `(w *Window) BeforeCreate(*gorm.DB) error { return assignID(&w.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Settings struct` — Settings are the tenant's window lengths (BN-C04).
+- **func** `(Settings) TableName() string { return "ben_settings" }` — TableName maps to ben_settings.
+- **type** `Dependant struct` — Dependant is a person a worker may cover (BN-C09); sensitive.
+- **func** `(Dependant) TableName() string { return "ben_dependants" }` — TableName maps to ben_dependants.
+- **func** `(d *Dependant) BeforeCreate(*gorm.DB) error { return assignID(&d.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `LifeEvent struct` — LifeEvent opens a special enrolment window (BN-C04, BN-C09); sensitive.
+- **func** `(LifeEvent) TableName() string { return "ben_life_events" }` — TableName maps to ben_life_events.
+- **func** `(l *LifeEvent) BeforeCreate(*gorm.DB) error { return assignID(&l.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **type** `Election struct` — Election is a worker's choice for a plan over [EffectiveFrom, EffectiveTo) (BN-C05, BN-C06). A waived election has no level.
+- **func** `(Election) TableName() string { return "ben_elections" }` — TableName maps to ben_elections.
+- **func** `(e *Election) BeforeCreate(*gorm.DB) error { return assignID(&e.ID) }` — BeforeCreate assigns a UUID v4 when unset.
+- **func** `(e Election) CoversDay(on time.Time) bool` — CoversDay reports whether the election is in force on the date (waived elections cost and cover nothing).
+
+#### `internal/hr/benefits/service.go` (548 lines)
+- **func** `appErr(status int, code, msg string) *sharedErrors.AppError`
+- **func** `invalid(field, msg string) *sharedErrors.AppError`
+- **type** `Directory interface` — Directory is benefits' view of HR/Employee.
+- **method** `Directory.GetByID(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **method** `Directory.GetByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `Ports struct` — Ports are the collaborators benefits consumes.
+- **type** `Actor struct` — Actor is the caller; the flags are benefits:read / manage / read_sensitive.
+- **type** `Service struct` — Service implements benefits (BN-C01..BN-C11).
+- **func** `NewService(store Store, p Ports, now func() time.Time) *Service` — NewService builds the service.
+- **func** `(s *Service) log(ctx context.Context, a Actor, action, resource, id string, meta map[string]string)`
+- **func** `orNotFound(err error) error`
+- **func** `midnight(t time.Time) time.Time`
+- **func** `(s *Service) today() Date { return Date{midnight(s.now().UTC())} }`
+- **func** `parseDate(field, raw string) (Date, error)`
+- **func** `required(field, v string, max int) (string, error)`
+- **func** `optional(field string, v *string, max int) (*string, error)`
+- **func** `(s *Service) me(ctx context.Context, a Actor) (*employeeDTO.EmployeeResponse, error)`
+- **func** `(s *Service) worker(ctx context.Context, tenantID, id uuid.UUID) (*employeeDTO.EmployeeResponse, error)`
+- **type** `SettingsInput struct` — SettingsInput is the settings body.
+- **func** `(s *Service) settings(ctx context.Context, tenantID uuid.UUID) (Settings, error)`
+- **func** `(s *Service) GetSettings(ctx context.Context, a Actor) (*Settings, error)` — GetSettings returns the window lengths or the defaults.
+- **func** `(s *Service) PutSettings(ctx context.Context, a Actor, in SettingsInput) (*Settings, error)` — PutSettings sets the new-hire and life-event window lengths in days (0 to 365).
+- **type** `WindowInput struct` — WindowInput is an open-enrolment window body.
+- **func** `(s *Service) CreateWindow(ctx context.Context, a Actor, in WindowInput) (*Window, error)` — CreateWindow opens a tenant-wide enrolment window.
+- **func** `(s *Service) CancelWindow(ctx context.Context, a Actor, id uuid.UUID) (*Window, error)` — CancelWindow cancels a window; it is idempotent.
+- **func** `(s *Service) Windows(ctx context.Context, a Actor) ([]Window, error)` — Windows lists the tenant's open-enrolment windows, newest first.
+- **type** `PlanInput struct` — PlanInput creates (code, name, category, plan_year, effective_from and levels required) or patches a plan.
+- **type** `VersionInput struct` — VersionInput adds a cost version.
+- **func** `validateEligibility(e *Eligibility) error`
+- **func** `validateLevels(levels []Level) ([]Level, error)`
+- **func** `(s *Service) withVersions(ctx context.Context, db *gorm.DB, p *Plan) (*Plan, error)`
+- **func** `(s *Service) CreatePlan(ctx context.Context, a Actor, in PlanInput) (*Plan, error)` — CreatePlan is BN-C01: a draft plan with its first cost version.
+- **func** `(s *Service) UpdatePlan(ctx context.Context, a Actor, id uuid.UUID, in PlanInput) (*Plan, error)` — UpdatePlan patches name, provider and eligibility; costs change only through AddVersion (BN-C02).
+- **func** `(s *Service) AddVersion(ctx context.Context, a Actor, id uuid.UUID, in VersionInput) (*Plan, error)` — AddVersion is BN-C02: new costs from a future date; the previous version ends where this one starts.
+- **func** `(s *Service) movePlan(ctx context.Context, a Actor, id uuid.UUID, to string, from ...string) (*Plan, error)`
+- **func** `(s *Service) ActivatePlan(ctx context.Context, a Actor, id uuid.UUID) (*Plan, error)` — ActivatePlan moves draft → active: workers can now elect it.
+- **func** `(s *Service) RetirePlan(ctx context.Context, a Actor, id uuid.UUID) (*Plan, error)` — RetirePlan moves draft | active → retired: no new elections; existing ones continue until ended.
+- **func** `(s *Service) GetPlan(ctx context.Context, a Actor, id uuid.UUID) (*Plan, error)` — GetPlan returns a plan with its versions.
+- **func** `(s *Service) Plans(ctx context.Context, a Actor, status string, page, perPage int) ([]Plan, int64, error)` — Plans lists plans.
+
+#### `internal/hr/benefits/store.go` (249 lines)
+- **type** `ElectionFilter struct` — ElectionFilter narrows election lists.
+- **type** `CountRow struct` — CountRow is how many elections of a plan, level and status are in force on a date (BN-C10).
+- **type** `Store interface` — Store is benefits data access (tenant-scoped; `tx` passed per call).
+- **method** `Store.InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **method** `Store.DB() *gorm.DB`
+- **method** `Store.Lock(ctx context.Context, tx *gorm.DB, key string) error` — Lock takes a transaction-scoped advisory lock on key.
+- **method** `Store.Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **method** `Store.Settings(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (*Settings, error)`
+- **method** `Store.SaveSettings(ctx context.Context, tx *gorm.DB, row *Settings) error`
+- **method** `Store.Plan(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Plan, error)`
+- **method** `Store.PlanCodeTaken(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, code string) (bool, error)`
+- **method** `Store.Plans(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, status string, page, perPage int) ([]Plan, int64, error)`
+- **method** `Store.ActivePlans(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]Plan, error)`
+- **method** `Store.Versions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, planIDs []uuid.UUID) ([]PlanVersion, error)`
+- **method** `Store.Window(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Window, error)`
+- **method** `Store.Windows(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]Window, error)`
+- **method** `Store.OpenWindowOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, on Date) (bool, error)`
+- **method** `Store.Dependant(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Dependant, error)`
+- **method** `Store.Dependants(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]Dependant, error)`
+- **method** `Store.LifeEvents(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]LifeEvent, error)`
+- **method** `Store.LifeEventSince(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, since, upTo Date) (*LifeEvent, error)` — LifeEventSince is the latest life event dated in [since, upTo], if any.
+- **method** `Store.Election(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID, lock bool) (*Election, error)`
+- **method** `Store.LiveElection(ctx context.Context, db *gorm.DB, tenantID, employeeID, planID uuid.UUID, lock bool) (*Election, error)` — LiveElection is the open-ended (active or waived) election of the worker for the plan.
+- **method** `Store.Elections(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, f ElectionFilter, page, perPage int) ([]Election, int64, error)`
+- **method** `Store.EmployeeElections(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID) ([]Election, error)` — EmployeeElections lists all of the worker's elections, newest first.
+- **method** `Store.ElectionsOn(ctx context.Context, db *gorm.DB, tenantID, employeeID uuid.UUID, on Date) ([]Election, error)` — ElectionsOn lists the worker's non-waived elections in force on the date.
+- **method** `Store.EndForTermination(ctx context.Context, tx *gorm.DB, tenantID, employeeID uuid.UUID, end Date, actionID uuid.UUID) (int, error)` — returns how many it ended; a waiver costs nothing and stays (BN-C08).
+- **method** `Store.Reinstate(ctx context.Context, tx *gorm.DB, tenantID, actionID uuid.UUID) (int, error)` — Reinstate reopens the elections that action ended and returns how many (BN-C08).
+- **method** `Store.Counts(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, on Date) ([]CountRow, error)`
+- **method** `Store.Event(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]string) error` — Event stores an outbox event (ids and statuses only).
+- **type** `gormStore struct{ db *gorm.DB }`
+- **func** `NewStore(db *gorm.DB) Store { return gormStore{db: db} }` — NewStore builds the gorm-backed Store.
+- **func** `(s gormStore) InTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s gormStore) DB() *gorm.DB { return s.db }`
+- **func** `(s gormStore) Lock(ctx context.Context, tx *gorm.DB, key string) error`
+- **func** `(s gormStore) Create(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `(s gormStore) Save(ctx context.Context, tx *gorm.DB, row interface{}) error`
+- **func** `take[T any](q *gorm.DB) (*T, error)`
+- **func** `scoped(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) *gorm.DB`
+- **func** `paginate[T any](q *gorm.DB, order string, page, perPage int) ([]T, int64, error)`
+- **func** `(s gormStore) Settings(ctx context.Context, db *gorm.DB, t uuid.UUID) (*Settings, error)`
+- **func** `(s gormStore) SaveSettings(ctx context.Context, tx *gorm.DB, row *Settings) error`
+- **func** `(s gormStore) Plan(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Plan, error)`
+- **func** `(s gormStore) PlanCodeTaken(ctx context.Context, db *gorm.DB, t uuid.UUID, code string) (bool, error)`
+- **func** `(s gormStore) Plans(ctx context.Context, db *gorm.DB, t uuid.UUID, status string, page, perPage int) ([]Plan, int64, error)`
+- **func** `(s gormStore) ActivePlans(ctx context.Context, db *gorm.DB, t uuid.UUID) ([]Plan, error)`
+- **func** `(s gormStore) Versions(ctx context.Context, db *gorm.DB, t uuid.UUID, ids []uuid.UUID) ([]PlanVersion, error)`
+- **func** `(s gormStore) Window(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Window, error)`
+- **func** `(s gormStore) Windows(ctx context.Context, db *gorm.DB, t uuid.UUID) ([]Window, error)`
+- **func** `(s gormStore) OpenWindowOn(ctx context.Context, db *gorm.DB, t uuid.UUID, on Date) (bool, error)`
+- **func** `(s gormStore) Dependant(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Dependant, error)`
+- **func** `(s gormStore) Dependants(ctx context.Context, db *gorm.DB, t, e uuid.UUID) ([]Dependant, error)`
+- **func** `(s gormStore) LifeEvents(ctx context.Context, db *gorm.DB, t, e uuid.UUID) ([]LifeEvent, error)`
+- **func** `(s gormStore) LifeEventSince(ctx context.Context, db *gorm.DB, t, e uuid.UUID, since, upTo Date) (*LifeEvent, error)`
+- **func** `(s gormStore) Election(ctx context.Context, db *gorm.DB, t, id uuid.UUID, lock bool) (*Election, error)`
+- **func** `(s gormStore) LiveElection(ctx context.Context, db *gorm.DB, t, e, p uuid.UUID, lock bool) (*Election, error)`
+- **func** `(s gormStore) Elections(ctx context.Context, db *gorm.DB, t uuid.UUID, f ElectionFilter, page, perPage int) ([]Election, int64, error)`
+- **func** `(s gormStore) EmployeeElections(ctx context.Context, db *gorm.DB, t, e uuid.UUID) ([]Election, error)`
+- **func** `(s gormStore) ElectionsOn(ctx context.Context, db *gorm.DB, t, e uuid.UUID, on Date) ([]Election, error)`
+- **func** `(s gormStore) EndForTermination(ctx context.Context, tx *gorm.DB, t, e uuid.UUID, end Date, action uuid.UUID) (int, error)`
+- **func** `(s gormStore) Reinstate(ctx context.Context, tx *gorm.DB, t, action uuid.UUID) (int, error)`
+- **func** `(s gormStore) Counts(ctx context.Context, db *gorm.DB, t uuid.UUID, on Date) ([]CountRow, error)`
+- **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
 
 ## D. Test inventory
 
@@ -6495,7 +9016,7 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - `internal/hr/organization/services/team_service_test.go`: TestTeamService_CreateTeam, TestTeamService_MoveAndDeactivate, TestTeamService_GetListRenameConflict
 - `internal/hr/organization/validators/validators_test.go`: TestValidateOrgCode, TestIsReservedOrgCode
 
-### M1 HR / Employee — 23 test functions in 17 files
+### M1 HR / Employee — 29 test functions in 18 files
 - `internal/hr/employee/controllers/document_controller_test.go`: TestDocumentController_Endpoints
 - `internal/hr/employee/controllers/employee_controller_test.go`: TestEmployeeController_Endpoints
 - `internal/hr/employee/controllers/statutory_controller_test.go`: TestStatutoryController_Endpoints
@@ -6503,6 +9024,7 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - `internal/hr/employee/controllers/timeline_controller_test.go`: TestTimelineController_List
 - `internal/hr/employee/events/events_test.go`: TestNewEventEnvelope
 - `internal/hr/employee/models/models_test.go`: TestEmployeeModelsInstantiation
+- `internal/hr/employee/records/records_test.go`: TestContacts, TestEducationAndPrior, TestChangeRequests, TestFailures, TestModelsCodec, TestHTTP
 - `internal/hr/employee/services/coverage_branches_test.go`: TestEmployeeServiceEdgeCasesAndBranches, TestStatutoryAndDocumentAndTimelineEdgeCases
 - `internal/hr/employee/services/document_service_test.go`: TestEmployeeDocumentService
 - `internal/hr/employee/services/employee_service_test.go`: TestEmployeeServiceLifecycle
@@ -6514,7 +9036,7 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - `internal/hr/employee/services/timeline_service_test.go`: TestEmployeeTimelineService
 - `internal/hr/employee/validators/validators_test.go`: TestValidateEmployeeCode, TestValidateStatus, TestValidateEmploymentType, TestValidateTransitionMatrix, TestValidateEmergencyContacts
 
-### M1 HR / Attendance — 74 test functions in 20 files
+### M1 HR / Attendance — 83 test functions in 21 files
 - `internal/hr/attendance/calc/calc_golden_test.go`: TestGolden_G4_Totals, TestGolden_G4_FirstLast, TestGolden_G5_NightShift, TestGolden_G5_TimeZoneLateness
 - `internal/hr/attendance/calc/calc_test.go`: TestParseAndFormatHHMM, TestShiftShape, TestThresholdDefaults, TestAttendanceDateNoShiftIsUTC, TestAttendanceDateWindowClampedByShiftStart, TestOpenSessionStart
 - `internal/hr/attendance/controllers/controllers_test.go`: TestEndpoints_HappyPathsAndStatusCodes, TestEndpoints_ServiceErrorsMapToEnvelope, TestEndpoints_ValidationEnvelope, TestEndpoints_G13_PaginationClamp, TestEndpoints_RequireActorContext, TestEndpoints_SelfEndpointsIgnoreClientIDs, TestSnake, TestFail_NormalizesPersistenceErrors
@@ -6522,6 +9044,7 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - `internal/hr/attendance/dto/dto_test.go`: TestParsePage_G13, TestPageOffsetAndMeta
 - `internal/hr/attendance/events/events_test.go`: TestNewEnvelope, TestPayloadsCarryNoLocationOrNetworkData
 - `internal/hr/attendance/models/models_test.go`: TestAttendanceModels_TableNames, TestAttendanceModels_Indexes, TestAttendanceModels_PendingIndexIsPartial, TestAttendanceModels_IndexParityWithSQL, TestAttendanceModels_IntegerColumns, TestAttendanceModels_AppendOnly, TestAttendanceModels_BeforeCreateGeneratesIDs
+- `internal/hr/attendance/ops/ops_test.go`: TestInbox, TestPolicy, TestOvertimeReport, TestRosters, TestAutoAbsent, TestSweep, TestImport, TestModelsAndHelpers, TestHTTP
 - `internal/hr/attendance/routes/routes_test.go`: TestRoutes_ContractMatchesSpec, TestRoutes_SelfEndpointsHaveNoPermissionGuard
 - `internal/hr/attendance/services/assignment_golden_test.go`: TestGolden_G10_AssignmentOverlap, TestAssignmentService_Validation, TestAssignmentService_List
 - `internal/hr/attendance/services/fakes_more_test.go`: (helpers only)
@@ -6536,13 +9059,16 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - `internal/hr/attendance/services/shift_service_test.go`: TestShiftService_CreateDefaultsAndDerivedFields, TestShiftService_CreateValidation, TestShiftService_GetListUpdate, TestShiftService_DeactivateGuard
 - `internal/hr/attendance/validators/validators_test.go`: TestValidateShiftCode, TestLoadTimezone, TestParseDate, TestDateRange, TestThresholdPair
 
-### M1 HR / Leave — 48 test functions in 16 files
+### M1 HR / Leave — 63 test functions in 19 files
 - `internal/hr/leave/calc/calc_golden_test.go`: TestGolden_G2_CountDays, TestGolden_G3_Accrual, TestGolden_G4_CarryForward, TestDateHelpers
+- `internal/hr/leave/calc/parity_test.go`: TestAccruedFromMatchesCalendarYear, TestAccruedFromAprilYear, TestYearOf, TestCountDaysWeekOffOverride
 - `internal/hr/leave/controllers/controllers_test.go`: TestEndpoints_HappyPaths, TestEndpoints_ErrorsAndAuth, TestEndpoints_Validation, TestEndpoints_G15_Pagination, TestEndpoints_SelfIgnoresClientIdentity, TestFail_NormalizesPersistenceErrors
 - `internal/hr/leave/controllers/stub_test.go`: (helpers only)
 - `internal/hr/leave/dto/dto_test.go`: TestParsePage_G15, TestPage_OffsetAndMeta
 - `internal/hr/leave/events/events_test.go`: TestNew_Envelope, TestPayloads_NoFreeText
 - `internal/hr/leave/models/models_test.go`: TestLeaveModels_TableNames, TestLeaveModels_Indexes, TestLeaveModels_ColumnTypes, TestLeaveModels_DeletionPolicy, TestLeaveModels_BeforeCreateGeneratesIDs, TestBalance_Available
+- `internal/hr/leave/plus/plus_test.go`: TestPolicy, TestLocationCalendar, TestInboxAndCalendar, TestCompOff, TestCompOffUsesLocationCalendar, TestCompOffExpiry, TestEncashment, TestModelsAndHelpers, TestHTTP, TestFromCoreAndEdges
+- `internal/hr/leave/plus/settlement_test.go`: TestSettlementPort
 - `internal/hr/leave/routes/routes_test.go`: TestRoutes_ContractMatchesSpec, TestRoutes_OpenToAuthenticated
 - `internal/hr/leave/services/admin_services_test.go`: TestTypeService_Lifecycle, TestHolidayService, TestBalanceService
 - `internal/hr/leave/services/fakes_more_test.go`: (helpers only)
@@ -6554,29 +9080,35 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - `internal/hr/leave/services/unpaid_leave_test.go`: TestUnpaidLeave_UnpaidDays
 - `internal/hr/leave/validators/validators_test.go`: TestNormalizeTypeCode, TestAmounts, TestParseDateAndYear, TestGenderApplies, TestNoticeOK
 
-### M1 HR / Payroll — 37 test functions in 14 files
+### M1 HR / Payroll — 59 test functions in 19 files
 - `internal/hr/payroll/calc/calc_golden_test.go`: TestGolden_G2_Breakdown, TestGolden_G3_Overflow, TestGolden_G4_Proration, TestGolden_G5_PF, TestGolden_G6_ESI, TestGolden_G7_PT, TestGolden_G8_TDS, TestGolden_G9_NetCap, TestCompute_FullPayslip, TestCompute_OverflowAndInterleavedCap
+- `internal/hr/payroll/calc/parity_test.go`: TestEmployerPF, TestEmployerESI, TestPTSlabs, TestComputeSegmentsMatchesCompute, TestComputeSegmentsMidMonth, TestComputeSegmentsExtras
 - `internal/hr/payroll/calc/structure_test.go`: TestValidateStructure, TestMonthlyAndDaysInMonth
 - `internal/hr/payroll/controllers/controllers_test.go`: TestEndpoints, TestEndpoints_ErrorsAuthValidation, TestEndpoints_G16
 - `internal/hr/payroll/dto/dto_test.go`: TestParsePage_G16
 - `internal/hr/payroll/events/events_test.go`: TestNewAndPayload
 - `internal/hr/payroll/models/models_test.go`: TestPayrollModels_TableNames, TestPayrollModels_Indexes, TestPayrollModels_ColumnTypes, TestPayrollModels_DeletionAndIDs
+- `internal/hr/payroll/plus/plus_test.go`: TestPTSlabs, TestStateLookup, TestSettlementLifecycle, TestSettlementRules, TestSettlementFailures, TestModelsAndHelpers, TestHTTP
+- `internal/hr/payroll/plus/settle_test.go`: TestServiceYears, TestSettleGratuity, TestSettlePayouts
 - `internal/hr/payroll/routes/routes_test.go`: TestRoutes_Contract
 - `internal/hr/payroll/services/admin_test.go`: TestStructureService, TestAssignmentService, TestRunCreateAndQueries
 - `internal/hr/payroll/services/fakes_more_test.go`: (helpers only)
+- `internal/hr/payroll/services/fakes_parity_test.go`: (helpers only)
 - `internal/hr/payroll/services/fakes_test.go`: (helpers only)
 - `internal/hr/payroll/services/harness_test.go`: (helpers only)
+- `internal/hr/payroll/services/parity_test.go`: TestParityEmployerLines, TestParityMidMonthChange, TestParityStatePT, TestParityBenefits, TestParityArrears, TestParityArrearsSkipsBrokenStructures
 - `internal/hr/payroll/services/payslip_test.go`: TestPayslipQueriesAndCSV, TestCalculateWarnings, TestCalculateSkipsOutsideWindow, TestPayrollFaultInjection, TestOutboxRelayAndRunner
 - `internal/hr/payroll/services/run_golden_test.go`: TestGolden_Calculate, TestGolden_G11_G12_StateMachine, TestGolden_G15_Recalculate, TestGolden_SelfVisibilityAndPrivacy
 - `internal/hr/payroll/validators/validators_test.go`: TestParseDateAndCTC, TestValidatePeriod, TestCSVSafe
 
-### M1 HR / Recruitment — 29 test functions in 13 files
+### M1 HR / Recruitment — 37 test functions in 14 files
 - `internal/hr/recruitment/module_test.go`: TestOrgDirectory
 - `internal/hr/recruitment/controllers/controllers_test.go`: TestControllers_HappyPathAndAuth, TestControllers_ServiceErrorsAndBadInput, TestControllers_QueryFilters
 - `internal/hr/recruitment/dto/dto_test.go`: TestParsePage_G14
 - `internal/hr/recruitment/events/events_test.go`: TestNewEnvelope
 - `internal/hr/recruitment/models/models_test.go`: TestRecruitmentModels_TablesAndIndexes, TestRecruitmentModels_ColumnTypesAndIDs
 - `internal/hr/recruitment/pipeline/pipeline_test.go`: TestGolden_G2_StageGraph, TestGolden_G3_JobStatusGraph
+- `internal/hr/recruitment/plus/plus_test.go`: TestReleaseHire, TestRequisitions, TestScorecards, TestScores, TestOfferPolicyAndGate, TestOfferApproval, TestModelsAndHelpers, TestHTTP
 - `internal/hr/recruitment/routes/routes_test.go`: TestRoutes_Contract
 - `internal/hr/recruitment/services/admin_test.go`: TestJobs_UpdateListAndOrgRefs, TestCandidates_ListUpdateAndOfferExit, TestInterviews_ListCancelAndLookups, TestOffers_ValidationWithdrawAndExpiry, TestHire_PortFailures, TestOutboxRelay, TestHelpers
 - `internal/hr/recruitment/services/failures_test.go`: TestRepositoryFailures
@@ -6608,24 +9140,47 @@ _Package:_ Package services holds HR/Core business rules (specification.md CO-00
 - `internal/hr/core/services/harness_test.go`: (helpers only)
 - `internal/hr/core/services/more_test.go`: TestWorkersHeadcountBackfill, TestActionsInputAndLists, TestRelayAndLoops, TestFailures, TestFailures_ReverseAndSweep
 
+### M1 HR / Compensation — 8 test functions in 1 files
+- `internal/hr/compensation/compensation_test.go`: TestPayRanges, TestPositionAndBands, TestChangesLifecycle, TestChangeFailures, TestMeritCycle, TestMeritFailures, TestModelsAndHelpers, TestHTTP
+
+### M1 HR / Onboarding — 12 test functions in 1 files
+- `internal/hr/onboarding/onboarding_test.go`: TestTemplates, TestStartFromCoreAndRecruitment, TestMostSpecificWins, TestManualStart, TestTasksAndCompletion, TestEarlyCompleteAndCancel, TestClearance, TestExitInterview, TestViews, TestTaskFailures, TestModelsAndHelpers, TestHTTP
+
+### M1 HR / Learning — 19 test functions in 2 files
+- `internal/hr/learning/http_test.go`: TestHTTP
+- `internal/hr/learning/learning_test.go`: TestCourseValidation, TestCourseLifecycle, TestPlans, TestSettingsAndZones, TestOverdueFollowsTheTenantZone, TestAssignments, TestPlanAssignment, TestCoreHook, TestRecurrence, TestSelfEnrol, TestSelfAttestedCompletion, TestVerification, TestCorrectionAndWaiver, TestRetiredCourseKeepsCompletions, TestViews, TestPlanProgress, TestModelsAndHelpers, TestWorkforceStatuses
+
+### M1 HR / Benefits — 12 test functions in 2 files
+- `internal/hr/benefits/benefits_test.go`: TestPlanValidationAndLifecycle, TestSettingsAndWindows, TestEnrolmentWindows, TestEligibility, TestElect, TestChangeWaiveEnd, TestDeductions, TestTerminationHook, TestDependantsAndLifeEvents, TestReportAndListings, TestModelsAndHelpers
+- `internal/hr/benefits/http_test.go`: TestHTTP
+
 ### Integration suite (`backend/tests/integration`)
 - `access_test.go`: TestAccessPredefinedRoles, TestAccessScopesInheritanceAndCycles, TestAccessUserGrantsAndBlocks, TestAccessAntiEscalation, TestAccessAutomaticRoles, TestAccessTenantIsolation
+- `attendance_ops_test.go`: TestAttendanceParity
 - `attendance_test.go`: TestAttendancePunchFlow, TestAttendanceRegularization, TestAttendanceRBAC, TestAttendanceIsolation, TestAttendanceConcurrentPunches, TestAttendancePagination
+- `benefits_test.go`: TestBenefits
+- `compensation_test.go`: TestCompensationLifecycle
 - `contract_test.go`: TestSwaggerMatchesRoutes
 - `core_test.go`: TestCoreLifecycle
+- `employee_records_test.go`: TestEmployeeRecordsAndChangeRequests
 - `employee_test.go`: TestEmployeeLifecycle, TestEmployeeStatusStateMachine, TestEmployeeStatutoryAndPIIMasking, TestEmployeeDocuments, TestEmployeeSelfService, TestEmployeeRBACTiers, TestUserDeactivationConvergesEmployee
 - `golden_test.go`: TestGoldenM1_TeamMoveKeepsMappingsConsistent, TestGoldenM1_AuditOnEveryOrgWrite, TestGoldenNoSecretLeakage, TestGoldenM2_EmployeeForForeignTenantUser, TestGoldenM2_AtomicOnboarding, TestGoldenM1_RejectedHierarchyChangeLeavesNoTrace
 - `harness_test.go`: TestMain
 - `identity_test.go`: TestTenantRoutesRequirePlatformKey, TestTenantLifecycle, TestTenantAdminProvisioningIsAtomic, TestPlatformRoutesDisabledWithoutKeyIsCoveredByMiddlewareUnit, TestAuthLoginErrors, TestLoginRateLimitCountsFailuresOnly, TestRefreshRotationReuseAndLogout, TestAccessTokenValidation, TestForgotAndResetPassword, TestAuthMe, TestUserLifecycle, TestDeactivatedUserSessionsAreRevoked, TestAssignAndRemoveRoles, TestRolesAndPermissions, TestRBACEnforcement, TestAuditTrail, TestPaginationIsClampedEverywhere, TestErrorEnvelopeIsUniform, TestCORSHeaders, TestTenantIsolation
 - `invitation_test.go`: TestInvitationLifecycle, TestInvitationRevokeAndEscalation
+- `learning_test.go`: TestLearning
+- `leave_plus_test.go`: TestLeaveParity
 - `leave_test.go`: TestLeaveLifecycle, TestLeaveOverlapAndPagination, TestLeaveRBACAndSelfApproval, TestLeaveIsolation, TestLeaveConcurrency
 - `location_test.go`: TestOrganizationLocations
+- `onboarding_test.go`: TestOnboardingLifecycle
 - `org_test.go`: TestDepartmentLifecycleAndHierarchy, TestDepartmentDepthLimit, TestTeamLifecycle, TestDesignationLifecycle, TestMappingRulesAndUserDeactivationConvergence, TestOrgChartIsReadYourWritesConsistent, TestOrgChartUserChain, TestOrgRBAC
+- `payroll_plus_test.go`: TestPayrollParity
 - `payroll_test.go`: TestPayrollLifecycle, TestPayrollRBACAndIsolation
 - `perf_test.go`: TestPerformanceBudgets
 - `performance_parity_test.go`: TestPerformanceCalibrationAndFeedback
 - `performance_test.go`: TestPerformanceLifecycle
 - `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
+- `recruitment_plus_test.go`: TestRecruitmentParity
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
 - `schema_test.go`: TestMigrationsAreIdempotentAndComplete, TestSchemasAreOwnedAndIsolated, TestBusinessCodesAreTenantScoped
 - `security_test.go`: TestSecurityHeadersAndBodyLimit, TestInjectionAttemptsAreInert, TestPrivilegeEscalationIsBlocked
@@ -7218,6 +9773,16 @@ Evidence: migration hr/000047 (up/down/up verified); services 95.7 %, location c
 | FR-DOC001 | Attach employee documents: `document_type` (`id_proof`, `contract`, `resume`, `education`, `certification`, `nda`), `file_name`, `file_url`, `file_size`, `mime_type`. |
 | FR-DOC002 | List documents for employee (tenant-scoped). |
 | FR-DOC003 | Verify document: `POST /employees/{id}/documents/{doc_id}/verify` records `verified_at` and `verified_by` user ID (requires `employee:admin`). |
+| FR-ER001 | Emergency contacts `{name 1–150, relationship 1–50, phone 5–30, email?, is_primary}`, at most 5 per worker. Exactly one is primary when any exist: setting a new primary clears the old one, and the first contact becomes primary. |
+| FR-ER002 | Education `{institution 1–200, qualification 1–150, field_of_study?, start_year?, end_year? (≥ start, ≤ current year + 6), grade?}`. |
+| FR-ER003 | Prior employment `{employer 1–200, title 1–150, start_date, end_date ≥ start (≤ today), reason_for_leaving? ≤ 500}`. Periods may not overlap (409 `OVERLAP`). |
+| FR-ER004 | Self-service CRUD under `/employees/me/{emergency-contacts\|education\|prior-employment}`. HR reads under `/employees/{id}/…` (`employee:read`) and writes with `employee:update`. Foreign ids → 404. |
+| FR-ER005 | Records carry no compensation. Audit and events hold ids only. |
+| FR-CR001 | Types and payloads:<br>- `name {first_name, last_name, display_name?}`<br>- `address {current_address?, permanent_address?}`, with at least one address<br>- `bank {bank_name, bank_account_number 6–34 alphanumeric, bank_routing_swift 4–20}`<br>The request also carries a `reason?`. |
+| FR-CR002 | A worker submits for themselves (`POST /employees/me/change-requests`). At most one `submitted` request per type (409 `CONFLICT`). The worker may cancel while it is submitted. |
+| FR-CR003 | Approvers hold `employee:approve_changes`. They list (`GET /employee-change-requests?status&type&employee_id`), read, approve or reject (with a comment). An approver can never decide their own request (403 `EMPLOYEE_SELF_APPROVAL`). Only submitted requests can be decided (409 `REQUEST_STATE`). |
+| FR-CR004 | Approving applies the payload in the same transaction: the name goes to the profile, addresses to the contact record, and bank details to the statutory record. A timeline entry `personal_data_changed:<type>` is written. |
+| FR-CR005 | Bank account numbers in responses are masked (`****1234`) unless the caller holds `employee:read_sensitive`. Audit and events (`employee.change_request.submitted\|approved\|rejected`) carry ids and the type only. |
 | FR-TL001 | System-generated immutable timeline events: `hired`, `probation_completed`, `promoted`, `transferred`, `resigned`, `terminated`. |
 | FR-TL002 | Read timeline: `GET /employees/{id}/timeline` returns chronological events. |
 | FR-EV001 | Consume `identity.user.deactivated` -> marks employee status as `inactive`/`terminated`, appends exit timeline event. |
@@ -7248,6 +9813,15 @@ Evidence: migration hr/000047 (up/down/up verified); services 95.7 %, location c
 ### 2026-10-06 — hardening pass (branch `fix/module-0-2-hardening`)
 Verification-console findings fixed and pinned by tests; full list in the hardening report in `docs/modules/m0-identity-access/testing.md`. Highlights: PII unmask requires employee:read_sensitive (audited), status state machine + exit/confirmation effects, synchronous user-deactivation convergence (FR-EV001), emergency-contact validation, document verify ownership, statutory upsert fix.
 Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pass; coverage 86.5 % (services 93-97 %); migrations up/down/up clean.
+### 2026-10-21 — records and change requests (HR parity P1)
+- DE-R1: Name, address and bank changes from self-service go through approval (FR-CR). The existing
+  `PATCH /employees/me` keeps phone and emergency contacts only, so a stolen session cannot redirect pay silently.
+- DE-R2: Approval needs a new `employee:approve_changes` permission (default `hr_admin`). Approvers can never
+  decide their own request.
+- DE-R3: Structured emergency contacts live in their own table (FR-ER001). The legacy JSONB field on the contact
+  record remains for compatibility.
+- DE-R4: Prior-employment periods are kept non-overlapping by a `btree_gist` exclusion constraint as well as the
+  service.
 
 ### m1-hr-management/contexts/attendance  _(from specification.md)_
 
@@ -7325,6 +9899,18 @@ Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pas
 | NFR-SEC001 | Every query `tenant_id`-scoped; every id resolved in caller tenant |
 | NFR-SEC002 | Self endpoints derive employee from JWT user only — no employee_id parameter accepted |
 | NFR-D001 | Multi-table writes in one transaction; events via outbox in the same transaction |
+| AP-01 | Inbox: `GET /inbox` returns pending regularizations of the caller's direct reports (organization mappings, primary and active). A holder of `attendance:approve` at tenant scope may pass `scope=all` to see every pending request. Never includes the caller's own request. |
+| AP-02 | `POST /inbox/{id}/approve` and `/reject` let a manager decide a report's request through the same rules as AT-016/AT-017 (self-approval refused, reject needs a comment). A request of someone who is not the caller's report is 404 unless the caller holds tenant-scope `attendance:approve`. |
+| AP-03 | Policy: `PUT/GET /policy` (`manage` / `read`): `week_off_days` (weekday numbers 0=Sunday..6, default `[0,6]`), `overtime_min_daily` (minutes, default 30), `overtime_max_daily` (default 240), `overtime_max_monthly` (default 3600), `overtime_rate_weekday` and `overtime_rate_week_off` (hundredths of the hourly rate, default 150 and 200), `auto_absent_enabled` (default false). One row per tenant; `GET` returns the defaults when none was saved. Validation: weekday list distinct 0..6, minimum ≤ daily maximum ≤ 1440, rates 100..500. |
+| AP-04 | Overtime report: `GET /overtime/report?month=YYYY-MM[&employee_id=]` (`read`). Per worker and day, eligible minutes = the record's `overtime_minutes` when ≥ the daily minimum, else 0, capped at the daily maximum. On a week-off day the whole worked time counts as overtime. A worker's month total is capped at the monthly maximum (earliest days first). `weighted_minutes` = Σ eligible × rate / 100 (weekday or week-off rate). Exact integer arithmetic. |
+| AP-05 | Rosters: `POST /rosters` and `PATCH /rosters/{id}` (`manage`), `GET /rosters`, `GET /rosters/{id}` (`read`). A roster has a unique name (case-insensitive), a status `active|archived` and a pattern of 1–12 segments `{shift_id, days}` (days 1–31, the shift must be active). |
+| AP-06 | `POST /rosters/{id}/apply {employee_ids, from, cycles}` (`manage`) lays the pattern end to end from `from` for `cycles` repeats (1–26) as ordinary shift assignments. All or nothing: any overlap with an existing assignment (AT-011) is 409 `ROSTER_OVERLAP` naming the worker; at most 100 workers and 200 assignments per worker. Archived rosters cannot be applied. |
+| AP-07 | Auto-absent: for a date D, every working worker (status active, probation or notice, joined on or before D) with no record for D gets a `system` record: `week_off` on a week-off day, `holiday` on a tenant holiday, otherwise `absent`. Idempotent: a worker with any record (punched, leave, regularized) is untouched, and running twice creates nothing the second time. |
+| AP-08 | `POST /jobs/auto-absent {date?}` (`manage`) runs AP-07 for the caller's tenant (default yesterday; D must be before today and within the last 31 days) and returns `{date, absent, week_off, holiday, skipped}`; the run is logged. A daily background sweep does the same for the previous day in every tenant with `auto_absent_enabled`. |
+| AP-09 | A later punch or approved regularization on a `system` record recomputes it like any other record (AT-021); `summary` counts follow AT-020 unchanged. |
+| AP-10 | Bulk import: `POST /imports {dry_run, rows}` (`manage`), 1–500 rows `{employee_code, date, punch_in, punch_out}` (RFC 3339 instants). Rules per row: worker exists by code; date within the last 90 days and not in the future; out after in, span ≤ 20 h, local date of `in` matches `date` (AT-014 attribution); no duplicate worker/date in the batch; an existing record with punches is an error `EXISTS` unless `overwrite` is true (then AT-017 supersede). |
+| AP-11 | Import is atomic: if any row has an error nothing is written (200 with `applied: 0` and per-row errors); `dry_run` validates only. Applied rows become records with source `import` and `is_regularized = true`, totals recomputed per AT-006..AT-010. Every real import is logged (`GET /imports`, `read`). |
+| AP-12 | Privacy: audit and logs carry ids, dates and counts, never punch times. |
 
 **Decision log (decisions.md, verbatim)**
 
@@ -7361,6 +9947,24 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 2026-10-09 — P7 DONE: live goldens G1, G2, G6–G9, G11–G13 PASS on Docker Postgres; migrations up/down/up clean; AutoMigrate↔SQL parity fixed (D3-14: integer columns, partial/expression unique indexes, pending backstop); AT-004 precedence clarified (D3-13); suite-level login limiter reset (D3-15, also unblocks HR/Organization TestOrgRBAC in full runs). Impact: dev DBs created before this need 3 indexes dropped once (see D3-14).
 2026-10-09 — P9 DONE (backend CLOSED): DoD §24 walked with evidence; 5 functions refactored to params ≤4 (D3-16); routes↔swagger 19/19; threat→evidence map; live AS-T6 concurrency test (10 parallel INs → 1 session). P8 frontend BLOCKED (no identity shell).
 2026-10-09 — Integrated onto M0 Identity, HR/Organization, HR/Employee hardening (branch integrate/m3-m4-on-hardening): migrations renumbered 000026–000037, app wiring, error normalization, integration tests ported; 59/59 PASS.
+##### Parity decisions (2026-10-22)
+- **DA-P1** The parity features live in `attendance/ops` and write through `attendance/services.TimeWriter`, so the
+  punch, regularization and import paths share one recompute (AT-006..AT-010). Regularization approval was refactored onto the
+  same `setWindow`; its goldens did not change.
+- **DA-P2** The inbox decides through the existing regularization service. Managers do not get tenant-scope
+  `attendance:approve`; reach is by organization mapping (primary, active, `manager_user_id`), and the routes need only a
+  login. A stranger gets 404, not 403, so ids do not leak.
+- **DA-P3** Rosters generate ordinary shift assignments instead of a second scheduling model. Punch resolution (AT-005)
+  and AT-011 stay untouched. The cost is one assignment row per segment, bounded at 200 per worker per apply.
+- **DA-P4** Auto-absent is opt-in per tenant (`auto_absent_enabled`, default off) so no tenant gets absent records it
+  did not ask for. Each worker commits on its own, which makes the run resumable and idempotent; the daily sweep
+  skips a tenant/day that already has a run logged.
+- **DA-P5** Holidays come from HR/Leave through `leave/api.Holidays` (non-optional tenant holidays only). Per-location
+  calendars arrive with the leave parity work and plug in behind the same port.
+- **DA-P6** Overtime is a report computed from stored records, not a ledger: policy changes re-price history on the
+  next read. Payroll will consume the report through a port in the payroll parity work (decision there).
+- **DA-P7** Bulk import takes instants (RFC 3339) and requires `punch_in` within a day of `date`, so offsets of any
+  timezone pass. It is all-or-nothing and logs counts only (AP-12).
 
 ### m1-hr-management/contexts/leave  _(from specification.md)_
 
@@ -7411,6 +10015,24 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 | NFR-SEC002 | Self endpoints derive the employee from the JWT user only |
 | NFR-D001 | Request + balance + ledger + attendance + outbox writes in one transaction |
 | NFR-D002 | Day arithmetic in integer hundredths; no floating-point in balances |
+| LP-01 | Policy: `PUT/GET /policy` (`manage` / `read`): `year_start_month` (1–12, default 1), `comp_off_leave_type_id` (an active leave type, optional), `comp_off_expiry_days` (1–365, default 90). Changing `year_start_month` after balances exist is refused (409 `YEAR_LOCKED`) unless no balance row exists yet. |
+| LP-02 | Leave year: the leave year is labelled by the calendar year in which it starts. With `year_start_month = 4`, 2026-05-10 and 2027-02-01 are both in leave year 2026. LV-003 (range in the current leave year), balance rows, accrual and carry-forward all use the leave year. Accrual credits months from the later of the year start and the joining month through the year end (annual) or through the current month (monthly); month 12 of the year still lands exactly on the allowance. |
+| LP-03 | Location holidays: `POST/GET /location-holidays`, `DELETE /location-holidays/{id}` (`manage` / `read`): a date, name and optional flag for one organization location. Unique per location and date. An employee's location is their core assignment on the date; employees without one use the tenant calendar only. |
+| LP-04 | Week-off patterns: `PUT /week-offs/{location_id}` (`manage`) sets the weekly-off weekdays (0 = Sunday … 6; empty list allowed) for a location, `GET /week-offs` (`read`) lists them, `DELETE /week-offs/{location_id}` removes it. Without a pattern the location (and every employee without one) uses Saturday and Sunday. |
+| LP-05 | Pricing (LV-006) and attendance marking use the employee's calendar: tenant holidays ∪ their location's non-optional holidays as blocked dates, and the location's week-off weekdays instead of Saturday/Sunday. Existing requests keep their snapshotted `total_days` (LV-012). |
+| LP-06 | Manager routing: `GET /inbox` lists pending requests of the caller's direct reports (organization mappings); `POST /inbox/{id}/approve|reject` decide them through LV-010. A request of anyone else is 404; tenant-scope `leave:approve` holders pass `scope=all` to see every pending request. |
+| LP-07 | Team calendar: `GET /team-calendar?from=&to=` (range ≤ 62 days) returns, for the caller's direct reports (all workers for `leave:read`), their pending and approved leave overlapping the range plus the dates blocked for the tenant. Rejected and cancelled leave is never shown; reasons are never shown. |
+| LP-08 | Comp-off request: `POST /comp-off {worked_date, days, reason}` (days 0.5 or 1; the worked date within the last 30 days, a holiday or week-off for the worker, with attendance work minutes > 0; one non-cancelled request per worker and date; needs `comp_off_leave_type_id` in the policy, else 409 `COMP_OFF_NOT_CONFIGURED`). Errors: 409 `NOT_A_NON_WORKING_DAY`, 409 `NO_WORK_RECORDED`, 409 `CONFLICT`. |
+| LP-09 | Decision: `POST /comp-off/{id}/approve|reject|cancel`. The worker's manager or a `leave:approve` tenant holder decides; never the requester (403 `SELF_APPROVAL_FORBIDDEN`); the requester cancels their own pending request. Approval credits the comp-off leave type through a balance adjustment (ledger row, note "comp-off") in the same transaction and sets `expires_on = worked_date + comp_off_expiry_days`. |
+| LP-10 | Expiry: `POST /comp-off/expire` (`manage`) and a daily sweep debit each approved, unexpired-flag credit whose `expires_on` has passed by `min(credit days, balance available)` (never below zero) and mark it expired with the debited days. Idempotent. |
+| LP-11 | Lists: `GET /comp-off/me`, `GET /comp-off` (`read`, filters status/employee_id). |
+| LP-12 | Encashment rules: `PUT /encashment-rules/{leave_type_id}` (`manage`) sets `max_days_per_year` (0–365) and `min_balance_after` (≥ 0), `GET /encashment-rules` (`read`) lists them. A type without a rule is not encashable (409 `NOT_ENCASHABLE`). |
+| LP-13 | Encashment request: `POST /encashments {leave_type_id, days, reason}` (days a multiple of 0.5 > 0). Rules: type active and encashable; `days` ≤ remaining annual allowance (max − approved − pending in the leave year); the balance available now, minus pending encashments, minus `days` must stay ≥ `min_balance_after` (409 `INSUFFICIENT_BALANCE`); at most one pending request per worker and type (409 `CONFLICT`). |
+| LP-14 | Decision: `POST /encashments/{id}/approve|reject|cancel`. The worker's manager or a `leave:approve` tenant holder decides; never the requester; the requester cancels own pending. Approval re-checks LP-13 and debits the balance with an adjustment (ledger note "encashment"); the request keeps `paid_out_at = null` until payroll consumes it (payroll parity). |
+| LP-15 | Lists: `GET /encashments/me`, `GET /encashments` (`read`, filters status/employee_id/leave_type_id). |
+| LP-16 | Every write takes the per-employee leave lock (LV-014) so balances cannot race with applications. |
+| LP-17 | Events `leave.comp_off_credited`, `leave.encashment_approved` carry ids and day counts only; audit metadata never includes reasons. |
+| LP-18 | Failure semantics: a failed balance adjustment rolls the decision back; nothing is half-applied. |
 
 **Requirements and rules (ID-tagged bullets)**
 
@@ -7461,6 +10083,26 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 2026-10-09 — P7 DONE: live goldens PASS (11 goldens), full suite 16/16, migration cycle + parity identical.
 2026-10-09 — P9 DONE (backend CLOSED): DoD walked with evidence; perf caveat recorded (D4-11).
 2026-10-09 — Integrated onto M0 Identity, HR/Organization, HR/Employee hardening (branch integrate/m3-m4-on-hardening): migrations renumbered 000026–000037, app wiring, error normalization, integration tests ported; 59/59 PASS.
+##### Parity decisions (2026-10-22)
+- **DL-P1** Parity lives in `leave/plus`; the old services change in three places only, each behind a nil-safe hook:
+  the leave year (`calc.AccruedFrom`/`YearOf`), the pricing calendar (`CalendarSource.For` plus `CountInput.WeekOff`) and
+  the balance mover. With no calendar source nothing changes (the old goldens pass untouched).
+- **DL-P2** The leave year is labelled by the calendar year in which it starts. It cannot be changed once any balance
+  row exists (`YEAR_LOCKED`): re-labelling ledgers would rewrite history (LV-016). Tenants choose it before first use.
+- **DL-P3** A worker's calendar is chosen by their core assignment's location on the first day of the range. A range
+  that spans a transfer is priced with the starting location; this is simple, predictable and documented.
+- **DL-P4** Location holidays and week-off patterns add to, never replace, the tenant calendar: blocked dates are the
+  union, the weekly off is the location's pattern when it has one. Optional holidays never block.
+- **DL-P5** Manager reach uses organization mappings (primary, active, `manager_user_id`), the same rule as the
+  attendance inbox. The inbox routes only need a login; a stranger gets 404.
+- **DL-P6** Comp-off and encashment adjust balances through `BalanceMover` inside the decision's transaction, so a
+  failed adjustment rolls the decision back (LP-18). Comp-off is credited as an `adjustment` ledger row with a note
+  rather than a new ledger kind, which keeps the ledger CHECK constraint and every report unchanged.
+- **DL-P7** Comp-off expiry debits `min(credit, available)`, never below zero. It does not track which credit a day of
+  comp-off leave consumed (no FIFO bookkeeping); in the worst case an old credit's expiry removes days that belonged to
+  a newer credit, which is the safe direction for the employer and never produces a negative balance.
+- **DL-P8** Encashment keeps `paid_out_at = null` until payroll consumes it; the payroll parity item (final settlement
+  and encashment payout) adds the port that reads and marks approved, unpaid encashments.
 
 ### m1-hr-management/contexts/payroll  _(from specification.md)_
 
@@ -7503,6 +10145,15 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 | P18 | GET `/payroll/payslips/{id}` | `payroll:read` | any payslip |
 | P19 | GET `/payroll/payslips/me?page&per_page` | self | finalized only |
 | P20 | GET `/payroll/payslips/me/{id}` | self | own + finalized, else 404 |
+| PP-01 | Employer contributions (shown on the payslip as lines of kind `employer`; never part of gross, deductions or net): with `pf_enabled`, on `base = min(earned BASIC, ₹15,000)`: EPS = 8.33% and EPF = 12% − EPS (12% rounded to the rupee, EPS rounded, EPF the remainder), EDLI = 0.5%, PF admin = 0.5% (each rounded to the rupee). With `esi_enabled` and the PY-006 eligibility test, employer ESI = 3.25% of earned gross rounded up to the rupee. `employer_cost` = Σ employer lines, stored on the payslip and totalled on the run. |
+| PP-02 | State professional tax: the worker's state is the state of their core assignment's location on the last day of the period. A tenant configures slabs per state (`PUT /pt-slabs/{state}`): each slab has `min_gross`, `max_gross` (empty = unbounded), `amount` and an optional `month` (1–12) that overrides the generic slab for that month only. Without tenant slabs the built-in defaults apply for KA, MH, WB, GJ, AP and TS; the defaults are configuration data that must be verified against current state law before production use. A worker without a state, or with a state that has neither tenant slabs nor defaults, keeps the single default slab of PY-007. |
+| PP-03 | Mid-month CTC change: the pay window is split by the worker's assignment history. Each segment is priced at its own structure and CTC, prorated by its payable days; LOP is asked per segment range. Earned amounts are added per component code in first-seen order. PF and PT use the merged earned figures; ESI eligibility and TDS projection use the last segment's full-month figures. A one-segment month is computed exactly as before. |
+| PP-04 | Arrears: when assignment history changes retroactively (a backdated compensation change or correction), the next calculated run settles every earlier finalized payslip of the worker within the last 12 months. Due = recomputed earned gross under the current history − (paid gross + arrears already settled for that payslip); LOP of the payslip is spread over its segments by calendar days (the last segment takes the remainder). Due > 0 is an earning `ARREARS` (taxable, in gross, not prorated); Due < 0 is a deduction `ARREARS_RECOVERY`. Each source payslip is settled by the amount computed at that time; recalculating a run replaces its own arrears. Statutory deductions are not recomputed on arrears in v1 (decision DP-04). |
+| PP-05 | Benefit deductions: a port supplies per-worker deduction lines (`BEN_<code>`) for the period; they are added after the structure's own deductions and before statutory lines, so the net-pay cap (PY-009) trims statutory lines first. Without a benefits context the port yields nothing. |
+| PP-06 | Final settlement: `POST /settlements {employee_id}` (`payroll:manage`) for a worker whose profile has an exit date or the status `terminated`. It computes, from the worker's current assignment: **gratuity** (service ≥ 5 completed years, a remainder of ≥ 6 months rounds the years up: last full-month BASIC × 15 / 26 × years, rounded to the rupee, capped at ₹20,00,000), **leave encashment** of the available days of every leave type with an encashment rule (BASIC ÷ 26 per day), **approved unpaid encashments** (same daily rate) and **notice recovery** (a deduction: shortfall days × monthly gross ÷ 30, where shortfall = notice period days − days between resignation and exit date, only when both dates are known). Net = Σ earnings − recovery, never below 0 (the unrecovered part is shown as `recovery_shortfall`). The last month's salary is paid by the normal run, which clips the window at the exit date (PY-003), and is not part of the settlement. |
+| PP-07 | Settlement lifecycle: `draft → approved → paid`, or `cancelled`. A draft can be recalculated (`POST /settlements/{id}/recalculate`). Approval needs a user other than the calculator (403 `PAY_SELF_APPROVAL`) and a completed exit clearance from HR/Onboarding (409 `CLEARANCE_PENDING`). Marking paid (`/pay`) records `paid_at` and marks the worker's approved encashments paid in HR/Leave in the same transaction. One open (draft or approved) settlement per worker (409 `CONFLICT`). |
+| PP-08 | Settlement reads: `GET /settlements`, `GET /settlements/{id}` (`payroll:read`); the worker sees their own paid settlement through `GET /settlements/me`. Events `payroll.settlement.approved` and `payroll.settlement.paid` carry ids only; amounts never appear in events or audit metadata. |
+| PP-09 | PT slab endpoints: `GET /pt-slabs` (tenant slabs plus the built-in defaults, `payroll:read`), `PUT /pt-slabs/{state}` (replaces the state's slabs, `payroll:manage`; state is a two-letter code; slabs must be ascending, non-overlapping and cover from 0), `DELETE /pt-slabs/{state}` (back to the defaults). |
 
 **Requirements and rules (ID-tagged bullets)**
 
@@ -7548,6 +10199,32 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 2026-10-09 — P5 DONE: payroll services, events, relay; HR/Leave UnpaidLeave port; goldens green.
 2026-10-09 — P6 DONE: HTTP edge, app wiring, swagger.
 2026-10-09 — P7+P9 DONE (backend CLOSED): integration goldens, parity, DoD.
+##### Parity decisions (2026-10-23)
+- **DP-01** Employer contributions are payslip lines of kind `employer`. They are outside gross, deductions and net, so
+  every existing payslip, CSV and total keeps its meaning; `employer_cost` and the run `employer_total` carry the
+  cost. The migration widens the line-kind check; the down migration deletes employer lines before narrowing it.
+- **DP-02** A payslip is always computed from segments (`calc.ComputeSegments`). One segment equals the original
+  `Compute` (a golden proves it), so mid-month CTC changes need no second code path.
+- **DP-03** State professional tax: tenant slabs override built-in defaults per state; a worker with no state keeps the
+  PY-007 single slab. The built-in KA, MH, WB, GJ, AP and TS slabs are configuration data that must be verified against
+  current state law before production use; half-yearly states (TN, KL) are not built in and are set by the tenant.
+- **DP-04** Statutory deductions are not recomputed on arrears in v1. Arrears are a taxable earning added after the
+  statutory base is fixed. Recomputing PF/ESI/PT/TDS across past months is a larger design (supplementary payslips) and
+  is deferred to P2.
+- **DP-05** A payslip stores the segments it was priced with. Arrears are only considered when the current assignment
+  history differs from the stored segments, so unchanged history can never produce a spurious difference, even when LOP
+  fell in one segment only. Where it did change, LOP is spread over the new segments by calendar days.
+- **DP-06** Each source payslip is settled by the amount computed at that time and recorded per run; later runs subtract
+  everything other runs settled, so arrears are paid exactly once and recalculation replaces only its own rows.
+- **DP-07** Benefits plug in through `BenefitDeductions` behind a switch installed after construction, because
+  HR/Benefits is built after payroll. Without it nothing is deducted.
+- **DP-08** Final settlement excludes the last month salary, which the normal run pays with the window clipped at the
+  exit date (PY-003). Gratuity uses the last full-month BASIC (15/26 per year, ₹20 lakh cap, five completed years,
+  six-month remainder rounds up). Notice recovery is skipped when the resignation date is missing or after the exit
+  date, and is capped at the settlement earnings, with the rest reported as `recovery_shortfall`.
+- **DP-09** Approving a settlement needs the exit clearance from HR/Onboarding, which is also what HR/Onboarding publishes
+  for exactly this purpose (onboarding OB-07). Paying marks the worker approved encashments paid in HR/Leave in the
+  same transaction, so an encashment can never be paid twice.
 
 ### m1-hr-management/contexts/recruitment  _(from specification.md)_
 
@@ -7586,6 +10263,13 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 | R18 | GET `/recruitment/offers?candidate_id&page&per_page` | `recruitment:read` |
 | R19 | POST `/recruitment/offers/{id}/decision` `{decision: accepted\|declined}` | `recruitment:manage` |
 | R20 | POST `/recruitment/offers/{id}/withdraw` | `recruitment:manage` |
+| RP-01 | Seat reservation (fixes the last-seat orphan): the first hire step locks the job and reserves a seat before any user is invited or profile created. Capacity = `headcount − hired_count − reserved_count`; none left → 409 `JOB_NOT_OPEN` with nothing created. Completing the hire turns the reservation into `hired_count`. A retry of the same candidate reuses its reservation (RC-010). `POST /candidates/{id}/hire/release` (`recruitment:hire`) gives the seat back while no employee profile has been recorded for the candidate (409 `HIRE_COMPLETED` otherwise) and is idempotent. |
+| RP-02 | Requisition: `POST /requisitions {position_id, headcount, justification}` (`manage`) for a core position. The position must exist and be active (404 / 409 `INACTIVE_REFERENCE`); `headcount` ≥ 1 and ≤ the position's open seats (⌊open FTE⌋) minus seats already requested by other requisitions that are submitted or approved (409 `NO_VACANCY`). Statuses `draft → submitted → approved | rejected`, or `cancelled` (draft and submitted only). |
+| RP-03 | `POST /requisitions/{id}/submit` (`manage`, requester); `approve` / `reject` (`recruitment:approve`; never the requester, 403 `RECRUITMENT_SELF_APPROVAL`; reject needs a comment). Approval re-checks RP-02 and creates a **draft** job (title = position title, department = the position's, headcount, employment type `full_time`, description = justification) linked to the requisition (`job_id`). `GET /requisitions` (filters `status`, `position_id`) and `GET /requisitions/{id}` (`read`). |
+| RP-04 | Scorecards: `POST/GET /scorecards`, `GET/PATCH /scorecards/{id}` (`manage` / `read`): a name and 1–10 competencies `{name, weight_pct}` whose weights (percentages, `60` = 60.00%) sum to exactly 100; status `active | archived`. `PUT /jobs/{id}/scorecard {scorecard_id}` (`manage`) assigns an active scorecard to a draft or open job. |
+| RP-05 | Interview scores: `PUT /interviews/{id}/scores {scores:[{competency, score, note?}]}` by the assigned interviewer only (others 404), for a scheduled or completed interview of a candidate whose job has a scorecard. Every competency of the scorecard exactly once, score 1–5 (hundredths not allowed); the call replaces the interviewer's earlier scores. `GET /candidates/{id}/scorecard` (`read`): per competency the average over submitted interviews, the weighted overall (hundredths of a point) and the interview count. Scores and notes never appear in events or audit metadata. |
+| RP-06 | Offer approval policy: `PUT/GET /offer-policy` (`manage` / `read`): `required_approvals` 0–3 and `threshold_ctc` (≥ 0). An offer needs approval when `required_approvals > 0` and `offered_ctc > threshold_ctc`; such an offer is created with status `pending_approval` (one live offer per candidate still holds) and cannot be accepted, declined or hired from. Default policy: 0 approvals, nothing changes. |
+| RP-07 | `POST /offers/{id}/approve` and `/reject` (`recruitment:approve`): each user approves once and never the offer's creator (403 `RECRUITMENT_SELF_APPROVAL`; 409 `ALREADY_DECIDED`); reject needs a comment and ends the offer as `withdrawn` (the candidate's stage is not changed). The offer becomes `offered` when `required_approvals` distinct approvals exist; `GET /offers/{id}/approvals` (`read`) lists the decisions. Events `recruitment.offer.approved` / `rejected` carry ids only. |
 
 **Requirements and rules (ID-tagged bullets)**
 
@@ -7628,6 +10312,28 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 2026-10-09 — P5 DONE: services, hire saga, events, relay; D6-07..D6-09.
 2026-10-09 — P6 DONE: HTTP, wiring, swagger.
 2026-10-09 — P7 + P9 DONE: integration 63/63; backend CLOSED.
+---
+##### Parity decisions (2026-10-23)
+- **DR-01** The seat is reserved in the first hire step, in the same transaction that locks the job, so a failed hire can
+  never leave a user or profile behind for a seat that does not exist. Capacity is `headcount − hired − reserved`. The
+  reservation is turned into `hired_count` when the hire completes, and `POST /candidates/{id}/hire/release` gives it
+  back while no employee profile exists. A retry reuses its own reservation.
+- **DR-02** Requisitions read positions through `core/api.Positions`, a new port beside `Directory` so existing fakes
+  keep compiling. Seats are the whole open FTE today. Seats already requested by submitted requisitions, or approved
+  ones whose job is still live, are subtracted, so two requisitions cannot both claim the last seat.
+- **DR-03** Approving a requisition creates a **draft** job, never an open one: HR still reviews the posting before it is
+  published.
+- **DR-04** Scorecard weights are percentages in the API (`60` means 60.00) and must total exactly 100. Averages are
+  computed in hundredths with integer arithmetic and the overall score is the weighted sum, so there is no float
+  rounding. Competency names match case-insensitively.
+- **DR-05** Only the assigned interviewer scores an interview; anyone else gets 404, as for feedback. A repeated call
+  replaces the earlier scores. Scores and notes never reach events or audit metadata (RG5).
+- **DR-06** Offer approval is a hook on offer creation (`OfferGate`) so a tenant with no policy is unchanged. A
+  `pending_approval` offer counts as a live offer for the one-open-offer rule and is withdrawn when the candidate leaves
+  the pipeline. A rejection withdraws the offer; it does not move the candidate back, because the existing withdrawal
+  rules already decide that when HR acts.
+- **DR-07** `recruitment:approve` is a new sensitive permission, defaulted to the HR admin template only. The creator of
+  a requisition or offer can never approve it, whatever role they hold.
 
 ### m1-hr-management/contexts/performance  _(from specification.md)_
 
@@ -7836,3 +10542,215 @@ Format: Decision / Reason / Alternatives / Tradeoff.
   manager's user id.
 ##### Changelog
 2026-10-20 — Design: spec CO-001..CO-051, 32 operations, goldens CG1–CG12.
+
+### m1-hr-management/contexts/compensation  _(from specification.md)_
+
+**Requirements and rules (ID-tagged table rows)**
+
+| ID | Text | … |
+|---|---|---|
+| CO-C01 | Pay range `{grade_id (core grade), min ≤ mid ≤ max (> 0), effective_from}`. A new range for the same grade closes the previous one the day before. Ranges never overlap per grade, and back-dating before the current start is refused (409). |
+| CO-C02 | Compa-ratio and penetration are computed exactly (hundredths, half away from zero) against the range in effect on the date for the worker's core grade on that date. Without a grade or range they are null. |
+| CO-C10 | `POST /changes {employee_id, annual_base, effective_from, reason: hire\|promotion\|market\|correction, comment?}` creates an off-cycle change. If it is the worker's first record, or the increase is at most 10% of the current base, it is applied at once. Otherwise it waits for approval by a different user (`compensation:approve`). |
+| CO-C11 | Applying a change closes the open record the day before `effective_from` (it must be after the current start, else 409 `BACKDATED`) and inserts the new one. It also sets the payroll CTC from that date through payroll's port, keeping the worker's payroll structure. Without a payroll assignment, `payroll_synced = false` and nothing fails. |
+| CO-C12 | `GET /workers/{employee_id}` returns the history, the current record, the compa-ratio and penetration, and the pending changes. `GET /me` returns the same for the caller (own data only). |
+| CO-C13 | Changes: `pending → approved (applied) \| rejected \| cancelled`. Decisions are by a user other than the requester. |
+| CO-C20 | Create a draft `{name, effective_date, performance_cycle_id?, guidelines: [{rating: low\|medium\|high\|unrated, compa: below\|within\|above, min_pct, max_pct}]}`. The compa bands are: below < 0.90 ≤ within ≤ 1.10 < above. |
+| CO-C21 | Budgets `PUT /merit-cycles/{id}/budgets [{department_id, amount}]` (draft only). |
+| CO-C22 | Open (draft → open, `compensation:manage`). This snapshots one proposal per worker who has a current compensation record and a core assignment with a department on the effective date. Each proposal stores the current base, the compa-ratio, the final rating band from performance (CP-005: the snapshot is taken now; `unrated` when none) and the manager (the core assignment's manager). |
+| CO-C23 | While open, the worker's manager (or `compensation:manage`) sets `{increase_pct 0.00–50.00, justification?}`. The amount is base × pct, rounded to the rupee. Outside the guideline range for its bands, a justification is required (400) and the proposal is flagged `outside_guideline`. |
+| CO-C24 | Budget usage per department is live: Σ amounts vs budget. A proposal that would push its department over budget needs `override_budget = true` with a justification (409 `BUDGET_EXCEEDED` otherwise). |
+| CO-C25 | Close for review (open → in_review, manage), approve (in_review → approved, `compensation:approve`, not the user who opened it), apply (approved → applied, manage). Applying writes one record per proposal with pct > 0, effective on the cycle date (reason `merit`, linked to the cycle), and syncs payroll. A second apply is 409 `CYCLE_STATE` and writes nothing. |
+| CO-C26 | Visibility (CP-006): a manager sees only proposals where they are the manager, only while the cycle is open or in review. Employees see their own applied result through their history. |
+
+**Decision log (decisions.md, verbatim)**
+
+- **DCO-01** Compensation owns the annual base; payroll owns the salary structure and the calculation. Applying a
+  record calls the payroll `CTC` port inside the same transaction. The worker keeps their payroll structure, and
+  a worker without a payroll assignment is recorded with `payroll_synced = false` (CP-003).
+- **DCO-02** Records never overlap. This is enforced twice: a per-worker advisory lock in the service and a gist
+  exclusion constraint. A new record must start after the open one (`BACKDATED` otherwise); corrections are new
+  records with reason `correction`, nothing is deleted (CP-002).
+- **DCO-03** Off-cycle maker-checker (CP-007): a worker's first record and raises up to 10% apply at once. Cuts and
+  raises above 10% wait for a `compensation:approve` holder who is not the requester (`COMP_SELF_APPROVAL`). The
+  threshold is a constant for v1; a tenant setting comes with M7 Approvals.
+- **DCO-04** A merit cycle is approved by someone other than the user who opened it. Applying it is one transaction;
+  a second apply is `CYCLE_STATE`, so applying twice never writes twice.
+- **DCO-05** A department with no budget row has a budget of zero. Every positive proposal there needs
+  `override_budget` with a justification, so a forgotten budget fails safe instead of being unlimited.
+- **DCO-06** Proposals snapshot base, compa band, rating band and manager when the cycle opens (CP-005). Later
+  changes in core or performance do not move an open cycle. Workers without a current record or department get no
+  proposal.
+- **DCO-07** Amounts are `kernel.Money` (paise) and percentages are hundredths; a merit amount is rounded to the
+  rupee. No floating point anywhere.
+- **DCO-08** Events and audit metadata carry ids, dates and reasons only, never amounts, percentages or ratings
+  (HR-009).
+
+### m1-hr-management/contexts/onboarding  _(from specification.md)_
+
+**Requirements and rules (ID-tagged table rows)**
+
+| ID | Text | … |
+|---|---|---|
+| OB-01 | Template: `kind onboarding|offboarding`, name, optional criteria `department_id`, `job_profile_id`, `location_id`, `worker_type`, status `active|archived`. Tasks: title, description, `owner_role employee|manager|hr|it|finance`, `due_offset_days` (−90..365, relative to the anchor date), optional `document_type`, `blocking`. A task list is replaced as a whole (`PUT .../tasks`, 1–50 tasks). |
+| OB-02 | Applicability (ON-001): a template applies when every criterion it sets matches the worker's placement on the anchor date. Among matching active templates of the kind, only those with the most criteria apply; their tasks are merged in template then task order. No matching template → a checklist with no tasks. |
+| OB-03 | Start (ON-002, ON-003): a completed core `hire`/`rehire` starts onboarding anchored on the effective date; a completed `terminate` starts offboarding anchored on the last working day; a recruitment hire starts onboarding anchored on the joining date. Starting is idempotent: the same source never creates a second checklist, and a worker never has two open checklists of one kind (the second start is a no-op). Manual start `POST /checklists` by `onboarding:manage` returns 409 `CONFLICT` instead. Rescinding the core action cancels the checklist it started. |
+| OB-04 | Tasks: `employee` tasks are assigned to the worker, `manager` tasks to the worker's manager on the anchor date (no manager → pool), `hr|it|finance` tasks to the pool (any `onboarding:manage` holder). Due date = anchor + offset. |
+| OB-05 | Completing a task (`done`): its assignee or `onboarding:manage`. A task with `document_type` needs a **verified** employee document of that type (409 `DOCUMENT_REQUIRED`); its id is stored as evidence (ON-005). Skipping: `onboarding:manage`, with a reason, never a blocking task (409 `TASK_BLOCKING`). Reopen: `onboarding:manage`. Tasks of a closed checklist cannot change (409 `CHECKLIST_STATE`). |
+| OB-06 | Completion: a checklist completes automatically when no task is open and (offboarding) clearance is complete. `onboarding:manage` may complete it early only when no **blocking** task is open (409 `BLOCKING_OPEN`) and clearance is complete (409 `CLEARANCE_PENDING`); remaining open tasks become `skipped`. Cancel: `onboarding:manage`, with a reason. |
+| OB-07 | Exit clearance (ON-006): an offboarding checklist gets sign-offs `manager`, `hr`, `it`, `finance`. `manager` is signed by the worker's manager or `onboarding:manage`; the others by `onboarding:manage`. Each records actor, time and note; signing twice is 409 `ALREADY_CLEARED`. When the last one is signed the checklist records `clearance_completed_at` and emits `hr.onboarding.clearance_completed`. Payroll reads `ClearanceCompleted` through `onboarding/api` before releasing final settlement. |
+| OB-08 | Exit interview: the departing worker submits answers once (`PUT`, 409 `ALREADY_SUBMITTED`), only on an open offboarding checklist. Readable by the worker and `onboarding:exit_interview` only (managers and `onboarding:read` get 403/404). Never in events or audit metadata. |
+| OB-09 | Views (ON-004): `GET /my-tasks` (assigned to me, plus pool tasks for `onboarding:manage`; open first, by due date); `GET /me` (my checklists with tasks); `GET /checklists` (`onboarding:read`: all with filters; otherwise those where I am the worker or the manager); `GET /checklists/{id}` with tasks, clearance and progress `{total, done, skipped, open, overdue}`. |
+| OB-10 | Progress report (ON-008): `GET /reports/progress?kind=` per department: open and completed checklists, open and overdue tasks. |
+| OG1 | Isolation: foreign ids 404 |
+| OG2 | Duplicate start (core hire then recruitment hire, or the same action twice) creates one checklist |
+| OG3 | Most specific templates win |
+| OG4 | Blocking task holds completion; skip refuses a blocking task |
+| OG5 | Document task needs a verified document |
+| OG6 | Clearance: checklist cannot complete before all sign-offs; event on completion; payroll port reports it |
+| OG7 | Exit interview visible only to the worker and `onboarding:exit_interview` |
+| OG8 | Rescinded hire cancels its checklist |
+
+**Decision log (decisions.md, verbatim)**
+
+- **DOB-01** Checklists are started by hooks that run inside the transaction of the event that causes them
+  (`core/api.ActionHook`, `recruitment/api.HireHook`). A failed start rolls the hire or action back, so a worker is
+  never hired without their checklist. The alternative, consuming outbox events, was rejected: it is eventually
+  consistent and needs a consumer per source.
+- **DOB-02** Starting is idempotent twice over: a unique index on `(tenant, kind, source_id)` and one open checklist
+  per worker and kind. A recruitment hire followed by a core hire for the same worker therefore yields one checklist.
+  The manual start returns 409 instead of silently doing nothing.
+- **DOB-03** Rescinding a core action cancels the checklist it started (OB-03). Work already done stays visible as
+  history on the cancelled checklist.
+- **DOB-04** The most specific matching templates apply, not a merge of all matches (OB-02). Ties apply together in
+  creation order. A template with no criteria is the tenant default.
+- **DOB-05** Manager tasks go to the worker's manager on the anchor date. Without a manager they fall into the HR pool
+  rather than being lost.
+- **DOB-06** Document tasks are backed by `employee_documents.verified_at`. Onboarding stores only the evidence id;
+  the file lifecycle stays in employee (M8 later).
+- **DOB-07** Offboarding has four fixed clearance areas (manager, hr, it, finance). Completing the last one stamps the
+  checklist, emits `hr.onboarding.clearance_completed` and is what payroll reads through `onboarding/api.Clearance`.
+- **DOB-08** Exit-interview answers are readable by the worker and `onboarding:exit_interview` only. The `read` and
+  `manage` permissions deliberately do not include them, and reads by the permission holder are audited. Answers are
+  never in events or audit metadata.
+- **DOB-09** The worker's login is deactivated by core only after the last working day, so the departing worker can
+  still reach their offboarding tasks and the exit interview until then.
+
+### m1-hr-management/contexts/learning  _(from specification.md)_
+
+**Requirements and rules (ID-tagged table rows)**
+
+| ID | Text | … |
+|---|---|---|
+| LN-C01 | Course: `title` 1â€“150, `description` â‰¤ 2000, `provider` â‰¤ 100, `content_kind` `link` or `document`, `duration_mins` 0â€“10000, up to 10 `tags` (lower-cased, â‰¤ 30), `verification` `self` (default), `manager` or `hr`, `self_enrol` (default false). A link needs `content_url`: https only, a host, no user-info, â‰¤ 500 characters (`javascript:`, `data:`, `http:` refused). A document needs `document_ref` (â‰¤ 200, opaque, no URL scheme). `thumbnail_ref` â‰¤ 500 is an https URL or an opaque reference, never a `data:` URL. A new course is `draft`, version 1. |
+| LN-C02 | Updating title, description, provider, content, duration or tags of a draft or published course increments `version` and stores a snapshot; changing only `verification`, `self_enrol` or the thumbnail does not. A retired course cannot be edited (409 `COURSE_STATE`). `GET /courses/{id}/versions` lists snapshots. |
+| LN-C03 | `publish` moves `draft â†’ published`; `retire` moves `draft | published â†’ retired`. Retiring keeps every enrolment and completion, and open enrolments can still be completed; a retired or draft course cannot be assigned or self-enrolled (409 `COURSE_STATE`). |
+| LN-C04 | Plan: `name` 1â€“150 (unique, case-insensitive), `description` â‰¤ 1000, status `active | archived`. `PUT /plans/{id}/items` replaces the ordered items (1â€“50 distinct, non-retired courses, each `mandatory` or optional). A plan is complete for a worker when every mandatory item has a completed enrolment (waived counts as done). |
+| LN-C05 | Assignment: `target_kind` `employee | department | job_profile | location | all` with `target_id` (absent for `all`), exactly one of `course_id` or `plan_id` (a published course, or an active plan whose courses are all published), `mandatory`, at most one of `due_date` (calendar date) or `due_in_days` (1â€“1000, counted from the enrolment date), and `recurrence_days` 30â€“3650 (needs `due_in_days`, not `due_date`). Creating it enrols every active worker who matches today and answers `{matched, created}`. Cancelling stops future enrolments and recurrence and keeps existing ones. |
+| LN-C06 | Matching uses HR/Core placement on today's date (department, job profile, location) and the employee directory (`all`, `employee`). Enrolments are created idempotently under the key `assignment Â· course Â· cycle`, so running the same assignment twice, or a worker matching the same assignment through a rule and an individual assignment, never gives two enrolments for one assignment. |
+| LN-C07 | Joiners and movers: when HR/Core completes a hire, rehire, transfer or promotion, the worker's new placement is matched against every active rule assignment (not `employee` ones) and the missing enrolments are created, inside the action's transaction but in a savepoint, so a learning failure can never roll back or block an HR action. A rescinded action or a termination enrols nobody. |
+| LN-C08 | Self-enrolment: a published course with `self_enrol` (or an active plan whose courses all allow it) â†’ the worker gets one enrolment per course, source `self`. A worker with a live self enrolment (`not_started | in_progress`) in the same course gets 409 `ALREADY_ENROLLED`. |
+| LN-C09 | Enrolment statuses: `not_started â†’ in_progress â†’ completed`, or `waived` from `not_started | in_progress`. `overdue` is not stored: an enrolment is overdue when its `due_date` is before today in the tenant's time zone and it is `not_started | in_progress`; it is returned with `overdue: true` and `status=overdue` filters on it. The time zone is a tenant setting (`PUT /settings`, IANA name, default `Asia/Kolkata`). |
+| LN-C10 | Start: the learner moves their own `not_started` enrolment to `in_progress` (409 `ENROLMENT_STATE` otherwise). Complete: the learner submits `{score?, evidence_ref?, certificate_ref?}` (score 0â€“100; references â‰¤ 300). Course `verification` `self` â†’ the completion is `verified` and the enrolment `completed`; `manager` or `hr` â†’ the completion is `pending` and the enrolment stays `in_progress` until verified. A second submission while one is pending â†’ 409 `COMPLETION_PENDING`; completing a completed or waived enrolment â†’ 409 `ENROLMENT_STATE`. |
+| LN-C11 | Verify / reject a pending completion. `manager`: the learner's direct manager or `learning:manage`; `hr`: `learning:manage` only; nobody verifies their own (403 `LEARNING_SELF_VERIFY`). Verify â†’ completion `verified`, enrolment `completed`. Reject needs a comment â†’ completion `rejected`, enrolment back to `in_progress`, and the learner may submit again. A decided completion â†’ 409 `COMPLETION_STATE`. |
+| LN-C12 | Completions are immutable: nothing edits a completion's content. `POST /enrolments/{id}/correct` (`learning:manage`, reason required) writes a new `verified` completion with attestation `hr`, marks the earlier live one `superseded` and links `supersedes_id`; on an enrolment with no completion it completes it on the worker's behalf. A waived enrolment cannot be corrected. |
+| LN-C13 | Waive (`learning:manage`, reason â‰¤ 500) â†’ `waived`; a waived or completed enrolment cannot be waived again (409 `ENROLMENT_STATE`). |
+| LN-C14 | Recurrence: for each active assignment with `recurrence_days`, once today reaches `next_cycle_on` a new cycle's enrolments are created for every worker who matches then (same idempotent key), and `next_cycle_on` advances by `recurrence_days`; several missed cycles are caught up one at a time by repeated runs, never skipped silently. `POST /recurrence/run` (`learning:manage`) runs it now; a background loop runs it every hour. |
+| LN-C15 | Views: `GET /enrolments/me` (own, filter `status`), `GET /transcript/me` (own completed enrolments with their verified completion), `GET /enrolments/team` (direct reports), `GET /enrolments` (`learning:read`, filters `employee_id`, `course_id`, `status`, `assignment_id`), `GET /plans/{id}/progress` (own, or `employee_id` with `learning:read`). |
+| LN-C16 | Compliance report (`learning:read`): `GET /reports/compliance?department_id&course_id&mandatory` â†’ per department and course the counts `total, not_started, in_progress, completed, waived, overdue`. Department is the worker's department when they were enrolled. No personal data. |
+| LN-C17 | Events and audit carry ids and statuses only (`learning.course.published`, `learning.course.retired`, `learning.assignment.created`, `learning.assignment.cancelled`, `learning.enrolment.completed`, `learning.enrolment.waived`); never scores, evidence, comments or free text (HR-009). |
+| LN-C18 | Tenant isolation: every row carries `tenant_id`; a foreign tenant's id is 404. |
+
+**Errors**
+
+`NOT_FOUND`, `VALIDATION_ERROR`, `COURSE_STATE`, `PLAN_STATE`, `ALREADY_ENROLLED`, `ENROLMENT_STATE`, `COMPLETION_PENDING`,
+`COMPLETION_STATE`, `LEARNING_SELF_VERIFY`, `EMPLOYEE_NOT_FOUND`, `FORBIDDEN`.
+
+**Decision log (decisions.md, verbatim)**
+
+- **DL-01** Content is never hosted. A course is metadata plus an https link or an opaque document reference (the file
+  belongs to M8 later). Links must be absolute https URLs with a host and no user-info, so `javascript:`, `data:` and
+  plain `http:` never reach a learner's browser. A thumbnail is an https URL or an opaque reference, never inline data.
+- **DL-02** Versioning covers content only (title, description, provider, content, duration, tags). Switching
+  `verification` or `self_enrol` is a policy change and does not create a version, so history shows what learners
+  actually read.
+- **DL-03** An enrolment's dedupe key is `assignment · course · cycle`. Two different assignments of the same course give
+  a worker two enrolments on purpose (for example a department rule plus a personal assignment with its own due date);
+  running one assignment twice, a hook firing twice or two recurrence runs never do.
+- **DL-04** Rule matching reads placement from HR/Core on the day and the employee directory. The current workforce is
+  `active`, `probation`, `notice` and `on_leave`; an exited or inactive worker is never enrolled. `job_profile`,
+  `location` and `department` ids are not validated for existence (core exposes no read for them), so a mistyped id matches
+  nobody and the response says `matched: 0`.
+- **DL-05** The joiner and mover hook runs inside core's transaction but in a savepoint and always returns nil. A
+  learning failure (database error, a retired course) is swallowed and the worker is picked up the next time the hook or
+  a recurrence run touches them; HR actions are never blocked or rolled back by learning (LN-C07).
+- **DL-06** Overdue is computed, not stored, so no job has to flip statuses and a change of time zone is reflected at
+  once. Due dates are calendar dates compared with today in the tenant's learning time zone (default `Asia/Kolkata`;
+  HR-007). The hourly recurrence loop looks one day ahead of UTC and re-checks each assignment in its own tenant zone.
+- **DL-07** Recurrence advances one cycle per assignment per run, from the scheduled date and not from today, so a long
+  outage is caught up cycle by cycle instead of skipping compliance periods. A new cycle's due date is `due_in_days`
+  from the day the cycle starts; recurring assignments therefore refuse a fixed `due_date`.
+- **DL-08** A completion is immutable. `verified` ones are final; a correction writes a new HR-attested completion and
+  marks the old `superseded`, so the audit trail keeps every version. A rejected completion stays as history and the
+  learner may submit again.
+- **DL-09** Verification authority follows the course: `self` verifies at once; `manager` is the learner's direct manager
+  (from HR/Organization mappings) or `learning:manage`; `hr` is `learning:manage` only. Nobody verifies their own, even
+  with `learning:manage`. Others get 404, not 403, so completions of strangers are not discoverable.
+- **DL-10** A waiver cannot hide a pending verification (409 `COMPLETION_PENDING`): the completion must be decided first,
+  or HR corrects the enrolment.
+- **DL-11** Plan progress counts the worker's enrolment in each plan course whatever its source, newest cycle first, so
+  completing a plan's course on your own still counts towards the plan. Waived counts as done.
+- **DL-12** Events (`learning.course.published|retired`, `learning.assignment.created|cancelled`,
+  `learning.enrolment.completed|waived`) go to `lrn_events_outbox` with ids and statuses only. There is no relay yet, as for
+  compensation and onboarding; a consumer is added with its first subscriber. Scores, evidence and comments never leave
+  the context (HR-009).
+
+### m1-hr-management/contexts/benefits  _(from specification.md)_
+
+**Requirements and rules (ID-tagged table rows)**
+
+| ID | Text | … |
+|---|---|---|
+| BN-C01 | Plan: `code` (2–30, letters, digits, `_`, `-`; unique per tenant, case-insensitive; stored upper-case), `name` 1–150, `category` `health | life | accident | retirement | wellness | other`, `provider` ≤ 100, `plan_year` 2000–2100, `eligibility`, status `draft | active | retired`. The first **version** is created with the plan. |
+| BN-C02 | A version is `{effective_from, levels}` with 1–10 coverage levels `{code, name, employee_cost, employer_cost, max_dependants}` (costs ≥ 0 per month, `max_dependants` 0–10, level codes unique within the version). A plan's costs never change in place: `POST /plans/{id}/versions` adds a version that starts strictly after the current latest version and not in the past; the previous version ends where the new one starts. Names, provider and eligibility can be patched; levels cannot. |
+| BN-C03 | Eligibility `{worker_types, employment_types, grade_ids, location_ids, min_tenure_days}`; an empty list means no restriction; tenure is whole days from the joining date. It is evaluated from HR/Core placement and the employee profile on the date of the election. A plan the worker is not eligible for is not offered (`GET /options`) and electing it is refused (409 `NOT_ELIGIBLE`). |
+| BN-C04 | An enrolment window is open for a worker when any of: an **open enrolment** window covers today (tenant-wide, `starts_on`–`ends_on` inclusive); the worker is within `new_hire_days` of their joining date (inclusive, default 30); a **life event** of theirs is within `life_event_days` of its date (inclusive, default 30). Otherwise an election, change or end by the worker is refused with 409 `ENROLMENT_WINDOW_CLOSED`. HR (`benefits:manage`) may end an election at any time. |
+| BN-C05 | Election `{plan_id, level_code, dependant_ids?, effective_from?}`: the plan is `active`, the version in force on `effective_from` has the level, the dependants are the worker's own active ones and not more than the level's `max_dependants`, `effective_from` is today or up to 90 days ahead (default today). One live election per worker and plan: electing again while one is `active` or `waived` is 409 `ELECTION_EXISTS` (change or end it instead). |
+| BN-C06 | Change `POST /elections/{id}/change {level_code, dependant_ids?, effective_from?}` ends the current election on the new one's start date and writes the new election, in one transaction. Waive `POST /elections/waive {plan_id}` records an explicit `waived` election from today and ends any active one; electing later replaces the waiver. End `POST /elections/{id}/end` ends it today. Statuses `active`, `waived` (no cost), `ended` (has an `effective_to`, exclusive; it still counts until that date). Ended rows are history and are never deleted. |
+| BN-C07 | Payroll hand-off: `Deductions(tenant, employee, from, to)` returns one line `BEN_<PLAN CODE>` per election that is not waived, started on or before `to` and has no end or ends after `to`, at the employee cost of its level in the version in force on `to`. A whole month is charged if the election covers the last day of the period, nothing otherwise. Employer cost is reported, never deducted. |
+| BN-C08 | Termination: when HR/Core completes a `terminate` action, every live election of the worker ends the day after the last working day (reason `termination`, linked to the action), so deductions stop with the month containing that day; rescinding the termination reinstates exactly the elections that termination ended. A failure here rolls the action back (unlike learning), because a missed end would keep deducting. |
+| BN-C09 | Dependants `{name 1–100, relationship spouse | child | parent | other, date_of_birth}` (not in the future, not before 1900) belong to a worker and are managed only by them; removing one that an active election covers is 409 `DEPENDANT_IN_USE`. Life events `{type marriage | birth | adoption | divorce | death | other, event_date, evidence_ref?}` (not more than 90 days in the future) are recorded by the worker or by HR for a worker. Both are **sensitive**: visible to the worker and to `benefits:read_sensitive` only, never in events or audit metadata (BN-007). |
+| BN-C10 | Report `GET /reports/enrolment` (`benefits:read`): per plan and level the number of active elections and waivers on today's date and the total monthly employee and employer cost. No personal data. |
+| BN-C11 | Events and audit carry ids and statuses only (`benefits.plan.activated|retired`, `benefits.election.created|ended|waived`); never dependants, life events or costs. Tenant isolation: foreign ids are 404. |
+
+**Errors**
+
+`NOT_FOUND`, `VALIDATION_ERROR`, `CONFLICT`, `PLAN_STATE`, `NOT_ELIGIBLE`, `ENROLMENT_WINDOW_CLOSED`, `ELECTION_EXISTS`,
+`ELECTION_STATE`, `DEPENDANT_IN_USE`, `EMPLOYEE_NOT_FOUND`, `FORBIDDEN`.
+
+**Decision log (decisions.md, verbatim)**
+
+- **DB-01** Costs are per month because payroll runs monthly (specification open question resolved). A plan's costs never
+  change in place: a cost change is a new version that starts after the current one and not in the past, so the history
+  of what a worker was charged is exact (BN-001).
+- **DB-02** Payroll is charged a whole month for every election that covers the **last day** of the period, and nothing
+  otherwise. This avoids proration rules for mid-month starts and ends; an election that ends before the last day stops
+  costing in that month. The employer cost is reported (`GET /reports/enrolment`) and never deducted.
+- **DB-03** The payroll port moved to `payroll/api` (`BenefitLine`, `BenefitDeductions`) so HR/Benefits can implement it
+  without importing payroll's services; payroll's own names are aliases, so nothing in payroll changed behaviour.
+- **DB-04** Eligibility lists explicit grade ids rather than a rank range: core publishes a grade's existence and active
+  flag but not its rank. An empty list means no restriction. Eligibility is evaluated on the election's start date.
+- **DB-05** Windows are open enrolment (tenant-wide dates), new hire (from the joining date for `new_hire_days`) and
+  life event (the event date for `life_event_days`), all inclusive. The checks are made against today for the worker's own
+  actions; `benefits:manage` may end an election at any time. Life events are accepted as recorded, with no approval step.
+- **DB-06** An election row is never edited except to end it. Ending sets `effective_to` (exclusive) and a reason, so
+  history stays complete. A waiver is an election row with no level; electing later ends the waiver with reason
+  `replaced`. A same-day replacement leaves an empty range (`effective_to = effective_from`), which the schema allows.
+  One open-ended row per worker and plan is enforced by a partial unique index and an advisory lock.
+- **DB-07** Termination (BN-C08) ends only open-ended active elections, at the day after the last working day, and
+  records the core action id. Rescinding reinstates exactly the rows that action ended. The hook returns its error, so a
+  failure rolls the termination back: a missed end would keep deducting, which is worse than a blocked action.
+- **DB-08** Dependants and life events are sensitive (HR-009). Only the worker manages their dependants; HR reads them with
+  `benefits:read_sensitive`. A manager gets nothing. Events, audit metadata and reports carry ids, statuses and counts only.
+- **DB-09** Retiring a plan blocks new elections but leaves existing ones running until they are ended; HR ends them with
+  `benefits:manage` when a plan is withdrawn.

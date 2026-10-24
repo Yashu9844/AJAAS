@@ -4,7 +4,7 @@ A browser console for verifying every shipped backend feature by hand, against t
 product UI. Standard and rules: `docs/ARCHITECTURE.md` §14. It is a verification tool, not product UI, and must be
 excluded from production builds.
 
-**Status (2026-10-20, restructure Phase D):** pages exist at canonical routes for M0 and every built HR context:
+**Status (2026-10-24, Phase E complete):** pages exist at canonical routes for M0 and every built HR context:
 
 | Route | Page | Operations | Scenarios |
 |---|---|---|---|
@@ -17,10 +17,16 @@ excluded from production builds.
 | `/dev-test/hr/recruitment` | HR Recruitment | generated (20) | `S_RECRUITMENT` |
 | `/dev-test/hr/core` | HR Core HCM | generated (32) | `S_CORE` (2) |
 | `/dev-test/hr/performance` | HR Performance & OKRs | generated (33) | `S_PERFORMANCE` (4) |
+| `/dev-test/hr/compensation` | HR Compensation | generated (24) | `S_COMPENSATION` |
+| `/dev-test/hr/onboarding` | HR Onboarding & Offboarding | generated (19) | `S_ONBOARDING` |
+| `/dev-test/hr/learning` | HR Learning | generated (35) | `S_LEARNING` (`hr.learning.flow`) |
+| `/dev-test/hr/benefits` | HR Benefits | generated (29) | `S_BENEFITS` (`hr.benefits.flow`) |
 
 From now on each feature ships its page in the same phase as its backend (delivery phase P8, `docs/ENGINEERING.md` §3).
-Last full run (2026-10-20, `jaas_console` DB, headless): **37/37 scenarios passed** (A-only scenarios; the two-tenant
-`AB` scenarios run in the browser).
+Last full run (2026-10-24, fresh `jaas_console2` DB, headless): **48/48 scenarios passed** (A-only scenarios; the two-tenant
+`AB` scenarios run in the browser). The run found one tooling defect, fixed in `scripts/console-headless.mjs`: it sent bodies
+without `Content-Length`, and handlers that treat an unknown (chunked) length as "no body" dropped the reject comment and the
+auto-absent date. Browsers and curl always send the length. Run scenarios on a fresh tenant: some (import log) count rows.
 
 ## 1. Run it
 

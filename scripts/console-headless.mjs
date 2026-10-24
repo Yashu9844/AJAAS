@@ -34,6 +34,8 @@ globalThis.fetch = (url, init = {}) =>
   new Promise((resolve, reject) => {
     const u = new URL(url);
     const headers = { ...(init.headers ?? {}), Host: u.host };
+    // Like a browser, announce the body length: some handlers treat an unknown (chunked) length as "no body".
+    if (init.body) headers["Content-Length"] = Buffer.byteLength(init.body);
     const req = http.request({ host: "127.0.0.1", port: u.port, path: u.pathname + u.search, method: init.method ?? "GET", headers }, (res) => {
       const chunks = [];
       res.on("data", (c) => chunks.push(c));
@@ -66,7 +68,7 @@ if (login.status !== 200) {
 }
 setSession("A", { slug, accessToken: lb.data.access_token, refreshToken: lb.data.refresh_token, expiresAt: lb.data.expires_at, user: lb.data.user, tenantId: lb.data.tenant_id });
 const ep = { host: "localhost", port, platformKey: process.env.PLATFORM_KEY ?? "dev-platform-admin-key-change-me" };
-const all = [...S0.filter((s) => s.needs !== "AB"), ...S0_ACCESS, ...S1.filter((s) => s.needs !== "AB"), ...S2.filter((s) => s.needs !== "AB"), ...hr.S_ATTENDANCE, ...hr.S_LEAVE, ...hr.S_PAYROLL, ...hr.S_RECRUITMENT, ...hr.S_PERFORMANCE, ...hr.S_CORE, ...hr.S_EMPLOYEE_RECORDS, ...hr.S_COMPENSATION, ...hr.S_ONBOARDING]
+const all = [...S0.filter((s) => s.needs !== "AB"), ...S0_ACCESS, ...S1.filter((s) => s.needs !== "AB"), ...S2.filter((s) => s.needs !== "AB"), ...hr.S_ATTENDANCE, ...hr.S_LEAVE, ...hr.S_PAYROLL, ...hr.S_RECRUITMENT, ...hr.S_PERFORMANCE, ...hr.S_CORE, ...hr.S_EMPLOYEE_RECORDS, ...hr.S_COMPENSATION, ...hr.S_ONBOARDING, ...hr.S_LEARNING, ...hr.S_BENEFITS]
   .filter((s) => !filter || s.key.includes(filter));
 let failed = 0;
 for (const sc of all) {

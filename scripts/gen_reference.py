@@ -9,11 +9,11 @@ BACKEND = os.path.join(ROOT, 'backend')
 INTERNAL = os.path.join(BACKEND, 'internal')
 
 MODULE_ORDER = ['shared', 'app', 'identity', 'organization', 'employee', 'attendance', 'leave', 'payroll',
-                'recruitment', 'performance', 'core', 'compensation', 'onboarding']
+                'recruitment', 'performance', 'core', 'compensation', 'onboarding', 'learning', 'benefits']
 TITLES = {'shared': 'Shared infrastructure', 'app': 'Application wiring (internal/app)', 'identity': 'M0 Identity & Access',
           'organization': 'M1 HR / Organization', 'employee': 'M1 HR / Employee', 'attendance': 'M1 HR / Attendance',
           'leave': 'M1 HR / Leave', 'payroll': 'M1 HR / Payroll', 'recruitment': 'M1 HR / Recruitment',
-          'performance': 'M1 HR / Performance & OKRs', 'core': 'M1 HR / Core HCM', 'compensation': 'M1 HR / Compensation', 'onboarding': 'M1 HR / Onboarding'}
+          'performance': 'M1 HR / Performance & OKRs', 'core': 'M1 HR / Core HCM', 'compensation': 'M1 HR / Compensation', 'onboarding': 'M1 HR / Onboarding', 'learning': 'M1 HR / Learning', 'benefits': 'M1 HR / Benefits'}
 
 
 def read(path):
@@ -62,7 +62,7 @@ def package_doc(src):
     return ' '.join(l[2:].strip() for l in m.group(1).strip().split('\n'))
 
 
-HR = {'organization', 'employee', 'attendance', 'leave', 'payroll', 'recruitment', 'performance', 'core', 'compensation', 'onboarding'}
+HR = {'organization', 'employee', 'attendance', 'leave', 'payroll', 'recruitment', 'performance', 'core', 'compensation', 'onboarding', 'learning', 'benefits'}
 
 
 def module_dir(module):
