@@ -1,7 +1,6 @@
 # M2 Projects & Tasks
 
-**Status:** NOT STARTED — design pending. Proposed contract in `specification.md`; logical data model, ER diagram and
-service diagram in `model/`.
+**Status:** DESIGN — specification, design, decisions, plan and testing written 2026-10-27; **awaiting owner approval** (open questions in `decisions.md`). No code yet.
 
 **Purpose:** Project delivery and work tracking; employee identity is referenced by IDs.
 
@@ -15,10 +14,14 @@ service diagram in `model/`.
 
 | File | Holds |
 |---|---|
-| `specification.md` | proposed purpose, data model, API shapes, rules, events and acceptance tests (from `docs/ARCHITECTURE.md` section 5) plus the proposed entities |
+| `specification.md` | the contract: requirement ids (PR, TK, CM, TM, AT, SP, VW, EV, SC), extension points and golden tests |
+| `design.md` | service boundary, packages, data model, mechanisms, storage layer, API groups, performance |
+| `decisions.md` | proposed decisions and the open questions to answer |
+| `plan.md` | steps P0–P8 with gates |
+| `testing.md` | required test coverage |
+| `reference-kaneo.md` | feature matrix against the open-source Kaneo reference (no code copied) |
 | `model/db-model.md` | proposed tables, relationships, dependencies, reliability tables, indexes (owner bundle, verbatim) |
 | `model/erd.mmd` | Mermaid ER diagram |
 | `model/architecture.mmd` | Mermaid service interaction diagram |
 
-When the module enters design, `design.md`, `testing.md`, `plan.md` and `decisions.md` are added and the
-specification is frozen (see `docs/ENGINEERING.md`, documentation standard).
+The specification freezes when the design is approved (see `docs/ENGINEERING.md`, documentation standard).
