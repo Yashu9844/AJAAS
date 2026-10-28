@@ -32,7 +32,9 @@ CONTEXTS = {
 # A path belongs to the context with the longest matching prefix, so nested prefixes can be split between contexts.
 PM_CONTEXTS = {
     'projects': ('PM_PROJECTS', ['/projects', '/project-roles', '/project-permissions', '/project-labels']),
-    'tasks': ('PM_TASKS', ['/projects/{id}/tasks', '/projects/{id}/activity', '/projects/{id}/time', '/tasks', '/tickets', '/comments', '/time-entries', '/attachments']),
+    'tasks': ('PM_TASKS', ['/projects/{id}/tasks', '/projects/{id}/activity', '/tasks', '/tickets']),
+    'collab': ('PM_COLLAB', ['/tasks/{id}/comments', '/tasks/{id}/watch', '/tasks/{id}/watchers', '/tasks/{id}/time', '/tasks/{id}/attachments',
+                             '/projects/{id}/time', '/comments', '/time-entries', '/attachments']),
     'planning': ('PM_PLANNING', ['/projects/{id}/sprints', '/projects/{id}/backlog', '/projects/{id}/board', '/projects/{id}/calendar', '/projects/{id}/gantt',
                                  '/projects/{id}/plan', '/sprints', '/my-work', '/search', '/saved-views', '/calendar-tokens', '/calendar']),
     'platform': ('PM_PLATFORM', ['/projects/{id}/group-rules']),

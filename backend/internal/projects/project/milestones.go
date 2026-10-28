@@ -68,7 +68,7 @@ func (s *Service) CreateMilestone(ctx context.Context, a api.Actor, projectID uu
 		if err := tx.Create(&m).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "milestone.created", "milestone", m.ID, map[string]any{"project_id": projectID})
+		s.audit(ctx, tx, a, "milestone.created", ref{"milestone", m.ID, map[string]any{"project_id": projectID}})
 		return nil
 	})
 	if isDup(err) {
@@ -115,7 +115,7 @@ func (s *Service) DeleteMilestone(ctx context.Context, a api.Actor, projectID, i
 		if res.RowsAffected == 0 {
 			return kernel.NotFound("milestone")
 		}
-		s.audit(ctx, tx, a, "milestone.deleted", "milestone", id, nil)
+		s.audit(ctx, tx, a, "milestone.deleted", ref{"milestone", id, nil})
 		return nil
 	})
 }

@@ -113,7 +113,7 @@ func (s *Service) setArchived(ctx context.Context, a api.Actor, id uuid.UUID, ar
 		if res.Error != nil {
 			return res.Error
 		}
-		s.audit(ctx, tx, a, event, "project", id, nil)
+		s.audit(ctx, tx, a, event, ref{"project", id, nil})
 		return kernel.Emit(ctx, tx, a.TenantID, event, map[string]any{"project_id": id})
 	})
 	if err != nil {
@@ -139,7 +139,7 @@ func (s *Service) Delete(ctx context.Context, a api.Actor, id uuid.UUID) error {
 			s.now().UTC(), s.now().UTC(), id, a.TenantID).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.deleted", "project", id, nil)
+		s.audit(ctx, tx, a, "project.deleted", ref{"project", id, nil})
 		return kernel.Emit(ctx, tx, a.TenantID, "project.deleted", map[string]any{"project_id": id})
 	})
 }

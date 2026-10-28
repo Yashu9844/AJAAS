@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	coreAPI "github.com/jaas/jaas/internal/hr/core/api"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/kernel"
 	leaveAPI "github.com/jaas/jaas/internal/hr/leave/api"
 	onboardingAPI "github.com/jaas/jaas/internal/hr/onboarding/api"
@@ -20,6 +19,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/payroll/models"
 	"github.com/jaas/jaas/internal/hr/payroll/repositories"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"gorm.io/gorm"
 )
 

@@ -34,20 +34,32 @@ func Respond(c *gin.Context, status int, data any, err error) {
 	c.JSON(status, gin.H{"data": data})
 }
 
+// CursorPage is one page of a cursor-paged list.
+type CursorPage[T any] struct {
+	Rows  []T
+	Limit int
+	Next  string
+}
+
+// NewCursorPage bundles a page for RespondCursor.
+func NewCursorPage[T any](rows []T, limit int, next string) CursorPage[T] {
+	return CursorPage[T]{Rows: rows, Limit: limit, Next: next}
+}
+
 // RespondCursor writes a cursor-paged list: {data, meta: {limit, next_cursor}}.
-func RespondCursor[T any](c *gin.Context, rows []T, limit int, next string, err error) {
+func RespondCursor[T any](c *gin.Context, p CursorPage[T], err error) {
 	if err != nil {
 		Fail(c, err)
 		return
 	}
-	if rows == nil {
-		rows = []T{}
+	if p.Rows == nil {
+		p.Rows = []T{}
 	}
 	var cur any
-	if next != "" {
-		cur = next
+	if p.Next != "" {
+		cur = p.Next
 	}
-	c.JSON(http.StatusOK, gin.H{"data": rows, "meta": gin.H{"limit": limit, "next_cursor": cur}})
+	c.JSON(http.StatusOK, gin.H{"data": p.Rows, "meta": gin.H{"limit": p.Limit, "next_cursor": cur}})
 }
 
 // Bind decodes the JSON body into dst or answers 400.

@@ -35,7 +35,7 @@ func (s *Service) DeleteColumn(ctx context.Context, a api.Actor, projectID, id u
 		if err := ensureCategories(tx, projectID); err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "column.deleted", "column", id, map[string]any{"project_id": projectID})
+		s.audit(ctx, tx, a, "column.deleted", ref{"column", id, map[string]any{"project_id": projectID}})
 		return nil
 	})
 }
@@ -49,8 +49,10 @@ func mapMissing(err error, what string) error {
 
 // moveTasksOut moves every task of col into target, keeping completion state consistent with the target category.
 func (s *Service) moveTasksOut(tx *gorm.DB, col Column, moveTo *uuid.UUID) error {
-	var n int64
-	tx.Table("tasks").Where("column_id = ?", col.ID).Count(&n)
+	n, err := countRows(tx, "tasks", "column_id = ?", col.ID)
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return nil
 	}

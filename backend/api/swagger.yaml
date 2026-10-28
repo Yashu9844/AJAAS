@@ -5606,6 +5606,782 @@ paths:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
         '403': {description: 'FORBIDDEN'}
         '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/comments:
+    get:
+      summary: 'Comments of a task, oldest first; deleted ones are tombstones with an empty body (task.read)'
+      tags: [Comments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Add a markdown comment (max 10000); @[Name](user:uuid) mentions of users who cannot read the project are dropped (task.comment)'
+      tags: [Comments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CommentInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /comments/{id}:
+    patch:
+      summary: 'Edit your own comment; sets edited_at (task.comment)'
+      tags: [Comments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CommentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Delete your own comment, or any with comment.moderate; leaves a tombstone'
+      tags: [Comments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/watch:
+    get:
+      summary: 'Whether the caller watches the task, and why (task.read)'
+      tags: [Watchers]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    put:
+      summary: 'Watch the task as the caller (task.read)'
+      tags: [Watchers]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    delete:
+      summary: 'Stop watching the task as the caller'
+      tags: [Watchers]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/watchers:
+    get:
+      summary: 'Watchers of a task by user id (task.read)'
+      tags: [Watchers]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/time:
+    get:
+      summary: 'Time entries of a task, newest first; mine=true limits to the caller (task.read)'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: mine, in: query, schema: {type: boolean}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Log finished work: started_at, minutes 1..1440, note (time.log); 409 TIME_TRACKING_DISABLED, TIME_LOCKED'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TimeLogInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /time-entries/{id}:
+    patch:
+      summary: 'Edit an entry: the author within the 30-day lock window, time.manage holders always; 409 TIMER_RUNNING for a running timer'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TimeUpdateInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Delete an entry (author within the lock window, or time.manage); also discards a running timer'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /time-entries/timer/start:
+    post:
+      summary: 'Start the caller timer on a task; one running timer per user, else 409 TIMER_RUNNING (time.log)'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TimerStartInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /time-entries/timer/stop:
+    post:
+      summary: 'Stop the caller running timer and log the elapsed minutes; 404 when none runs'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /time-entries/timer:
+    get:
+      summary: 'The caller running timer, or data null when none runs'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+  /projects/{id}/time/report:
+    get:
+      summary: 'Logged minutes of a project for a date range, per task (with estimate) or per user (task.read)'
+      tags: [Time tracking]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: from, in: query, schema: {type: string, format: date}}, {name: to, in: query, schema: {type: string, format: date}}, {name: group_by, in: query, schema: {type: string, enum: [task, user]}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/attachments:
+    post:
+      summary: 'Start an upload: validates the file and returns the pending attachment with a presigned PUT valid for 5 minutes (attachment.upload)'
+      tags: [Attachments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttachmentInitInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'Ready attachments of a task (task.read)'
+      tags: [Attachments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /attachments/{id}/complete:
+    post:
+      summary: 'Verify the uploaded object (size, type, checksum), scan it and mark it ready; 409 UPLOAD_MISMATCH keeps it pending'
+      tags: [Attachments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /attachments/{id}/download:
+    get:
+      summary: 'Presigned download URL valid for 2 minutes, authorised against the task project (task.read)'
+      tags: [Attachments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /attachments/{id}:
+    delete:
+      summary: 'Delete an attachment and its object (the uploader, or attachment.delete)'
+      tags: [Attachments]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /projects/{id}/sprints:
+    post:
+      summary: 'Create a planned sprint in a scrum project (sprint.manage)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SprintInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'List the sprints of a scrum project with task counts, newest first'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: status, in: query, schema: {type: string, enum: [planned, active, completed]}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /sprints/{id}:
+    get:
+      summary: 'One sprint with its task count'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    patch:
+      summary: 'Edit a planned or active sprint; send version (or If-Match) (sprint.manage)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SprintInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Delete a planned sprint; its tasks return to the backlog (sprint.manage)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /sprints/{id}/start:
+    post:
+      summary: 'Start a planned sprint that has dates; one active sprint per project (sprint.manage)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /sprints/{id}/complete:
+    post:
+      summary: 'Complete the active sprint, moving unfinished tasks to the next planned sprint or the backlog (sprint.manage)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SprintCompleteInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /sprints/{id}/report:
+    get:
+      summary: 'Committed versus completed counts and estimates (stored when completed, live otherwise)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /projects/{id}/backlog:
+    get:
+      summary: 'Backlog tasks by rank: backlog-category columns (kanban) or tasks without a sprint (scrum) (task.read)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /projects/{id}/plan:
+    post:
+      summary: 'Move up to 100 tasks between the backlog and a sprint; per-task result list (task.update)'
+      tags: [Planning]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PlanInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /projects/{id}/board:
+    get:
+      summary: 'Board: columns with counts and cursor-paged tasks per column; cursor_<columnId> pages one column (task.read)'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: per_column, in: query, schema: {type: integer, minimum: 1, maximum: 100}}, {name: sprint, in: query, schema: {type: string}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /projects/{id}/calendar:
+    get:
+      summary: 'Tasks by due date or start date in a window of at most 62 days (task.read)'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: from, in: query, schema: {type: string, format: date}}, {name: to, in: query, schema: {type: string, format: date}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /projects/{id}/gantt:
+    get:
+      summary: 'Dated tasks, milestones and dependencies for a window, at most 500 tasks per page (task.read)'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: from, in: query, schema: {type: string, format: date}}, {name: to, in: query, schema: {type: string, format: date}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /my-work:
+    get:
+      summary: 'Tasks assigned to me, grouped overdue / today / this_week / later / no_date, with counts'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: group, in: query, schema: {type: string, enum: [overdue, today, this_week, later, no_date]}}, {name: per_group, in: query, schema: {type: integer, minimum: 1, maximum: 100}}, {name: cursor, in: query, schema: {type: string}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /my-work/counts:
+    get:
+      summary: 'Badge counts for My work'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+  /calendar:
+    get:
+      summary: 'My calendar: assigned tasks across readable projects in a window of at most 62 days'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: from, in: query, schema: {type: string, format: date}}, {name: to, in: query, schema: {type: string, format: date}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /search:
+    get:
+      summary: 'Full-text and ticket-id search over readable projects of the tenant, at most 50 hits'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: q, in: query, schema: {type: string}}, {name: project_id, in: query, schema: {type: string, format: uuid}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /saved-views:
+    post:
+      summary: 'Save a view; shared views belong to a project and need view.share'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SavedViewInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'My views plus the shared views of readable projects'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: project_id, in: query, schema: {type: string, format: uuid}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /saved-views/{id}:
+    patch:
+      summary: 'Edit a view (owner, or view.share for a shared one); send version (or If-Match)'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SavedViewInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Delete a view (owner, or view.share for a shared one)'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /calendar-tokens:
+    post:
+      summary: 'Create an iCalendar feed token; the secret is shown once in this response'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CalendarTokenInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'List my active feed tokens (never the secrets)'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+  /calendar-tokens/{id}:
+    delete:
+      summary: 'Revoke one of my feed tokens at once'
+      tags: [Views]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /calendar/feed.ics:
+    get:
+      summary: 'iCalendar feed of my assigned tasks, authenticated by the token query parameter only (no bearer token, rate limited per IP)'
+      tags: [Views]
+      security: []
+      parameters: [{name: token, in: query, schema: {type: string}}]
+      responses:
+        '200': {description: OK, content: {text/calendar: {schema: {type: string}}}}
+        '404': {description: 'NOT_FOUND'}
+        '429': {description: 'RATE_LIMITED'}
+  /projects/{id}/group-rules:
+    get:
+      summary: 'List the membership rules of a project (project.manage_members)'
+      tags: [Project groups]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Add a department, team or reports-of rule; members are expanded at once (project.manage_members)'
+      tags: [Project groups]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/GroupRuleInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /projects/{id}/group-rules/{rule_id}:
+    delete:
+      summary: 'Remove a rule; members only it granted leave the project (project.manage_members)'
+      tags: [Project groups]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: rule_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /projects/{id}/group-rules/refresh:
+    post:
+      summary: 'Re-resolve the rules against current HR data (project.manage_members)'
+      tags: [Project groups]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /projects/{id}/tasks:
+    post:
+      summary: 'Create a task with the next ticket number, appended to its column (task.create)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'List tasks with filters, sort and keyset cursor (task.read)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: column_id, in: query, schema: {type: string, format: uuid}}, {name: category, in: query, schema: {type: string, enum: [backlog, todo, in_progress, done, canceled]}}, {name: priority, in: query, schema: {type: string, enum: [none, low, medium, high, urgent]}}, {name: assignee, in: query, schema: {type: string, description: 'user id or me'}}, {name: label_id, in: query, schema: {type: string, format: uuid}}, {name: milestone_id, in: query, schema: {type: string, format: uuid}}, {name: sprint_id, in: query, schema: {type: string, format: uuid}}, {name: parent_id, in: query, schema: {type: string, format: uuid}}, {name: due_from, in: query, schema: {type: string}}, {name: due_to, in: query, schema: {type: string}}, {name: overdue, in: query, schema: {type: boolean}}, {name: blocked, in: query, schema: {type: boolean}}, {name: top_level, in: query, schema: {type: boolean}}, {name: archived, in: query, schema: {type: boolean}}, {name: q, in: query, schema: {type: string}}, {name: sort, in: query, schema: {type: string, enum: [rank, created, updated, due, priority, number]}}, {name: dir, in: query, schema: {type: string, enum: [asc, desc]}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /projects/{id}/tasks/bulk:
+    post:
+      summary: 'Update up to 100 tasks; the response lists each task outcome (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskBulkInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /projects/{id}/activity:
+    get:
+      summary: 'Project activity, newest first, cursor by sequence (task.read)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: order, in: query, schema: {type: string, enum: [asc, desc]}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}:
+    get:
+      summary: 'One task with ticket id, derived flags, assignees and labels'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit a task; version (body or If-Match) is required (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskUpdateInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Soft-delete a task and its subtasks (task.delete)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /tickets/{key}:
+    get:
+      summary: 'Resolve a ticket id such as KEY-12; moved tasks keep their old ids'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: key, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/move:
+    post:
+      summary: 'Move to a column and position; WIP and done rules apply (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskMoveInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/reorder:
+    post:
+      summary: 'Place next to a neighbour with one before_id or after_id (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskMoveInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/move-project:
+    post:
+      summary: 'Move to another project: new number, alias for the old ticket id (task.update, task.create)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskMoveProjectInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/duplicate:
+    post:
+      summary: 'Copy a task, optionally with labels and assignees (task.create)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskDuplicateInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/archive:
+    post:
+      summary: 'Archive a task (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/restore:
+    post:
+      summary: 'Restore an archived task (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/assignees:
+    post:
+      summary: 'Assign project members (task.assign)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskAssigneesInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/assignees/{user_id}:
+    delete:
+      summary: 'Remove an assignee (task.assign)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/labels:
+    post:
+      summary: 'Add labels of the project or tenant (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskLabelsInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/labels/{label_id}:
+    delete:
+      summary: 'Remove a label (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: label_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/subtasks:
+    get:
+      summary: 'List direct subtasks with progress'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/relations:
+    get:
+      summary: 'List relations; ends in unreadable projects are hidden'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Relate to another task; blocks may not form a cycle (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TaskRelationInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /tasks/{id}/relations/{relation_id}:
+    delete:
+      summary: 'Remove a relation (task.update)'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: relation_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/activity:
+    get:
+      summary: 'Task history, newest first, cursor by sequence'
+      tags: [Tasks]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: order, in: query, schema: {type: string, enum: [asc, desc]}}, {name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
 # END M2 projects
 components:
   securitySchemes:
@@ -6980,4 +7756,24 @@ components:
     ColumnOrderInput: {type: object, properties: {column_ids: {type: array, items: {type: string, format: uuid}}}, required: [column_ids]}
     LabelInput: {type: object, properties: {name: {type: string}, color: {type: string, example: '#3B82F6'}}, required: [name]}
     MilestoneInput: {type: object, properties: {name: {type: string}, due_on: {type: string, format: date}, status: {type: string, enum: [open, reached]}}}
+    CommentInput: {type: object, properties: {body: {type: string}}, required: [body]}
+    TimeLogInput: {type: object, properties: {started_at: {type: string, format: date-time}, minutes: {type: integer}, note: {type: string}}, required: [started_at, minutes]}
+    TimeUpdateInput: {type: object, properties: {started_at: {type: string, format: date-time}, minutes: {type: integer}, note: {type: string}}}
+    TimerStartInput: {type: object, properties: {task_id: {type: string, format: uuid}}, required: [task_id]}
+    AttachmentInitInput: {type: object, properties: {filename: {type: string}, size: {type: integer}, content_type: {type: string}, sha256: {type: string, description: 'optional lowercase hex checksum the object must match'}}, required: [filename, size, content_type]}
+    SprintInput: {type: object, properties: {name: {type: string}, goal: {type: string}, start_on: {type: string, format: date}, end_on: {type: string, format: date}, version: {type: integer}}, required: [name]}
+    SprintCompleteInput: {type: object, properties: {move_unfinished_to: {type: string, description: 'backlog or the id of the next planned sprint'}}, required: [move_unfinished_to]}
+    PlanInput: {type: object, properties: {task_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}, sprint_id: {type: string, format: uuid, nullable: true}, versions: {type: object, additionalProperties: {type: integer}}}, required: [task_ids]}
+    SavedViewInput: {type: object, properties: {name: {type: string}, layout: {type: string, enum: [board, list, calendar, gantt]}, project_id: {type: string, format: uuid}, filters: {type: object}, sort: {type: array, items: {type: object}}, grouping: {type: string, enum: ['', column, assignee, priority, milestone, sprint]}, shared: {type: boolean}, version: {type: integer}}}
+    CalendarTokenInput: {type: object, properties: {label: {type: string}}}
+    GroupRuleInput: {type: object, properties: {kind: {type: string, enum: [department, team, reports_of]}, ref_id: {type: string, format: uuid}, role: {type: string, enum: [manager, member, viewer]}}, required: [kind, ref_id, role]}
+    TaskInput: {type: object, properties: {title: {type: string}, description: {type: string}, column_id: {type: string, format: uuid}, priority: {type: string, enum: [none, low, medium, high, urgent]}, start_on: {type: string, format: date}, due_at: {type: string, format: date-time}, estimate_minutes: {type: integer}, milestone_id: {type: string, format: uuid}, sprint_id: {type: string, format: uuid}, parent_task_id: {type: string, format: uuid}, assignee_ids: {type: array, items: {type: string, format: uuid}}, label_ids: {type: array, items: {type: string, format: uuid}}}, required: [title]}
+    TaskUpdateInput: {type: object, properties: {version: {type: integer}, title: {type: string}, description: {type: string}, priority: {type: string, enum: [none, low, medium, high, urgent]}, start_on: {type: string, format: date, nullable: true}, due_at: {type: string, format: date-time, nullable: true}, estimate_minutes: {type: integer, nullable: true}, milestone_id: {type: string, format: uuid, nullable: true}, sprint_id: {type: string, format: uuid, nullable: true}, parent_task_id: {type: string, format: uuid, nullable: true}}, required: [version]}
+    TaskMoveInput: {type: object, properties: {column_id: {type: string, format: uuid}, before_id: {type: string, format: uuid}, after_id: {type: string, format: uuid}, version: {type: integer}, force: {type: boolean}}}
+    TaskMoveProjectInput: {type: object, properties: {project_id: {type: string, format: uuid}, column_id: {type: string, format: uuid}, version: {type: integer}}, required: [project_id]}
+    TaskDuplicateInput: {type: object, properties: {copy_assignees: {type: boolean}, copy_labels: {type: boolean}}}
+    TaskAssigneesInput: {type: object, properties: {user_ids: {type: array, items: {type: string, format: uuid}}}, required: [user_ids]}
+    TaskLabelsInput: {type: object, properties: {label_ids: {type: array, items: {type: string, format: uuid}}}, required: [label_ids]}
+    TaskRelationInput: {type: object, properties: {target_task_id: {type: string, format: uuid}, type: {type: string, enum: [blocks, related, duplicates]}}, required: [target_task_id, type]}
+    TaskBulkInput: {type: object, properties: {task_ids: {type: array, items: {type: string, format: uuid}}, column_id: {type: string, format: uuid}, priority: {type: string, enum: [none, low, medium, high, urgent]}, assignees_add: {type: array, items: {type: string, format: uuid}}, assignees_remove: {type: array, items: {type: string, format: uuid}}, labels_add: {type: array, items: {type: string, format: uuid}}, labels_remove: {type: array, items: {type: string, format: uuid}}, milestone_id: {type: string, format: uuid, nullable: true}, sprint_id: {type: string, format: uuid, nullable: true}, archive: {type: boolean}, force: {type: boolean}}, required: [task_ids]}
 # END schemas M2 projects

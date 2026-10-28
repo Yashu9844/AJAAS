@@ -8,12 +8,18 @@ OUT = sys.argv[2]             # output markdown path for the appendix
 BACKEND = os.path.join(ROOT, 'backend')
 INTERNAL = os.path.join(BACKEND, 'internal')
 
+# M2 Projects & Tasks packages live under internal/projects/<dir>.
+M2 = {'m2_kernel': 'kernel', 'm2_api': 'api', 'm2_project': 'project', 'm2_task': 'task', 'm2_collab': 'collab', 'm2_planning': 'planning'}
+
 MODULE_ORDER = ['shared', 'app', 'identity', 'organization', 'employee', 'attendance', 'leave', 'payroll',
-                'recruitment', 'performance', 'core', 'compensation', 'onboarding', 'learning', 'benefits']
+                'recruitment', 'performance', 'core', 'compensation', 'onboarding', 'learning', 'benefits',
+                'm2_kernel', 'm2_api', 'm2_project', 'm2_task', 'm2_collab', 'm2_planning']
 TITLES = {'shared': 'Shared infrastructure', 'app': 'Application wiring (internal/app)', 'identity': 'M0 Identity & Access',
           'organization': 'M1 HR / Organization', 'employee': 'M1 HR / Employee', 'attendance': 'M1 HR / Attendance',
           'leave': 'M1 HR / Leave', 'payroll': 'M1 HR / Payroll', 'recruitment': 'M1 HR / Recruitment',
-          'performance': 'M1 HR / Performance & OKRs', 'core': 'M1 HR / Core HCM', 'compensation': 'M1 HR / Compensation', 'onboarding': 'M1 HR / Onboarding', 'learning': 'M1 HR / Learning', 'benefits': 'M1 HR / Benefits'}
+          'performance': 'M1 HR / Performance & OKRs', 'core': 'M1 HR / Core HCM', 'compensation': 'M1 HR / Compensation', 'onboarding': 'M1 HR / Onboarding', 'learning': 'M1 HR / Learning', 'benefits': 'M1 HR / Benefits',
+          'm2_kernel': 'M2 Projects / kernel', 'm2_api': 'M2 Projects / api', 'm2_project': 'M2 Projects / project',
+          'm2_task': 'M2 Projects / task', 'm2_collab': 'M2 Projects / collab', 'm2_planning': 'M2 Projects / planning'}
 
 
 def read(path):
@@ -66,6 +72,8 @@ HR = {'organization', 'employee', 'attendance', 'leave', 'payroll', 'recruitment
 
 
 def module_dir(module):
+    if module in M2:
+        return os.path.join(INTERNAL, 'projects', M2[module])
     return os.path.join(INTERNAL, 'hr', module) if module in HR else os.path.join(INTERNAL, module)
 
 
@@ -93,6 +101,8 @@ def routes(module):
     """Routes of a context: the controller-style routes/routes.go plus every RegisterRoutes in the context's other
     packages (single-package contexts and the plus/ops/records sub-packages register routes in http.go)."""
     rows = []
+    if module in M2:
+        return m2_routes(module)
     main = os.path.join(module_dir(module), 'routes', 'routes.go')
     if os.path.exists(main):
         rows += routes_in(module, main)
@@ -104,6 +114,33 @@ def routes(module):
                     rows += routes_in(module, p)
     if module == 'employee':
         rows += records_routes()
+    return rows
+
+
+def m2_routes(module):
+    """M2 handlers register routes through closures, so list them from the route tables that generate the contract
+    (scripts/pm_routes_*.py plus the base table in gen_projects_swagger.py); TestSwaggerMatchesRoutes proves them equal to the router."""
+    import glob
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    owner = {'tasks': 'm2_task', 'collab': 'm2_collab', 'planning': 'm2_planning', 'platform': 'm2_project'}
+    spec = importlib.util.spec_from_file_location('gen_projects_swagger', os.path.join(here, 'gen_projects_swagger.py'))
+    base = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(base)
+    separate, rows = set(), []
+    for f in sorted(glob.glob(os.path.join(here, 'pm_routes_*.py'))):
+        name = os.path.basename(f)[len('pm_routes_'):-3]
+        sp = importlib.util.spec_from_file_location('pm_' + name, f)
+        mod = importlib.util.module_from_spec(sp)
+        sp.loader.exec_module(mod)
+        for r in mod.ROUTES:
+            separate.add((r[0], r[1]))
+            if owner.get(name) == module:
+                rows.append((r[0].upper(), '/api/v1' + re.sub(r'\{(\w+)\}', r':\1', r[1]), '(from the contract; ' + r[2] + ')'))
+    if module == 'm2_project':
+        for r in base.ROUTES:
+            if (r[0], r[1]) not in separate:
+                rows.append((r[0].upper(), '/api/v1' + re.sub(r'\{(\w+)\}', r':\1', r[1]), '(from the contract; ' + r[2] + ')'))
     return rows
 
 
@@ -165,7 +202,7 @@ def routes_in(module, p):
 def migration_files():
     """Yield (label, path) for every up migration, per schema set (identity, then hr)."""
     base = os.path.join(BACKEND, 'migrations')
-    for schema in ('identity', 'hr'):
+    for schema in ('identity', 'hr', 'projects'):
         d = os.path.join(base, schema)
         for f in sorted(os.listdir(d)):
             if f.endswith('.up.sql'):
@@ -269,7 +306,7 @@ def main():
 
     w.append('\n## E. Business rules, errors and decisions (verbatim from each module bundle)\n')
     mods = os.path.join(ROOT, 'docs', 'modules')
-    bundles = [('m0-identity-access', os.path.join(mods, 'm0-identity-access'))]
+    bundles = [('m0-identity-access', os.path.join(mods, 'm0-identity-access')), ('m2-projects-tasks', os.path.join(mods, 'm2-projects-tasks'))]
     ctx_root = os.path.join(mods, 'm1-hr-management', 'contexts')
     for ctx in MODULE_ORDER:
         if os.path.isdir(os.path.join(ctx_root, ctx)):

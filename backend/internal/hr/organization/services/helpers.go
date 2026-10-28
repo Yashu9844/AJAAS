@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/events"
 	"github.com/jaas/jaas/internal/hr/organization/models"
 	"github.com/jaas/jaas/internal/hr/organization/repositories"
 	"github.com/jaas/jaas/internal/hr/organization/validators"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
 )

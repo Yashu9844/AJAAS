@@ -6,12 +6,17 @@ package projects
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/projects/api"
+	"github.com/jaas/jaas/internal/projects/collab"
 	"github.com/jaas/jaas/internal/projects/kernel"
+	"github.com/jaas/jaas/internal/projects/planning"
+	"github.com/jaas/jaas/internal/projects/ports"
 	"github.com/jaas/jaas/internal/projects/project"
+	"github.com/jaas/jaas/internal/projects/task"
 	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/shared/outbox"
 	"github.com/jaas/jaas/internal/shared/queue"
@@ -30,6 +35,12 @@ const (
 	Exchange = "jaas.projects.events"
 )
 
+// groupRefreshEvery is how often group membership rules are re-resolved against HR data.
+const groupRefreshEvery = 10 * time.Minute
+
+// collabSweepEvery is how often stale timers are stopped and abandoned uploads removed.
+const collabSweepEvery = 5 * time.Minute
+
 // Options are the infrastructure handles M2 needs.
 type Options struct {
 	DB         *gorm.DB
@@ -37,21 +48,32 @@ type Options struct {
 	Logger     *zerolog.Logger
 	Identity   identityport.Port
 	Storage    storage.Store   // nil: attachments answer 503 until storage is configured
+	People     ports.People    // nil: group rules answer 503 until organisation data is wired
 	Background context.Context // nil: no relays or sweeps (tests)
 }
 
 // Module is the M2 service.
 type Module struct {
-	o       Options
-	project *project.Service
+	o        Options
+	project  *project.Service
+	task     *task.Service
+	planning *planning.Service
+	collab   *collab.Service
 }
 
 // New builds the module and registers its permissions with M0.
 func New(ctx context.Context, o Options) (*Module, error) {
 	m := &Module{o: o}
-	m.project = project.NewService(o.DB, project.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit()})
-	// wire:tasks
-	// wire:planning
+	m.project = project.NewService(o.DB, project.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit(), People: o.People})
+	m.task = task.NewService(o.DB, m.project, task.Ports{Audit: o.Identity.Audit()})
+	m.planning = planning.NewService(o.DB, m.project, planning.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit()}) // wire:planning
+	o.Identity.OnUserDeactivated(m.project)                                                                                 // specification section 7: deactivated logins leave projects, history stays
+	// wire:collab
+	m.collab = collab.NewService(o.DB, collab.Ports{Authorizer: m.project, Tasks: m.task, Storage: o.Storage, Users: o.Identity.Users(), Audit: o.Identity.Audit()})
+	m.task.SetHooks(m.collab.TaskHooks()) // CM-02/CM-03: description mentions and automatic watchers
+	if o.Background != nil && o.Logger != nil {
+		go m.collab.Run(o.Background, collabSweepEvery, func(err error) { o.Logger.Error().Err(err).Msg("collaboration sweep failed") })
+	}
 	// wire:platform
 	if err := o.Identity.RegisterPermissions(ctx, Catalogue()); err != nil {
 		return nil, fmt.Errorf("projects permission catalogue: %w", err)
@@ -80,6 +102,7 @@ func (m *Module) startBackground() {
 	}
 	relay := outbox.NewTableRelay(m.o.DB, kernel.OutboxTable, Exchange, m.o.Publisher)
 	go relay.Run(m.o.Background, func(err error) { m.o.Logger.Error().Err(err).Str("outbox", OutboxTable).Msg("outbox relay failed") })
+	go m.project.RunGroupRefresh(m.o.Background, groupRefreshEvery, func(err error) { m.o.Logger.Error().Err(err).Msg("group rule refresh failed") })
 }
 
 // Authorizer exposes project access resolution for tests and other contexts.
@@ -92,7 +115,11 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		idp.Flag("projects", "create", api.FlagCreate), idp.Flag("projects", "read_all", api.FlagReadAll),
 		idp.Flag("projects", "manage_all", api.FlagManageAll), idp.Flag("project_roles", "manage", api.FlagRoles))
 	m.project.Register(g)
-	// routes:tasks
-	// routes:planning
+	m.task.Register(g)
+	m.planning.Register(g) // routes:planning
+	// routes:collab
+	m.collab.Register(g)
 	// routes:platform
+	// routes:planning-public
+	m.planning.RegisterPublic(rg) // the iCalendar feed is the one M2 route without a bearer token (token + per-IP limit)
 }

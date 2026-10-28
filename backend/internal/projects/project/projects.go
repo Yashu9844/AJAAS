@@ -70,10 +70,17 @@ func (in *CreateInput) normalise() error {
 	if in.Mode == "" {
 		in.Mode = api.ModeKanban
 	}
-	return checkShape(in.Visibility, in.Mode, in.Icon, in.Color, in.StartOn, in.DueOn)
+	return checkShape(shape{in.Visibility, in.Mode, in.Icon, in.Color, in.StartOn, in.DueOn})
 }
 
-func checkShape(visibility, mode, icon, color string, start, due *kernel.Date) error {
+// shape is the part of a project validated on both create and update.
+type shape struct {
+	visibility, mode, icon, color string
+	start, due                    *kernel.Date
+}
+
+func checkShape(sh shape) error {
+	visibility, mode, icon, color, start, due := sh.visibility, sh.mode, sh.icon, sh.color, sh.start, sh.due
 	switch {
 	case visibility != "private" && visibility != api.VisibilityTenant:
 		return kernel.Invalid("visibility", "must be private or tenant")
@@ -113,7 +120,7 @@ func (s *Service) Create(ctx context.Context, a api.Actor, in CreateInput) (*Pro
 		if err := createDefaultColumns(tx, p); err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.created", "project", p.ID, map[string]any{"key": p.Key})
+		s.audit(ctx, tx, a, "project.created", ref{"project", p.ID, map[string]any{"key": p.Key}})
 		return kernel.Emit(ctx, tx, a.TenantID, "project.created", map[string]any{"project_id": p.ID, "key": p.Key, "owner_user_id": a.UserID})
 	})
 	if isDup(err) {
@@ -137,8 +144,10 @@ func (s *Service) Get(ctx context.Context, a api.Actor, id uuid.UUID) (*Project,
 		return nil, err
 	}
 	p.MyRole = acc.Role
-	var n int64
-	s.db.WithContext(ctx).Table("project_favorites").Where("project_id = ? AND user_id = ?", id, a.UserID).Count(&n)
+	n, err := countRows(s.db.WithContext(ctx), "project_favorites", "project_id = ? AND user_id = ?", id, a.UserID)
+	if err != nil {
+		return nil, err
+	}
 	p.Favorite = n > 0
 	return &p, nil
 }
@@ -169,7 +178,7 @@ func (s *Service) Update(ctx context.Context, a api.Actor, id uuid.UUID, in Upda
 		if err := tx.Save(p).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.updated", "project", id, nil)
+		s.audit(ctx, tx, a, "project.updated", ref{"project", id, nil})
 		out = p
 		return kernel.Emit(ctx, tx, a.TenantID, "project.updated", map[string]any{"project_id": id, "version": p.Version})
 	})
@@ -202,7 +211,7 @@ func (in UpdateInput) apply(p *Project) error {
 	if tooLong(p.Description, maxDescription) {
 		return kernel.Invalid("description", "is too long")
 	}
-	return checkShape(p.Visibility, p.Mode, p.Icon, p.Color, p.StartOn, p.DueOn)
+	return checkShape(shape{p.Visibility, p.Mode, p.Icon, p.Color, p.StartOn, p.DueOn})
 }
 
 func setStr(dst *string, src *string) {

@@ -48,6 +48,7 @@ type Member struct {
 	RoleKey      *string    `json:"role_key"`
 	CustomRoleID *uuid.UUID `gorm:"type:uuid" json:"custom_role_id"`
 	Active       bool       `json:"active"`
+	Source       string     `gorm:"default:direct" json:"source"`
 	AddedBy      uuid.UUID  `gorm:"type:uuid" json:"added_by"`
 	AddedAt      time.Time  `json:"added_at"`
 }

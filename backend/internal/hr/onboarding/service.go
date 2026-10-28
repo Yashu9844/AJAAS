@@ -14,9 +14,9 @@ import (
 	coreAPI "github.com/jaas/jaas/internal/hr/core/api"
 	employeeAPI "github.com/jaas/jaas/internal/hr/employee/api"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	recruitmentAPI "github.com/jaas/jaas/internal/hr/recruitment/api"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"gorm.io/gorm"
 )
 

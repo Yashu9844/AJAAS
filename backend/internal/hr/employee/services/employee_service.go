@@ -13,8 +13,8 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee/models"
 	"github.com/jaas/jaas/internal/hr/employee/repositories"
 	"github.com/jaas/jaas/internal/hr/employee/validators"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
 )

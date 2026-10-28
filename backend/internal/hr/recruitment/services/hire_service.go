@@ -7,12 +7,12 @@ import (
 
 	"github.com/google/uuid"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/recruitment/dto"
 	"github.com/jaas/jaas/internal/hr/recruitment/events"
 	"github.com/jaas/jaas/internal/hr/recruitment/models"
 	"github.com/jaas/jaas/internal/hr/recruitment/pipeline"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"gorm.io/gorm"
 )
 

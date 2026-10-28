@@ -8,13 +8,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/identity"
 	"github.com/jaas/jaas/internal/identity/access"
 	identityDTO "github.com/jaas/jaas/internal/identity/dto"
 	identityMiddleware "github.com/jaas/jaas/internal/identity/middleware"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"gorm.io/gorm"
 )
 

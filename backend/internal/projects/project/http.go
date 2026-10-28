@@ -53,6 +53,7 @@ func (s *Service) Register(g *gin.RouterGroup) {
 	h.columnRoutes(g)
 	h.labelRoutes(g)
 	h.milestoneRoutes(g)
+	h.groupRoutes(g)
 }
 
 func (h handler) projectRoutes(g *gin.RouterGroup) {
@@ -66,7 +67,7 @@ func (h handler) projectRoutes(g *gin.RouterGroup) {
 		f := ListFilter{Status: c.Query("status"), Query: c.Query("q"), Mine: c.Query("mine") == "true", Favorite: c.Query("favorite") == "true",
 			Cursor: c.Query("cursor"), Limit: kernel.ClampLimit(c.Query("limit"))}
 		rows, next, err := h.s.List(c.Request.Context(), a, f)
-		kernel.RespondCursor(c, rows, f.Limit, next, err)
+		kernel.RespondCursor(c, kernel.NewCursorPage(rows, f.Limit, next), err)
 	}))
 	g.GET("/projects/:id", withID(func(c *gin.Context, a api.Actor, id uuid.UUID) {
 		p, err := h.s.Get(c.Request.Context(), a, id)

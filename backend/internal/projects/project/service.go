@@ -11,14 +11,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/projects/api"
 	"github.com/jaas/jaas/internal/projects/kernel"
+	"github.com/jaas/jaas/internal/projects/ports"
 	"github.com/jaas/jaas/internal/shared/identityport"
 	"gorm.io/gorm"
 )
 
 // Ports are the services the project context needs from the rest of the platform.
 type Ports struct {
-	Users identityport.Users
-	Audit identityport.Auditor
+	Users  identityport.Users
+	Audit  identityport.Auditor
+	People ports.People // nil: group rules answer 503 PEOPLE_UNAVAILABLE
 }
 
 // Service holds the project use cases. It also implements api.Authorizer.
@@ -71,6 +73,13 @@ func itoa(n int) string {
 	return string(b)
 }
 
+// countRows counts rows of table matching where, reporting database errors instead of treating them as zero.
+func countRows(db *gorm.DB, table, where string, args ...any) (int64, error) {
+	var n int64
+	err := db.Table(table).Where(where, args...).Count(&n).Error
+	return n, err
+}
+
 func isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }
 
 // inTx runs fn in a transaction.
@@ -78,15 +87,17 @@ func (s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	return s.db.WithContext(ctx).Transaction(fn)
 }
 
+// ref names the audited resource and carries the metadata (ids and codes only).
+type ref struct {
+	resource string
+	id       uuid.UUID
+	meta     map[string]any
+}
+
 // audit records a successful mutation; metadata holds ids and codes only. Failures never fail the request (SECURITY 7).
-func (s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action, resource string, id uuid.UUID, meta map[string]any) {
+func (s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref) {
 	if s.p.Audit == nil {
 		return
 	}
-	_ = s.p.Audit.Log(ctx, tx, a.TenantID.String(), a.UserID.String(), action, resource, id.String(), meta, a.IP, a.UserAgent)
-}
-
-// touch moves a project to the top of the recent-activity list.
-func (s *Service) touch(ctx context.Context, tx *gorm.DB, projectID uuid.UUID) error {
-	return tx.WithContext(ctx).Exec(`UPDATE projects SET last_activity_at = ? WHERE id = ?`, s.now().UTC(), projectID).Error
+	_ = s.p.Audit.Log(ctx, tx, a.TenantID.String(), a.UserID.String(), action, r.resource, r.id.String(), r.meta, a.IP, a.UserAgent)
 }

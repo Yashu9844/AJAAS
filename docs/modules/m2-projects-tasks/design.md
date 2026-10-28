@@ -150,6 +150,24 @@ A `/dev-test/projects` page with generated operation forms from the OpenAPI and 
 |---|---|
 | Rank rebalancing under concurrent moves | per-column advisory lock, bounded rebalance, golden test with parallel moves |
 | Group-rule membership drifting from HR | refresh on org events plus a nightly reconcile; effective membership computed at read time with a short cache |
-| Object storage dependency in dev/CI | MinIO container and an in-memory fake for unit tests |
+| Object storage dependency in dev/CI | S3-compatible dev service (`adobe/s3mock`) and an in-memory fake for unit tests |
 | Scope growth from the Kaneo feature list | phases 1–3 frozen here; phase 4–5 only through the reserved extension points |
 | Second service increases operational surface | per-service entry point and gateway arrive with the gateway phase; until then the all-in-one binary keeps dev simple |
+
+## 9. As built (2026-10-28)
+
+- **Packages:** `backend/internal/projects/{kernel,api,ports,testdb,project,task,collab,planning}` plus `module.go` (composition root:
+  permissions, relay, group-rule refresh, collaboration sweep, routes). Contexts reach each other only through `api` (Authorizer,
+  TaskResolver, TaskHooks) and `kernel`; `TestImportBoundaries` keeps M2 free of HR and identity internals.
+- **Wiring order in `module.go`:** project -> task (needs the authorizer) -> collab (needs the task resolver) -> `task.SetHooks(collab.TaskHooks())`
+  (late bound, because collab depends on task) -> planning.
+- **Tables (plural, unprefixed, schema `projects`):** `projects`, `project_roles`, `project_members`, `project_group_rules`, `board_columns`,
+  `labels`, `milestones`, `project_favorites`, `tasks`, `task_assignees`, `task_labels`, `task_relations`, `task_ticket_alias`, `activity`,
+  `comments`, `mentions`, `task_watchers`, `time_entries`, `attachments`, `sprints`, `saved_views`, `calendar_tokens`, `projects_events_outbox`,
+  `projects_events_inbox` (22 migrations, 000001-000040 with reserved ranges per context; `idempotency_records` is the shared table in `identity`).
+- **Read models** (board, calendar, Gantt, My work, search) read the M2 tables by SQL; the only task column planning writes is `sprint_id`.
+- **Search:** `tasks.search` tsvector (trigger-maintained, `simple` configuration) with a GIN index; queries use `websearch_to_tsquery`.
+- **Ranks:** fractional base-62 strings (`kernel.RankBetween`) with `COLLATE "C"`; the task context rebalances a column with fixed-width ranks.
+- **Performance (PG7, 50 000 tasks in one project, p95 over 30 runs):** board walk 111 ms, board first page 113 ms, backlog 19 ms,
+  search 78 ms, Gantt page 68 ms, My work 226 ms - all under the 500 ms list budget (details in `notes-planning.md`).
+- **Not built here (extension points kept):** custom fields, automation rules, webhooks, integrations, MCP/CLI, recurrence, public links.

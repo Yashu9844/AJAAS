@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/models"
+	"github.com/jaas/jaas/internal/shared/identityport"
 )
 
 func newTeamSvc() (*stubDeptRepo, *stubTeamRepo, *stubMappingRepo, *stubUserChecker, TeamService) {

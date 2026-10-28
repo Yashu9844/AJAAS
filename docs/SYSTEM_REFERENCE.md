@@ -1140,7 +1140,135 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/benefits/employees/:id/life-events` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] sensitive, (inline handler) |
 | GET | `/api/v1/hr/benefits/reports/enrolment` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] read, (inline handler) |
 
-Total routes registered by module route files: **441** (plus `GET /health`).
+### M2 Projects / project — 39 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| GET | `/api/v1/projects/:id/group-rules` | (from the contract; List the membership rules of a project (project.manage_members)) |
+| POST | `/api/v1/projects/:id/group-rules` | (from the contract; Add a department, team or reports-of rule; members are expanded at once (project.manage_members)) |
+| DELETE | `/api/v1/projects/:id/group-rules/:rule_id` | (from the contract; Remove a rule; members only it granted leave the project (project.manage_members)) |
+| POST | `/api/v1/projects/:id/group-rules/refresh` | (from the contract; Re-resolve the rules against current HR data (project.manage_members)) |
+| POST | `/api/v1/projects` | (from the contract; Create a project; the caller becomes its owner (projects:create)) |
+| GET | `/api/v1/projects` | (from the contract; List the projects the caller can read, most recently active first) |
+| GET | `/api/v1/projects/:id` | (from the contract; One project with the caller favourite flag and role) |
+| PATCH | `/api/v1/projects/:id` | (from the contract; Edit a project; send version (or If-Match) for optimistic concurrency (project.update)) |
+| POST | `/api/v1/projects/:id/archive` | (from the contract; Archive a project, freezing its tasks (project.archive)) |
+| POST | `/api/v1/projects/:id/restore` | (from the contract; Restore an archived project (project.archive)) |
+| DELETE | `/api/v1/projects/:id` | (from the contract; Soft-delete an archived project (projects:manage_all)) |
+| PUT | `/api/v1/projects/:id/favorite` | (from the contract; Star the project for the caller) |
+| DELETE | `/api/v1/projects/:id/favorite` | (from the contract; Unstar the project for the caller) |
+| GET | `/api/v1/projects/:id/members` | (from the contract; List active members with role names) |
+| POST | `/api/v1/projects/:id/members` | (from the contract; Add a member with a built-in or custom role (project.manage_members)) |
+| PATCH | `/api/v1/projects/:id/members/:user_id` | (from the contract; Change a member role; the last owner stays (project.manage_members)) |
+| DELETE | `/api/v1/projects/:id/members/:user_id` | (from the contract; Remove a member; anyone may remove themselves) |
+| GET | `/api/v1/project-permissions` | (from the contract; Project permissions and the built-in roles) |
+| GET | `/api/v1/project-roles` | (from the contract; List the tenant custom project roles) |
+| POST | `/api/v1/project-roles` | (from the contract; Create a custom role (project_roles:manage)) |
+| PATCH | `/api/v1/project-roles/:id` | (from the contract; Edit a custom role (project_roles:manage)) |
+| DELETE | `/api/v1/project-roles/:id` | (from the contract; Delete an unused custom role (project_roles:manage)) |
+| GET | `/api/v1/projects/:id/columns` | (from the contract; List board columns with open task counts) |
+| POST | `/api/v1/projects/:id/columns` | (from the contract; Add a column (column.manage)) |
+| PUT | `/api/v1/projects/:id/columns/order` | (from the contract; Reorder all columns (column.manage)) |
+| PATCH | `/api/v1/projects/:id/columns/:column_id` | (from the contract; Edit a column; keeps one todo and one done column (column.manage)) |
+| DELETE | `/api/v1/projects/:id/columns/:column_id` | (from the contract; Delete a column, moving its tasks to move_to (column.manage)) |
+| GET | `/api/v1/projects/:id/labels` | (from the contract; Project and tenant-wide labels usable in the project) |
+| POST | `/api/v1/projects/:id/labels` | (from the contract; Create a project label (label.manage)) |
+| PATCH | `/api/v1/projects/:id/labels/:label_id` | (from the contract; Edit a project label (label.manage)) |
+| DELETE | `/api/v1/projects/:id/labels/:label_id` | (from the contract; Delete a project label from every task (label.manage)) |
+| GET | `/api/v1/project-labels` | (from the contract; List tenant-wide labels) |
+| POST | `/api/v1/project-labels` | (from the contract; Create a tenant-wide label (projects:manage_all)) |
+| PATCH | `/api/v1/project-labels/:id` | (from the contract; Edit a tenant-wide label (projects:manage_all)) |
+| DELETE | `/api/v1/project-labels/:id` | (from the contract; Delete a tenant-wide label (projects:manage_all)) |
+| GET | `/api/v1/projects/:id/milestones` | (from the contract; List milestones with progress) |
+| POST | `/api/v1/projects/:id/milestones` | (from the contract; Create a milestone (milestone.manage)) |
+| PATCH | `/api/v1/projects/:id/milestones/:milestone_id` | (from the contract; Edit a milestone (milestone.manage)) |
+| DELETE | `/api/v1/projects/:id/milestones/:milestone_id` | (from the contract; Delete a milestone; its tasks stay (milestone.manage)) |
+
+### M2 Projects / task — 23 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/projects/:id/tasks` | (from the contract; Create a task with the next ticket number, appended to its column (task.create)) |
+| GET | `/api/v1/projects/:id/tasks` | (from the contract; List tasks with filters, sort and keyset cursor (task.read)) |
+| POST | `/api/v1/projects/:id/tasks/bulk` | (from the contract; Update up to 100 tasks; the response lists each task outcome (task.update)) |
+| GET | `/api/v1/projects/:id/activity` | (from the contract; Project activity, newest first, cursor by sequence (task.read)) |
+| GET | `/api/v1/tasks/:id` | (from the contract; One task with ticket id, derived flags, assignees and labels) |
+| PATCH | `/api/v1/tasks/:id` | (from the contract; Edit a task; version (body or If-Match) is required (task.update)) |
+| DELETE | `/api/v1/tasks/:id` | (from the contract; Soft-delete a task and its subtasks (task.delete)) |
+| GET | `/api/v1/tickets/:key` | (from the contract; Resolve a ticket id such as KEY-12; moved tasks keep their old ids) |
+| POST | `/api/v1/tasks/:id/move` | (from the contract; Move to a column and position; WIP and done rules apply (task.update)) |
+| POST | `/api/v1/tasks/:id/reorder` | (from the contract; Place next to a neighbour with one before_id or after_id (task.update)) |
+| POST | `/api/v1/tasks/:id/move-project` | (from the contract; Move to another project: new number, alias for the old ticket id (task.update, task.create)) |
+| POST | `/api/v1/tasks/:id/duplicate` | (from the contract; Copy a task, optionally with labels and assignees (task.create)) |
+| POST | `/api/v1/tasks/:id/archive` | (from the contract; Archive a task (task.update)) |
+| POST | `/api/v1/tasks/:id/restore` | (from the contract; Restore an archived task (task.update)) |
+| POST | `/api/v1/tasks/:id/assignees` | (from the contract; Assign project members (task.assign)) |
+| DELETE | `/api/v1/tasks/:id/assignees/:user_id` | (from the contract; Remove an assignee (task.assign)) |
+| POST | `/api/v1/tasks/:id/labels` | (from the contract; Add labels of the project or tenant (task.update)) |
+| DELETE | `/api/v1/tasks/:id/labels/:label_id` | (from the contract; Remove a label (task.update)) |
+| GET | `/api/v1/tasks/:id/subtasks` | (from the contract; List direct subtasks with progress) |
+| GET | `/api/v1/tasks/:id/relations` | (from the contract; List relations; ends in unreadable projects are hidden) |
+| POST | `/api/v1/tasks/:id/relations` | (from the contract; Relate to another task; blocks may not form a cycle (task.update)) |
+| DELETE | `/api/v1/tasks/:id/relations/:relation_id` | (from the contract; Remove a relation (task.update)) |
+| GET | `/api/v1/tasks/:id/activity` | (from the contract; Task history, newest first, cursor by sequence) |
+
+### M2 Projects / collab — 21 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| GET | `/api/v1/tasks/:id/comments` | (from the contract; Comments of a task, oldest first; deleted ones are tombstones with an empty body (task.read)) |
+| POST | `/api/v1/tasks/:id/comments` | (from the contract; Add a markdown comment (max 10000); @[Name](user:uuid) mentions of users who cannot read the project are dropped (task.comment)) |
+| PATCH | `/api/v1/comments/:id` | (from the contract; Edit your own comment; sets edited_at (task.comment)) |
+| DELETE | `/api/v1/comments/:id` | (from the contract; Delete your own comment, or any with comment.moderate; leaves a tombstone) |
+| GET | `/api/v1/tasks/:id/watch` | (from the contract; Whether the caller watches the task, and why (task.read)) |
+| PUT | `/api/v1/tasks/:id/watch` | (from the contract; Watch the task as the caller (task.read)) |
+| DELETE | `/api/v1/tasks/:id/watch` | (from the contract; Stop watching the task as the caller) |
+| GET | `/api/v1/tasks/:id/watchers` | (from the contract; Watchers of a task by user id (task.read)) |
+| GET | `/api/v1/tasks/:id/time` | (from the contract; Time entries of a task, newest first; mine=true limits to the caller (task.read)) |
+| POST | `/api/v1/tasks/:id/time` | (from the contract; Log finished work: started_at, minutes 1..1440, note (time.log); 409 TIME_TRACKING_DISABLED, TIME_LOCKED) |
+| PATCH | `/api/v1/time-entries/:id` | (from the contract; Edit an entry: the author within the 30-day lock window, time.manage holders always; 409 TIMER_RUNNING for a running timer) |
+| DELETE | `/api/v1/time-entries/:id` | (from the contract; Delete an entry (author within the lock window, or time.manage); also discards a running timer) |
+| POST | `/api/v1/time-entries/timer/start` | (from the contract; Start the caller timer on a task; one running timer per user, else 409 TIMER_RUNNING (time.log)) |
+| POST | `/api/v1/time-entries/timer/stop` | (from the contract; Stop the caller running timer and log the elapsed minutes; 404 when none runs) |
+| GET | `/api/v1/time-entries/timer` | (from the contract; The caller running timer, or data null when none runs) |
+| GET | `/api/v1/projects/:id/time/report` | (from the contract; Logged minutes of a project for a date range, per task (with estimate) or per user (task.read)) |
+| POST | `/api/v1/tasks/:id/attachments` | (from the contract; Start an upload: validates the file and returns the pending attachment with a presigned PUT valid for 5 minutes (attachment.upload)) |
+| GET | `/api/v1/tasks/:id/attachments` | (from the contract; Ready attachments of a task (task.read)) |
+| POST | `/api/v1/attachments/:id/complete` | (from the contract; Verify the uploaded object (size, type, checksum), scan it and mark it ready; 409 UPLOAD_MISMATCH keeps it pending) |
+| GET | `/api/v1/attachments/:id/download` | (from the contract; Presigned download URL valid for 2 minutes, authorised against the task project (task.read)) |
+| DELETE | `/api/v1/attachments/:id` | (from the contract; Delete an attachment and its object (the uploader, or attachment.delete)) |
+
+### M2 Projects / planning — 25 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| POST | `/api/v1/projects/:id/sprints` | (from the contract; Create a planned sprint in a scrum project (sprint.manage)) |
+| GET | `/api/v1/projects/:id/sprints` | (from the contract; List the sprints of a scrum project with task counts, newest first) |
+| GET | `/api/v1/sprints/:id` | (from the contract; One sprint with its task count) |
+| PATCH | `/api/v1/sprints/:id` | (from the contract; Edit a planned or active sprint; send version (or If-Match) (sprint.manage)) |
+| DELETE | `/api/v1/sprints/:id` | (from the contract; Delete a planned sprint; its tasks return to the backlog (sprint.manage)) |
+| POST | `/api/v1/sprints/:id/start` | (from the contract; Start a planned sprint that has dates; one active sprint per project (sprint.manage)) |
+| POST | `/api/v1/sprints/:id/complete` | (from the contract; Complete the active sprint, moving unfinished tasks to the next planned sprint or the backlog (sprint.manage)) |
+| GET | `/api/v1/sprints/:id/report` | (from the contract; Committed versus completed counts and estimates (stored when completed, live otherwise)) |
+| GET | `/api/v1/projects/:id/backlog` | (from the contract; Backlog tasks by rank: backlog-category columns (kanban) or tasks without a sprint (scrum) (task.read)) |
+| POST | `/api/v1/projects/:id/plan` | (from the contract; Move up to 100 tasks between the backlog and a sprint; per-task result list (task.update)) |
+| GET | `/api/v1/projects/:id/board` | (from the contract; Board: columns with counts and cursor-paged tasks per column; cursor_<columnId> pages one column (task.read)) |
+| GET | `/api/v1/projects/:id/calendar` | (from the contract; Tasks by due date or start date in a window of at most 62 days (task.read)) |
+| GET | `/api/v1/projects/:id/gantt` | (from the contract; Dated tasks, milestones and dependencies for a window, at most 500 tasks per page (task.read)) |
+| GET | `/api/v1/my-work` | (from the contract; Tasks assigned to me, grouped overdue / today / this_week / later / no_date, with counts) |
+| GET | `/api/v1/my-work/counts` | (from the contract; Badge counts for My work) |
+| GET | `/api/v1/calendar` | (from the contract; My calendar: assigned tasks across readable projects in a window of at most 62 days) |
+| GET | `/api/v1/search` | (from the contract; Full-text and ticket-id search over readable projects of the tenant, at most 50 hits) |
+| POST | `/api/v1/saved-views` | (from the contract; Save a view; shared views belong to a project and need view.share) |
+| GET | `/api/v1/saved-views` | (from the contract; My views plus the shared views of readable projects) |
+| PATCH | `/api/v1/saved-views/:id` | (from the contract; Edit a view (owner, or view.share for a shared one); send version (or If-Match)) |
+| DELETE | `/api/v1/saved-views/:id` | (from the contract; Delete a view (owner, or view.share for a shared one)) |
+| POST | `/api/v1/calendar-tokens` | (from the contract; Create an iCalendar feed token; the secret is shown once in this response) |
+| GET | `/api/v1/calendar-tokens` | (from the contract; List my active feed tokens (never the secrets)) |
+| DELETE | `/api/v1/calendar-tokens/:id` | (from the contract; Revoke one of my feed tokens at once) |
+| GET | `/api/v1/calendar/feed.ics` | (from the contract; iCalendar feed of my assigned tasks, authenticated by the token query parameter only (no bearer token, rate limited per IP)) |
+
+Total routes registered by module route files: **549** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -3224,6 +3352,383 @@ Total routes registered by module route files: **441** (plus `GET /health`).
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - index `idx_ben_outbox_published` on `ben_events_outbox` (published) WHERE published = FALSE
 
+#### `projects/000001_create_projects_events_outbox.up.sql`
+- **table `projects_events_outbox`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `event_id` UUID — NOT NULL UNIQUE
+  - `routing_key` VARCHAR(100) — NOT NULL
+  - `payload` JSONB — NOT NULL
+  - `published` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `published_at` TIMESTAMPTZ
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `last_error` TEXT
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_projects_outbox_pending` on `projects_events_outbox` (created_at) WHERE published = FALSE
+
+#### `projects/000002_create_projects_events_inbox.up.sql`
+- **table `projects_events_inbox`**
+  - `event_id` UUID — NOT NULL
+  - `consumer` VARCHAR(100) — NOT NULL
+  - `tenant_id` UUID — NOT NULL
+  - `event_type` VARCHAR(100) — NOT NULL
+  - `received_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (consumer, event_id)
+- index `idx_projects_inbox_received` on `projects_events_inbox` (received_at)
+
+#### `projects/000003_create_projects.up.sql`
+- **table `projects`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `key` VARCHAR(10) — NOT NULL
+  - `name` VARCHAR(120) — NOT NULL
+  - `description` TEXT — NOT NULL DEFAULT ''
+  - `status` VARCHAR(16) — NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived'))
+  - `visibility` VARCHAR(16) — NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'tenant'))
+  - `mode` VARCHAR(16) — NOT NULL DEFAULT 'kanban' CHECK (mode IN ('kanban', 'scrum'))
+  - `owner_user_id` UUID — NOT NULL
+  - `start_on` DATE
+  - `due_on` DATE
+  - `icon` VARCHAR(40) — NOT NULL DEFAULT ''
+  - `color` VARCHAR(16) — NOT NULL DEFAULT ''
+  - `task_counter` INT — NOT NULL DEFAULT 0
+  - `time_tracking_enabled` BOOLEAN — NOT NULL DEFAULT TRUE
+  - `version` INT — NOT NULL DEFAULT 1
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `last_activity_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `archived_at` TIMESTAMPTZ
+  - `deleted_at` TIMESTAMPTZ
+  - _constraint:_ CONSTRAINT projects_dates CHECK (due_on IS NULL OR start_on IS NULL OR due_on >= start_on)
+- UNIQUE index `uq_projects_tenant_key` on `projects` (tenant_id, key)
+- index `idx_projects_tenant_activity` on `projects` (tenant_id, last_activity_at DESC, id) WHERE deleted_at IS NULL
+
+#### `projects/000004_create_project_roles_and_members.up.sql`
+- **table `project_roles`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `name` VARCHAR(60) — NOT NULL
+  - `description` VARCHAR(300) — NOT NULL DEFAULT ''
+  - `permissions` JSONB — NOT NULL DEFAULT '[]'
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `project_members`**
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL
+  - `tenant_id` UUID — NOT NULL
+  - `role_key` VARCHAR(20) — CHECK (role_key IN ('owner', 'manager', 'member', 'viewer'))
+  - `custom_role_id` UUID — REFERENCES project_roles (id)
+  - `active` BOOLEAN — NOT NULL DEFAULT TRUE
+  - `added_by` UUID — NOT NULL
+  - `added_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (project_id, user_id)
+  - _constraint:_ CONSTRAINT project_members_one_role CHECK ((role_key IS NULL) <> (custom_role_id IS NULL))
+- UNIQUE index `uq_project_roles_name` on `project_roles` (tenant_id, lower(name))
+- index `idx_project_members_user` on `project_members` (tenant_id, user_id) WHERE active
+
+#### `projects/000005_create_board_columns.up.sql`
+- **table `board_columns`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `name` VARCHAR(60) — NOT NULL
+  - `key` VARCHAR(40) — NOT NULL
+  - `position` INT — NOT NULL
+  - `color` VARCHAR(16) — NOT NULL DEFAULT ''
+  - `category` VARCHAR(16) — NOT NULL CHECK (category IN ('backlog', 'todo', 'in_progress', 'done', 'canceled'))
+  - `wip_limit` INT — CHECK (wip_limit IS NULL OR wip_limit > 0)
+  - `wip_hard` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `is_default` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_board_columns_key` on `board_columns` (project_id, key)
+- UNIQUE index `uq_board_columns_default` on `board_columns` (project_id) WHERE is_default
+- index `idx_board_columns_order` on `board_columns` (project_id, position)
+
+#### `projects/000006_create_labels_and_milestones.up.sql`
+- **table `labels`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — REFERENCES projects (id) ON DELETE CASCADE
+  - `name` VARCHAR(60) — NOT NULL
+  - `color` VARCHAR(16) — NOT NULL DEFAULT ''
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `milestones`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `name` VARCHAR(120) — NOT NULL
+  - `due_on` DATE
+  - `status` VARCHAR(16) — NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reached'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `project_favorites`**
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL
+  - `tenant_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (project_id, user_id)
+- UNIQUE index `uq_labels_project_name` on `labels` (project_id, lower(name)) WHERE project_id IS NOT NULL
+- UNIQUE index `uq_labels_tenant_name` on `labels` (tenant_id, lower(name)) WHERE project_id IS NULL
+- UNIQUE index `uq_milestones_name` on `milestones` (project_id, lower(name))
+- index `idx_project_favorites_user` on `project_favorites` (tenant_id, user_id)
+
+#### `projects/000007_create_tasks.up.sql`
+- **table `tasks`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `number` INT — NOT NULL
+  - `parent_task_id` UUID — REFERENCES tasks (id)
+  - `depth` SMALLINT — NOT NULL DEFAULT 0 CHECK (depth BETWEEN 0 AND 3)
+  - `title` VARCHAR(300) — NOT NULL
+  - `description` TEXT — NOT NULL DEFAULT ''
+  - `column_id` UUID — NOT NULL REFERENCES board_columns (id)
+  - `priority` VARCHAR(8) — NOT NULL DEFAULT 'none' CHECK (priority IN ('none', 'low', 'medium', 'high', 'urgent'))
+  - `reporter_user_id` UUID — NOT NULL
+  - `start_on` DATE
+  - `due_at` TIMESTAMPTZ
+  - `estimate_minutes` INT — CHECK (estimate_minutes IS NULL OR estimate_minutes >= 0)
+  - `milestone_id` UUID — REFERENCES milestones (id)
+  - `sprint_id` UUID
+  - `rank` TEXT — COLLATE "C" NOT NULL
+  - `completed_at` TIMESTAMPTZ
+  - `archived_at` TIMESTAMPTZ
+  - `deleted_at` TIMESTAMPTZ
+  - `version` INT — NOT NULL DEFAULT 1
+  - `search` TSVECTOR
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT tasks_dates CHECK (start_on IS NULL OR due_at IS NULL OR due_at::date >= start_on)
+- UNIQUE index `uq_tasks_project_number` on `tasks` (project_id, number)
+- index `idx_tasks_board` on `tasks` (tenant_id, project_id, column_id, rank, id) WHERE deleted_at IS NULL AND archived_at IS NULL
+- index `idx_tasks_project_updated` on `tasks` (tenant_id, project_id, updated_at DESC) WHERE deleted_at IS NULL
+- index `idx_tasks_project_due` on `tasks` (tenant_id, project_id, due_at) WHERE deleted_at IS NULL AND due_at IS NOT NULL
+- index `idx_tasks_parent` on `tasks` (parent_task_id) WHERE parent_task_id IS NOT NULL
+- index `idx_tasks_milestone` on `tasks` (milestone_id) WHERE milestone_id IS NOT NULL
+- index `idx_tasks_sprint` on `tasks` (sprint_id) WHERE sprint_id IS NOT NULL
+- index `idx_tasks_search` on `tasks` USING GIN (search)
+
+#### `projects/000008_create_task_assignees_labels.up.sql`
+- **table `task_assignees`**
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL
+  - `tenant_id` UUID — NOT NULL
+  - `assigned_by` UUID — NOT NULL
+  - `assigned_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (task_id, user_id)
+- **table `task_labels`**
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `label_id` UUID — NOT NULL REFERENCES labels (id)
+  - `tenant_id` UUID — NOT NULL
+  - _constraint:_ PRIMARY KEY (task_id, label_id)
+- index `idx_task_assignees_user` on `task_assignees` (tenant_id, user_id)
+- index `idx_task_labels_label` on `task_labels` (label_id)
+
+#### `projects/000009_create_activity.up.sql`
+- **table `activity`**
+  - `seq` BIGSERIAL — PRIMARY KEY
+  - `id` UUID — NOT NULL UNIQUE
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `task_id` UUID — REFERENCES tasks (id) ON DELETE CASCADE
+  - `actor_user_id` UUID
+  - `type` VARCHAR(60) — NOT NULL
+  - `data` JSONB — NOT NULL DEFAULT '{}'
+  - `source` VARCHAR(20) — NOT NULL DEFAULT 'user'
+  - `occurred_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_activity_task` on `activity` (tenant_id, task_id, seq) WHERE task_id IS NOT NULL
+- index `idx_activity_project` on `activity` (tenant_id, project_id, seq)
+
+#### `projects/000010_create_task_relations.up.sql`
+- **table `task_relations`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `source_task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `target_task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `type` VARCHAR(12) — NOT NULL CHECK (type IN ('blocks', 'related', 'duplicates'))
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT task_relations_distinct CHECK (source_task_id <> target_task_id)
+- UNIQUE index `uq_task_relations` on `task_relations` (source_task_id, target_task_id, type)
+- index `idx_task_relations_source` on `task_relations` (tenant_id, source_task_id, type)
+- index `idx_task_relations_target` on `task_relations` (tenant_id, target_task_id, type)
+
+#### `projects/000011_create_task_ticket_alias.up.sql`
+- **table `task_ticket_alias`**
+  - `tenant_id` UUID — NOT NULL
+  - `old_key` VARCHAR(10) — NOT NULL
+  - `old_number` INT — NOT NULL
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (tenant_id, old_key, old_number)
+- index `idx_task_ticket_alias_task` on `task_ticket_alias` (task_id)
+
+#### `projects/000012_tasks_list_sort_indexes.up.sql`
+- index `idx_tasks_list_rank` on `tasks` (tenant_id, project_id, rank, id) WHERE deleted_at IS NULL
+- index `idx_tasks_list_created` on `tasks` (tenant_id, project_id, created_at, id) WHERE deleted_at IS NULL
+- index `idx_tasks_list_updated` on `tasks` (tenant_id, project_id, updated_at, id) WHERE deleted_at IS NULL
+- index `idx_tasks_list_due` on `tasks` (tenant_id, project_id, (COALESCE(due_at, 'infinity'::timestamptz)), id) WHERE deleted_at IS NULL
+- index `idx_tasks_list_priority` on `tasks` (tenant_id, project_id, priority_rank, id) WHERE deleted_at IS NULL
+- index `idx_tasks_list_number` on `tasks` (tenant_id, project_id, number) WHERE deleted_at IS NULL
+- ALTER `tasks` ADD COLUMN priority_rank SMALLINT GENERATED ALWAYS AS ( CASE priority WHEN 'urgent' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END) STORED
+
+#### `projects/000020_create_comments.up.sql`
+- **table `comments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `author_user_id` UUID — NOT NULL
+  - `body` TEXT — NOT NULL DEFAULT '' CHECK (char_length(body) <= 10000)
+  - `edited_at` TIMESTAMPTZ
+  - `deleted_at` TIMESTAMPTZ
+  - `deleted_by` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_comments_task` on `comments` (tenant_id, task_id, created_at, id)
+
+#### `projects/000021_create_mentions.up.sql`
+- **table `mentions`**
+  - `tenant_id` UUID — NOT NULL
+  - `source_kind` VARCHAR(10) — NOT NULL CHECK (source_kind IN ('task', 'comment'))
+  - `source_id` UUID — NOT NULL
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (source_kind, source_id, user_id)
+- index `idx_mentions_user` on `mentions` (tenant_id, user_id, created_at DESC)
+- index `idx_mentions_task` on `mentions` (tenant_id, task_id)
+
+#### `projects/000022_create_task_watchers.up.sql`
+- **table `task_watchers`**
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL
+  - `tenant_id` UUID — NOT NULL
+  - `reason` VARCHAR(12) — NOT NULL DEFAULT 'explicit' CHECK (reason IN ('explicit', 'reporter', 'assignee', 'commenter', 'mentioned'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (task_id, user_id)
+- index `idx_task_watchers_user` on `task_watchers` (tenant_id, user_id)
+
+#### `projects/000023_create_time_entries.up.sql`
+- **table `time_entries`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL
+  - `started_at` TIMESTAMPTZ — NOT NULL
+  - `ended_at` TIMESTAMPTZ
+  - `minutes` INT — NOT NULL DEFAULT 0 CHECK (minutes BETWEEN 0 AND 1440)
+  - `note` VARCHAR(500) — NOT NULL DEFAULT ''
+  - `source` VARCHAR(8) — NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'timer'))
+  - `auto_stopped` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT time_entries_span CHECK (ended_at IS NULL OR ended_at >= started_at)
+- UNIQUE index `uq_time_entries_running` on `time_entries` (tenant_id, user_id) WHERE ended_at IS NULL
+- index `idx_time_entries_task` on `time_entries` (tenant_id, task_id, started_at DESC)
+- index `idx_time_entries_user` on `time_entries` (tenant_id, user_id, started_at)
+- index `idx_time_entries_stale` on `time_entries` (started_at) WHERE ended_at IS NULL
+
+#### `projects/000024_create_attachments.up.sql`
+- **table `attachments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL
+  - `task_id` UUID — NOT NULL
+  - `storage_key` TEXT — NOT NULL
+  - `filename` VARCHAR(255) — NOT NULL
+  - `content_type` VARCHAR(127) — NOT NULL
+  - `size` BIGINT — NOT NULL CHECK (size > 0)
+  - `sha256` VARCHAR(64) — NOT NULL DEFAULT ''
+  - `status` VARCHAR(8) — NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready', 'deleted'))
+  - `uploaded_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `ready_at` TIMESTAMPTZ
+  - `deleted_at` TIMESTAMPTZ
+- index `idx_attachments_task` on `attachments` (tenant_id, task_id, created_at, id) WHERE status = 'ready'
+- index `idx_attachments_quota` on `attachments` (tenant_id) WHERE status <> 'deleted'
+- index `idx_attachments_sweep` on `attachments` (status, created_at) WHERE status <> 'ready'
+
+#### `projects/000030_create_sprints.up.sql`
+- **table `sprints`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `name` VARCHAR(120) — NOT NULL
+  - `goal` VARCHAR(1000) — NOT NULL DEFAULT ''
+  - `start_on` DATE
+  - `end_on` DATE
+  - `status` VARCHAR(16) — NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'active', 'completed'))
+  - `started_at` TIMESTAMPTZ
+  - `completed_at` TIMESTAMPTZ
+  - `report` JSONB
+  - `version` INT — NOT NULL DEFAULT 1
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT sprints_dates CHECK (start_on IS NULL OR end_on IS NULL OR end_on >= start_on)
+- UNIQUE index `uq_sprints_one_active` on `sprints` (project_id) WHERE status = 'active'
+- UNIQUE index `uq_sprints_name` on `sprints` (project_id, lower(name))
+- index `idx_sprints_project` on `sprints` (tenant_id, project_id, created_at DESC, id DESC)
+- ALTER `tasks` ADD CONSTRAINT fk_tasks_sprint FOREIGN KEY (sprint_id) REFERENCES sprints (id) ON DELETE SET NULL
+
+#### `projects/000031_create_saved_views.up.sql`
+- **table `saved_views`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — REFERENCES projects (id) ON DELETE CASCADE
+  - `owner_user_id` UUID — NOT NULL
+  - `name` VARCHAR(80) — NOT NULL
+  - `layout` VARCHAR(12) — NOT NULL CHECK (layout IN ('board', 'list', 'calendar', 'gantt'))
+  - `filters` JSONB — NOT NULL DEFAULT '{}'
+  - `sort` JSONB — NOT NULL DEFAULT '[]'
+  - `grouping` VARCHAR(24) — NOT NULL DEFAULT ''
+  - `shared` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `version` INT — NOT NULL DEFAULT 1
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ CONSTRAINT saved_views_shared_needs_project CHECK (NOT shared OR project_id IS NOT NULL)
+- UNIQUE index `uq_saved_views_name` on `saved_views` (tenant_id, owner_user_id, COALESCE(project_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name))
+- index `idx_saved_views_owner` on `saved_views` (tenant_id, owner_user_id, created_at DESC, id DESC)
+- index `idx_saved_views_shared` on `saved_views` (tenant_id, project_id) WHERE shared
+
+#### `projects/000032_create_calendar_tokens.up.sql`
+- **table `calendar_tokens`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `user_id` UUID — NOT NULL
+  - `token_hash` CHAR(64) — NOT NULL
+  - `label` VARCHAR(60) — NOT NULL DEFAULT ''
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `last_used_at` TIMESTAMPTZ
+  - `revoked_at` TIMESTAMPTZ
+- UNIQUE index `uq_calendar_tokens_hash` on `calendar_tokens` (token_hash)
+- index `idx_calendar_tokens_user` on `calendar_tokens` (tenant_id, user_id) WHERE revoked_at IS NULL
+
+#### `projects/000033_create_planning_view_indexes.up.sql`
+- index `idx_plan_tasks_backlog` on `tasks` (tenant_id, project_id, rank, id) WHERE sprint_id IS NULL AND deleted_at IS NULL AND archived_at IS NULL
+- index `idx_plan_tasks_sprint` on `tasks` (tenant_id, sprint_id, rank, id) WHERE sprint_id IS NOT NULL AND deleted_at IS NULL
+- index `idx_plan_tasks_gantt` on `tasks` (tenant_id, project_id, (COALESCE(start_on, (due_at AT TIME ZONE 'UTC')::date)), id) WHERE deleted_at IS NULL AND archived_at IS NULL AND (start_on IS NOT NULL OR due_at IS NOT NULL)
+- index `idx_plan_task_assignees_user` on `task_assignees` (tenant_id, user_id, task_id)
+
+#### `projects/000040_create_group_rules.up.sql`
+- **table `project_group_rules`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `kind` VARCHAR(16) — NOT NULL CHECK (kind IN ('department', 'team', 'reports_of'))
+  - `ref_id` UUID — NOT NULL
+  - `role_key` VARCHAR(20) — NOT NULL CHECK (role_key IN ('manager', 'member', 'viewer'))
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `refreshed_at` TIMESTAMPTZ
+- UNIQUE index `uq_project_group_rules` on `project_group_rules` (project_id, kind, ref_id)
+- index `idx_project_group_rules_tenant` on `project_group_rules` (tenant_id, kind, ref_id)
+- ALTER `project_members` ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'direct' CHECK (source IN ('direct', 'group'))
+- ALTER `project_members` ADD CONSTRAINT project_members_group_not_owner CHECK (source = 'direct' OR role_key IS DISTINCT FROM 'owner')
+- ALTER `task_assignees` ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE
+
 ## C. Code inventory — every file, type and function
 
 
@@ -3244,8 +3749,9 @@ Total routes registered by module route files: **441** (plus `GET /health`).
 - **func** `(r *RedisClient) TTL(ctx context.Context, key string) (time.Duration, error)` — TTL returns the remaining time-to-live of key (negative when absent / no expiry).
 - **func** `(r *RedisClient) Ping(ctx context.Context) error` — Ping checks the connection (readiness probes).
 
-#### `internal/shared/config/config.go` (93 lines)
+#### `internal/shared/config/config.go` (105 lines)
 - **type** `Config struct` — Config holds all configurations of the application.
+- **type** `StorageConfig struct` — StorageConfig holds the S3-compatible object-storage settings (MinIO in development). An empty Bucket leaves file features disabled; services that need storage report a clear error instead of failing at startup.
 - **type** `PlatformConfig struct` — PlatformConfig holds platform-operator (super admin) settings.
 - **type** `ServerConfig struct` — ServerConfig holds server configuration details.
 - **type** `DatabaseConfig struct` — DatabaseConfig holds database configuration details.
@@ -3313,6 +3819,63 @@ _Package:_ Package idempotency makes retried commands safe (docs/ARCHITECTURE.md
 - **func** `(s gormStore) Release(ctx context.Context, id uuid.UUID) error`
 - **func** `(s gormStore) PurgeExpired(ctx context.Context, now time.Time) (int64, error)`
 
+#### `internal/shared/identityport/port.go` (87 lines)
+_Package:_ Package identityport is M1 HR Management's only view of M0 Identity & Access (docs/modules/m1-hr-management/ design.md §4). HR packages depend on these interfaces, never on internal/identity/... packages (enforced by the import-boundary test). The in-process adapter lives in identityport/inprocess; a JWT-claims + HTTP adapter replaces it when HR is deployed separately. The permission catalogue types come from the published contract package internal/identity/access.
+- **type** `User struct` — User is HR's view of a login identity.
+- **func** `(u *User) Active() bool { return u != nil && u.Status == "active" }` — Active reports whether the user can sign in.
+- **type** `Invite struct` — Invite asks M0 to create an invited user and send them an invitation.
+- **type** `Users interface` — Users reads and changes login identities.
+- **method** `Users.GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*User, error)` — GetByID returns the user, or nil when it does not exist in the tenant.
+- **method** `Users.DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id, correlationID uuid.UUID) error`
+- **method** `Users.ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error` — ActivateUser re-enables a deactivated login (HR/Core rehire and rescinded termination).
+- **method** `Users.InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in Invite, correlationID uuid.UUID) (*User, error)`
+- **type** `Auditor interface` — Auditor writes audit records (HR keeps using M0's audit trail until hr.audit_events exists).
+- **method** `Auditor.Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
+- **type** `HTTP interface` — HTTP provides the request guards HR routes use.
+- **method** `HTTP.TenantResolver() gin.HandlerFunc` — TenantResolver resolves the tenant from the host; Authenticate verifies the access token.
+- **method** `HTTP.Authenticate() gin.HandlerFunc`
+- **method** `HTTP.Require(resource, action string) gin.HandlerFunc` — Require admits callers holding resource:action at tenant scope.
+- **method** `HTTP.RequireScoped(resource, action string, minScope access.Scope) gin.HandlerFunc` — RequireScoped admits callers holding resource:action at minScope or wider and exposes their scope.
+- **method** `HTTP.Flag(resource, action, key string) gin.HandlerFunc` — Flag stores under key whether the caller holds resource:action at tenant scope (never blocks).
+- **method** `HTTP.AuditTrail(action, resource string) gin.HandlerFunc` — AuditTrail records a successful mutation after the handler ran.
+- **type** `DeactivationHook interface` — DeactivationHook converges HR data when a login identity is deactivated, inside the same transaction.
+- **method** `DeactivationHook.DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, correlationID uuid.UUID) error`
+- **type** `RoleFacts interface` — RoleFacts tells M0 who currently qualifies for the automatic Employee and Manager roles (docs/ARCHITECTURE.md §17).
+- **method** `RoleFacts.Members(ctx context.Context, tenantID uuid.UUID) (employees, managers []uuid.UUID, err error)`
+- **method** `RoleFacts.MemberOf(ctx context.Context, tenantID, userID uuid.UUID) (employee, manager bool, err error)`
+- **type** `Port interface` — Port is everything HR needs from M0.
+- **method** `Port.Users() Users`
+- **method** `Port.Audit() Auditor`
+- **method** `Port.RegisterPermissions(ctx context.Context, defs []access.PermissionDef) error` — RegisterPermissions registers HR permission definitions (with predefined-role defaults) in M0's catalogue.
+- **method** `Port.OnUserDeactivated(h DeactivationHook)` — OnUserDeactivated registers a hook run when M0 deactivates a user.
+- **method** `Port.ProvideRoleFacts(f RoleFacts)` — ProvideRoleFacts installs HR as the source of the automatic Employee and Manager roles.
+
+#### `internal/shared/identityport/inprocess/adapter.go` (101 lines)
+_Package:_ Package inprocess adapts the in-process M0 identity module to identityport.Port. It is the only HR package that imports internal/identity/... packages.
+- **type** `port struct`
+- **func** `New(m *identity.Module, db *gorm.DB) identityport.Port` — New returns the in-process Port over the identity module; db is used for route-level audit writes.
+- **func** `(p *port) TenantResolver() gin.HandlerFunc { return p.resolver }`
+- **func** `(p *port) Authenticate() gin.HandlerFunc   { return p.authn }`
+- **func** `(p *port) Require(resource, action string) gin.HandlerFunc`
+- **func** `(p *port) RequireScoped(resource, action string, min access.Scope) gin.HandlerFunc`
+- **func** `(p *port) Flag(resource, action, key string) gin.HandlerFunc`
+- **func** `(p *port) AuditTrail(action, resource string) gin.HandlerFunc`
+- **func** `(p *port) Users() identityport.Users   { return users{svc: p.m.UserService()} }`
+- **func** `(p *port) Audit() identityport.Auditor { return p.m.AuditService() }`
+- **func** `(p *port) RegisterPermissions(ctx context.Context, defs []access.PermissionDef) error`
+- **func** `(p *port) OnUserDeactivated(h identityport.DeactivationHook)`
+- **func** `(p *port) ProvideRoleFacts(f identityport.RoleFacts) { p.m.SetAutomaticRoleSource(f) }`
+- **type** `users struct{ svc identityServices.UserService }`
+- **func** `toUser(tenantID uuid.UUID, u *identityDTO.UserResponse) (*identityport.User, error)`
+- **func** `(u users) GetByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*identityport.User, error)`
+- **func** `(u users) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id, correlationID uuid.UUID) error`
+- **func** `(u users) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
+- **func** `(u users) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in identityport.Invite, correlationID uuid.UUID) (*identityport.User, error)`
+
+#### `internal/shared/inbox/inbox.go` (26 lines)
+_Package:_ Package inbox makes event handlers idempotent. The broker delivers at least once, so a handler calls Claim inside the transaction that applies the event's effect: the first delivery records the event id and proceeds, a redelivery finds the row and the handler skips it. Each service owns one inbox table (consumer, event_id, tenant_id, event_type).
+- **func** `Claim(tx *gorm.DB, table, consumer string, tenantID, eventID uuid.UUID, eventType string) (bool, error)` — Claim records that consumer is handling event eventID and reports whether this is the first time. Call it in the handler's transaction; if the transaction rolls back, the claim rolls back with it and the event is handled on redelivery. table is a trusted constant.
+
 #### `internal/shared/logger/logger.go` (37 lines)
 - **type** `Logger struct` — Logger is a wrapper around zerolog.Logger
 - **func** `NewLogger(env string) *Logger` — NewLogger initializes and returns a structured logger.
@@ -3327,7 +3890,7 @@ _Package:_ Package idempotency makes retried commands safe (docs/ARCHITECTURE.md
 #### `internal/shared/middleware/cors.go` (74 lines)
 - **func** `CORS(allowedOrigins []string) gin.HandlerFunc` — CORS handles Cross-Origin Resource Sharing. allowedOrigins is an explicit allow-list; a single "*" entry allows any origin (development only; credentials are then NOT allowed, per the CORS spec). An empty list disables CORS headers. Tenant subdomain origins can be allowed with a "*.example.com" wildcard entry.
 
-#### `internal/shared/middleware/hardening.go` (39 lines)
+#### `internal/shared/middleware/hardening.go` (61 lines)
 - **func** `BodyLimit(max int64) gin.HandlerFunc` — BodyLimit rejects request bodies larger than max with 413 before handlers read them.
 - **func** `SecurityHeaders() gin.HandlerFunc` — SecurityHeaders sets conservative defaults for an API that never serves HTML.
 
@@ -3366,6 +3929,13 @@ _Package:_ Package outbox is the transactional outbox shared by every service (d
 - **func** `(r *Relay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
 - **func** `(r *Relay) Run(ctx context.Context)` — Run relays until ctx is cancelled.
 
+#### `internal/shared/outbox/table_relay.go` (91 lines)
+- **type** `TableRelay struct` — TableRelay publishes the rows of one context's `<prefix>_events_outbox` table (id, routing_key, payload, published, published_at, attempts, last_error) to the message bus (HR-009). Rows are claimed with FOR UPDATE SKIP LOCKED, so several instances can run side by side; a row that fails TableRelayMaxAttempts times is left for an operator.
+- **func** `NewTableRelay(db *gorm.DB, table, exchange string, publisher queue.EventPublisher) *TableRelay` — NewTableRelay builds a relay for table (a trusted constant, validated) publishing to exchange.
+- **type** `outboxRow struct`
+- **func** `(r *TableRelay) RelayOnce(ctx context.Context) (int, error)` — RelayOnce publishes one batch and returns how many rows were published.
+- **func** `(r *TableRelay) Run(ctx context.Context, onErr func(error))` — Run ticks RelayOnce until ctx is cancelled. A failed tick is reported through onErr (may be nil) and retried.
+
 #### `internal/shared/queue/publisher.go` (25 lines)
 - **type** `EventPublisher interface` — EventPublisher defines the contract to dispatch events to message brokers.
 - **method** `EventPublisher.Publish(ctx context.Context, exchange string, routingKey string, event interface{}) error`
@@ -3381,6 +3951,37 @@ _Package:_ Package outbox is the transactional outbox shared by every service (d
 - **func** `(p *RabbitMQPublisher) Publish(ctx context.Context, exchange string, routingKey string, event interface{}) error` — Publish serializes event and publishes it to the specified exchange.
 - **func** `(p *RabbitMQPublisher) Close() error` — Close gracefully releases connections.
 
+#### `internal/shared/storage/memory.go` (81 lines)
+- **type** `Memory struct` — Memory is an in-process Store for unit tests. Put plays the part of the client's upload to a presigned URL.
+- **func** `NewMemory() *Memory { return &Memory{objects: map[string]ObjectInfo{}, now: time.Now} }` — NewMemory returns an empty Memory store.
+- **func** `(m *Memory) PresignPut(_ context.Context, key, contentType string, size int64, sum string, ttl time.Duration) (PutTarget, error)`
+- **func** `(m *Memory) PresignGet(_ context.Context, key, filename string, ttl time.Duration) (string, error)`
+- **func** `(m *Memory) Head(_ context.Context, key string) (ObjectInfo, error)`
+- **func** `(m *Memory) Delete(_ context.Context, key string) error`
+- **func** `(m *Memory) Put(key, contentType string, data []byte)` — Put stores data under key, as a client would after PresignPut.
+- **func** `(m *Memory) Has(key string) bool` — Has reports whether key exists.
+- **func** `(m *Memory) Len() int` — Len is the number of stored objects.
+
+#### `internal/shared/storage/s3.go` (107 lines)
+- **type** `S3Config struct` — S3Config configures the S3-compatible adapter (AWS S3, MinIO, and others).
+- **type** `S3 struct` — S3 is the Store backed by an S3-compatible service.
+- **func** `NewS3(ctx context.Context, c S3Config) (*S3, error)` — NewS3 builds the adapter. It does not contact the service; call EnsureBucket in development.
+- **func** `(s *S3) EnsureBucket(ctx context.Context) error` — EnsureBucket creates the bucket when it is missing (development and tests; production buckets are provisioned).
+- **func** `(s *S3) PresignPut(ctx context.Context, key, contentType string, size int64, sum string, ttl time.Duration) (PutTarget, error)`
+- **func** `(s *S3) PresignGet(ctx context.Context, key, filename string, ttl time.Duration) (string, error)`
+- **func** `(s *S3) Head(ctx context.Context, key string) (ObjectInfo, error)`
+- **func** `(s *S3) Delete(ctx context.Context, key string) error`
+
+#### `internal/shared/storage/storage.go` (41 lines)
+_Package:_ Package storage is the object-storage port shared by every service (docs/modules/m2-projects-tasks/design.md §5). Callers depend on Store; the adapter behind it is chosen at startup (S3-compatible, with MinIO in development) and tests use Memory. Buckets are private: only short-lived presigned URLs leave the system.
+- **type** `PutTarget struct` — PutTarget tells a client how to upload one object.
+- **type** `ObjectInfo struct` — ObjectInfo describes a stored object.
+- **type** `Store interface` — Store is the provider interface. Keys are opaque, tenant-scoped paths built by the caller.
+- **method** `Store.PresignPut(ctx context.Context, key, contentType string, size int64, sha256 string, ttl time.Duration) (PutTarget, error)` — is sha256 (lowercase hex) when it is not empty.
+- **method** `Store.PresignGet(ctx context.Context, key, filename string, ttl time.Duration) (string, error)` — PresignGet returns a download URL that names the file filename.
+- **method** `Store.Head(ctx context.Context, key string) (ObjectInfo, error)` — Head returns the stored object's metadata, or ErrNotFound.
+- **method** `Store.Delete(ctx context.Context, key string) error` — Delete removes the object; deleting a missing object is not an error.
+
 #### `internal/shared/utils/pagination.go` (34 lines)
 - **func** `NormalizePagination(page, perPage int) (int, int)` — NormalizePagination applies defaults and bounds: page >= 1, 1 <= per_page <= MaxPerPage.
 - **func** `ParsePagination(c *gin.Context) (int, int)` — ParsePagination reads ?page and ?per_page, tolerating junk values (falls back to defaults) and clamping the range.
@@ -3394,7 +3995,7 @@ _Package:_ Package outbox is the transactional outbox shared by every service (d
 ### Application wiring (internal/app)
 
 
-#### `internal/app/app.go` (129 lines)
+#### `internal/app/app.go` (136 lines)
 _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go and the integration tests share it so the tested router is exactly the production router.
 - **type** `Options struct` — Options carries the infrastructure handles and runtime policy the engine needs.
 - **func** `ValidateConfig(cfg *config.Config) error` — ValidateConfig rejects configurations that are unsafe to run.
@@ -3408,6 +4009,9 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 #### `internal/app/identity.go` (43 lines)
 - **func** `startIdentityBackground(o Options, id *identity.Module, store idempotency.Store)` — startIdentityBackground runs M0's outbox relay and the idempotency purger while background work is enabled.
 - **func** `registerDevMailbox(v1 *gin.RouterGroup, o Options, id *identity.Module)` — registerDevMailbox exposes one-time secrets (reset and invitation tokens) to developers and the test console in development and test only, behind the platform key: GET /api/v1/dev/mailbox?tenant_id=…&email=…
+
+#### `internal/app/projects.go` (26 lines)
+- **func** `buildProjects(o Options, idp identityport.Port, people ports.People) (*projects.Module, error)` — buildProjects wires M2 Projects & Tasks, including the object-storage provider when one is configured.
 
 ### M0 Identity & Access
 
@@ -4295,11 +4899,13 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 ### M1 HR / Organization
 
 
-#### `internal/hr/organization/access_facts.go` (46 lines)
+#### `internal/hr/organization/access_facts.go` (65 lines)
 - **func** `(m *Module) ManagerUserIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)` — ManagerUserIDs lists the users of the tenant who currently have at least one active direct report (automatic Manager role, docs/ARCHITECTURE.md §17).
 - **func** `(m *Module) HasDirectReports(ctx context.Context, tenantID, userID uuid.UUID) (bool, error)` — HasDirectReports reports whether the user manages at least one active mapping in the tenant.
 - **func** `(m *Module) DirectManager(ctx context.Context, tenantID, userID uuid.UUID) (*uuid.UUID, error)` — DirectManager returns the manager_user_id of the user's primary active mapping, or nil (HR/Performance D7-03).
 - **func** `(m *Module) DirectReportUserIDs(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)` — DirectReportUserIDs lists the users whose primary active mapping reports to the manager (attendance AP-01).
+- **func** `(m *Module) DepartmentUserIDs(ctx context.Context, tenantID, departmentID uuid.UUID) ([]uuid.UUID, error)` — DepartmentUserIDs lists the users with an active placement in the department (M2 project group rules).
+- **func** `(m *Module) TeamUserIDs(ctx context.Context, tenantID, teamID uuid.UUID) ([]uuid.UUID, error)` — TeamUserIDs lists the users with an active placement in the team (M2 project group rules).
 
 #### `internal/hr/organization/catalogue.go` (16 lines)
 - **func** `Catalogue() []access.PermissionDef` — Catalogue is HR/Organization's permission catalogue with the scopes predefined roles receive by default (docs/ARCHITECTURE.md §17). The app registers it with M0 at boot.
@@ -9169,10 +9775,925 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 - **func** `(s gormStore) Counts(ctx context.Context, db *gorm.DB, t uuid.UUID, on Date) ([]CountRow, error)`
 - **func** `(s gormStore) Event(ctx context.Context, tx *gorm.DB, t uuid.UUID, key string, payload map[string]string) error`
 
+### M2 Projects / kernel
+
+
+#### `internal/projects/kernel/activity.go` (40 lines)
+- **type** `Activity struct` — Activity is one append-only history entry (CM-04). Data carries ids and field values; no free-text personal data.
+- **func** `LogActivity(ctx context.Context, tx *gorm.DB, a Activity) error` — LogActivity appends an entry in the caller transaction and bumps the project recent-activity time.
+
+#### `internal/projects/kernel/cursor.go` (55 lines)
+- **func** `EncodeCursor(v any) string` — EncodeCursor turns a position into an opaque token.
+- **func** `DecodeCursor(token string, dst any) error` — DecodeCursor parses a token into dst; an empty token means the first page and leaves dst untouched.
+- **func** `ClampLimit(raw string) int` — ClampLimit applies the default and the maximum.
+- **func** `Trim[T any](rows []T, limit int) ([]T, bool)` — Trim cuts the extra probe row fetched to learn whether another page exists.
+
+#### `internal/projects/kernel/date.go` (67 lines)
+- **type** `Date struct{ time.Time }` — Date is a calendar day without a time zone; it reads and writes DATE columns and JSON as YYYY-MM-DD.
+- **func** `ParseDate(s string) (Date, error)` — ParseDate reads YYYY-MM-DD.
+- **func** `(d Date) String() string { return d.Time.Format(dateLayout) }` — String formats the day.
+- **func** `(d Date) MarshalJSON() ([]byte, error) { return json.Marshal(d.String()) }` — MarshalJSON writes the day as a string.
+- **func** `(d *Date) UnmarshalJSON(b []byte) error` — UnmarshalJSON reads YYYY-MM-DD.
+- **func** `(d Date) Value() (driver.Value, error) { return d.String(), nil }` — Value stores the day.
+- **func** `(d *Date) Scan(src any) error` — Scan reads a DATE.
+- **func** `(d Date) Before(o Date) bool { return d.Time.Before(o.Time) }` — Before reports whether d is strictly before o.
+
+#### `internal/projects/kernel/errors.go` (47 lines)
+_Package:_ Package kernel holds what every M2 context shares: error constructors, outbox events, cursors, fractional ranks and HTTP helpers. It imports no other M2 package.
+- **func** `Err(status int, code, msg string) *sharedErrors.AppError` — Err builds an application error with an explicit status and a stable code.
+- **func** `Invalid(field, msg string) *sharedErrors.AppError` — Invalid is a 400 VALIDATION_ERROR naming the field.
+- **func** `NotFound(what string) *sharedErrors.AppError` — NotFound is a 404; foreign-tenant and no-access ids answer the same way so nothing leaks.
+- **func** `Forbidden(perm string) *sharedErrors.AppError` — Forbidden is a 403 for callers who can see the object but lack the permission.
+- **func** `Conflict(code, msg string) *sharedErrors.AppError { return Err(http.StatusConflict, code, msg) }` — Conflict is a 409 with a stable code.
+- **type** `VersionConflict struct{ Current int }` — VersionConflict is returned when an edit carries a stale version; Current is what the caller should re-read (TK-03).
+- **func** `(e *VersionConflict) Error() string`
+- **func** `AsVersionConflict(err error) (*VersionConflict, bool)` — AsVersionConflict unwraps a VersionConflict.
+
+#### `internal/projects/kernel/events.go` (28 lines)
+- **func** `Emit(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]any) error` — Emit writes one event, version 1, in the caller transaction. Payloads hold ids and versions only (EV, PG12).
+
+#### `internal/projects/kernel/http.go` (109 lines)
+- **func** `Fail(c *gin.Context, err error)` — Fail writes the error envelope; unknown errors become a generic 500 so nothing internal leaks.
+- **func** `Respond(c *gin.Context, status int, data any, err error)` — Respond writes {data} with status, or the error.
+- **func** `NewCursorPage[T any](rows []T, limit int, next string) CursorPage[T]` — NewCursorPage bundles a page for RespondCursor.
+- **func** `RespondCursor[T any](c *gin.Context, p CursorPage[T], err error)` — RespondCursor writes a cursor-paged list: {data, meta: {limit, next_cursor}}.
+- **func** `Bind(c *gin.Context, dst any) bool` — Bind decodes the JSON body into dst or answers 400.
+- **func** `ParamUUID(c *gin.Context, name string) (uuid.UUID, bool)` — ParamUUID reads a path parameter as a UUID or answers 400.
+- **func** `QueryUUID(c *gin.Context, name string) (*uuid.UUID, bool)` — QueryUUID reads an optional UUID query parameter; ok is false (and 400 written) when it is present but malformed.
+- **func** `IfMatchVersion(c *gin.Context) int` — IfMatchVersion reads the expected version from the If-Match header (an optional W/"3" or "3" form); 0 means absent.
+
+#### `internal/projects/kernel/rank.go` (80 lines)
+- **func** `RankBetween(lo, hi string) string` — RankBetween returns a rank strictly between lo and hi; "" means unbounded on that side. It returns "" when lo is not below hi.
+- **func** `midpoint(lo, hi string) string`
+- **func** `digitAt(s string, i int) byte`
+- **func** `tail(s string, n int) string`
+- **func** `ValidRank(s string) bool` — ValidRank reports whether s is a well-formed rank (non-empty, alphabet only, no trailing zero digit).
+- **func** `Spread(n int) []string` — Spread returns n increasing ranks, used to rebalance a column whose ranks have grown long.
+
+#### `internal/projects/kernel/stringlist.go` (36 lines)
+- **type** `StringList []string` — StringList is a JSON array of strings stored in a JSONB column.
+- **func** `(l StringList) Value() (driver.Value, error)` — Value stores the list as JSON; nil is stored as an empty array.
+- **func** `(l *StringList) Scan(src any) error` — Scan reads a JSONB array.
+
+### M2 Projects / api
+
+
+#### `internal/projects/api/access.go` (193 lines)
+_Package:_ Package api is the contract between M2 contexts: the project context implements Authorizer, and the task and planning contexts depend on this package only (never on project/). Specification section 8.
+- **type** `Perm string` — Perm is a project-level permission (specification section 8).
+- **func** `buildBuiltins() map[string]map[Perm]bool`
+- **func** `BuiltinRoles() []string { return []string{RoleOwner, RoleManager, RoleMember, RoleViewer} }` — BuiltinRoles lists the fixed role keys, most privileged first.
+- **func** `BuiltinPerms(role string) map[Perm]bool { return builtin[role] }` — BuiltinPerms returns the permission set of a built-in role (nil when the key is unknown).
+- **func** `ValidPerm(p string) bool` — ValidPerm reports whether p is a known project permission.
+- **func** `SortedPerms(set map[Perm]bool) []string` — SortedPerms returns the permissions in a set as sorted strings.
+- **type** `Actor struct` — Actor is the authenticated caller plus the tenant-level permissions the request guards resolved.
+- **type** `ProjectInfo struct` — ProjectInfo is the part of a project every context needs.
+- **type** `Access struct` — Access is what the caller may do in one project.
+- **func** `(a Access) Can(p Perm) bool { return a.Perms[p] }` — Can reports whether the caller holds p in the project.
+- **func** `(a Access) Require(p Perm) error` — Require returns a 403 when the caller lacks p, or a 409 when an archived project blocks a write.
+- **func** `Archived(held map[Perm]bool) map[Perm]bool` — Archived reduces a permission set to what an archived project allows (PR-03).
+- **type** `Authorizer interface` — Authorizer resolves what a caller may do in a project (the project context implements it).
+- **method** `Authorizer.Access(ctx context.Context, db *gorm.DB, a Actor, projectID uuid.UUID) (Access, error)` — Access returns the caller access to the project, or 404 when the caller cannot read it (PG4).
+- **method** `Authorizer.ReadableProjectIDs(ctx context.Context, db *gorm.DB, a Actor) ([]uuid.UUID, error)` — ReadableProjectIDs lists the projects the caller can read, for cross-project queries (search, my work).
+- **func** `ActorFrom(c *gin.Context) (Actor, bool)` — ActorFrom builds the Actor from the request context set by the identity guards.
+
+#### `internal/projects/api/hooks.go` (34 lines)
+- **type** `TaskText struct` — TaskText is a task description that was just saved (on create or edit).
+- **type** `WatchRequest struct` — WatchRequest asks for users to watch a task for a reason (reporter, assignee).
+- **type** `TaskHooks interface` — TaskHooks lets the collaboration context react to task changes inside the task transaction: mentions in descriptions (CM-02) and automatic watchers (CM-03). The task context calls it when set and works without it.
+- **method** `TaskHooks.TaskTextSaved(ctx context.Context, tx *gorm.DB, t TaskText) error` — TaskTextSaved stores the readable mentions of the description and watches newly mentioned users.
+- **method** `TaskHooks.WatchTask(ctx context.Context, tx *gorm.DB, w WatchRequest) error` — WatchTask makes the users watchers of the task, keeping existing watches unchanged.
+
+#### `internal/projects/api/tasks.go` (26 lines)
+- **type** `TaskRef struct` — TaskRef is the part of a task other contexts need (comments, time, attachments, views).
+- **type** `TaskResolver interface` — TaskResolver finds a task and the caller access to its project. The task context implements it; contexts that act on a task (collab, planning) depend on this interface instead of reading the task context. A task the caller cannot read is a 404, the same as an unknown id (PG4).
+- **method** `TaskResolver.Task(ctx context.Context, db *gorm.DB, a Actor, taskID uuid.UUID) (TaskRef, Access, error)`
+
+### M2 Projects / project
+
+
+#### `internal/projects/project/access.go` (101 lines)
+- **func** `(s *Service) Access(ctx context.Context, db *gorm.DB, a api.Actor, projectID uuid.UUID) (api.Access, error)` — Access resolves what the caller may do in the project (specification section 8): tenant-level permissions, then the effective member role, then tenant visibility for reads. A caller who cannot read the project gets 404 (PG4).
+- **func** `(s *Service) heldPerms(db *gorm.DB, a api.Actor, p Project) (map[api.Perm]bool, string, bool, error)` — heldPerms merges the permission sources before the archive filter.
+- **func** `(s *Service) memberPerms(db *gorm.DB, m Member) (map[api.Perm]bool, string, error)` — memberPerms returns the permission set and display name of a member role, built-in or custom.
+- **func** `(s *Service) ReadableProjectIDs(ctx context.Context, db *gorm.DB, a api.Actor) ([]uuid.UUID, error)` — ReadableProjectIDs lists the projects the caller can read (used by search and My work).
+
+#### `internal/projects/project/columns.go` (252 lines)
+- **type** `ColumnInput struct` — ColumnInput creates or edits a column; nil fields are unchanged on edit.
+- **func** `validCategory(c string) bool`
+- **func** `createDefaultColumns(tx *gorm.DB, p Project) error`
+- **func** `(s *Service) Columns(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Column, error)` — Columns lists the project columns in order, with open task counts.
+- **func** `(s *Service) CreateColumn(ctx context.Context, a api.Actor, projectID uuid.UUID, in ColumnInput) (*Column, error)` — CreateColumn appends a column (PR-06).
+- **func** `(in ColumnInput) apply(c *Column) error`
+- **func** `uniqueKey(tx *gorm.DB, projectID uuid.UUID, name string) (string, error)`
+- **func** `(s *Service) require(ctx context.Context, a api.Actor, projectID uuid.UUID, p api.Perm) error` — require resolves the project and checks one permission.
+- **func** `(s *Service) UpdateColumn(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in ColumnInput) (*Column, error)` — UpdateColumn edits a column; the project must keep a todo and a done column (PR-06).
+- **func** `ensureCategories(tx *gorm.DB, projectID uuid.UUID) error` — ensureCategories enforces the todo and done columns every project needs.
+- **func** `(s *Service) ReorderColumns(ctx context.Context, a api.Actor, projectID uuid.UUID, ids []uuid.UUID) ([]Column, error)` — ReorderColumns sets the display order; ids must list every column exactly once.
+- **func** `sameSet(a, b []uuid.UUID) bool`
+
+#### `internal/projects/project/columns_delete.go` (73 lines)
+- **func** `(s *Service) DeleteColumn(ctx context.Context, a api.Actor, projectID, id uuid.UUID, moveTo *uuid.UUID) error` — DeleteColumn removes a column. A column that still has tasks needs moveTo, the column that receives them (PR-06).
+- **func** `mapMissing(err error, what string) error`
+- **func** `(s *Service) moveTasksOut(tx *gorm.DB, col Column, moveTo *uuid.UUID) error` — moveTasksOut moves every task of col into target, keeping completion state consistent with the target category.
+
+#### `internal/projects/project/deactivation.go` (69 lines)
+- **func** `(s *Service) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, _ uuid.UUID) error` — DeactivateUserMappings marks the user inactive in every project and on every assignment, keeping history. It is the identityport DeactivationHook, so it runs in the same transaction that deactivates the login (specification section 7).
+- **type** `identityEnvelope struct`
+- **func** `(s *Service) HandleIdentityEvent(ctx context.Context, raw []byte) error` — HandleIdentityEvent applies an identity or HR lifecycle event delivered by a broker consumer. Redeliveries are recognised through the inbox ledger and ignored (PG10). Unknown event types are ignored.
+
+#### `internal/projects/project/group_refresh.go` (106 lines)
+- **func** `(s *Service) RefreshGroups(ctx context.Context, tenantID, projectID uuid.UUID) error` — RefreshGroups reconciles the group-sourced members of one project with its rules. Direct members are never touched or overridden. The people lookups happen before the transaction so no external call is made while rows are locked.
+- **func** `(s *Service) reconcile(tx *gorm.DB, tenantID, projectID uuid.UUID, want map[uuid.UUID]string) error`
+- **type** `groupScope struct` — groupScope is the tenant, project and current group rows a reconcile works on.
+- **func** `(s *Service) upsertGroupMember(tx *gorm.DB, scope groupScope, uid uuid.UUID, role string) error` — upsertGroupMember inserts or updates a group member; a user who is already a direct member keeps the direct row.
+- **func** `(s *Service) RefreshAll(ctx context.Context) error` — RefreshAll refreshes every project of the tenant that has rules; a periodic sweep keeps group membership aligned with HR.
+- **func** `(s *Service) RunGroupRefresh(ctx context.Context, interval time.Duration, onErr func(error))` — RunGroupRefresh refreshes all group rules every interval until ctx ends; failures go to onErr and are retried.
+
+#### `internal/projects/project/group_rules.go` (170 lines)
+- **type** `GroupRule struct` — GroupRule gives every member of a department or team, or a manager direct reports, a role in the project.
+- **func** `(GroupRule) TableName() string { return "project_group_rules" }` — TableName maps to project_group_rules.
+- **type** `GroupRuleInput struct` — GroupRuleInput adds a rule.
+- **func** `(in GroupRuleInput) validate() error`
+- **func** `(s *Service) requirePeople() error`
+- **func** `(s *Service) GroupRules(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]GroupRule, error)` — GroupRules lists the project rules.
+- **func** `(s *Service) AddGroupRule(ctx context.Context, a api.Actor, projectID uuid.UUID, in GroupRuleInput) (*GroupRule, error)` — AddGroupRule creates a rule and expands it into members at once.
+- **func** `(s *Service) RemoveGroupRule(ctx context.Context, a api.Actor, projectID, ruleID uuid.UUID) error` — RemoveGroupRule deletes a rule; members only that rule granted are removed.
+- **func** `(s *Service) RefreshProject(ctx context.Context, a api.Actor, projectID uuid.UUID) error` — RefreshProject re-resolves a project rules through the people port (manage_members).
+- **func** `(s *Service) desiredMembers(ctx context.Context, rules []GroupRule, tenantID uuid.UUID) (map[uuid.UUID]string, error)` — desiredMembers resolves every rule to users, keeping the highest role per user. Network-free of the DB transaction.
+- **func** `(s *Service) resolve(ctx context.Context, p ports.People, tenantID uuid.UUID, r GroupRule) ([]uuid.UUID, error)`
+
+#### `internal/projects/project/http.go` (124 lines)
+- **type** `handler struct{ s *Service }` — handler adapts a use case to gin: it resolves the actor and the :id path parameter.
+- **func** `act(fn func(c *gin.Context, a api.Actor)) gin.HandlerFunc`
+- **func** `withID(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `withSub(name string, fn func(c *gin.Context, a api.Actor, id, sub uuid.UUID)) gin.HandlerFunc` — withSub resolves :id and a second path parameter.
+- **func** `body[T any](c *gin.Context, run func(in T))`
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the project routes on g (already guarded by tenant resolution, authentication and the flag middleware).
+- **func** `(h handler) projectRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) memberRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/project/http_config.go` (129 lines)
+- **func** `(h handler) roleRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) columnRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) labelRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) milestoneRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/project/http_groups.go` (29 lines)
+- **func** `(h handler) groupRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/project/labels.go` (134 lines)
+- **type** `LabelInput struct` — LabelInput creates or edits a label.
+- **func** `(in LabelInput) validate() (string, error)`
+- **func** `(s *Service) Labels(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Label, error)` — Labels lists the labels usable in a project: its own and the tenant-wide ones (PR-07).
+- **func** `(s *Service) TenantLabels(ctx context.Context, a api.Actor) ([]Label, error)` — TenantLabels lists the tenant-wide labels.
+- **func** `(s *Service) CreateLabel(ctx context.Context, a api.Actor, projectID *uuid.UUID, in LabelInput) (*Label, error)` — CreateLabel adds a project label (label.manage) or, with a nil projectID, a tenant-wide label (tenant administrators).
+- **func** `(s *Service) labelGuard(ctx context.Context, a api.Actor, projectID *uuid.UUID) error`
+- **func** `(s *Service) loadLabel(tx *gorm.DB, a api.Actor, projectID *uuid.UUID, id uuid.UUID) (*Label, error)` — loadLabel finds a label in the given scope (a project, or the tenant when projectID is nil).
+- **func** `(s *Service) UpdateLabel(ctx context.Context, a api.Actor, projectID *uuid.UUID, id uuid.UUID, in LabelInput) (*Label, error)` — UpdateLabel renames or recolors a label.
+- **func** `(s *Service) DeleteLabel(ctx context.Context, a api.Actor, projectID *uuid.UUID, id uuid.UUID) error` — DeleteLabel removes a label from every task and deletes it.
+
+#### `internal/projects/project/lifecycle.go` (164 lines)
+- **func** `(s *Service) List(ctx context.Context, a api.Actor, f ListFilter) ([]Project, string, error)` — List returns the projects the caller can read, most recently active first (PR-09).
+- **func** `(s *Service) listWhere(a api.Actor, f ListFilter, cur listCursor) (string, []any)`
+- **func** `escapeLike(s string) string`
+- **func** `(s *Service) Archive(ctx context.Context, a api.Actor, id uuid.UUID) (*Project, error)` — Archive hides the project and freezes its tasks; reversible (PR-03).
+- **func** `(s *Service) Restore(ctx context.Context, a api.Actor, id uuid.UUID) (*Project, error)` — Restore reverses Archive.
+- **func** `(s *Service) setArchived(ctx context.Context, a api.Actor, id uuid.UUID, archive bool) (*Project, error)`
+- **func** `(s *Service) Delete(ctx context.Context, a api.Actor, id uuid.UUID) error` — Delete soft-deletes an archived project; only tenant administrators may (PR-03).
+- **func** `(s *Service) SetFavorite(ctx context.Context, a api.Actor, id uuid.UUID, on bool) error` — SetFavorite stars or unstars the project for the caller.
+- **func** `lockProject(tx *gorm.DB, tenantID, id uuid.UUID) (*Project, error)` — lockProject takes a row lock on the project inside tx and returns it; used by operations that must serialise.
+
+#### `internal/projects/project/members.go` (207 lines)
+- **type** `MemberInput struct` — MemberInput adds or changes a member. Exactly one of Role (built-in key) and CustomRoleID is set.
+- **type** `MemberView struct` — MemberView is a member with the role name resolved.
+- **func** `(s *Service) Members(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]MemberView, error)` — Members lists the active members of a project.
+- **func** `(in MemberInput) validate(db *gorm.DB, tenantID uuid.UUID) error`
+- **func** `(in MemberInput) roleCols() (*string, *uuid.UUID)`
+- **func** `grantsOwner(in MemberInput, current *Member) bool` — grantsOwner reports whether the change needs the caller to be an owner (or a tenant administrator).
+- **func** `(s *Service) AddMember(ctx context.Context, a api.Actor, projectID uuid.UUID, in MemberInput) (*Member, error)` — AddMember adds a user to a project (PR-04).
+- **func** `ownerLevel(acc api.Access, a api.Actor) bool { return a.ManageAll || acc.Role == api.RoleOwner }`
+- **func** `(s *Service) upsertMember(ctx context.Context, a api.Actor, projectID uuid.UUID, in MemberInput) (*Member, error)`
+- **func** `(s *Service) ChangeMember(ctx context.Context, a api.Actor, projectID, userID uuid.UUID, in MemberInput) (*Member, error)` — ChangeMember changes a member role; the last owner cannot be demoted (PR-04).
+- **func** `(s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, userID uuid.UUID) error` — RemoveMember removes a member; anyone may remove themselves. The last owner stays (PR-04).
+- **func** `ensureOwner(tx *gorm.DB, projectID uuid.UUID) error` — ensureOwner refuses a change that would leave the project without an owner.
+
+#### `internal/projects/project/milestones.go` (121 lines)
+- **type** `MilestoneInput struct` — MilestoneInput creates or edits a milestone; nil fields are unchanged on edit.
+- **func** `(s *Service) Milestones(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Milestone, error)` — Milestones lists a project milestones with progress counts (PR-08).
+- **func** `(in MilestoneInput) apply(m *Milestone) error`
+- **func** `(s *Service) CreateMilestone(ctx context.Context, a api.Actor, projectID uuid.UUID, in MilestoneInput) (*Milestone, error)` — CreateMilestone adds a milestone (milestone.manage).
+- **func** `(s *Service) UpdateMilestone(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in MilestoneInput) (*Milestone, error)` — UpdateMilestone edits a milestone.
+- **func** `(s *Service) DeleteMilestone(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — DeleteMilestone removes a milestone; its tasks keep existing without one.
+
+#### `internal/projects/project/models.go` (123 lines)
+_Package:_ Package project is the project context of M2: projects, members, roles, columns, labels, milestones and favourites, and the Authorizer every other M2 context uses (specification sections 1 and 8).
+- **type** `Project struct` — Project is a unit of work with its own members, columns and tasks (PR-01).
+- **func** `(Project) TableName() string { return "projects" }` — TableName maps to projects.projects.
+- **type** `Member struct` — Member links a user to a project with a built-in or custom role (PR-04, PR-05).
+- **func** `(Member) TableName() string { return "project_members" }` — TableName maps to project_members.
+- **type** `CustomRole struct` — CustomRole is a tenant-defined named set of project permissions (PR-05).
+- **func** `(CustomRole) TableName() string { return "project_roles" }` — TableName maps to project_roles.
+- **type** `Column struct` — Column is a board status of a project (PR-06).
+- **func** `(Column) TableName() string { return "board_columns" }` — TableName maps to board_columns.
+- **type** `Label struct` — Label tags tasks; ProjectID is nil for a tenant-wide label (PR-07).
+- **func** `(Label) TableName() string { return "labels" }` — TableName maps to labels.
+- **type** `Milestone struct` — Milestone groups tasks toward a date (PR-08).
+- **func** `(Milestone) TableName() string { return "milestones" }` — TableName maps to milestones.
+
+#### `internal/projects/project/projects.go` (221 lines)
+- **type** `CreateInput struct` — CreateInput creates a project (PR-01).
+- **type** `UpdateInput struct` — UpdateInput edits a project; nil fields are unchanged. Version, when set, must match (optimistic concurrency).
+- **type** `ListFilter struct` — ListFilter narrows the project list (PR-09).
+- **type** `listCursor struct`
+- **func** `(in *CreateInput) normalise() error`
+- **type** `shape struct` — shape is the part of a project validated on both create and update.
+- **func** `checkShape(sh shape) error`
+- **func** `(s *Service) Create(ctx context.Context, a api.Actor, in CreateInput) (*Project, error)` — Create makes a project owned by the caller, with the default columns (PR-01).
+- **func** `(s *Service) Get(ctx context.Context, a api.Actor, id uuid.UUID) (*Project, error)` — Get returns a project the caller can read, with their favourite flag and role.
+- **func** `(s *Service) Update(ctx context.Context, a api.Actor, id uuid.UUID, in UpdateInput) (*Project, error)` — Update edits a project (project.update).
+- **func** `(in UpdateInput) apply(p *Project) error`
+- **func** `setStr(dst *string, src *string)`
+
+#### `internal/projects/project/roles.go` (159 lines)
+- **type** `RoleInput struct` — RoleInput creates or edits a custom project role (PR-05).
+- **type** `BuiltinRole struct` — BuiltinRole describes one fixed role in the catalogue.
+- **type** `Catalogue struct` — Catalogue lists the project permissions and the built-in roles.
+- **func** `PermissionCatalogue() Catalogue` — PermissionCatalogue returns what a custom role can be built from.
+- **func** `(in RoleInput) validate() (kernel.StringList, string, error)`
+- **func** `(s *Service) requireRoles(a api.Actor) error`
+- **func** `(s *Service) Roles(ctx context.Context, a api.Actor) ([]CustomRole, error)` — Roles lists the tenant custom roles.
+- **func** `(s *Service) CreateRole(ctx context.Context, a api.Actor, in RoleInput) (*CustomRole, error)` — CreateRole defines a custom role.
+- **func** `(s *Service) UpdateRole(ctx context.Context, a api.Actor, id uuid.UUID, in RoleInput) (*CustomRole, error)` — UpdateRole edits a custom role; members pick up the new permissions at once.
+- **func** `(s *Service) DeleteRole(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteRole removes a custom role that no member uses.
+
+#### `internal/projects/project/service.go` (103 lines)
+- **type** `Ports struct` — Ports are the services the project context needs from the rest of the platform.
+- **type** `Service struct` — Service holds the project use cases. It also implements api.Authorizer.
+- **func** `NewService(db *gorm.DB, p Ports) *Service { return &Service{db: db, p: p, now: time.Now} }` — NewService builds the service.
+- **func** `(s *Service) conn(db *gorm.DB) *gorm.DB`
+- **func** `tooLong(v string, max int) bool { return utf8.RuneCountInString(v) > max }`
+- **func** `text(field, v string, min, max int) (string, error)`
+- **func** `itoa(n int) string`
+- **func** `countRows(db *gorm.DB, table, where string, args ...any) (int64, error)` — countRows counts rows of table matching where, reporting database errors instead of treating them as zero.
+- **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error` — inTx runs fn in a transaction.
+- **type** `ref struct` — ref names the audited resource and carries the metadata (ids and codes only).
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref)` — audit records a successful mutation; metadata holds ids and codes only. Failures never fail the request (SECURITY 7).
+
+### M2 Projects / task
+
+
+#### `internal/projects/task/activity.go` (73 lines)
+- **type** `ActivityFilter struct` — ActivityFilter pages an activity read by its monotonic sequence (CM-04).
+- **type** `seqCursor struct`
+- **func** `(s *Service) TaskActivity(ctx context.Context, a api.Actor, taskID uuid.UUID, f ActivityFilter) ([]ActivityRow, string, error)` — TaskActivity returns the history of one task, newest first unless Asc is set.
+- **func** `(s *Service) ProjectActivity(ctx context.Context, a api.Actor, projectID uuid.UUID, f ActivityFilter) ([]ActivityRow, string, error)` — ProjectActivity returns the history of a project, newest first unless Asc is set.
+- **func** `(s *Service) activity(ctx context.Context, a api.Actor, scope string, id uuid.UUID, f ActivityFilter) ([]ActivityRow, string, error)`
+
+#### `internal/projects/task/assign.go` (141 lines)
+- **func** `addAssignees(tx *gorm.DB, a api.Actor, taskID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error)` — addAssignees inserts the assignees that are not yet on the task and returns the new ones.
+- **func** `addLabels(tx *gorm.DB, tenantID, taskID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error)` — addLabels attaches the labels that are not yet on the task and returns the new ones.
+- **func** `(m *mut) assign(ids []uuid.UUID) error` — assign adds assignees who are project members (task.assign).
+- **func** `(m *mut) unassign(ids []uuid.UUID) error` — unassign removes assignees (task.assign).
+- **func** `(m *mut) attachLabels(ids []uuid.UUID) error` — attachLabels adds labels of the tenant or project (task.update).
+- **func** `(m *mut) detachLabels(ids []uuid.UUID) error` — detachLabels removes labels from the task.
+- **func** `(s *Service) AddAssignees(ctx context.Context, a api.Actor, id uuid.UUID, in UserIDsInput) (*View, error)` — AddAssignees assigns users to a task (task.assign).
+- **func** `(s *Service) RemoveAssignee(ctx context.Context, a api.Actor, id, userID uuid.UUID) (*View, error)` — RemoveAssignee removes one assignee (task.assign).
+- **func** `(s *Service) AddLabels(ctx context.Context, a api.Actor, id uuid.UUID, in LabelIDsInput) (*View, error)` — AddLabels labels a task (task.update).
+- **func** `(s *Service) RemoveLabel(ctx context.Context, a api.Actor, id, labelID uuid.UUID) (*View, error)` — RemoveLabel removes one label from a task (task.update).
+
+#### `internal/projects/task/bulk.go` (167 lines)
+- **type** `BulkInput struct` — BulkInput applies the same changes to up to 100 tasks of one project (TK-09).
+- **type** `BulkError struct` — BulkError is the reason one task of a bulk request failed.
+- **type** `BulkResult struct` — BulkResult is the outcome for one task.
+- **type** `BulkOutput struct` — BulkOutput lists every task outcome in request order.
+- **func** `(in *BulkInput) validate() error`
+- **func** `errInfo(err error) BulkError` — errInfo turns any error into the code and message a client may see.
+- **func** `(s *Service) Bulk(ctx context.Context, a api.Actor, projectID uuid.UUID, in BulkInput) (*BulkOutput, error)` — Bulk updates many tasks of a project; each task is authorised and applied on its own, and the response says which succeeded (TK-09).
+- **func** `(s *Service) bulkOne(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in BulkInput) (*View, error)`
+- **func** `(m *mut) bulkApply(in BulkInput) error` — bulkApply runs the requested changes on one locked task: restore first, archive last.
+- **func** `(m *mut) bulkLinks(in BulkInput) error`
+
+#### `internal/projects/task/create.go` (175 lines)
+- **func** `(in *CreateInput) normalise() error`
+- **func** `(s *Service) Create(ctx context.Context, a api.Actor, projectID uuid.UUID, in CreateInput) (*View, error)` — Create adds a task to a project with the next ticket number, appended to its column (TK-01, TK-02).
+- **func** `(s *Service) targetColumn(tx *gorm.DB, a api.Actor, projectID uuid.UUID, id *uuid.UUID) (*colRow, error)`
+- **func** `checkRefs(tx *gorm.DB, a api.Actor, projectID uuid.UUID, in CreateInput) (int, error)` — checkRefs validates every id the input names against the project and tenant.
+- **func** `(s *Service) insertTask(u unit, projectID uuid.UUID, in CreateInput) (uuid.UUID, []string, error)`
+- **func** `(s *Service) writeCreated(u unit, t *Task, in CreateInput) error` — writeCreated stores assignees and labels and records the created (and assigned) notes.
+- **func** `nextNumber(tx *gorm.DB, tenantID, projectID uuid.UUID) (int, error)` — nextNumber allocates the project-scoped ticket number atomically; a rollback releases it, so there are no gaps (PG5).
+
+#### `internal/projects/task/duplicate.go` (110 lines)
+- **func** `(s *Service) Duplicate(ctx context.Context, a api.Actor, id uuid.UUID, in DuplicateInput) (*View, error)` — Duplicate copies a task into the same column right after the original (TK-11): a new number, the same fields, no comments, and the labels and assignees only when asked.
+- **func** `copyTitle(title string) string`
+- **func** `(s *Service) copyTask(u unit, src *Task, in DuplicateInput) (uuid.UUID, []string, error)`
+- **func** `copyLinks(u unit, ids [2]uuid.UUID, in DuplicateInput) error` — copyLinks copies labels and the assignees who are still active project members. copyLinks copies labels and the assignees who are still active project members; ids is {from, to}.
+
+#### `internal/projects/task/hooks.go` (41 lines)
+- **func** `(s *Service) SetHooks(h api.TaskHooks) { s.hooks = h }` — SetHooks installs the collaboration hooks (mentions in descriptions, automatic watchers). It is late-bound because the collaboration context depends on this one for task resolution.
+- **func** `(s *Service) textSaved(ctx context.Context, tx *gorm.DB, a api.Actor, t *Task, text string) error` — textSaved reports a saved description so mentions are stored in the same transaction.
+- **func** `(s *Service) watch(ctx context.Context, tx *gorm.DB, w api.WatchRequest) error` — watch makes users watch the task (reporter and assignees).
+- **func** `(s *Service) afterCreate(u unit, t *Task, assignees []uuid.UUID) error` — afterCreate stores the mentions of the new description and watches the reporter and the assignees.
+
+#### `internal/projects/task/http.go` (151 lines)
+- **type** `handler struct{ s *Service }` — handler adapts a use case to gin: it resolves the actor and the path parameters.
+- **func** `act(fn func(c *gin.Context, a api.Actor)) gin.HandlerFunc`
+- **func** `withID(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `withSub(name string, fn func(c *gin.Context, a api.Actor, id, sub uuid.UUID)) gin.HandlerFunc` — withSub resolves :id and a second path parameter.
+- **func** `body[T any](c *gin.Context, run func(in T))`
+- **func** `withVersion(c *gin.Context, v **int)` — withVersion fills a missing body version from the If-Match header.
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the task routes on g (already guarded by tenant resolution, authentication and the flag middleware).
+- **func** `(h handler) collectionRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) taskRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) moveRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/task/http_links.go` (136 lines)
+- **func** `(h handler) linkRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) readRoutes(g *gin.RouterGroup)`
+- **func** `activityFilter(c *gin.Context) ActivityFilter`
+- **func** `queryBool(c *gin.Context, name string) (*bool, bool)` — queryBool reads an optional boolean parameter; ok is false (and 400 written) when it is present but malformed.
+- **func** `queryTime(c *gin.Context, name string) (*time.Time, bool)`
+- **func** `parseFilter(c *gin.Context, a api.Actor) (ListFilter, bool)` — parseFilter reads the list query parameters; assignee=me means the caller.
+- **func** `parseFilterFlags(c *gin.Context, f ListFilter) (ListFilter, bool)`
+
+#### `internal/projects/task/lifecycle.go` (56 lines)
+- **func** `(s *Service) Archive(ctx context.Context, a api.Actor, id uuid.UUID) (*View, error)` — Archive hides a task from default lists; archiving an archived task changes nothing (TK-10).
+- **func** `(s *Service) Restore(ctx context.Context, a api.Actor, id uuid.UUID) (*View, error)` — Restore brings an archived task back; restoring a live task changes nothing.
+- **func** `(m *mut) setArchived(archived bool) error`
+- **func** `(s *Service) Delete(ctx context.Context, a api.Actor, id uuid.UUID) error` — Delete soft-deletes a task and its subtasks (task.delete); the retention job purges them later (TK-10).
+
+#### `internal/projects/task/list.go` (126 lines)
+- **type** `ListFilter struct` — ListFilter narrows and orders a project task list (TK-13). Nil pointers and empty strings mean "no filter".
+- **type** `sortSpec struct`
+- **type** `listCursor struct`
+- **func** `(f ListFilter) resolveSort() (string, sortSpec, string, error)` — resolveSort validates the sort key and direction and returns the effective pair.
+- **func** `(s *Service) List(ctx context.Context, a api.Actor, projectID uuid.UUID, f ListFilter) ([]View, string, error)` — List pages the tasks of a project with filters and a keyset cursor (TK-13). Order is stable: the sort key, then id.
+
+#### `internal/projects/task/list_where.go` (107 lines)
+- **func** `(f ListFilter) where(tenantID, projectID uuid.UUID) (string, []any, error)` — where builds the WHERE clause and its arguments; every user value is a bound parameter.
+- **type** `cond struct`
+- **func** `ptr[T any](p *T) any`
+- **func** `(f ListFilter) equalities() []cond` — equalities lists the single-value filters with fixed SQL fragments.
+- **func** `(f ListFilter) dueRange(w string, args []any) (string, []any)`
+- **func** `(f ListFilter) flags(w string) string`
+- **func** `escapeLike(s string) string`
+
+#### `internal/projects/task/load.go` (143 lines)
+- **func** `(s *Service) row(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*Task, error)` — row reads one task without access checks (internal use after the caller was authorised).
+- **func** `(s *Service) locate(ctx context.Context, a api.Actor, id uuid.UUID) (*Task, api.Access, error)` — locate finds a live task and the caller access to its project; unknown, foreign and unreadable ids are all 404 (PG4).
+- **func** `(s *Service) Task(ctx context.Context, db *gorm.DB, a api.Actor, taskID uuid.UUID) (api.TaskRef, api.Access, error)` — Task implements api.TaskResolver: the task reference and the caller access to its project.
+- **func** `(s *Service) conn(db *gorm.DB) *gorm.DB`
+- **func** `(s *Service) view(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*View, error)` — view loads one task as the API shape.
+- **type** `pair struct`
+- **func** `(s *Service) fill(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rows []View) error` — fill adds assignees, labels and the progress roll-up to a page of views with two batched queries.
+- **func** `(s *Service) Get(ctx context.Context, a api.Actor, id uuid.UUID) (*View, error)` — Get returns a task the caller can read.
+
+#### `internal/projects/task/models.go` (195 lines)
+_Package:_ Package task is the task core context of M2: tasks, assignees, labels, subtasks, relations, ordering and the task activity reads (specification sections 2 and 3). It depends on the api package only, never on the project context.
+- **type** `Task struct` — Task is the stored row of a work item (TK-01).
+- **func** `(Task) TableName() string { return "tasks" }` — TableName maps to tasks.
+- **type** `View struct` — View is a task as the API returns it: the row plus ticket id, column category and derived flags (TK-06, TK-07).
+- **type** `Assignee struct` — Assignee is one assignment; a deactivated login stays as history with Active false.
+- **func** `(o *Opt[T]) UnmarshalJSON(b []byte) error` — UnmarshalJSON records that the field was present and keeps null as a clear.
+- **func** `(o Opt[T]) MarshalJSON() ([]byte, error) { return json.Marshal(o.Val) }` — MarshalJSON writes the value, or null.
+- **type** `CreateInput struct` — CreateInput creates a task (TK-01).
+- **type** `UpdateInput struct` — UpdateInput edits fields; absent fields stay, null clears the nullable ones. Version is required (TK-03).
+- **type** `MoveInput struct` — MoveInput moves a task to a column and/or position (TK-04, TK-05). Before and After name a neighbour task.
+- **type** `MoveProjectInput struct` — MoveProjectInput moves a task to another project (TK-08).
+- **type** `DuplicateInput struct` — DuplicateInput copies a task (TK-11).
+- **type** `UserIDsInput struct` — UserIDsInput names users for an assignee change.
+- **type** `LabelIDsInput struct` — LabelIDsInput names labels for a label change.
+- **type** `RelationInput struct` — RelationInput relates the task to another (TK-07).
+- **type** `Relation struct` — Relation is one stored relation.
+- **func** `(Relation) TableName() string { return "task_relations" }` — TableName maps to task_relations.
+- **type** `RelationView struct` — RelationView is a relation seen from one task: the other end is resolved when the caller can read it.
+- **type** `ActivityRow struct` — ActivityRow is one history entry as returned by the reads (CM-04).
+
+#### `internal/projects/task/move.go` (141 lines)
+- **func** `wipCheck(tx *gorm.DB, tenantID uuid.UUID, col *colRow, exclude uuid.UUID) ([]string, error)` — wipCheck enforces the WIP limit of the target column: a hard limit refuses (409 WIP_LIMIT), a soft one warns (TK-04).
+- **func** `targetOf(in MoveInput) func(t *Task) uuid.UUID`
+- **func** `(s *Service) Move(ctx context.Context, a api.Actor, id uuid.UUID, in MoveInput) (*View, error)` — Move puts a task in a column, at a position or at the end (TK-04, TK-05).
+- **func** `(s *Service) Reorder(ctx context.Context, a api.Actor, id uuid.UUID, in MoveInput) (*View, error)` — Reorder moves a task next to a neighbour in its column (or the named column).
+- **func** `(m *mut) place(in MoveInput) error`
+- **func** `(m *mut) changeColumn(to *colRow, rank string, force bool) error` — changeColumn applies a column change: rules for done, WIP, completion time and the completed/reopened events.
+- **func** `(m *mut) doneRules(force bool) error` — doneRules refuses completion while blockers or subtasks are open unless a manager forces it (TK-06, TK-07).
+
+#### `internal/projects/task/moveproject.go` (166 lines)
+- **type** `projectKey struct{ tenantID, projectID uuid.UUID }` — projectKey names a project inside its tenant.
+- **func** `pickColumn(db *gorm.DB, target projectKey, want *uuid.UUID, from *colRow) (*colRow, error)` — pickColumn chooses the column a moved task lands in: the requested one, the one with the same key, the first one of the same category, or the default column of the target project.
+- **func** `(s *Service) MoveProject(ctx context.Context, a api.Actor, id uuid.UUID, in MoveProjectInput) (*View, error)` — MoveProject moves a task to another project (TK-08): a new number there, columns, labels and milestone mapped or cleared, the sprint cleared, and an alias so the old ticket id keeps resolving.
+- **type** `moveTarget struct`
+- **func** `(m *mut) moveProject(tg moveTarget) error`
+- **func** `(m *mut) applyMove(tg moveTarget, number int, rank string) error`
+- **func** `(m *mut) remapLinks(target uuid.UUID) error` — remapLinks maps milestone and project labels to the target project by name and drops what has no counterpart; the assignees who cannot read the target project are removed.
+
+#### `internal/projects/task/mutate.go` (193 lines)
+- **type** `note struct` — note is one history entry plus its outbox event, written when the mutation commits (ids and versions only, PG12).
+- **type** `unit struct` — unit bundles what every write inside a transaction needs: the context, the transaction and the caller.
+- **type** `mut struct` — mut is one task mutation inside a transaction. The row is locked; operations record their effects and finish writes the single UPDATE, the version bump, the activity, the events and the audit entries.
+- **type** `mutSpec struct` — mutSpec says how a mutation is guarded.
+- **func** `lockColumn(tx *gorm.DB, columnID uuid.UUID) error`
+- **func** `lockRow(tx *gorm.DB, tenantID, id uuid.UUID) (*Task, error)`
+- **func** `(s *Service) mutate(ctx context.Context, a api.Actor, id uuid.UUID, spec mutSpec, fn func(m *mut) error) (*View, error)` — mutate authorises, locks and runs fn; it returns the refreshed view.
+- **func** `(s *Service) begin(u unit, acc api.Access, t0 *Task, spec mutSpec) (*mut, error)`
+- **func** `(m *mut) change(col string, v any)` — change records a column update that bumps the version.
+- **func** `(m *mut) quiet(col string, v any) { m.sets[col] = v }` — quiet records a column update that leaves the version alone (a rank move inside a column).
+- **func** `(m *mut) touch() { m.dirty = true }` — touch marks the task changed without a column update (assignee and label rows).
+- **func** `(m *mut) unit() unit { return unit{m.ctx, m.tx, m.a} }`
+- **func** `(m *mut) add(n note) { m.pending = append(m.pending, n) }`
+- **func** `(m *mut) finish() error`
+- **func** `(s *Service) record(u unit, t *Task, n note) error` — record writes the activity entry, the outbox event and the audit entry of one note.
+
+#### `internal/projects/task/rank.go` (157 lines)
+- **type** `slot struct{ before, after *uuid.UUID }` — slot says where a task goes inside a column: after or before a neighbour, or at the end when both are nil.
+- **type** `colPlace struct{ tenantID, columnID, exclude uuid.UUID }` — colPlace names a column and the task being placed in it (excluded from neighbour lookups).
+- **type** `bounds struct`
+- **func** `neighbour(tx *gorm.DB, p colPlace, id uuid.UUID) (string, bool, error)` — neighbour returns the rank of a live task in the column (the exclusion is the task being placed) and whether another live task shares that rank, which makes "next to it" ambiguous.
+- **func** `edge(tx *gorm.DB, fn string, a edgeArgs) (string, error)` — edge returns the lowest or highest live rank in the column that satisfies cond ("" when there is none).
+- **type** `edgeArgs struct`
+- **func** `(s *Service) neighbours(tx *gorm.DB, p colPlace, at slot) (bounds, error)`
+- **func** `usable(r string, b bounds) bool`
+- **func** `(s *Service) allocRank(tx *gorm.DB, p colPlace, at slot) (string, error)` — allocRank returns a rank for the task at the slot. The caller holds the column advisory lock. When the neighbours leave no room (equal ranks, or ranks grown too long) the column is rebalanced once and the slot is computed again.
+- **func** `rebalance(tx *gorm.DB, tenantID, columnID uuid.UUID) error` — rebalance rewrites the ranks of one column with evenly spread values, bounded by rebalanceLimit tasks.
+- **func** `spreadRanks(n int) []string` — spreadRanks returns n strictly increasing ranks of one fixed width (trailing zeros trimmed), leaving room between neighbours for many inserts. kernel.Spread would grow a character every few items on long columns.
+- **func** `encodeRank(v uint64, width int) string`
+
+#### `internal/projects/task/refs.go` (136 lines)
+- **type** `colRow struct` — colRow is the part of a board column the task context needs.
+- **func** `(colRow) TableName() string { return "board_columns" }`
+- **func** `(c colRow) closed() bool { return c.Category == "done" || c.Category == "canceled" }`
+- **func** `column(tx *gorm.DB, tenantID, projectID, id uuid.UUID) (*colRow, error)` — column loads a column of the project; a foreign or unknown id is a validation error naming the field.
+- **func** `defaultColumn(tx *gorm.DB, tenantID, projectID uuid.UUID) (*colRow, error)`
+- **func** `count(tx *gorm.DB, sql string, args ...any) (int64, error)`
+- **func** `checkMilestone(tx *gorm.DB, tenantID, projectID uuid.UUID, id *uuid.UUID) error`
+- **func** `checkSprint(tx *gorm.DB, tenantID, projectID uuid.UUID, id *uuid.UUID) error`
+- **func** `checkLabels(tx *gorm.DB, tenantID, projectID uuid.UUID, ids []uuid.UUID) error` — checkLabels accepts tenant-wide labels and labels of this project only.
+- **func** `checkAssignees(tx *gorm.DB, tenantID, projectID uuid.UUID, ids []uuid.UUID) error` — checkAssignees requires every user to be an active member who can read tasks in the project.
+- **func** `checkParent(tx *gorm.DB, tenantID, projectID uuid.UUID, parentID *uuid.UUID) (int, error)` — checkParent returns the depth a child of parentID gets; the parent must be a live task of the project.
+
+#### `internal/projects/task/relations.go` (184 lines)
+- **func** `lockRelations(tx *gorm.DB, tenantID uuid.UUID) error` — lockRelations serialises dependency edits of a tenant: a cycle can run through any project, so one advisory lock per tenant is the smallest lock that makes the check-then-insert atomic (PG3).
+- **func** `reaches(tx *gorm.DB, tenantID, start, goal uuid.UUID) (bool, error)` — reaches walks blocks edges breadth first from start and reports whether goal is reachable, within maxGraphWalk nodes.
+- **func** `(in RelationInput) validate(self uuid.UUID) error`
+- **func** `(s *Service) AddRelation(ctx context.Context, a api.Actor, id uuid.UUID, in RelationInput) (*Relation, error)` — AddRelation relates the task to another one the caller can read; blocks may not form a cycle (TK-07).
+- **type** `relEnds struct{ src, dst *Task }` — relEnds are the two tasks of a relation.
+- **func** `(s *Service) insertRelation(u unit, rel Relation, ends relEnds) error`
+- **func** `(s *Service) noteRelation(u unit, rel Relation, ends relEnds, verb string) error` — noteRelation records the event once and the activity on both tasks.
+- **func** `(s *Service) RemoveRelation(ctx context.Context, a api.Actor, id, relationID uuid.UUID) error` — RemoveRelation deletes a relation that touches the task (task.update).
+- **func** `(s *Service) Relations(ctx context.Context, a api.Actor, id uuid.UUID) ([]RelationView, error)` — Relations lists the relations of a task; the other end appears only when its project is readable by the caller.
+
+#### `internal/projects/task/service.go` (134 lines)
+- **type** `Ports struct` — Ports are the platform services the task context needs.
+- **type** `Service struct` — Service holds the task use cases. It implements api.TaskResolver.
+- **func** `NewService(db *gorm.DB, auth api.Authorizer, p Ports) *Service` — NewService builds the service; auth resolves what the caller may do in a project.
+- **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
+- **func** `isCheck(err error) bool { return errors.Is(err, gorm.ErrCheckConstraintViolated) }`
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `runes(v string) int { return utf8.RuneCountInString(v) }`
+- **func** `cleanTitle(v string) (string, error)`
+- **func** `checkDescription(v string) error`
+- **func** `checkPriority(v string) error`
+- **func** `checkEstimate(v *int) error`
+- **func** `checkDates(start *kernel.Date, due *time.Time) error` — checkDates enforces start_on <= due_at (a day comparison in UTC).
+- **func** `uniqueIDs(ids []uuid.UUID, max int, field string) ([]uuid.UUID, error)`
+- **func** `(s *Service) audit(u unit, action string, id uuid.UUID, meta map[string]any)` — audit records a successful mutation; metadata holds ids only. Failures never fail the request.
+- **func** `(s *Service) access(ctx context.Context, a api.Actor, projectID uuid.UUID) (api.Access, error)` — access resolves the caller access to a project (404 when the caller cannot read it).
+
+#### `internal/projects/task/ticket.go` (63 lines)
+- **func** `(s *Service) ByKey(ctx context.Context, a api.Actor, key string) (*View, error)` — ByKey resolves a ticket id such as KEY-12 inside the tenant (TK-12). A moved task keeps answering to its old ids.
+- **func** `(s *Service) resolveTicket(ctx context.Context, tenantID uuid.UUID, key string, number int) (uuid.UUID, error)`
+- **func** `(s *Service) Subtasks(ctx context.Context, a api.Actor, id uuid.UUID, f ListFilter) ([]View, string, error)` — Subtasks lists the direct subtasks of a task, oldest ticket first, with the usual cursor.
+
+#### `internal/projects/task/update.go` (202 lines)
+- **type** `fieldChange struct` — fieldChange is one edited field. Free text (title, description) is recorded by name only.
+- **func** `(c fieldChange) entry() map[string]any`
+- **func** `(m *mut) setField(chs *[]fieldChange, c fieldChange, col string)` — setField records a column change when the value differs.
+- **func** `(in UpdateInput) validate() error`
+- **func** `(s *Service) Update(ctx context.Context, a api.Actor, id uuid.UUID, in UpdateInput) (*View, error)` — Update edits a task with optimistic concurrency (TK-03): a stale version is a VersionConflict.
+- **func** `(m *mut) applyUpdate(in UpdateInput) error`
+- **func** `hasField(chs []fieldChange, f string) bool { return fieldOf(chs, f).field != "" }`
+- **func** `fieldOf(chs []fieldChange, f string) fieldChange`
+- **func** `(m *mut) textFields(in UpdateInput, chs *[]fieldChange)`
+- **func** `(m *mut) scheduleFields(in UpdateInput, chs *[]fieldChange) error` — scheduleFields applies start_on, due_at and the estimate, checking the merged dates.
+- **func** `(m *mut) linkFields(in UpdateInput, chs *[]fieldChange) error` — linkFields applies milestone, sprint and parent, validating each against the project.
+- **func** `(m *mut) reparent(parent *uuid.UUID, chs *[]fieldChange) error` — reparent changes the parent of a task that has no subtasks of its own (so no descendant can become its ancestor).
+- **func** `sameID(a, b *uuid.UUID) bool`
+- **func** `sameInt(a, b *int) bool { return (a == nil && b == nil) || (a != nil && b != nil && *a == *b) }`
+- **func** `sameTime(a, b *time.Time) bool`
+- **func** `sameDate(a, b *kernel.Date) bool`
+
+### M2 Projects / collab
+
+
+#### `internal/projects/collab/attachments.go` (149 lines)
+- **type** `UploadTicket struct` — UploadTicket answers an init: the pending attachment and where the client PUTs the bytes (AT-01).
+- **func** `(s *Service) store() (storage.Store, error)` — store returns the object store, or 503 when none is configured.
+- **func** `storageDown() error`
+- **func** `StorageKey(tenantID, projectID, attachmentID uuid.UUID) string` — StorageKey is the object key layout t/<tenant>/p/<project>/a/<attachment-id> (design section 5).
+- **func** `(s *Service) InitAttachment(ctx context.Context, a api.Actor, taskID uuid.UUID, in InitInput) (*UploadTicket, error)` — InitAttachment validates the file, reserves quota, writes a pending row and returns a presigned PUT (AT-01, AT-02). attachment.upload is required. Nothing is stored until the client uploads and completes.
+- **func** `(s *Service) reserve(ctx context.Context, tx *gorm.DB, att *Attachment) error` — reserve checks the per-task count and the tenant quota under a tenant lock, then inserts the pending row.
+- **func** `(s *Service) markDeleted(ctx context.Context, tenantID, id uuid.UUID)` — markDeleted retires a row whose upload can no longer happen; the sweep removes row and object.
+- **type** `attachmentCursor struct`
+- **func** `(s *Service) ListAttachments(ctx context.Context, a api.Actor, taskID uuid.UUID, pr PageRequest) ([]Attachment, string, error)` — ListAttachments pages a task's ready attachments, oldest first (AT-01).
+- **func** `(s *Service) loadAttachment(ctx context.Context, tenantID, id uuid.UUID) (Attachment, error)` — loadAttachment reads a live (pending or ready) attachment of the tenant.
+- **func** `(s *Service) attachmentContext(ctx context.Context, a api.Actor, id uuid.UUID) (Attachment, api.TaskRef, api.Access, error)` — attachmentContext finds an attachment and authorises the caller against the project of its task, never against the attachment id alone (PG8). A pending upload is invisible to everyone but its uploader.
+
+#### `internal/projects/collab/attachments_access.go` (90 lines)
+- **type** `DownloadLink struct` — DownloadLink is a short-lived presigned GET (AT-03).
+- **func** `(s *Service) DownloadAttachment(ctx context.Context, a api.Actor, id uuid.UUID) (*DownloadLink, error)` — DownloadAttachment authorises the caller against the project of the attachment's task (task.read) and returns a two-minute presigned URL. Only ready attachments download; unknown, foreign, pending and deleted ids are 404 (PG8). Downloads from private projects are written to the activity log (AT-03).
+- **func** `(s *Service) DeleteAttachment(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteAttachment retires an attachment and removes its object. The uploader may delete their own (attachment.upload); anyone else needs attachment.delete (AT-03). A failed object delete leaves the row for the sweep to retry.
+
+#### `internal/projects/collab/attachments_complete.go` (111 lines)
+- **func** `uploadMismatch() error`
+- **func** `baseType(ct string) string` — baseType lowercases a media type and drops its parameters.
+- **func** `(s *Service) CompleteAttachment(ctx context.Context, a api.Actor, id uuid.UUID) (*Attachment, error)` — CompleteAttachment verifies the uploaded object against what init declared, runs the scan hook and marks the attachment ready (AT-01, AT-02). A mismatch answers 409 UPLOAD_MISMATCH and the row stays pending. Completing a ready attachment again returns it unchanged.
+- **type** `attachFact struct` — attachFact is an attachment that just became ready, with the task it belongs to.
+- **func** `(s *Service) announceAttached(ctx context.Context, tx *gorm.DB, a api.Actor, f attachFact) error`
+- **func** `(s *Service) verifyUpload(ctx context.Context, st storage.Store, att *Attachment) error` — verifyUpload heads the object, compares it with the declaration and scans it. No database transaction is open (I/O).
+
+#### `internal/projects/collab/attachments_rules.go` (124 lines)
+- **func** `sanitizeFilename(raw string) (string, error)` — sanitizeFilename keeps the last path segment, drops control and format characters (bidi overrides included) and rejects names that are empty after that, longer than 255 characters or carry an executable extension anywhere after the first dot.
+- **func** `normalizeContentType(raw string) (string, error)` — normalizeContentType lowercases the media type and drops parameters, then checks the allow-list.
+- **type** `InitInput struct` — InitInput describes the file a client wants to upload.
+- **type** `checked struct` — checked is an InitInput after sanitising and validation.
+- **func** `(in InitInput) validate() (checked, error)`
+
+#### `internal/projects/collab/comments.go` (243 lines)
+- **type** `CommentInput struct` — CommentInput is the body of a comment create or edit.
+- **type** `commentWrite struct` — commentWrite is a comment ready to be stored together with what its author's markdown mentions.
+- **func** `(s *Service) prepareBody(ctx context.Context, a api.Actor, ref api.TaskRef, in CommentInput) (string, []uuid.UUID, error)` — prepareBody validates the markdown and drops the mentions that cannot read the project or are the author (CM-02).
+- **func** `(s *Service) CreateComment(ctx context.Context, a api.Actor, taskID uuid.UUID, in CommentInput) (*Comment, error)` — CreateComment adds a comment to a task (CM-01). The commenter and the readable mentioned users start watching (CM-03).
+- **func** `(s *Service) storeComment(ctx context.Context, tx *gorm.DB, a api.Actor, w commentWrite) error`
+- **func** `(s *Service) afterMentions(ctx context.Context, tx *gorm.DB, a api.Actor, w commentWrite) error` — afterMentions stores the mentions, makes the newly mentioned users watchers and announces them with ids only (PG11, PG12).
+- **type** `commentCursor struct`
+- **func** `(s *Service) ListComments(ctx context.Context, a api.Actor, taskID uuid.UUID, pr PageRequest) ([]Comment, string, error)` — ListComments pages a task's comments oldest first; deleted ones appear as tombstones with an empty body.
+- **func** `(s *Service) fillComments(ctx context.Context, tenantID uuid.UUID, rows []Comment) error` — fillComments marks tombstones and attaches the stored mentions of the page.
+- **func** `(s *Service) loadComment(ctx context.Context, tenantID, id uuid.UUID) (Comment, error)` — loadComment reads a comment of the tenant (tombstones included).
+- **func** `(s *Service) commentContext(ctx context.Context, a api.Actor, id uuid.UUID) (Comment, api.TaskRef, api.Access, error)` — commentContext finds a comment and authorises the caller against the project of its task.
+- **func** `(s *Service) UpdateComment(ctx context.Context, a api.Actor, id uuid.UUID, in CommentInput) (*Comment, error)` — UpdateComment lets the author edit a comment; the edit time is recorded (CM-01).
+- **func** `orNotFound(err error, what string) error`
+- **func** `(s *Service) DeleteComment(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteComment turns a comment into a tombstone. The author may delete their own; comment.moderate holders any (CM-01).
+
+#### `internal/projects/collab/hooks.go` (38 lines)
+- **type** `hooks struct{ s *Service }` — hooks adapts the service to api.TaskHooks.
+- **func** `(s *Service) TaskHooks() api.TaskHooks { return hooks{s: s} }` — TaskHooks returns the hooks the task context calls for descriptions and automatic watchers.
+- **func** `(h hooks) TaskTextSaved(ctx context.Context, tx *gorm.DB, t api.TaskText) error` — TaskTextSaved stores the readable mentions of a description, watches the newly mentioned users and emits task.mentioned with ids only (CM-02, PG11).
+- **func** `(h hooks) WatchTask(ctx context.Context, tx *gorm.DB, w api.WatchRequest) error` — WatchTask makes the users watchers of the task.
+
+#### `internal/projects/collab/http.go` (93 lines)
+- **type** `handler struct{ s *Service }` — handler adapts the use cases to gin: it resolves the actor and the :id path parameter.
+- **func** `act(fn func(c *gin.Context, a api.Actor)) gin.HandlerFunc`
+- **func** `withID(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `body[T any](c *gin.Context, run func(in T))`
+- **func** `pageOf(c *gin.Context) PageRequest`
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the collaboration routes on g (already guarded by tenant resolution, authentication and the flag middleware). The task routes use :id for the task, like the task context.
+- **func** `(h handler) commentRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) watcherRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/collab/http_attach.go` (35 lines)
+- **func** `(h handler) attachmentRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/collab/http_time.go` (60 lines)
+- **type** `timerStart struct` — timerStart is the body of POST /time-entries/timer/start.
+- **func** `(h handler) timeRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) timerRoutes(g *gin.RouterGroup)` — timerRoutes use POST and GET only, so they never meet the PATCH and DELETE /time-entries/:id routes in one gin tree.
+
+#### `internal/projects/collab/mentions.go` (119 lines)
+- **func** `ParseMentions(text string) []uuid.UUID` — ParseMentions extracts the distinct user ids of the @[Name](user:<uuid>) tokens in markdown, in order of appearance and capped at maxMentions (CM-02). Task descriptions use it too. It does not check that the users may read anything: callers pass the result through ReadableMentions before storing or announcing it.
+- **func** `(s *Service) ReadableMentions(ctx context.Context, tenantID, projectID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error)` — ReadableMentions drops the ids that cannot read the project (CM-02, PG11), so a mention never leaks a task. The rule is evaluated for the mentioned user with an actor that carries no tenant-level flags: a tenant-visible project is readable by every active user of the tenant, a private project only by its active members. Users who can read a private project solely through projects:read_all are dropped too, which fails closed. Unknown, foreign-tenant and inactive users are dropped.
+- **func** `(s *Service) canRead(ctx context.Context, tenantID, projectID, userID uuid.UUID) (bool, error)`
+- **func** `isNotFound(err error) bool`
+- **type** `MentionSet struct` — MentionSet is the readable mentions of one comment or task description.
+- **func** `ReplaceMentions(ctx context.Context, tx *gorm.DB, m MentionSet) ([]uuid.UUID, error)` — ReplaceMentions stores the set in the caller transaction and returns the users who were not mentioned before.
+
+#### `internal/projects/collab/models.go` (77 lines)
+- **type** `Comment struct` — Comment is a task comment; a deleted comment keeps its row as a tombstone with an empty body (CM-01).
+- **func** `(Comment) TableName() string { return "comments" }` — TableName maps to comments.
+- **type** `Watcher struct` — Watcher is a user who follows a task (CM-03). Reason is explicit, reporter, assignee, commenter or mentioned.
+- **func** `(Watcher) TableName() string { return "task_watchers" }` — TableName maps to task_watchers.
+- **type** `TimeEntry struct` — TimeEntry is time logged on a task; EndedAt is nil while a timer runs (TM-01).
+- **func** `(TimeEntry) TableName() string { return "time_entries" }` — TableName maps to time_entries.
+- **type** `Attachment struct` — Attachment is the metadata of one stored file; the bytes live in object storage (AT-01).
+- **func** `(Attachment) TableName() string { return "attachments" }` — TableName maps to attachments.
+
+#### `internal/projects/collab/service.go` (115 lines)
+_Package:_ Package collab is the collaboration context of M2: comments with mentions, watchers, time tracking and file attachments (specification sections 3, 4 and 5). It acts on tasks only through api.TaskResolver and on project access only through api.Authorizer, so it never imports the task or project contexts.
+- **type** `Scanner interface` — Scanner is the malware-scan hook that runs before an upload becomes ready (AT-02).
+- **method** `Scanner.Scan(ctx context.Context, key string, info storage.ObjectInfo) (clean bool, err error)` — Scan inspects the stored object; clean is false when it must be rejected.
+- **type** `NoopScanner struct{}` — NoopScanner accepts every file until a real scanner exists.
+- **func** `(NoopScanner) Scan(context.Context, string, storage.ObjectInfo) (bool, error) { return true, nil }` — Scan always reports the object as clean.
+- **type** `Ports struct` — Ports are the services the collaboration context needs from the rest of the platform.
+- **type** `Service struct` — Service holds the collaboration use cases.
+- **func** `NewService(db *gorm.DB, p Ports) *Service` — NewService builds the service.
+- **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error` — inTx runs fn in a short transaction.
+- **type** `auditEntry struct` — auditEntry is one audit record; metadata holds ids and codes only (SECURITY 7, PG12).
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, e auditEntry)` — audit records a successful mutation; a failure never fails the request.
+- **func** `(s *Service) taskAccess(ctx context.Context, a api.Actor, taskID uuid.UUID, perm api.Perm) (api.TaskRef, api.Access, error)` — taskAccess resolves the task through its project and requires perm; unknown, foreign and unreadable tasks are 404 (PG4).
+- **type** `PageRequest struct` — PageRequest is a cursor and a clamped page size.
+- **func** `(p PageRequest) limit() int`
+- **func** `page[T any](rows []T, limit int, cursor func(T) any) ([]T, string)` — page trims the probe row and encodes the cursor of the last returned row.
+
+#### `internal/projects/collab/sweep.go` (75 lines)
+- **type** `SweepResult struct` — SweepResult counts what one attachment sweep did.
+- **func** `(s *Service) SweepAttachments(ctx context.Context, olderThan time.Duration) (SweepResult, error)` — SweepAttachments retires pending uploads older than olderThan (AT-04) and attachments whose task no longer exists, then deletes the object of every deleted attachment and, once the object is gone, its row. It handles one batch of up to 500 rows; a failed object delete keeps the row for the next run. Without storage it does nothing.
+- **func** `(s *Service) Run(ctx context.Context, interval time.Duration, onErr func(error))` — Run stops stale timers (TM-03) and sweeps attachments (AT-04) every interval until ctx ends. onErr receives failures; a failing sweep never stops the loop.
+- **func** `(s *Service) tick(ctx context.Context, onErr func(error))`
+
+#### `internal/projects/collab/time.go` (249 lines)
+- **type** `ManualTimeInput struct` — ManualTimeInput logs finished work; EndedAt is derived from StartedAt and Minutes.
+- **type** `TimeUpdateInput struct` — TimeUpdateInput changes an entry; nil fields stay as they are.
+- **func** `(s *Service) requireTracking(acc api.Access) error`
+- **func** `(s *Service) locked(t time.Time) bool { return t.Before(s.now().Add(-LockWindow)) }` — locked reports whether an entry that started at t is past the author's lock window.
+- **func** `lockedError() error`
+- **func** `(s *Service) checkManual(in ManualTimeInput, manager bool) (string, error)`
+- **func** `(s *Service) LogTime(ctx context.Context, a api.Actor, taskID uuid.UUID, in ManualTimeInput) (*TimeEntry, error)` — LogTime records finished work on a task (TM-01); time.log and an enabled project are required.
+- **type** `timeFact struct` — timeFact is a finished entry to record in the activity log, the audit trail and the outbox.
+- **func** `(s *Service) announceTime(ctx context.Context, tx *gorm.DB, a api.Actor, f timeFact) error`
+- **type** `timeCursor struct`
+- **type** `TimeFilter struct` — TimeFilter pages a task's entries; Mine limits them to the caller's own.
+- **func** `(s *Service) ListTime(ctx context.Context, a api.Actor, taskID uuid.UUID, f TimeFilter) ([]TimeEntry, string, error)` — ListTime pages a task's entries newest first.
+- **func** `(s *Service) loadEntry(ctx context.Context, tenantID, id uuid.UUID) (TimeEntry, error)`
+- **func** `(s *Service) entryAccess(ctx context.Context, a api.Actor, e TimeEntry) (api.Access, error)` — entryAccess authorises an edit or delete: the author needs time.log, anyone else time.manage; only managers get past the lock window (TM-01).
+- **func** `(s *Service) UpdateTime(ctx context.Context, a api.Actor, id uuid.UUID, in TimeUpdateInput) (*TimeEntry, error)` — UpdateTime changes a finished entry (TM-01). A running timer must be stopped first.
+- **func** `(s *Service) applyUpdate(e *TimeEntry, in TimeUpdateInput, manager bool) error` — applyUpdate validates the changes and rewrites the entry fields in memory.
+- **func** `(s *Service) DeleteTime(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteTime removes an entry, including a running timer the author wants to discard (TM-01).
+
+#### `internal/projects/collab/time_report.go` (139 lines)
+- **type** `ReportQuery struct` — ReportQuery selects the range (inclusive days, UTC) and the grouping of a project time report.
+- **type** `ReportRow struct` — ReportRow is the time logged by one task or one user. Number, Title and EstimateMinutes are set when grouping by task.
+- **type** `Report struct` — Report is the totals of a project for a date range plus the estimate of all its open and closed tasks.
+- **type** `window struct{ from, to time.Time } // from inclusive, to exclusive`
+- **func** `(s *Service) parseWindow(q ReportQuery) (window, string, string, error)`
+- **func** `(s *Service) TimeReport(ctx context.Context, a api.Actor, projectID uuid.UUID, q ReportQuery) (*Report, error)` — TimeReport totals the finished time of a project per task or per user, with estimate against logged (TM-02). Readers of the project's tasks may see it; running timers are not counted until they stop.
+- **type** `reportScope struct` — reportScope is the tenant, project and date window a report covers.
+- **func** `(s *Service) reportRows(ctx context.Context, sc reportScope, r *Report) error`
+- **func** `(s *Service) reportTotals(ctx context.Context, sc reportScope, r *Report) error` — reportTotals sums every finished entry in range, so the totals stay exact when the row list is capped.
+
+#### `internal/projects/collab/timer.go` (128 lines)
+- **func** `(s *Service) StartTimer(ctx context.Context, a api.Actor, taskID uuid.UUID) (*TimeEntry, error)` — StartTimer starts the caller's timer on a task. One running timer per user is a database constraint, so two racing starts leave exactly one running and the other gets 409 TIMER_RUNNING (TM-01, PG6).
+- **func** `(s *Service) RunningTimer(ctx context.Context, a api.Actor) (*TimeEntry, error)` — RunningTimer returns the caller's running timer, or nil when none runs.
+- **func** `(s *Service) StopTimer(ctx context.Context, a api.Actor) (*TimeEntry, error)` — StopTimer stops the caller's running timer and logs the elapsed minutes (TM-01). Stopping needs no project permission: the timer is the caller's own row, and a user who lost access must still be able to end it.
+- **func** `(s *Service) taskRefOf(ctx context.Context, tx *gorm.DB, tenantID, taskID uuid.UUID) (api.TaskRef, error)` — taskRefOf reads the ids and version an announcement needs without an access check (the caller owns the timer).
+- **func** `(s *Service) StopStaleTimers(ctx context.Context, olderThan time.Duration) (int, error)` — StopStaleTimers stops every timer that has run longer than olderThan, caps its span at MaxTimerAge and marks it auto_stopped so the owner can correct it (TM-03). It handles one batch of up to 500 timers and returns how many it stopped; the Run loop calls it on a schedule.
+- **func** `(s *Service) announceStopped(ctx context.Context, tx *gorm.DB, e *TimeEntry) error` — announceStopped records a system stop in the activity log and the outbox on behalf of the timer owner.
+
+#### `internal/projects/collab/validate.go` (38 lines)
+- **func** `cleanText(field, s string, min, max int) (string, error)` — cleanText trims s and checks its length in characters; NUL bytes and invalid UTF-8 are refused because the database cannot store them.
+- **func** `itoa(n int) string`
+
+#### `internal/projects/collab/watchers.go` (101 lines)
+- **func** `AddWatcher(ctx context.Context, tx *gorm.DB, w Watcher) error` — AddWatcher makes a user watch a task in the caller transaction and keeps an existing watch unchanged. The task context uses it for reporters and assignees; this context for commenters and mentioned users.
+- **type** `WatchState struct` — WatchState says whether the caller watches a task and why.
+- **func** `(s *Service) Watch(ctx context.Context, a api.Actor, taskID uuid.UUID) (WatchState, error)` — Watch makes the caller an explicit watcher; watching twice is a no-op (CM-03).
+- **func** `(s *Service) Unwatch(ctx context.Context, a api.Actor, taskID uuid.UUID) error` — Unwatch stops the caller watching a task; it succeeds when the caller was not watching.
+- **func** `(s *Service) WatchStatus(ctx context.Context, a api.Actor, taskID uuid.UUID) (WatchState, error)` — WatchStatus reports whether the caller watches a task.
+- **type** `watcherCursor struct`
+- **func** `(s *Service) Watchers(ctx context.Context, a api.Actor, taskID uuid.UUID, pr PageRequest) ([]Watcher, string, error)` — Watchers lists a task's watchers by user id, cursor-paged.
+- **func** `watchMany(ctx context.Context, tx *gorm.DB, w Watcher, users []uuid.UUID) error` — watchMany adds auto-watchers (commenter, mentioned users) in the caller transaction.
+
+### M2 Projects / planning
+
+
+#### `internal/projects/planning/backlog.go` (30 lines)
+- **func** `(s *Service) Backlog(ctx context.Context, a api.Actor, projectID uuid.UUID, cursor string, limit int) ([]Card, string, error)` — Backlog lists the tasks waiting to be planned (SP-03): in a kanban project the tasks in a backlog-category column, in a scrum project the unfinished tasks that belong to no sprint. Ordered by rank, keyset paged (task.read).  Deviation from the literal specification text: in scrum mode finished (done or canceled) tasks without a sprint are not part of the backlog, because there is nothing left to plan.
+
+#### `internal/projects/planning/board.go` (161 lines)
+- **type** `BoardParams struct` — BoardParams selects the board slice. Cursors holds the opaque next_cursor per column id; Sprint is "", "active", "none" or a sprint id and narrows both the counts and the cards.
+- **type** `BoardColumn struct` — BoardColumn is a column with its total count and one keyset page of cards.
+- **type** `Board struct` — Board is the board read model.
+- **func** `ClampPerColumn(n int) int` — ClampPerColumn applies the board page default and maximum.
+- **func** `(s *Service) Board(ctx context.Context, a api.Actor, projectID uuid.UUID, p BoardParams) (*Board, error)` — Board returns the columns with counts and a cursor-paged slice of tasks per column; it never loads full history (VW-01, PG7, task.read).
+- **type** `sprintFilter struct` — sprintFilter is an SQL fragment over fixed text plus its bind values.
+- **func** `(s *Service) sprintScope(ctx context.Context, a api.Actor, projectID uuid.UUID, raw string) (sprintFilter, error)` — sprintScope turns the sprint parameter into a filter: "" none, "none" backlog only, "active" the active sprint, or a sprint id of the project (404 when it is not).
+- **func** `(s *Service) columnCounts(ctx context.Context, tenantID, projectID uuid.UUID, f sprintFilter) (map[uuid.UUID]int, error)`
+- **type** `boardScope struct` — boardScope is what one column page query needs.
+- **func** `(s *Service) fillColumn(ctx context.Context, bs boardScope, col *BoardColumn) error` — fillColumn loads one keyset page of cards for the column.
+
+#### `internal/projects/planning/calendar.go` (73 lines)
+- **type** `CalendarView struct` — CalendarView lists the tasks whose due_at or start_on falls in the window. Truncated is true when more than 500 tasks matched and the rest was cut (narrow the window or filter).
+- **func** `(s *Service) ProjectCalendar(ctx context.Context, a api.Actor, projectID uuid.UUID, w Window) (*CalendarView, error)` — ProjectCalendar returns one project calendar window of at most 62 days (VW-03, task.read).
+- **func** `(s *Service) MyCalendar(ctx context.Context, a api.Actor, w Window) (*CalendarView, error)` — MyCalendar returns the tasks assigned to the caller across the projects the caller can read (VW-03).
+- **func** `emptyCalendar(w Window) *CalendarView`
+- **func** `(s *Service) calendar(ctx context.Context, where string, args []any, w Window) (*CalendarView, error)`
+
+#### `internal/projects/planning/cards.go` (109 lines)
+- **type** `Card struct` — Card is the task summary every read model returns. It is a projection of the tasks table, not the task context model.
+- **type** `cardQuery struct` — cardQuery is a card page: where and order are fixed SQL fragments chosen by the service, never client text; every client value travels in args.
+- **func** `(q cardQuery) run(ctx context.Context, db *gorm.DB) ([]Card, error)` — run executes the page query (limit rows).
+- **type** `rankCursor struct` — rankCursor is the keyset position of a rank-ordered page.
+- **func** `rankCursorOf(c Card) string`
+- **func** `rankAfter(where string, args []any, cur rankCursor) (string, []any)` — rankAfter appends the keyset predicate for a decoded rank cursor.
+- **func** `pageRank(ctx context.Context, db *gorm.DB, q cardQuery, cursor string) ([]Card, string, error)` — pageRank runs a rank-ordered keyset page and returns the rows plus the next cursor.
+
+#### `internal/projects/planning/feed.go` (88 lines)
+- **func** `(s *Service) FeedFor(ctx context.Context, raw string) (string, error)` — FeedFor resolves a raw feed token to its user and renders that user iCalendar feed (VW-03). The tenant and the user come from the token row only; an unknown, revoked or malformed token, and a token whose owner is no longer active, all answer the same 404. Visibility is the owner's: only tasks assigned to them in projects they can read.
+- **func** `(s *Service) resolveToken(ctx context.Context, raw string) (*CalendarToken, error)` — resolveToken finds the active token row by hash and compares the hashes in constant time.
+- **func** `(s *Service) ownerActive(ctx context.Context, tok *CalendarToken) error` — ownerActive fails closed when the token owner was deactivated or removed.
+- **func** `(s *Service) feedTasks(ctx context.Context, a api.Actor, ids []uuid.UUID, now time.Time) ([]Card, error)`
+
+#### `internal/projects/planning/feed_limiter.go` (67 lines)
+- **type** `feedWindow struct`
+- **type** `feedLimiter struct` — feedLimiter is a fixed-window per-IP limiter held in process memory. Production can swap it for the shared Redis middleware through Service.SetFeedLimiter.
+- **func** `newFeedLimiter(limit int, window time.Duration) gin.HandlerFunc`
+- **func** `(l *feedLimiter) allow(key string) (bool, int)` — allow counts a hit for key and reports whether it is within the limit, plus the seconds until the window resets.
+- **func** `(l *feedLimiter) handle(c *gin.Context)`
+
+#### `internal/projects/planning/gantt.go` (140 lines)
+- **type** `GanttParams struct` — GanttParams selects a Gantt page. Window is nil for every dated task of the project.
+- **type** `GanttTask struct` — GanttTask is a dated task with the number of tasks it depends on.
+- **type** `GanttMilestone struct` — GanttMilestone is a milestone marker on the timeline.
+- **type** `Dependency struct` — Dependency is a directed blocks relation: Source blocks Target.
+- **type** `GanttView struct` — GanttView is one page of the Gantt read model (VW-04).
+- **type** `ganttCursor struct`
+- **func** `ClampGanttLimit(raw string) int` — ClampGanttLimit applies the Gantt page default (200) and maximum (500).
+- **func** `(s *Service) Gantt(ctx context.Context, a api.Actor, projectID uuid.UUID, p GanttParams) (*GanttView, error)` — Gantt returns the dated tasks, the milestones and the blocks relations of a project, paged by start day, at most 500 tasks per request (VW-04, task.read).
+- **func** `ganttWhere(a api.Actor, projectID uuid.UUID, w *Window, cur ganttCursor) (string, []any)`
+- **func** `ganttDay(c Card) string` — ganttDay is the sort key of a card as used by ganttStart.
+- **func** `(s *Service) ganttMilestones(ctx context.Context, tenantID, projectID uuid.UUID, w *Window) ([]GanttMilestone, error)`
+
+#### `internal/projects/planning/gantt_deps.go` (48 lines)
+- **func** `(s *Service) attachDependencies(ctx context.Context, a api.Actor, v *GanttView) error` — attachDependencies fills the blocks edges and per-task dependency counts of a Gantt page (VW-04).  The task context owns task relations (TK-07); this context only reads task_relations by SQL. An edge is returned when one end is on the page and both ends are live tasks in projects the caller can read, so a page never reveals a task of an unreadable project. DependencyCount is the number of readable tasks that block the task.
+
+#### `internal/projects/planning/http.go` (125 lines)
+- **type** `handler struct{ s *Service }` — handler adapts the use cases to gin: it resolves the actor and the :id path parameter.
+- **func** `act(fn func(c *gin.Context, a api.Actor)) gin.HandlerFunc`
+- **func** `withID(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `body[T any](c *gin.Context, run func(in T))`
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the planning routes on g (already guarded by tenant resolution, authentication and the flag middleware).
+- **func** `(s *Service) RegisterPublic(rg *gin.RouterGroup)` — RegisterPublic mounts the one route that has no bearer token: the iCalendar feed authenticated by a per-user token. The tenant is resolved from the token row, never from the client; the route is rate limited per IP.
+- **func** `(h handler) sprintRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) sprintFlowRoutes(g *gin.RouterGroup)`
+- **func** `(h handler) planRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/planning/http_saved.go` (63 lines)
+- **func** `(h handler) savedViewRoutes(g *gin.RouterGroup)`
+- **type** `TokenInput struct` — TokenInput names a new calendar feed token.
+- **func** `(h handler) tokenRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/planning/http_views.go` (96 lines)
+- **func** `boardParams(c *gin.Context) BoardParams` — boardParams reads per_column, sprint and the per-column cursors (cursor_<columnId>) from the query string.
+- **func** `(h handler) viewRoutes(g *gin.RouterGroup)`
+- **func** `ganttParams(c *gin.Context) (GanttParams, error)` — ganttParams reads the optional window (both ends or none), the cursor and the limit.
+- **func** `(h handler) workRoutes(g *gin.RouterGroup)`
+
+#### `internal/projects/planning/ics.go` (92 lines)
+- **func** `icsEscape(s string) string` — icsEscape escapes TEXT per RFC 5545 section 3.3.11: backslash, semicolon and comma are escaped, line breaks become the two characters \n, and other control characters are dropped, so a title can never start a new property line.
+- **func** `icsFold(line string) string` — icsFold folds a content line at 75 octets without splitting a UTF-8 sequence (RFC 5545 section 3.1).
+- **func** `buildICS(cards []Card, now time.Time) string` — buildICS renders cards as a VCALENDAR; the output uses CRLF line ends and contains no client-controlled raw line.
+- **func** `eventLines(c Card, now time.Time) []string`
+
+#### `internal/projects/planning/mywork.go` (207 lines)
+- **type** `WorkCounts struct` — WorkCounts are the per-group totals for badges. Total counts assigned open tasks; Watching and Mentions count the open tasks the caller watches or is mentioned in (read from the collaboration tables task_watchers and mentions).
+- **type** `WorkView struct` — WorkView is My work: per-group counts and, per group, the first page of tasks (or one full group page).
+- **type** `WorkParams struct` — WorkParams selects My work. Group, when set, returns that group only (a due-date group, watching or mentions), paged with Cursor; otherwise every group returns its first PerGroup tasks.
+- **type** `dayBounds struct{ today, tomorrow, nextWeek time.Time }` — dayBounds are the instants that split the groups, from the service clock (UTC): today starts at Today, this week runs to the next Monday.
+- **func** `boundsAt(now time.Time) dayBounds`
+- **func** `groupWhere(group string, b dayBounds) (string, []any, bool)` — groupWhere returns the due_at predicate of a group and its bind values.
+- **func** `(s *Service) MyWork(ctx context.Context, a api.Actor, p WorkParams) (*WorkView, error)` — MyWork returns the caller tasks grouped by due date plus the counts (VW-05). Only open tasks of active projects the caller can read are included.
+- **func** `(s *Service) MyWorkCounts(ctx context.Context, a api.Actor) (WorkCounts, error)` — MyWorkCounts returns the badge counts only.
+- **func** `(s *Service) workCounts(ctx context.Context, a api.Actor, ids []uuid.UUID, b dayBounds) (WorkCounts, error)`
+- **type** `workScope struct`
+- **type** `workCursor struct`
+- **func** `(s *Service) workGroup(ctx context.Context, w workScope, p WorkParams) ([]Card, string, error)` — workGroup loads one group page ordered by due date then id (keyset).
+- **func** `ClampWorkLimit(n int) int` — ClampWorkLimit applies the My work group page default (20) and maximum (100).
+
+#### `internal/projects/planning/mywork_linked.go` (78 lines)
+- **func** `validGroup(g string) bool`
+- **func** `isLinked(g string) bool { return g == GroupWatching || g == GroupMentions }`
+- **func** `linkedPredicate(g string) string`
+- **func** `(s *Service) linkedCounts(ctx context.Context, a api.Actor, ids []uuid.UUID, c *WorkCounts) error` — linkedCounts fills the watching and mentions badge counts.
+- **func** `(s *Service) linkedGroup(ctx context.Context, w workScope, p WorkParams) ([]Card, string, error)` — linkedGroup pages the watched or mentioned tasks, most recently updated first (keyset on updated_at, id).
+
+#### `internal/projects/planning/plan.go` (158 lines)
+- **type** `PlanInput struct` — PlanInput moves tasks between the backlog (SprintID nil) and a sprint. Versions optionally maps a task id to the version the caller last read; a stale entry yields a per-task conflict instead of failing the whole request.
+- **type** `PlanResult struct` — PlanResult is the outcome for one task; Version is the task version after the move, or the current one on conflict.
+- **type** `planTask struct`
+- **func** `(in PlanInput) validate() error`
+- **func** `(s *Service) PlanMove(ctx context.Context, a api.Actor, projectID uuid.UUID, in PlanInput) ([]PlanResult, error)` — PlanMove moves tasks between the backlog and sprints in bulk (SP-03, task.update). It writes only tasks.sprint_id (plus version+1 and updated_at) and checks each task version under a row lock, so a concurrent edit makes that task a per-task conflict while the others still move.
+- **func** `(s *Service) checkTargetSprint(tx *gorm.DB, a api.Actor, projectID uuid.UUID, id *uuid.UUID) error` — checkTargetSprint requires the target to be a planned or active sprint of the project (404 otherwise).
+- **func** `lockPlanTasks(tx *gorm.DB, tenantID, projectID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]planTask, error)` — lockPlanTasks reads and row-locks the live tasks of the project among ids, in id order so concurrent plans cannot deadlock.
+- **func** `decidePlan(in PlanInput, tasks map[uuid.UUID]planTask) ([]PlanResult, []planTask)` — decidePlan classifies every requested task and returns the ones that actually move.
+- **func** `sameSprint(a, b *uuid.UUID) bool`
+
+#### `internal/projects/planning/plan_apply.go` (49 lines)
+- **type** `planBatch struct` — planBatch is the set of tasks that really change sprint in one planning move.
+- **func** `(s *Service) applyPlan(ctx context.Context, tx *gorm.DB, a api.Actor, b planBatch) error` — applyPlan writes the sprint change for the locked tasks with one UPDATE of tasks.sprint_id, then records one activity entry and one event per task. Data and payloads carry ids and versions only (PG12).
+
+#### `internal/projects/planning/scope.go` (81 lines)
+- **func** `(s *Service) taskProjects(ctx context.Context, a api.Actor) ([]uuid.UUID, error)` — taskProjects lists the projects whose tasks the caller can read, for cross-project queries (search, My work, my calendar, the iCalendar feed). It starts from Authorizer.ReadableProjectIDs and drops projects where a custom role grants project.read without task.read; built-in roles, tenant visibility and tenant-wide read always carry both.
+- **func** `isNotFound(err error) bool`
+- **type** `Window struct` — Window is an inclusive range of calendar days (UTC).
+- **func** `ParseWindow(from, to string, maxDays int) (Window, error)` — ParseWindow reads from/to as YYYY-MM-DD and bounds the span (VW-03: at most 62 days; the Gantt allows more).
+- **func** `(w Window) bounds() (time.Time, time.Time)` — bounds returns the half-open instant range [start, end) covering the window days in UTC.
+
+#### `internal/projects/planning/search.go` (137 lines)
+- **type** `SearchParams struct` — SearchParams is a search request; ProjectID narrows it to one readable project.
+- **type** `SearchHit struct` — SearchHit is a card with how it matched ("ticket" or "text") and its rank.
+- **func** `ClampSearchLimit(raw string) int` — ClampSearchLimit applies the search default (20) and maximum (50).
+- **func** `(s *Service) Search(ctx context.Context, a api.Actor, p SearchParams) ([]SearchHit, error)` — Search finds tasks by ticket id (KEY-12) and by full text over title and description, only in projects the caller can read, always inside the caller tenant (TK-14, PG9). Text matches are ordered by ts_rank.
+- **func** `(s *Service) searchProjects(ctx context.Context, a api.Actor, only *uuid.UUID) ([]uuid.UUID, error)` — searchProjects is the readable project set, narrowed to one project when asked (404 when it is not readable).
+- **func** `(s *Service) ticketHit(ctx context.Context, a api.Actor, ids []uuid.UUID, q string) ([]SearchHit, error)` — ticketHit resolves a query shaped like KEY-12 to that task when its project is readable.
+- **type** `scoredID struct`
+- **func** `(s *Service) textHits(ctx context.Context, a api.Actor, ids []uuid.UUID, q string, limit int) ([]SearchHit, error)` — textHits ranks matches with the GIN-indexed tsvector, then loads the cards of the winners.
+
+#### `internal/projects/planning/service.go` (129 lines)
+_Package:_ Package planning is the planning and views context of M2: sprints, the backlog and bulk planning moves, and the read models (board, calendar, Gantt, My work, search, saved views, iCalendar feed). Specification sections 6 (SP, VW) and TK-14.  Boundary decision: this context does not import the task context. The read models query the tasks, board_columns, task_assignees and task_labels tables of the shared projects schema with SQL (always scoped by tenant_id), and authorisation goes through api.Authorizer. The single write it makes to a task row is tasks.sprint_id (plus version+1 and updated_at): the task context owns every other task column and its own rules (WIP, ranks, completion). A planning move changes one column only, so it can never clobber a concurrent edit of another field, and the per-task version predicate still makes it safe against concurrent edits (PG2 style).
+- **type** `Ports struct` — Ports are the platform services the planning context needs. Both are optional: without Users the iCalendar feed does not re-check that the token owner is still active; without Audit nothing is audited.
+- **type** `Service struct` — Service holds the planning use cases.
+- **func** `NewService(db *gorm.DB, authz api.Authorizer, p Ports) *Service` — NewService builds the service; authz is the project context.
+- **func** `(s *Service) SetFeedLimiter(h gin.HandlerFunc) { s.limiter = h }` — SetFeedLimiter replaces the default in-process limiter of the public iCalendar feed (for example with the shared Redis-backed middleware.RateLimiter).
+- **func** `tooLong(v string, max int) bool { return utf8.RuneCountInString(v) > max }`
+- **func** `text(field, v string, min, max int) (string, error)`
+- **func** `itoa(n int) string`
+- **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error` — inTx runs fn in a short transaction.
+- **func** `(s *Service) access(ctx context.Context, a api.Actor, projectID uuid.UUID) (api.Access, error)` — access resolves the caller access to a project; the caller cannot tell a private project from a missing one (PG4).
+- **func** `requireScrum(acc api.Access) error` — requireScrum answers 409 PROJECT_MODE for kanban projects: sprints exist only in scrum mode (SP-01).
+- **type** `ref struct` — ref names the audited resource.
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref)` — audit records a successful mutation; metadata holds ids and codes only. Failures never fail the request (SECURITY 7).
+- **func** `idArray(ids []uuid.UUID) string` — idArray renders ids as one Postgres uuid[] literal so a long list stays a single bind parameter (uuid.String only yields hex digits and dashes, so the literal cannot carry SQL).
+
+#### `internal/projects/planning/sprint_flow.go` (148 lines)
+- **func** `(s *Service) StartSprint(ctx context.Context, a api.Actor, id uuid.UUID) (*Sprint, error)` — StartSprint makes a planned sprint with dates the active one. A second active sprint in the project is refused by the partial unique index, so concurrent starts cannot both win (SP-01, SP-02, PG6).
+- **func** `(s *Service) CompleteSprint(ctx context.Context, a api.Actor, id uuid.UUID, in CompleteInput) (*Sprint, error)` — CompleteSprint closes an active sprint: unfinished tasks (column category not done or canceled) move to the next planned sprint or the backlog, and the commitment report is stored (SP-02). Only tasks.sprint_id changes.
+- **func** `(s *Service) finishCompletion(ctx context.Context, tx *gorm.DB, a api.Actor, sp *Sprint) error`
+- **func** `(s *Service) resolveTarget(tx *gorm.DB, a api.Actor, from *Sprint, raw string) (*uuid.UUID, error)` — resolveTarget validates move_unfinished_to: "backlog" (nil) or a planned sprint of the same project.
+- **func** `sprintStats(tx *gorm.DB, tenantID, sprintID uuid.UUID) (Report, error)` — sprintStats computes the commitment numbers from the tasks currently in the sprint (SP-02).
+- **func** `(s *Service) moveUnfinished(tx *gorm.DB, tenantID, from uuid.UUID, target *uuid.UUID) (int, error)` — moveUnfinished re-points unfinished tasks to target (nil = backlog) and bumps their version.
+- **func** `(s *Service) SprintReport(ctx context.Context, a api.Actor, id uuid.UUID) (*ReportView, error)` — SprintReport returns the stored report of a completed sprint, or the live numbers for a planned or active one.
+
+#### `internal/projects/planning/sprint_models.go` (100 lines)
+- **type** `Report struct` — Report is the commitment summary stored when a sprint completes (SP-02). MovedTo is "backlog" or the next sprint id.
+- **func** `(r Report) Value() (driver.Value, error)` — Value stores the report as JSONB.
+- **func** `(r *Report) Scan(src any) error` — Scan reads the JSONB report.
+- **type** `Sprint struct` — Sprint is a time-boxed batch of tasks in a scrum project (SP-01).
+- **func** `(Sprint) TableName() string { return "sprints" }` — TableName maps to sprints.
+- **type** `SprintInput struct` — SprintInput creates or edits a sprint; on edit nil fields are unchanged and Version, when set, must match.
+- **type** `CompleteInput struct` — CompleteInput closes a sprint; MoveUnfinishedTo is "backlog" or the id of the next planned sprint (SP-02).
+- **type** `SprintFilter struct` — SprintFilter narrows the sprint list.
+- **type** `ReportView struct` — ReportView is the report endpoint payload: stored for a completed sprint, computed live otherwise.
+
+#### `internal/projects/planning/sprints.go` (241 lines)
+- **type** `sprintCursor struct`
+- **func** `(s *Service) loadSprint(ctx context.Context, a api.Actor, id uuid.UUID, perm api.Perm) (*Sprint, api.Access, error)` — loadSprint finds a sprint in the caller tenant, resolves the project access (404 when the caller cannot read the project, PG4), then checks perm (403/409) and the scrum mode (409). An empty perm skips the permission check.
+- **func** `lockSprint(tx *gorm.DB, tenantID, id uuid.UUID) (*Sprint, error)` — lockSprint re-reads the sprint with a row lock inside tx so state transitions serialise.
+- **func** `(in SprintInput) validateNew() (Sprint, error)`
+- **func** `(in SprintInput) apply(sp *Sprint) error` — apply copies the set fields onto sp and checks the resulting shape.
+- **func** `(s *Service) CreateSprint(ctx context.Context, a api.Actor, projectID uuid.UUID, in SprintInput) (*Sprint, error)` — CreateSprint adds a planned sprint to a scrum project (SP-01, sprint.manage).
+- **func** `(s *Service) ListSprints(ctx context.Context, a api.Actor, projectID uuid.UUID, f SprintFilter) ([]Sprint, string, error)` — ListSprints returns the sprints of a project, newest first, with their task counts (project.read).
+- **func** `sprintWhere(a api.Actor, projectID uuid.UUID, f SprintFilter, cur sprintCursor) (string, []any)`
+- **func** `(s *Service) GetSprint(ctx context.Context, a api.Actor, id uuid.UUID) (*Sprint, error)` — GetSprint returns one sprint with its task count (project.read).
+- **func** `(s *Service) UpdateSprint(ctx context.Context, a api.Actor, id uuid.UUID, in SprintInput) (*Sprint, error)` — UpdateSprint edits a planned or active sprint; completed sprints are frozen (sprint.manage, optimistic version).
+- **func** `(s *Service) DeleteSprint(ctx context.Context, a api.Actor, id uuid.UUID) (int, error)` — DeleteSprint removes a planned sprint; its tasks return to the backlog (sprint.manage). Only the sprint_id column of those tasks changes.
+
+#### `internal/projects/planning/tokens.go` (103 lines)
+- **type** `CalendarToken struct` — CalendarToken authenticates one user iCalendar feed (VW-03). Only the SHA-256 hash is stored; Token and FeedPath are set once, in the response to creation.
+- **func** `(CalendarToken) TableName() string { return "calendar_tokens" }` — TableName maps to calendar_tokens.
+- **func** `hashToken(raw string) string` — hashToken is the stored form of a feed token.
+- **func** `newRawToken() (string, error)` — newRawToken returns 32 random bytes, base64url encoded.
+- **func** `(s *Service) CreateToken(ctx context.Context, a api.Actor, label string) (*CalendarToken, error)` — CreateToken issues a feed token for the caller; the raw token is returned only here (at most 10 active per user).
+- **func** `(s *Service) ListTokens(ctx context.Context, a api.Actor) ([]CalendarToken, error)` — ListTokens lists the caller active tokens (never the secrets). At most 10 can exist, so the list is not paged.
+- **func** `(s *Service) RevokeToken(ctx context.Context, a api.Actor, id uuid.UUID) error` — RevokeToken disables one of the caller tokens at once; another user's token is a 404.
+
+#### `internal/projects/planning/views.go` (224 lines)
+- **type** `viewCursor struct`
+- **func** `(s *Service) CreateView(ctx context.Context, a api.Actor, in ViewInput) (*SavedView, error)` — CreateView saves a personal view, or one shared with a project (view.share there) (VW-06).
+- **func** `(s *Service) checkViewProject(ctx context.Context, a api.Actor, projectID *uuid.UUID, shared bool) error` — checkViewProject requires read access to the view project, and view.share when the view is shared.
+- **func** `(s *Service) ListViews(ctx context.Context, a api.Actor, f ViewFilter) ([]SavedView, string, error)` — ListViews returns the caller own views plus the shared views of readable projects (VW-06).
+- **func** `viewWhere(a api.Actor, f ViewFilter, cur viewCursor, readable []uuid.UUID) (string, []any)` — viewWhere builds the visibility predicate: own views (project still readable) or shared views of readable projects.
+- **func** `(s *Service) loadView(ctx context.Context, a api.Actor, id uuid.UUID) (*SavedView, *api.Access, error)` — loadView finds a view the caller may see: their own, or a shared view of a project they can read. Anything else is 404.
+- **func** `canManageView(v *SavedView, acc *api.Access, a api.Actor) error` — canManageView allows the owner, or a view.share holder for a shared view.
+- **func** `(s *Service) UpdateView(ctx context.Context, a api.Actor, id uuid.UUID, in ViewInput) (*SavedView, error)` — UpdateView edits a view; sharing it needs view.share in the project (optimistic version).
+- **func** `(s *Service) changeSharing(v *SavedView, acc *api.Access, shared bool) error`
+- **func** `(s *Service) saveView(ctx context.Context, a api.Actor, v *SavedView) (*SavedView, error)` — saveView writes the edit guarded by the version it was read at, so a concurrent edit becomes a 409.
+- **func** `(s *Service) DeleteView(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteView removes a view the caller may manage.
+
+#### `internal/projects/planning/views_model.go` (108 lines)
+- **type** `RawJSON []byte` — RawJSON is a validated JSON document stored in a JSONB column and written to responses as-is.
+- **func** `(r RawJSON) Value() (driver.Value, error)` — Value stores the document.
+- **func** `(r *RawJSON) Scan(src any) error` — Scan reads a JSONB value.
+- **func** `(r RawJSON) MarshalJSON() ([]byte, error)` — MarshalJSON writes the stored document without re-encoding it.
+- **type** `SavedView struct` — SavedView is a named filter/sort/grouping/layout combination, personal or shared with a project (VW-06).
+- **func** `(SavedView) TableName() string { return "saved_views" }` — TableName maps to saved_views.
+- **type** `ViewInput struct` — ViewInput creates or edits a saved view; on edit nil/absent fields are unchanged and Version, when set, must match. ProjectID is read on create only.
+- **type** `ViewFilters struct` — ViewFilters is the closed set of filters a saved view may hold. It is decoded with unknown fields refused and stored re-encoded, so no free-form fragment can be persisted and none is ever interpolated into SQL.
+- **type** `SortKey struct` — SortKey orders a view by one allow-listed field.
+- **type** `ViewFilter struct` — ViewFilter narrows the saved view list.
+
+#### `internal/projects/planning/views_validate.go` (143 lines)
+- **func** `decodeStrict(raw json.RawMessage, dst any, field string) error` — decodeStrict decodes raw into dst and refuses unknown fields and trailing data.
+- **func** `normaliseFilters(raw json.RawMessage) (RawJSON, error)` — normaliseFilters validates a filters document and returns its canonical encoding.
+- **func** `(f ViewFilters) check() error`
+- **func** `subset(vals, allowed []string) bool` — subset reports whether every value is in the allowed set and the list is short.
+- **func** `normaliseSort(raw json.RawMessage) (RawJSON, error)` — normaliseSort validates the sort keys and returns their canonical encoding (an empty list is "[]").
+- **func** `(in ViewInput) apply(v *SavedView) error` — apply copies the set fields onto v after validating them (shared/project rules are checked by the service).
+
 ## D. Test inventory
 
 
-### Shared infrastructure — 21 test functions in 13 files
+### Shared infrastructure — 24 test functions in 14 files
 - `internal/shared/config/config_test.go`: TestLoadConfig, TestLoadConfig_EnvOverrides
 - `internal/shared/database/base_test.go`: TestBaseModel_BeforeCreate
 - `internal/shared/database/tx_test.go`: TestBeginTxNilDB, TestFinishNilTx
@@ -9181,9 +10702,10 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 - `internal/shared/idempotency/middleware_test.go`: TestReplaySameKeySamePayload, TestInProgressExpiredAndServerErrors
 - `internal/shared/middleware/correlation_test.go`: TestCorrelationIDIsValidatedEchoedAndPropagated
 - `internal/shared/middleware/cors_test.go`: TestCORS
-- `internal/shared/middleware/hardening_test.go`: TestBodyLimit, TestSecurityHeaders
+- `internal/shared/middleware/hardening_test.go`: TestBodyLimit, TestSecurityHeaders, TestBodyLimitGivesChunkedBodiesALength
 - `internal/shared/middleware/rate_limiter_test.go`: TestRateLimiter_BlocksAfterLimitWithRetryAfter, TestFailureRateLimiter_SuccessRefundsSlot, TestRateLimiter_FailsOpenOnStoreError
 - `internal/shared/outbox/relay_test.go`: TestRelayPublishesAndRecordsFailures
+- `internal/shared/storage/storage_test.go`: TestMemoryStore, TestS3RoundTrip
 - `internal/shared/utils/pagination_test.go`: TestNormalizePagination, TestParsePaginationToleratesJunk, TestBindErrorDetails
 - `internal/shared/utils/validator_test.go`: TestValidateStruct
 
@@ -9387,6 +10909,59 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 - `internal/hr/benefits/benefits_test.go`: TestPlanValidationAndLifecycle, TestSettingsAndWindows, TestEnrolmentWindows, TestEligibility, TestElect, TestChangeWaiveEnd, TestDeductions, TestTerminationHook, TestDependantsAndLifeEvents, TestReportAndListings, TestModelsAndHelpers
 - `internal/hr/benefits/http_test.go`: TestHTTP
 
+### M2 Projects / kernel — 8 test functions in 2 files
+- `internal/projects/kernel/http_test.go`: TestFailMapsErrorsWithoutLeaking, TestRespondersAndParsers, TestIfMatchVersion, TestDateAndStringList
+- `internal/projects/kernel/kernel_test.go`: TestRankBetweenKeepsOrder, TestRankEdgesAndSpread, TestCursorRoundTripAndLimits, TestErrorsAndVersionConflict
+
+### M2 Projects / api — 4 test functions in 1 files
+- `internal/projects/api/access_test.go`: TestBuiltinRolesAreNested, TestValidPermAndSortedPerms, TestRequireDistinguishesForbiddenFromArchived, TestActorFrom
+
+### M2 Projects / project — 19 test functions in 6 files
+- `internal/projects/project/columns_test.go`: TestColumnLifecycle, TestReorderAndDeleteColumns, TestLabelsAndMilestones
+- `internal/projects/project/faults_test.go`: TestEveryStatementFailureIsReportedAndRolledBack, TestRunGroupRefreshStopsWithContext
+- `internal/projects/project/group_test.go`: TestGroupRulesExpandAndReconcile, TestGroupRuleGuards, TestRefreshAllSweepsActiveProjectsWithRules, TestDeactivationAndInbox
+- `internal/projects/project/harness_test.go`: (helpers only)
+- `internal/projects/project/members_test.go`: TestMembersLifecycle, TestLastOwnerGuard, TestCustomRoles
+- `internal/projects/project/projects_test.go`: TestCreateProjectDefaults, TestCreateProjectValidation, TestAccessRules, TestTenantVisibilityAndArchivedFreeze, TestUpdateProjectVersioned, TestArchiveRestoreDeleteAndFavorite, TestListProjects
+
+### M2 Projects / task — 48 test functions in 13 files
+- `internal/projects/task/activity_test.go`: TestActivityReads, TestTicketLookup, TestTenantAndProjectIsolation
+- `internal/projects/task/bulk_test.go`: TestBulkUpdatePartialFailures, TestBulkValidationAndPermissions, TestBulkVersionConflictMessage
+- `internal/projects/task/create_test.go`: TestCreateAndGet, TestCreateValidation, TestCreatePermissionsAndTenancy, TestCreateWithRelations, TestSubtaskDepthLimit, TestTicketNumbersGapless, TestEventsAndAuditCarryIDsOnly
+- `internal/projects/task/faults_test.go`: TestStorageFailuresSurfaceAsErrors, TestMisconfiguredProjectsAndSprints, TestMoveProjectColumnFallbacks
+- `internal/projects/task/harness_test.go`: (helpers only)
+- `internal/projects/task/http_test.go`: TestHTTPTaskLifecycle, TestHTTPListLinksAndActivity
+- `internal/projects/task/inactive_test.go`: TestInactiveAssigneesAreHistory
+- `internal/projects/task/lifecycle_test.go`: TestAssigneesAndLabels, TestTooManyAssignees, TestArchiveRestoreDelete, TestDuplicate
+- `internal/projects/task/list_test.go`: TestListFilters, TestListValidationAndAccess, TestKeysetPaginationAllSorts, TestSubtasksListAndRollup
+- `internal/projects/task/move_test.go`: TestMoveColumnCompletion, TestWipLimits, TestConcurrentHardWip, TestDoneRulesBlockersAndSubtasks, TestReorder, TestRebalanceOnEqualAndLongRanks, TestSpreadRanks, TestRebalanceBound, TestConcurrentMovesLoseNothing
+- `internal/projects/task/moveproject_test.go`: TestMoveProject, TestMoveProjectRules
+- `internal/projects/task/relations_test.go`: TestRelationsBasics, TestDependencyCycles, TestConcurrentCycleInserts, TestRelationsAcrossProjectsRespectReadAccess
+- `internal/projects/task/update_test.go`: TestUpdateFieldsAndVersions, TestUpdateValidation, TestUpdateJSONNullSemantics, TestReparent, TestConcurrentUpdates, TestSequentialUpdatesAllLand
+
+### M2 Projects / collab — 37 test functions in 7 files
+- `internal/projects/collab/attachments_test.go`: TestAttachmentHappyPath, TestDownloadACL, TestTenantVisibleProjectDownloadsAreNotLogged, TestInitValidationTable, TestQuotaAndTaskLimit, TestCompleteMismatchKeepsPending, TestChecksumAcceptedWhenItMatches, TestCompletePermissionsAndPendingVisibility, TestMalwareHook, TestDeleteAttachmentRules, TestSweepAttachments, TestProviderFailures, TestNoStorageConfigured, TestListAttachmentsPaging, TestRunLoopSweepsAndStops
+- `internal/projects/collab/comments_test.go`: TestCommentLifecycleAndTombstone, TestCommentValidationAndUnknownIDs, TestCommentPagination, TestCommentArchivedProjectIsFrozen, TestMentionsNeverLeakATask, TestMentionsInTenantVisibleProjectAndEdits, TestCommentEventsAndAuditHoldIdsOnly
+- `internal/projects/collab/harness_test.go`: (helpers only)
+- `internal/projects/collab/http_test.go`: TestHTTPRoutesEndToEnd, TestHTTPStorageUnavailable
+- `internal/projects/collab/s3_test.go`: TestS3AttachmentRoundTrip
+- `internal/projects/collab/time_test.go`: TestLogTimeValidationTable, TestTimePermissionsAndEvents, TestTimeTrackingDisabled, TestEditDeleteAndLockWindow, TestListTimeMineAndPaging, TestTimerStartStopAndOneRunning, TestOneRunningTimerUnderRace, TestStopStaleTimers, TestTimeReport
+- `internal/projects/collab/watchers_test.go`: TestParseMentions, TestWatchUnwatchAndList, TestAddWatcherKeepsFirstReason
+
+### M2 Projects / planning — 45 test functions in 12 files
+- `internal/projects/planning/board_test.go`: TestBoardPagesEachColumn, TestBoardPagingIsStableUnderInserts, TestBoardSprintScopeAndErrors, TestBoardCardsCarryAssigneesAndLabels
+- `internal/projects/planning/calendar_test.go`: TestParseWindow, TestProjectCalendarWindow, TestCalendarTruncatesAt500, TestMyCalendar, TestGantt, TestGanttDependenciesHideUnreadableProjects
+- `internal/projects/planning/feed_test.go`: TestIcsEscapeAndFold, TestCalendarTokenLifecycle, TestFeedListsOnlyMyReadableAssignedTasks, TestFeedRefusesBadTokensAndInactiveOwners, TestFeedRouteIsPublicAndRateLimited, TestFeedLimiterWindowsExpire
+- `internal/projects/planning/harness_test.go`: (helpers only)
+- `internal/projects/planning/http_test.go`: TestHTTPSprintAndPlanFlow, TestHTTPViewsAndSearch, TestHTTPSavedViewsAndTokens, TestHTTPRequiresAnActorExceptTheFeed
+- `internal/projects/planning/mywork_test.go`: TestDayBounds, TestMyWorkGroupsAndCounts, TestMyWorkPagesOneGroup, TestMyWorkWatchingAndMentions
+- `internal/projects/planning/perf_test.go`: TestPG7LargeBoardPaginationWithinBudget
+- `internal/projects/planning/plan_test.go`: TestPlanMoveWritesOnlySprintColumn, TestPlanMovePerTaskOutcomes, TestPlanMoveConcurrentSameVersion, TestPlanMoveRefusals, TestBacklogByMode
+- `internal/projects/planning/search_test.go`: TestSearchTextRankingAndTicket, TestPG9SearchIsTenantIsolatedAndPrivacyAware, TestSearchHonoursTaskReadOfCustomRoles
+- `internal/projects/planning/sprint_flow_test.go`: TestSprintStateMachine, TestPG6OneActiveSprintUnderRace, TestCompleteSprintMovesUnfinishedAndReports, TestPG12PlanningEventsHoldIdsOnly
+- `internal/projects/planning/sprints_test.go`: TestSprintCrudAndAccess, TestSprintListPagingAndFilters, TestKanbanProjectsHaveNoSprints, TestDeleteSprintReleasesTasks, TestArchivedProjectFreezesPlanning
+- `internal/projects/planning/views_test.go`: TestSavedViewValidation, TestSavedViewVisibility, TestSavedViewUpdateAndDelete
+
 ### Integration suite (`backend/tests/integration`)
 - `access_test.go`: TestAccessPredefinedRoles, TestAccessScopesInheritanceAndCycles, TestAccessUserGrantsAndBlocks, TestAccessAntiEscalation, TestAccessAutomaticRoles, TestAccessTenantIsolation
 - `attendance_ops_test.go`: TestAttendanceParity
@@ -9400,6 +10975,7 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 - `golden_test.go`: TestGoldenM1_TeamMoveKeepsMappingsConsistent, TestGoldenM1_AuditOnEveryOrgWrite, TestGoldenNoSecretLeakage, TestGoldenM2_EmployeeForForeignTenantUser, TestGoldenM2_AtomicOnboarding, TestGoldenM1_RejectedHierarchyChangeLeavesNoTrace
 - `harness_test.go`: TestMain
 - `identity_test.go`: TestTenantRoutesRequirePlatformKey, TestTenantLifecycle, TestTenantAdminProvisioningIsAtomic, TestPlatformRoutesDisabledWithoutKeyIsCoveredByMiddlewareUnit, TestAuthLoginErrors, TestLoginRateLimitCountsFailuresOnly, TestRefreshRotationReuseAndLogout, TestAccessTokenValidation, TestForgotAndResetPassword, TestAuthMe, TestUserLifecycle, TestDeactivatedUserSessionsAreRevoked, TestAssignAndRemoveRoles, TestRolesAndPermissions, TestRBACEnforcement, TestAuditTrail, TestPaginationIsClampedEverywhere, TestErrorEnvelopeIsUniform, TestCORSHeaders, TestTenantIsolation
+- `inbox_test.go`: TestInboxClaimIsOncePerConsumer
 - `invitation_test.go`: TestInvitationLifecycle, TestInvitationRevokeAndEscalation
 - `learning_test.go`: TestLearning, TestLearningManagerVerification
 - `leave_plus_test.go`: TestLeaveParity
@@ -9413,6 +10989,12 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 - `performance_parity_test.go`: TestPerformanceCalibrationAndFeedback
 - `performance_test.go`: TestPerformanceLifecycle
 - `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
+- `projects_collab_test.go`: TestCollabComments, TestCollabTime, TestCollabAttachmentsWithoutStorage
+- `projects_groups_test.go`: TestProjectGroupRulesFollowHR
+- `projects_hooks_test.go`: TestTaskDescriptionMentionsAndAutoWatchers
+- `projects_planning_test.go`: TestPlanningSprintsAndPlan, TestPlanningViewsSearchAndFeed
+- `projects_tasks_test.go`: TestProjectTasksCore, TestTasksListingAndSubtasks, TestTaskRelationsAssigneesBulkAndMove
+- `projects_test.go`: TestProjectsContext
 - `recruitment_plus_test.go`: TestRecruitmentParity
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
 - `relay_test.go`: TestOutboxRelay, TestOutboxRelayRejectsBadTableNames
@@ -9883,6 +11465,109 @@ Sensors: build/vet/gofmt clean; unit + integration + golden + security tests pas
 role inheritance, predefined and automatic roles, per-user grants with expiry and blocks (blocks win), access
 version for cache invalidation, explain-access API. Legacy `RequirePermission` requires tenant scope so no existing
 route widens; scoped routes opt in through `RequireScopedPermission`.
+
+### m2-projects-tasks  _(from specification.md)_
+
+**Requirements and rules (ID-tagged table rows)**
+
+| ID | Text | … |
+|---|---|---|
+| PR-01 | A project has a `key` (2–10 uppercase letters/digits, unique per tenant), `name` (1–120), `description` (markdown, ≤ 10 000), `status` `active | archived`, `visibility` `private | tenant`, an owner, optional `start_on`/`due_on`, icon and color. It starts with default columns. |
+| PR-02 | `private`: only members and tenant-level admins see it. `tenant`: any user of the tenant can read it and its tasks (read-only unless a member). |
+| PR-03 | Archiving a project is reversible, hides it from default lists, blocks task creation and edits, and keeps all data. Deleting is a soft delete by tenant admins only, after archive. |
+| PR-04 | Membership: `project_member` (user, role). A user can be added directly, or through a **group rule** (phase 3): all members of a department or team, or a manager's direct reports, resolved through the people port and refreshed on org changes. Removing the last owner is refused. |
+| PR-05 | Roles: built-in `owner`, `manager`, `member`, `viewer` (fixed permission sets) plus tenant-defined **custom project roles** (a named set of project permissions). The project permissions are listed in section 8. |
+| PR-06 | **Columns** (statuses) per project: name, key, position, color, `category` `backlog | todo | in_progress | done | canceled`, optional WIP limit, default flag. Customisable (add, rename, reorder, recolor, delete when empty or with a target column). At least one `done` and one `todo` column always exist. The category drives reports, "completed" and overdue logic. |
+| PR-07 | **Labels**: project labels and tenant-wide labels (name unique per scope, color). |
+| PR-08 | **Milestones**: name, `due_on`, status `open | reached`; tasks may belong to one milestone; progress = done tasks / tasks. |
+| PR-09 | Project list for the caller: filters (status, member, key/name search), cursor pagination, `favorite` flag per user, sorted by recent activity by default. |
+| TK-01 | A task has a project-scoped sequence `number` (ticket id `KEY-12`, allocated atomically, never reused), `title` (1–300), `description` (markdown ≤ 50 000), `column`, `priority` `none | low | medium | high | urgent`, `reporter`, assignees (0..n), `start_on`, `due_at`, `estimate_minutes`, labels, milestone, optional `sprint`, optional `parent_task`, a `rank` for ordering, and a `version`. |
+| TK-02 | Create is idempotent (`Idempotency-Key`): a replay returns the original task, never a duplicate. |
+| TK-03 | Edit uses **optimistic concurrency**: every update carries the expected `version` (`If-Match` or body); a stale version returns 409 `VERSION_CONFLICT` with the current version; a successful update increments it. |
+| TK-04 | Moving a task to another column sets `completed_at` when the column category is `done` and clears it when moved out; `canceled` is closed but not "done". WIP limit overflow is refused when the limit is hard, warned when soft. |
+| TK-05 | Reorder within a column or between columns uses a fractional `rank` so one move touches one row; concurrent moves never lose a task. |
+| TK-06 | Subtasks: `parent_task` nests up to 3 levels; a parent cannot be done while open subtasks exist unless forced by a manager; progress rolls up. A subtask stays in the parent's project. |
+| TK-07 | Relations: `blocks` (directed), `related`, `duplicates`. `blocks` forbids cycles (checked inside the transaction over a bounded graph walk, 409 `DEPENDENCY_CYCLE`). A task with open blockers shows as blocked and cannot move to `done` unless forced. Cross-project relations are allowed between projects the caller can read. |
+| TK-08 | Move to another project: the task gets a new number in the target project and keeps its history, comments and attachments; the old ticket id keeps resolving (redirect). |
+| TK-09 | Bulk update (up to 100 tasks): column, priority, assignees add/remove, labels, milestone, sprint, archive. Each task is checked; the response lists per-task success or error. |
+| TK-10 | Archive and restore tasks (separate from delete). Soft delete by manager+; hard purge only by retention job after 30 days. |
+| TK-11 | Duplicate a task (title suffix, same labels/assignees optionally, no comments). |
+| TK-12 | Lookup by ticket id (`KEY-12`) resolves within the tenant. |
+| TK-13 | Task list for a project: filters (column, category, priority, assignee, label, milestone, sprint, due range, overdue, blocked, text), sorts (rank, created, updated, due, priority, number), **cursor pagination** (max 100). |
+| TK-14 | Search: tenant-scoped full text over title and description plus ticket-id lookup; only projects the caller can read are searched. |
+| CM-01 | Comments: markdown ≤ 10 000, author edits and deletes their own (deleted comments leave a tombstone), managers can delete any. Edited comments show `edited_at`. |
+| CM-02 | Mentions: `@[Name](user:<uuid>)` tokens in descriptions and comments. The server extracts ids, drops those who cannot read the project, stores them, and emits `task.mentioned` with ids only. |
+| CM-03 | Watchers: a user watches a task (explicitly, or automatically as reporter, assignee, commenter or mentioned). Watchers receive assignment/status/comment events (delivery by M10). |
+| CM-04 | **Activity**: an append-only history per task and per project (created, field changes with old/new values, moved, assigned, commented, attached, related, time logged). Entries are never edited or deleted; ordered by a monotonic sequence; cursor paged. |
+| CM-05 | Activity values for restricted fields are still present but personal data is only ids. |
+| TM-01 | Log time on a task: manual (`started_at`, minutes, note) or a running timer (start/stop). One running timer per user (database constraint). Entries are edited or deleted by their author within the project's lock window (default 30 days) and by managers. |
+| TM-02 | Totals per task, per user and per project for a date range; estimate vs logged. |
+| TM-03 | A timer left running more than 24 h is flagged and stopped by a sweep, marked `auto_stopped`. |
+| TM-04 | Time entries never include HR facts; payroll/billing use is out of scope. |
+| AT-01 | Files are stored in **S3-compatible object storage** through the shared storage port (section 6 of `design.md`), not as URLs. Flow: `init` (filename, size, content type) → client uploads straight to storage with a presigned URL → `complete` (server verifies existence, size, content type and checksum, then marks the attachment ready). |
+| AT-02 | Limits: 50 MB per file, per-tenant quota, allow-list of content types, filename sanitised, executables refused. A malware-scan hook runs before `ready` (no-op implementation until a scanner exists). |
+| AT-03 | Download: authorised against the task's project, returns a short-lived presigned URL; access is logged to activity for sensitive projects. Attachments inherit task/comment permissions (`attachment.upload`, `attachment.delete`). |
+| AT-04 | Pending uploads older than 24 h and deleted attachments are cleaned up by a sweep (object and row). Deleting a task keeps attachments until purge. |
+| AT-05 | Documents (M8) can later own attachment metadata; the storage keys and the port stay unchanged. |
+| SP-01 | **Sprints** (project mode `scrum`): name, goal, `start_on`, `end_on`, status `planned | active | completed`. At most one active sprint per project (database constraint). |
+| SP-02 | Start: requires planned status and dates; completing: unfinished tasks move to the next planned sprint or the backlog (choice in the request); a completion report stores committed vs completed counts and estimates. |
+| SP-03 | **Backlog**: in `kanban` mode, tasks in a `backlog`-category column; in `scrum` mode, tasks with no sprint. Planning view moves tasks between backlog and sprints in bulk. |
+| VW-01 | **Board** view: columns with counts, cursor-paged tasks per column (no full-history loads). |
+| VW-02 | **List** view: any filter/sort combination, grouping (column, assignee, priority, milestone, sprint), cursor pagination. |
+| VW-03 | **Calendar** view: tasks by `due_at` / `start_on` for a date window (max 62 days). An iCalendar feed per user (tokenised, revocable) lists assigned tasks. |
+| VW-04 | **Gantt** view: tasks with `start_on`/`due_at`, milestones and `blocks` relations for a window; computed server-side, bounded to 500 tasks per request with paging. |
+| VW-05 | **My work**: tasks assigned to me across projects grouped overdue / today / this week / later / no date, plus watching and mentions; counts endpoint for badges. |
+| VW-06 | **Saved views**: filters, sort, grouping and layout saved per user, or shared with a project (manager+). |
+
+**Decision log (decisions.md, verbatim)**
+
+Proposed decisions (DPJ) take effect when the design is approved. Open questions (Q) need an answer before the step that depends on them.
+##### Decisions DPJ-01..14 (approved 2026-10-28)
+- **DPJ-01 Own service, own stack.** M2 is written in Go in the monorepo, with its own Postgres schema `projects`, migrations, routes, outbox/inbox and console page. Kaneo is a feature reference only: no code or schema is copied or run, so there is no second runtime and no licence obligation beyond crediting the reference.
+- **DPJ-02 Tenant = workspace.** Kaneo's "workspace" maps to our tenant (M0). Invitations, users and tenant roles stay in M0; M2 adds project membership and project roles on top.
+- **DPJ-03 Columns are the statuses.** A task's status is its column; each column has a `category` (`backlog|todo|in_progress|done|canceled`) so reports and rules work across projects with different column names.
+- **DPJ-04 Optimistic concurrency from the start.** Tasks carry a `version`; edits send the expected version. (Kaneo has none; the original M2 proposal required it.)
+- **DPJ-05 Sprints are first-class** (Kaneo has none). A project is `kanban` or `scrum`; scrum projects plan work into sprints, kanban projects use a backlog column.
+- **DPJ-06 Multiple assignees**, as in the original proposal (Kaneo allows one).
+- **DPJ-07 Real file storage now.** Attachments use a shared S3-compatible storage port with presigned upload and download. HR documents (which today only store a URL) and M8 can adopt it later.
+- **DPJ-08 Markdown, not a rich-text document model.** Descriptions and comments are stored as markdown text; mentions are `@[Name](user:<uuid>)` tokens extracted by the server. A rich editor on the client can emit and render markdown.
+- **DPJ-09 Fractional ranks** for ordering so a move touches one row.
+- **DPJ-10 Ticket ids** `KEY-N` with a per-project counter; moving a task to another project keeps the old id resolving through `task_ticket_alias`.
+- **DPJ-11 HR-aware membership.** Add a department, a team or a manager's direct reports to a project through group rules resolved with the People port. This is the main product difference from a generic tracker.
+- **DPJ-12 Extension points over speculative tables.** Phase 4–5 tables are reserved by name and their plug-in points are documented in the specification (section 9); no empty tables are created now.
+- **DPJ-13 Shared identity port.** Move `identityport` to `internal/shared/identityport`; `shared/identityport` becomes a thin alias package so no HR file changes.
+- **DPJ-14 Notifications.** M2 only publishes events. Until M10 exists nothing is delivered; per-user preferences belong to M10. In-app "unread" for My work uses read markers owned by M2 only if M10 slips (revisit at phase 3).
+##### Owner answers (2026-10-28)
+1. **Scope:** phases 1-3 confirmed; later phases must not be blocked (extension points in specification section 9).
+2. **UI:** one test console for every module (`/dev-test`), with an M2 page of its own that depends on the identity pages for sign-in. A product UI is a later phase.
+3. **Storage:** approved, behind a provider interface (`shared/storage`). The AWS SDK v2 is added. **MinIO's official images are no longer published** (Docker Hub repository removed, Quay returns 401), so the dev service is `adobe/s3mock` on port 9090; the adapter speaks plain S3, so MinIO, AWS S3 or another compatible server is a configuration change. HR documents and other modules can adopt the same port later; HR is not changed now.
+4. **Decided by the implementer (owner delegated 4-8):**
+   - WIP limit: **soft by default**, with a per-column `wip_hard` switch (a hard column refuses the move with 409 `WIP_LIMIT`).
+   - Subtask depth: **3**.
+   - Time-entry lock window: **30 days**, and a project can **disable time tracking**.
+   - Labels: **tenant-wide and project labels** both kept.
+   - Public project links and recurring tasks: **phase 4+**.
+5. **Branching:** `module-2` is pushed to `origin` and pushed again after each phase.
+##### Implementation decisions (2026-10-28 onward)
+Format: decision - reason - alternatives - trade-off.
+- **DPJ-15 Routes at the `/api/v1` root, not under a module prefix.** `GET /projects`, `/tasks/:id`, `/sprints/:id`, ... - the spec and design name resources by their natural paths, and the module owns those names. Alternative `/api/v1/pm/...` (rejected: longer, and every console form and client would carry a prefix with no meaning). Trade-off: M2 must keep its root names unique across modules; `TestSwaggerMatchesRoutes` and the import-boundary test guard it.
+- **DPJ-16 Table names are plural and unprefixed inside schema `projects`.** The in-process search path (`identity,hr,projects,public`) resolves unqualified names, so a name used by two services would be ambiguous; `TestSchemasAreOwnedAndIsolated` now fails on any table name that exists in two schemas. Alternative: `pm_` prefix everywhere (rejected: noise, and a separate deployment already isolates by schema).
+- **DPJ-17 Storage provider: S3-compatible dev service is `adobe/s3mock`, not MinIO.** MinIO's official images are no longer published (Docker Hub repository removed, Quay answers 401). The adapter speaks plain S3 (AWS SDK v2) and is configured by endpoint/region/bucket/keys, so MinIO, AWS S3 or another server is a configuration change. HR and other modules can adopt the same `shared/storage` port later; HR is unchanged now.
+- **DPJ-18 Shared packages promoted for M2.** `identityport` (with its in-process adapter) moved to `internal/shared` so M2 and HR use one port; the HR table relay became `shared/outbox.TableRelay` (HR keeps a thin alias); `shared/inbox.Claim` is the first consumer ledger. Alternative: duplicate in M2 (rejected: two relays to keep in step). The HR import-boundary test now forbids any HR import of identity internals other than `identity/access`.
+- **DPJ-19 Role permissions are stored as JSONB, project member roles as `role_key` or `custom_role_id` (exactly one).** Keeps built-in roles in code (fixed sets, no per-tenant seeding) and custom roles editable with immediate effect on members. Alternative: seed built-in roles per tenant (rejected: seeding drift and a migration per permission added).
+- **DPJ-20 Ranks use `COLLATE "C"`.** Fractional string ranks (`kernel.RankBetween`) compare bytewise; the default collation would reorder them.
+- **DPJ-21 Activity is append-only by trigger.** `UPDATE` raises an exception; rows disappear only with their project (hard purge). The application role keeps `DELETE` for cascades.
+- **DPJ-22 Group rules are materialised.** A rule expands into `project_members` rows with `source = 'group'`; direct members are never overridden; an explicit role change pins a group member as a direct one; the highest role among rules wins; refresh runs on rule change, on request, and every 10 minutes. Alternative: resolve at read time on every access check (rejected: an HR call per request breaks the latency budget and the failure mode - HR down means nobody can open a project). Trade-off: up to ten minutes of lag after an HR change unless refreshed explicitly.
+- **DPJ-23 Deactivation uses the in-process `identityport.OnUserDeactivated` hook now, with an inbox-deduplicated `HandleIdentityEvent` for when a broker consumer exists.** The bus abstraction today only publishes; HR terminations deactivate the login, so one hook covers both sources. Memberships and assignments are marked inactive (history kept), an activity entry and a `project.member.removed` event are written in the same transaction. A user is never auto-added back on reactivation.
+- **DPJ-24 DB errors are never treated as "not found / zero".** A statement-level fault-injection test (`faults_test.go`) fails each SQL statement of the main flows in turn; the service must return an error and leave no partial change. It found and fixed seven silently-ignored count/lookup errors.
+- **DPJ-25 Coverage rule applied to services.** Service logic is covered by tests on a real PostgreSQL (no repository fakes), HTTP handlers by the integration ring through the production router; `project` services are at 95%.
+- **DPJ-26 Cross-context behaviour goes through `api` interfaces.** `TaskResolver` (collab and planning find a task and the caller access), `Authorizer`, and `TaskHooks` (description mentions and automatic watchers, bound late with `task.SetHooks`). Alternative: collab imported by task (rejected: a cycle, since collab resolves tasks). Trade-off: one more interface; the task context works without hooks (nil-safe).
+- **DPJ-27 Dependency graph edits use one advisory lock per tenant.** A `blocks` cycle can run through several projects, so a per-project lock lets two inserts in disjoint project pairs both pass the check. Cost: dependency edits of one tenant serialise (rare and short).
+- **DPJ-28 Planning writes exactly one task column (`sprint_id`).** Plan moves and sprint completion touch `tasks.sprint_id`, `version` and `updated_at` with a per-task version predicate; everything else about a task belongs to the task context. Read models read M2 tables by SQL. Alternative: route plan moves through the task service (rejected: planning would depend on task and bulk moves would need a per-task round trip).
+- **DPJ-29 The iCalendar feed is the one public M2 route.** It carries a per-user random token (32 bytes, SHA-256 stored, shown once, revocable), derives the tenant from the token row, lists only tasks assigned to the token owner in projects that owner can read, checks the owner is still active, and is rate limited per process (30/min/IP). Tenant-level flags are not available without a JWT, so tenant admins see only the private projects they belong to.
+- **DPJ-30 Attachments never pass through the API.** Clients upload with a presigned PUT and the server verifies the object (existence, size, type, checksum) before `ready`; the object key is `t/<tenant>/p/<project>/a/<attachment>`; the bucket is private; storage calls happen outside DB transactions; with no storage configured every attachment route answers 503 `STORAGE_UNAVAILABLE` and the rest of M2 works.
+- **DPJ-31 Time tracking.** One running timer per user (partial unique index), entries editable by their author within a 30-day lock window and by `time.manage`, projects can switch tracking off, timers running more than 24 h are stopped by a sweep and marked `auto_stopped`.
+- **DPJ-32 Permission model.** Four tenant-level catalogue entries were added to M0 (`projects:create` defaults to the Employee template; `projects:read_all` to Executive, Auditor, IT Admin; `projects:manage_all` and `project_roles:manage` to IT Admin). Project-level permissions are owned by M2 and are not M0 permissions. No M0 role or permission behaviour was changed.
 
 ### m1-hr-management/contexts/organization  _(from specification.md)_
 
@@ -10935,9 +12620,9 @@ Format: Decision / Reason / Alternatives / Tradeoff.
 - **DL-11** Plan progress counts the worker's enrolment in each plan course whatever its source, newest cycle first, so
   completing a plan's course on your own still counts towards the plan. Waived counts as done.
 - **DL-12** Events (`learning.course.published|retired`, `learning.assignment.created|cancelled`,
-  `learning.enrolment.completed|waived`) go to `lrn_events_outbox` with ids and statuses only. There is no relay yet, as for
-  compensation and onboarding; a consumer is added with its first subscriber. Scores, evidence and comments never leave
-  the context (HR-009).
+  `learning.enrolment.completed|waived`) go to `lrn_events_outbox` with ids and statuses only and are published to `jaas.learning.events` by the shared
+  `kernel.OutboxRelay` (30 s tick, claim with `FOR UPDATE SKIP LOCKED`, 10 attempts, `TestOutboxRelay`). Scores, evidence and
+  comments never leave the context (HR-009).
 
 ### m1-hr-management/contexts/benefits  _(from specification.md)_
 

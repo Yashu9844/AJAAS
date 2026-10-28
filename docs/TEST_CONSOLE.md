@@ -21,6 +21,13 @@ excluded from production builds.
 | `/dev-test/hr/onboarding` | HR Onboarding & Offboarding | generated (19) | `S_ONBOARDING` |
 | `/dev-test/hr/learning` | HR Learning | generated (35) | `S_LEARNING` (`hr.learning.flow`) |
 | `/dev-test/hr/benefits` | HR Benefits | generated (29) | `S_BENEFITS` (`hr.benefits.flow`) |
+| `/dev-test/projects` | M2 Projects | generated (35) | `scenariosPm.ts` `S_PROJECTS` |
+| `/dev-test/projects/tasks` | M2 Tasks | generated (23) | `scenariosPmTasks.ts` `S_PM_TASKS` |
+| `/dev-test/projects/collab` | M2 Collaboration | generated (21) | `scenariosPmCollab.ts` `S_PM_COLLAB` |
+| `/dev-test/projects/planning` | M2 Planning & Views | generated (25) | `scenariosPmPlanning.ts` `S_PM_PLANNING` |
+| `/dev-test/projects/platform` | M2 Group rules | generated (4) | `scenariosPmPlatform.ts` `S_PM_PLATFORM` |
+
+M2 operation forms are generated from the swagger by `scripts/gen_console_specs.py` into `generated/projectsSpecs.ts` (a path belongs to the context with the longest matching prefix); the M2 swagger section is generated from `scripts/pm_routes_*.py` by `scripts/gen_projects_swagger.py`.
 
 From now on each feature ships its page in the same phase as its backend (delivery phase P8, `docs/ENGINEERING.md` §3).
 Last full run (2026-10-24, fresh database, headless): **48/48 scenarios passed** (A-only scenarios; the two-tenant
@@ -34,6 +41,11 @@ date. It is fixed once, in `middleware.BodyLimit`, which now reads such bodies (
 Login form (session A, tenant `tenant_admin`) and pressed every enabled "Run scenario" button: 10/10 identity and 38/38 HR
 scenarios passed as the UI itself reports them (two-tenant scenarios stay disabled without session B). A person should still
 click through it once; see the walkthrough in `plan.md` §6.
+
+**M2 browser run (2026-10-28):** the five M2 pages, driven in headless Chrome through the Login form, pressed every "Run scenario" button:
+**11/11 scenarios passed, 296 steps** on the dev database. The first run found a real defect that neither curl nor the Go tests could: the
+CORS preflight did not allow `If-Match`, so versioned edits failed in a browser with "Failed to fetch" (DPJ-33, fixed in
+`internal/shared/middleware/cors.go` with a test).
 
 ## 1. Run it
 

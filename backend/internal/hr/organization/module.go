@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/controllers"
 	"github.com/jaas/jaas/internal/hr/organization/events"
 	"github.com/jaas/jaas/internal/hr/organization/models"
@@ -13,6 +12,7 @@ import (
 	orgRoutes "github.com/jaas/jaas/internal/hr/organization/routes"
 	"github.com/jaas/jaas/internal/hr/organization/services"
 	sharedCache "github.com/jaas/jaas/internal/shared/cache"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"

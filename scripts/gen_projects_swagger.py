@@ -11,7 +11,8 @@ Q = lambda name, typ='string', **kw: dict(name=name, **{'in': 'query'}, schema=d
 CURSOR = [Q('cursor'), Q('limit', 'integer', minimum=1, maximum=100)]
 UUID_ID = {'id': 'id'}
 
-# (method, path, summary, tag, query params, body schema, success status, error codes)
+# (method, path, summary, tag, query params, body schema, success status, error codes[, 'public'])
+# A 9th element 'public' documents a route without a bearer token (security: [], text/calendar response).
 ROUTES = [
     # --- projects
     ('post', '/projects', 'Create a project; the caller becomes its owner (projects:create)', 'Projects', [], 'ProjectInput', '201', ['400', '403', '409']),
@@ -100,8 +101,9 @@ def flow(v):
     return s if re.fullmatch(r'[A-Za-z0-9_./-]+', s) and s not in ('true', 'false', 'null') else "'" + s.replace("'", "''") + "'"
 
 
-def operation(method, path, summary, tag, query, body, status, errors):
-    out = [f'    {method}:', f"      summary: '{summary}'", f'      tags: [{tag}]', '      security: [{BearerAuth: []}, {TenantSubdomain: []}]']
+def operation(method, path, summary, tag, query, body, status, errors, public=None):
+    security = '[]' if public == 'public' else '[{BearerAuth: []}, {TenantSubdomain: []}]'
+    out = [f'    {method}:', f"      summary: '{summary}'", f'      tags: [{tag}]', f'      security: {security}']
     params = [dict(name=n, **{'in': 'path'}, required=True, schema=UUID) for n in re.findall(r'\{(\w+)\}', path)] + query
     if params:
         out.append('      parameters: ' + flow(params))
@@ -109,8 +111,9 @@ def operation(method, path, summary, tag, query, body, status, errors):
         out.append('      requestBody: ' + flow({'required': True, 'content': {'application/json': {'schema': {'$ref': f'#/components/schemas/{body}'}}}}))
     envelope = 'ProjectsListEnvelope' if method == 'get' and not re.search(r'\{[^}]+\}$', path) else 'ProjectsObjectEnvelope'
     out.append('      responses:')
-    out.append(f"        '{status}': " + flow({'description': 'OK', 'content': {'application/json': {'schema': {'$ref': f'#/components/schemas/{envelope}'}}}}))
-    codes = {'400': 'VALIDATION_ERROR', '403': 'FORBIDDEN', '404': 'NOT_FOUND', '409': 'CONFLICT'}
+    content = {'text/calendar': {'schema': {'type': 'string'}}} if public == 'public' else {'application/json': {'schema': {'$ref': f'#/components/schemas/{envelope}'}}}
+    out.append(f"        '{status}': " + flow({'description': 'OK', 'content': content}))
+    codes = {'400': 'VALIDATION_ERROR', '403': 'FORBIDDEN', '404': 'NOT_FOUND', '409': 'CONFLICT', '429': 'RATE_LIMITED'}
     out += [f"        '{c}': {{description: '{codes[c]}'}}" for c in errors]
     return out
 

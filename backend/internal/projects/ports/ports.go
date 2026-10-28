@@ -17,6 +17,6 @@ import (
 type People interface {
 	DepartmentMembers(ctx context.Context, tenantID, departmentID uuid.UUID) ([]uuid.UUID, error)
 	TeamMembers(ctx context.Context, tenantID, teamID uuid.UUID) ([]uuid.UUID, error)
-	// DirectAndIndirectReports lists the users who report, directly or not, to managerUserID.
-	Reports(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)
+	// DirectReports lists the users whose primary active placement reports to managerUserID.
+	DirectReports(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)
 }

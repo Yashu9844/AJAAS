@@ -23,7 +23,11 @@ const NAV = [
   { href: "/dev-test/hr/payroll", label: "M1 HR — Payroll" },
   { href: "/dev-test/hr/recruitment", label: "M1 HR — Recruitment" },
   { href: "/dev-test/hr/performance", label: "M1 HR — Performance & OKRs" },
-  { href: "/dev-test/projects", label: "M2 — Projects & Tasks" },
+  { href: "/dev-test/projects", label: "M2 — Projects" },
+  { href: "/dev-test/projects/tasks", label: "M2 — Tasks" },
+  { href: "/dev-test/projects/collab", label: "M2 — Collaboration" },
+  { href: "/dev-test/projects/planning", label: "M2 — Planning & Views" },
+  { href: "/dev-test/projects/platform", label: "M2 — Group rules" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {

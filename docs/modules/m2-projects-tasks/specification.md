@@ -1,7 +1,7 @@
-# M2 Projects & Tasks — Specification (DESIGN, awaiting approval)
+# M2 Projects & Tasks — Specification (FROZEN 2026-10-28, phases 1-3 built)
 
-> Status: **proposed for approval**; nothing is built. When approved this file is frozen and changes need a recorded
-> decision. It replaces the earlier proposal (kept in git history). Feature scope is **phases 1–3**; phases 4–5 are
+> Status: **approved 2026-10-28 and built** (phases 1-3). This file is frozen: changes need a recorded decision. Deviations found
+> while building are listed in the last section and in `decisions.md`. It replaces the earlier proposal (kept in git history). Feature scope is **phases 1–3**; phases 4–5 are
 > designed for (section 9) so nothing later forces a schema or API break. Universal rules (tenancy, idempotency,
 > outbox/inbox, envelopes, security, latency) in `docs/ARCHITECTURE.md` section 3 apply in full.
 >
@@ -131,3 +131,19 @@ Envelope version 1 (shared standard), exchange `jaas.projects.events`; payloads 
 ## 10. Golden tests (frozen when approved)
 
 `PG1` duplicate task creation replay returns the original; `PG2` concurrent status updates: exactly one wins per version, none lost; `PG3` dependency cycles rejected, including through concurrent inserts; `PG4` non-members denied, private projects invisible, foreign tenant ids 404; `PG5` task numbers are unique and gapless under concurrency; `PG6` one active sprint and one running timer enforced under races; `PG7` large board pagination: a 50 000-task project pages within budget with stable order; `PG8` attachment ACL: no download without project access, presigned URLs expire, wrong size/type refused; `PG9` tenant-isolated search; `PG10` event replay is idempotent for consumers and the outbox never loses a committed event; `PG11` mentions never leak a task to someone who cannot read it; `PG12` events and audit hold ids only.
+
+## 11. Deviations recorded while building (decision references in `decisions.md`)
+
+- Routes sit at the `/api/v1` root (`/projects`, `/tasks/{id}`, `/sprints/{id}`, ...), not under a module prefix (DPJ-15).
+- `PATCH /tasks/{id}` requires `version` (body) or `If-Match`; a same-column reorder writes only the rank and does not bump the version.
+- Dependency edits are serialised with one advisory lock per tenant (cycles can cross projects); the spec's per-project lock was not enough.
+- A task with a parent or subtasks cannot be moved to another project or re-parented (409 `TASK_HAS_HIERARCHY`).
+- Events added: `project.deleted`; deletion reuses `task.archived` with `deleted: true`, restore reuses `task.updated` with `restored: true`.
+- AT-02 refusals: oversize and type refusals are 400 `FILE_TOO_LARGE` / `FILE_TYPE_NOT_ALLOWED`, quota is 409 `QUOTA_EXCEEDED`.
+- CM-02: a mention counts as readable only for active tenant users who are members of the project (or the project is tenant-visible); users who
+  see a private project only through `projects:read_all` are not notified.
+- PR-04 group rules are materialised as `project_members.source = 'group'` rows and refreshed (DPJ-22); an explicit role change pins a member as direct.
+- SP-03: in scrum mode the backlog excludes done and canceled tasks that have no sprint; sprints, backlog and plan answer 409 `PROJECT_MODE` for kanban projects.
+- VW-03: the iCalendar feed is the only M2 route without a bearer token (token hash, owner still active, readable projects only).
+- TK-14 search is implemented in the planning context (`GET /search`); the task list also has a `q` filter.
+- Deactivated logins keep their rows: `project_members.active` and `task_assignees.active` become false; history stays (section 7).

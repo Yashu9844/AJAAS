@@ -94,7 +94,7 @@ func Build(o Options) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	projectsModule, err := buildProjects(o, idp)
+	projectsModule, err := buildProjects(o, idp, hrModule.People())
 	if err != nil {
 		return nil, err
 	}

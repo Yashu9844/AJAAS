@@ -44,3 +44,22 @@ func (m *Module) DirectReportUserIDs(ctx context.Context, tenantID, managerUserI
 		Distinct().Pluck("user_id", &ids).Error
 	return ids, err
 }
+
+// DepartmentUserIDs lists the users with an active placement in the department (M2 project group rules).
+func (m *Module) DepartmentUserIDs(ctx context.Context, tenantID, departmentID uuid.UUID) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := m.db.WithContext(ctx).Model(&models.Mapping{}).
+		Where("tenant_id = ? AND status = ? AND deleted_at IS NULL AND department_id = ?", tenantID, "active", departmentID).
+		Distinct().Pluck("user_id", &ids).Error
+	return ids, err
+}
+
+// TeamUserIDs lists the users with an active placement in the team (M2 project group rules).
+func (m *Module) TeamUserIDs(ctx context.Context, tenantID, teamID uuid.UUID) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := m.db.WithContext(ctx).Model(&models.Mapping{}).
+		Where("tenant_id = ? AND status = ? AND deleted_at IS NULL AND team_id = ?", tenantID, "active", teamID).
+		Distinct().Pluck("user_id", &ids).Error
+	return ids, err
+}
+

@@ -1151,9 +1151,2405 @@ export const PM_PROJECTS: OpSpec[] = [
   }
 ];
 
-export const PM_TASKS: OpSpec[] = [];
+export const PM_TASKS: OpSpec[] = [
+  {
+    "key": "pm.tasks.get.projects.id.activity",
+    "label": "Project activity, newest first, cursor by sequence (task.read)",
+    "method": "GET",
+    "path": "/projects/:id/activity",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "order",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "asc",
+          "desc"
+        ]
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.post.projects.id.tasks",
+    "label": "Create a task with the next ticket number, appended to its column (task.create)",
+    "method": "POST",
+    "path": "/projects/:id/tasks",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "title",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "column_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "priority",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "none",
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ]
+      },
+      {
+        "name": "start_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "due_at",
+        "where": "body",
+        "type": "datetime"
+      },
+      {
+        "name": "estimate_minutes",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "milestone_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "sprint_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "parent_task_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "assignee_ids",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "label_ids",
+        "where": "body",
+        "type": "list"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsTasksId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.get.projects.id.tasks",
+    "label": "List tasks with filters, sort and keyset cursor (task.read)",
+    "method": "GET",
+    "path": "/projects/:id/tasks",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "column_id",
+        "where": "query"
+      },
+      {
+        "name": "category",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "backlog",
+          "todo",
+          "in_progress",
+          "done",
+          "canceled"
+        ]
+      },
+      {
+        "name": "priority",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "none",
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ]
+      },
+      {
+        "name": "assignee",
+        "where": "query"
+      },
+      {
+        "name": "label_id",
+        "where": "query"
+      },
+      {
+        "name": "milestone_id",
+        "where": "query"
+      },
+      {
+        "name": "sprint_id",
+        "where": "query"
+      },
+      {
+        "name": "parent_id",
+        "where": "query"
+      },
+      {
+        "name": "due_from",
+        "where": "query"
+      },
+      {
+        "name": "due_to",
+        "where": "query"
+      },
+      {
+        "name": "overdue",
+        "where": "query",
+        "type": "bool"
+      },
+      {
+        "name": "blocked",
+        "where": "query",
+        "type": "bool"
+      },
+      {
+        "name": "top_level",
+        "where": "query",
+        "type": "bool"
+      },
+      {
+        "name": "archived",
+        "where": "query",
+        "type": "bool"
+      },
+      {
+        "name": "q",
+        "where": "query"
+      },
+      {
+        "name": "sort",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "rank",
+          "created",
+          "updated",
+          "due",
+          "priority",
+          "number"
+        ]
+      },
+      {
+        "name": "dir",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "asc",
+          "desc"
+        ]
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.post.projects.id.tasks.bulk",
+    "label": "Update up to 100 tasks; the response lists each task outcome (task.update)",
+    "method": "POST",
+    "path": "/projects/:id/tasks/bulk",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "task_ids",
+        "where": "body",
+        "type": "list",
+        "required": true
+      },
+      {
+        "name": "column_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "priority",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "none",
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ]
+      },
+      {
+        "name": "assignees_add",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "assignees_remove",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "labels_add",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "labels_remove",
+        "where": "body",
+        "type": "list"
+      },
+      {
+        "name": "milestone_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "sprint_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "archive",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "force",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.get.tasks.id",
+    "label": "One task with ticket id, derived flags, assignees and labels",
+    "method": "GET",
+    "path": "/tasks/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.patch.tasks.id",
+    "label": "Edit a task; version (body or If-Match) is required (task.update)",
+    "method": "PATCH",
+    "path": "/tasks/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "title",
+        "where": "body"
+      },
+      {
+        "name": "description",
+        "where": "body"
+      },
+      {
+        "name": "priority",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "none",
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ]
+      },
+      {
+        "name": "start_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "due_at",
+        "where": "body",
+        "type": "datetime"
+      },
+      {
+        "name": "estimate_minutes",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "milestone_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "sprint_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "parent_task_id",
+        "where": "body",
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.delete.tasks.id",
+    "label": "Soft-delete a task and its subtasks (task.delete)",
+    "method": "DELETE",
+    "path": "/tasks/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.get.tasks.id.activity",
+    "label": "Task history, newest first, cursor by sequence",
+    "method": "GET",
+    "path": "/tasks/:id/activity",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "order",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "asc",
+          "desc"
+        ]
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.archive",
+    "label": "Archive a task (task.update)",
+    "method": "POST",
+    "path": "/tasks/:id/archive",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.assignees",
+    "label": "Assign project members (task.assign)",
+    "method": "POST",
+    "path": "/tasks/:id/assignees",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "user_ids",
+        "where": "body",
+        "type": "list",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.delete.tasks.id.assignees.user.id",
+    "label": "Remove an assignee (task.assign)",
+    "method": "DELETE",
+    "path": "/tasks/:id/assignees/:user_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "user_id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksAssigneesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.duplicate",
+    "label": "Copy a task, optionally with labels and assignees (task.create)",
+    "method": "POST",
+    "path": "/tasks/:id/duplicate",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "copy_assignees",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "copy_labels",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "tasksDuplicateId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.labels",
+    "label": "Add labels of the project or tenant (task.update)",
+    "method": "POST",
+    "path": "/tasks/:id/labels",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "label_ids",
+        "where": "body",
+        "type": "list",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.delete.tasks.id.labels.label.id",
+    "label": "Remove a label (task.update)",
+    "method": "DELETE",
+    "path": "/tasks/:id/labels/:label_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "label_id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksLabelsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.move",
+    "label": "Move to a column and position; WIP and done rules apply (task.update)",
+    "method": "POST",
+    "path": "/tasks/:id/move",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "column_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "before_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "after_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "force",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.move.project",
+    "label": "Move to another project: new number, alias for the old ticket id (task.update, task.create)",
+    "method": "POST",
+    "path": "/tasks/:id/move-project",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "project_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "column_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.relations",
+    "label": "Relate to another task; blocks may not form a cycle (task.update)",
+    "method": "POST",
+    "path": "/tasks/:id/relations",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "target_task_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "blocks",
+          "related",
+          "duplicates"
+        ],
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "tasksRelationsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.get.tasks.id.relations",
+    "label": "List relations; ends in unreadable projects are hidden",
+    "method": "GET",
+    "path": "/tasks/:id/relations",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.delete.tasks.id.relations.relation.id",
+    "label": "Remove a relation (task.update)",
+    "method": "DELETE",
+    "path": "/tasks/:id/relations/:relation_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "relation_id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksRelationsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.reorder",
+    "label": "Place next to a neighbour with one before_id or after_id (task.update)",
+    "method": "POST",
+    "path": "/tasks/:id/reorder",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "column_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "before_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "after_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "force",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.post.tasks.id.restore",
+    "label": "Restore an archived task (task.update)",
+    "method": "POST",
+    "path": "/tasks/:id/restore",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.tasks.get.tasks.id.subtasks",
+    "label": "List direct subtasks with progress",
+    "method": "GET",
+    "path": "/tasks/:id/subtasks",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.tasks.get.tickets.key",
+    "label": "Resolve a ticket id such as KEY-12; moved tasks keep their old ids",
+    "method": "GET",
+    "path": "/tickets/:key",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "key",
+        "where": "path",
+        "required": true,
+        "ref": "ticketsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  }
+];
 
-export const PM_PLANNING: OpSpec[] = [];
+export const PM_COLLAB: OpSpec[] = [
+  {
+    "key": "pm.collab.delete.attachments.id",
+    "label": "Delete an attachment and its object (the uploader, or attachment.delete)",
+    "method": "DELETE",
+    "path": "/attachments/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attachmentsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.post.attachments.id.complete",
+    "label": "Verify the uploaded object (size, type, checksum), scan it and mark it ready; 409 UPLOAD_MISMATCH keeps it pending",
+    "method": "POST",
+    "path": "/attachments/:id/complete",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attachmentsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.get.attachments.id.download",
+    "label": "Presigned download URL valid for 2 minutes, authorised against the task project (task.read)",
+    "method": "GET",
+    "path": "/attachments/:id/download",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "attachmentsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.patch.comments.id",
+    "label": "Edit your own comment; sets edited_at (task.comment)",
+    "method": "PATCH",
+    "path": "/comments/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "commentsXId"
+      },
+      {
+        "name": "body",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.delete.comments.id",
+    "label": "Delete your own comment, or any with comment.moderate; leaves a tombstone",
+    "method": "DELETE",
+    "path": "/comments/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "commentsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.get.projects.id.time.report",
+    "label": "Logged minutes of a project for a date range, per task (with estimate) or per user (task.read)",
+    "method": "GET",
+    "path": "/projects/:id/time/report",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "from",
+        "where": "query"
+      },
+      {
+        "name": "to",
+        "where": "query"
+      },
+      {
+        "name": "group_by",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "task",
+          "user"
+        ]
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.post.tasks.id.attachments",
+    "label": "Start an upload: validates the file and returns the pending attachment with a presigned PUT valid for 5 minutes (attachment.upload)",
+    "method": "POST",
+    "path": "/tasks/:id/attachments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "filename",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "size",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "content_type",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "sha256",
+        "where": "body",
+        "placeholder": "optional lowercase hex checksum the object must match"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "tasksAttachmentsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.get.tasks.id.attachments",
+    "label": "Ready attachments of a task (task.read)",
+    "method": "GET",
+    "path": "/tasks/:id/attachments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.post.tasks.id.comments",
+    "label": "Add a markdown comment (max 10000); @[Name](user:uuid) mentions of users who cannot read the project are dropped (task.comment)",
+    "method": "POST",
+    "path": "/tasks/:id/comments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "body",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "tasksCommentsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.get.tasks.id.comments",
+    "label": "Comments of a task, oldest first; deleted ones are tombstones with an empty body (task.read)",
+    "method": "GET",
+    "path": "/tasks/:id/comments",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.post.tasks.id.time",
+    "label": "Log finished work: started_at, minutes 1..1440, note (time.log); 409 TIME_TRACKING_DISABLED, TIME_LOCKED",
+    "method": "POST",
+    "path": "/tasks/:id/time",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "started_at",
+        "where": "body",
+        "type": "datetime",
+        "required": true
+      },
+      {
+        "name": "minutes",
+        "where": "body",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "note",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "tasksTimeId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.get.tasks.id.time",
+    "label": "Time entries of a task, newest first; mine=true limits to the caller (task.read)",
+    "method": "GET",
+    "path": "/tasks/:id/time",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "mine",
+        "where": "query",
+        "type": "bool"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.get.tasks.id.watch",
+    "label": "Whether the caller watches the task, and why (task.read)",
+    "method": "GET",
+    "path": "/tasks/:id/watch",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.put.tasks.id.watch",
+    "label": "Watch the task as the caller (task.read)",
+    "method": "PUT",
+    "path": "/tasks/:id/watch",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.delete.tasks.id.watch",
+    "label": "Stop watching the task as the caller",
+    "method": "DELETE",
+    "path": "/tasks/:id/watch",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.get.tasks.id.watchers",
+    "label": "Watchers of a task by user id (task.read)",
+    "method": "GET",
+    "path": "/tasks/:id/watchers",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.get.time.entries.timer",
+    "label": "The caller running timer, or data null when none runs",
+    "method": "GET",
+    "path": "/time-entries/timer",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "pm.collab.post.time.entries.timer.start",
+    "label": "Start the caller timer on a task; one running timer per user, else 409 TIMER_RUNNING (time.log)",
+    "method": "POST",
+    "path": "/time-entries/timer/start",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "task_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "timeEntriesTimerId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.post.time.entries.timer.stop",
+    "label": "Stop the caller running timer and log the elapsed minutes; 404 when none runs",
+    "method": "POST",
+    "path": "/time-entries/timer/stop",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.collab.patch.time.entries.id",
+    "label": "Edit an entry: the author within the 30-day lock window, time.manage holders always; 409 TIMER_RUNNING for a running timer",
+    "method": "PATCH",
+    "path": "/time-entries/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "timeEntriesXId"
+      },
+      {
+        "name": "started_at",
+        "where": "body",
+        "type": "datetime"
+      },
+      {
+        "name": "minutes",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "note",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.collab.delete.time.entries.id",
+    "label": "Delete an entry (author within the lock window, or time.manage); also discards a running timer",
+    "method": "DELETE",
+    "path": "/time-entries/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "timeEntriesXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  }
+];
 
-export const PM_PLATFORM: OpSpec[] = [];
+export const PM_PLANNING: OpSpec[] = [
+  {
+    "key": "pm.planning.get.calendar",
+    "label": "My calendar: assigned tasks across readable projects in a window of at most 62 days",
+    "method": "GET",
+    "path": "/calendar",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "from",
+        "where": "query"
+      },
+      {
+        "name": "to",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "pm.planning.post.calendar.tokens",
+    "label": "Create an iCalendar feed token; the secret is shown once in this response",
+    "method": "POST",
+    "path": "/calendar-tokens",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "label",
+        "where": "body"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "calendarTokensXId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.get.calendar.tokens",
+    "label": "List my active feed tokens (never the secrets)",
+    "method": "GET",
+    "path": "/calendar-tokens",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "pm.planning.delete.calendar.tokens.id",
+    "label": "Revoke one of my feed tokens at once",
+    "method": "DELETE",
+    "path": "/calendar-tokens/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "calendarTokensXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.get.calendar.feed.ics",
+    "label": "iCalendar feed of my assigned tasks, authenticated by the token query parameter only (no bearer token, rate limited per IP)",
+    "method": "GET",
+    "path": "/calendar/feed.ics",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "token",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 429 RATE_LIMITED"
+  },
+  {
+    "key": "pm.planning.get.my.work",
+    "label": "Tasks assigned to me, grouped overdue / today / this_week / later / no_date, with counts",
+    "method": "GET",
+    "path": "/my-work",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "group",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "overdue",
+          "today",
+          "this_week",
+          "later",
+          "no_date"
+        ]
+      },
+      {
+        "name": "per_group",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR"
+  },
+  {
+    "key": "pm.planning.get.my.work.counts",
+    "label": "Badge counts for My work",
+    "method": "GET",
+    "path": "/my-work/counts",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "pm.planning.get.projects.id.backlog",
+    "label": "Backlog tasks by rank: backlog-category columns (kanban) or tasks without a sprint (scrum) (task.read)",
+    "method": "GET",
+    "path": "/projects/:id/backlog",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.get.projects.id.board",
+    "label": "Board: columns with counts and cursor-paged tasks per column; cursor_<columnId> pages one column (task.read)",
+    "method": "GET",
+    "path": "/projects/:id/board",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "per_column",
+        "where": "query",
+        "type": "number"
+      },
+      {
+        "name": "sprint",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.get.projects.id.calendar",
+    "label": "Tasks by due date or start date in a window of at most 62 days (task.read)",
+    "method": "GET",
+    "path": "/projects/:id/calendar",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "from",
+        "where": "query"
+      },
+      {
+        "name": "to",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.get.projects.id.gantt",
+    "label": "Dated tasks, milestones and dependencies for a window, at most 500 tasks per page (task.read)",
+    "method": "GET",
+    "path": "/projects/:id/gantt",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "from",
+        "where": "query"
+      },
+      {
+        "name": "to",
+        "where": "query"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.post.projects.id.plan",
+    "label": "Move up to 100 tasks between the backlog and a sprint; per-task result list (task.update)",
+    "method": "POST",
+    "path": "/projects/:id/plan",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "task_ids",
+        "where": "body",
+        "type": "list",
+        "required": true
+      },
+      {
+        "name": "sprint_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "versions",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.post.projects.id.sprints",
+    "label": "Create a planned sprint in a scrum project (sprint.manage)",
+    "method": "POST",
+    "path": "/projects/:id/sprints",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "goal",
+        "where": "body"
+      },
+      {
+        "name": "start_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsSprintsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.get.projects.id.sprints",
+    "label": "List the sprints of a scrum project with task counts, newest first",
+    "method": "GET",
+    "path": "/projects/:id/sprints",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "planned",
+          "active",
+          "completed"
+        ]
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.post.saved.views",
+    "label": "Save a view; shared views belong to a project and need view.share",
+    "method": "POST",
+    "path": "/saved-views",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "layout",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "board",
+          "list",
+          "calendar",
+          "gantt"
+        ]
+      },
+      {
+        "name": "project_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "filters",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "sort",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "grouping",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "",
+          "column",
+          "assignee",
+          "priority",
+          "milestone",
+          "sprint"
+        ]
+      },
+      {
+        "name": "shared",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "savedViewsXId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.get.saved.views",
+    "label": "My views plus the shared views of readable projects",
+    "method": "GET",
+    "path": "/saved-views",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "project_id",
+        "where": "query"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.patch.saved.views.id",
+    "label": "Edit a view (owner, or view.share for a shared one); send version (or If-Match)",
+    "method": "PATCH",
+    "path": "/saved-views/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "savedViewsXId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "layout",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "board",
+          "list",
+          "calendar",
+          "gantt"
+        ]
+      },
+      {
+        "name": "project_id",
+        "where": "body",
+        "placeholder": "uuid"
+      },
+      {
+        "name": "filters",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "sort",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "grouping",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "",
+          "column",
+          "assignee",
+          "priority",
+          "milestone",
+          "sprint"
+        ]
+      },
+      {
+        "name": "shared",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.delete.saved.views.id",
+    "label": "Delete a view (owner, or view.share for a shared one)",
+    "method": "DELETE",
+    "path": "/saved-views/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "savedViewsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.get.search",
+    "label": "Full-text and ticket-id search over readable projects of the tenant, at most 50 hits",
+    "method": "GET",
+    "path": "/search",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "q",
+        "where": "query"
+      },
+      {
+        "name": "project_id",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.planning.get.sprints.id",
+    "label": "One sprint with its task count",
+    "method": "GET",
+    "path": "/sprints/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "sprintsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.patch.sprints.id",
+    "label": "Edit a planned or active sprint; send version (or If-Match) (sprint.manage)",
+    "method": "PATCH",
+    "path": "/sprints/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "sprintsXId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "goal",
+        "where": "body"
+      },
+      {
+        "name": "start_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "end_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.delete.sprints.id",
+    "label": "Delete a planned sprint; its tasks return to the backlog (sprint.manage)",
+    "method": "DELETE",
+    "path": "/sprints/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "sprintsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.post.sprints.id.complete",
+    "label": "Complete the active sprint, moving unfinished tasks to the next planned sprint or the backlog (sprint.manage)",
+    "method": "POST",
+    "path": "/sprints/:id/complete",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "sprintsXId"
+      },
+      {
+        "name": "move_unfinished_to",
+        "where": "body",
+        "required": true,
+        "placeholder": "backlog or the id of the next planned sprint"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.get.sprints.id.report",
+    "label": "Committed versus completed counts and estimates (stored when completed, live otherwise)",
+    "method": "GET",
+    "path": "/sprints/:id/report",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "sprintsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.planning.post.sprints.id.start",
+    "label": "Start a planned sprint that has dates; one active sprint per project (sprint.manage)",
+    "method": "POST",
+    "path": "/sprints/:id/start",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "sprintsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  }
+];
+
+export const PM_PLATFORM: OpSpec[] = [
+  {
+    "key": "pm.platform.post.projects.id.group.rules",
+    "label": "Add a department, team or reports-of rule; members are expanded at once (project.manage_members)",
+    "method": "POST",
+    "path": "/projects/:id/group-rules",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "kind",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "department",
+          "team",
+          "reports_of"
+        ],
+        "required": true
+      },
+      {
+        "name": "ref_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "role",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "manager",
+          "member",
+          "viewer"
+        ],
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsGroupRulesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.platform.get.projects.id.group.rules",
+    "label": "List the membership rules of a project (project.manage_members)",
+    "method": "GET",
+    "path": "/projects/:id/group-rules",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.platform.post.projects.id.group.rules.refresh",
+    "label": "Re-resolve the rules against current HR data (project.manage_members)",
+    "method": "POST",
+    "path": "/projects/:id/group-rules/refresh",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.platform.delete.projects.id.group.rules.rule.id",
+    "label": "Remove a rule; members only it granted leave the project (project.manage_members)",
+    "method": "DELETE",
+    "path": "/projects/:id/group-rules/:rule_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "rule_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsGroupRulesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  }
+];
 

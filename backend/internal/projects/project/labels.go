@@ -58,7 +58,7 @@ func (s *Service) CreateLabel(ctx context.Context, a api.Actor, projectID *uuid.
 		if err := tx.Create(&l).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "label.created", "label", l.ID, nil)
+		s.audit(ctx, tx, a, "label.created", ref{"label", l.ID, nil})
 		return nil
 	})
 	if isDup(err) {
@@ -128,7 +128,7 @@ func (s *Service) DeleteLabel(ctx context.Context, a api.Actor, projectID *uuid.
 		if err := tx.Exec(`DELETE FROM task_labels WHERE label_id = ?`, id).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "label.deleted", "label", id, nil)
+		s.audit(ctx, tx, a, "label.deleted", ref{"label", id, nil})
 		return tx.Exec(`DELETE FROM labels WHERE id = ?`, id).Error
 	})
 }

@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -50,5 +51,16 @@ func TestCORS(t *testing.T) {
 	w = corsReq([]string{"*"}, "OPTIONS", "http://a.test")
 	if w.Code != http.StatusNoContent {
 		t.Errorf("preflight must be 204, got %d", w.Code)
+	}
+}
+
+// A browser may only send a header the preflight allows: versioned edits (M2 If-Match) and idempotent creates need both.
+func TestCORSAllowsVersionAndIdempotencyHeaders(t *testing.T) {
+	w := corsReq([]string{"*"}, "OPTIONS", "http://a.test")
+	allowed := w.Header().Get("Access-Control-Allow-Headers")
+	for _, h := range []string{"If-Match", "Idempotency-Key", "Authorization"} {
+		if !strings.Contains(allowed, h) {
+			t.Errorf("preflight must allow %s: %s", h, allowed)
+		}
 	}
 }

@@ -1398,7 +1398,8 @@ backend. The console is how the owner verifies each module by hand without waiti
 | C — HR service boundary | 3 | section 12 "Target" column for M1, shared idempotency/outbox | done 2026-10-20 (inbox arrives with the first consumer) |
 | D — test console | 2 (shell) | console covering M0 and every built HR context | done 2026-10-20 |
 | E — complete HR | 3 | finish `performance`, then `core`, `onboarding`, `compensation`, `learning`, `benefits` | done 2026-10-24 |
-| Afterwards | 4–7 | M7 Approvals and M8 Documents, then M2–M6 and M9–M12 | later |
+| F — M2 Projects & Tasks | 3 | phases 1-3 (projects, tasks, collaboration, planning, group rules): `docs/modules/m2-projects-tasks/plan.md` | done 2026-10-28 (phases 4-5 designed, not built) |
+| Afterwards | 4–7 | M7 Approvals and M8 Documents, then M3–M6 and M9–M12 | later |
 
 ## 17. Access model (adopted 2026-10-20)
 

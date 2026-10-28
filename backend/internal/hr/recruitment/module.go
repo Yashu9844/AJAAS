@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	coreAPI "github.com/jaas/jaas/internal/hr/core/api"
-	"github.com/jaas/jaas/internal/shared/identityport"
 	recruitmentAPI "github.com/jaas/jaas/internal/hr/recruitment/api"
 	"github.com/jaas/jaas/internal/hr/recruitment/plus"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"sync"
 	"time"
 

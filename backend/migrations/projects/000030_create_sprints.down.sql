@@ -1,0 +1,2 @@
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS fk_tasks_sprint;
+DROP TABLE IF EXISTS sprints;

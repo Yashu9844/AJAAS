@@ -79,12 +79,18 @@ func (s *Service) CreateColumn(ctx context.Context, a api.Actor, projectID uuid.
 			return err
 		}
 		var next int
-		tx.Raw(`SELECT COALESCE(max(position) + 1, 0) FROM board_columns WHERE project_id = ?`, projectID).Scan(&next)
-		c.Position, c.Key = next, uniqueKey(tx, projectID, c.Name)
+		if err := tx.Raw(`SELECT COALESCE(max(position) + 1, 0) FROM board_columns WHERE project_id = ?`, projectID).Scan(&next).Error; err != nil {
+			return err
+		}
+		key, err := uniqueKey(tx, projectID, c.Name)
+		if err != nil {
+			return err
+		}
+		c.Position, c.Key = next, key
 		if err := tx.Create(&c).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "column.created", "column", c.ID, map[string]any{"project_id": projectID})
+		s.audit(ctx, tx, a, "column.created", ref{"column", c.ID, map[string]any{"project_id": projectID}})
 		return nil
 	})
 	return &c, err
@@ -125,17 +131,19 @@ func (in ColumnInput) apply(c *Column) error {
 	return nil
 }
 
-func uniqueKey(tx *gorm.DB, projectID uuid.UUID, name string) string {
+func uniqueKey(tx *gorm.DB, projectID uuid.UUID, name string) (string, error) {
 	base := strings.Trim(slugStrip.ReplaceAllString(strings.ToLower(name), "-"), "-")
 	if base == "" {
 		base = "column"
 	}
 	key := base
 	for i := 2; ; i++ {
-		var n int64
-		tx.Table("board_columns").Where("project_id = ? AND key = ?", projectID, key).Count(&n)
+		n, err := countRows(tx, "board_columns", "project_id = ? AND key = ?", projectID, key)
+		if err != nil {
+			return "", err
+		}
 		if n == 0 {
-			return key
+			return key, nil
 		}
 		key = base + "-" + itoa(i)
 	}
@@ -183,9 +191,14 @@ func (s *Service) UpdateColumn(ctx context.Context, a api.Actor, projectID, id u
 
 // ensureCategories enforces the todo and done columns every project needs.
 func ensureCategories(tx *gorm.DB, projectID uuid.UUID) error {
-	var todo, done int64
-	tx.Table("board_columns").Where("project_id = ? AND category = 'todo'", projectID).Count(&todo)
-	tx.Table("board_columns").Where("project_id = ? AND category = 'done'", projectID).Count(&done)
+	todo, err := countRows(tx, "board_columns", "project_id = ? AND category = 'todo'", projectID)
+	if err != nil {
+		return err
+	}
+	done, err := countRows(tx, "board_columns", "project_id = ? AND category = 'done'", projectID)
+	if err != nil {
+		return err
+	}
 	if todo == 0 || done == 0 {
 		return kernel.Conflict("COLUMN_INVARIANT", "a project needs at least one todo column and one done column")
 	}
@@ -202,7 +215,9 @@ func (s *Service) ReorderColumns(ctx context.Context, a api.Actor, projectID uui
 			return err
 		}
 		var have []uuid.UUID
-		tx.Raw(`SELECT id FROM board_columns WHERE project_id = ?`, projectID).Scan(&have)
+		if err := tx.Raw(`SELECT id FROM board_columns WHERE project_id = ?`, projectID).Scan(&have).Error; err != nil {
+			return err
+		}
 		if !sameSet(have, ids) {
 			return kernel.Invalid("column_ids", "must list every column of the project exactly once")
 		}

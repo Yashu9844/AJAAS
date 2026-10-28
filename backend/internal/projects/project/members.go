@@ -42,8 +42,10 @@ func (in MemberInput) validate(db *gorm.DB, tenantID uuid.UUID) error {
 		return kernel.Invalid("role", "must be owner, manager, member or viewer")
 	}
 	if in.CustomRoleID != nil {
-		var n int64
-		db.Table("project_roles").Where("id = ? AND tenant_id = ?", *in.CustomRoleID, tenantID).Count(&n)
+		n, err := countRows(db, "project_roles", "id = ? AND tenant_id = ?", *in.CustomRoleID, tenantID)
+		if err != nil {
+			return err
+		}
 		if n == 0 {
 			return kernel.Invalid("custom_role_id", "unknown role")
 		}
@@ -97,8 +99,11 @@ func (s *Service) upsertMember(ctx context.Context, a api.Actor, projectID uuid.
 		if _, err := lockProject(tx, a.TenantID, projectID); err != nil {
 			return err
 		}
-		var existing Member
-		if tx.Where("project_id = ? AND user_id = ? AND active", projectID, in.UserID).Take(&existing).Error == nil {
+		have, err := countRows(tx, "project_members", "project_id = ? AND user_id = ? AND active", projectID, in.UserID)
+		if err != nil {
+			return err
+		}
+		if have > 0 {
 			return kernel.Conflict("ALREADY_MEMBER", "the user is already a member")
 		}
 		if err := tx.Exec(`DELETE FROM project_members WHERE project_id = ? AND user_id = ?`, projectID, in.UserID).Error; err != nil {
@@ -107,7 +112,7 @@ func (s *Service) upsertMember(ctx context.Context, a api.Actor, projectID uuid.
 		if err := tx.Create(&m).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.member.added", "project", projectID, map[string]any{"user_id": in.UserID})
+		s.audit(ctx, tx, a, "project.member.added", ref{"project", projectID, map[string]any{"user_id": in.UserID}})
 		return kernel.Emit(ctx, tx, a.TenantID, "project.member.added", map[string]any{"project_id": projectID, "user_id": in.UserID})
 	})
 	return &m, err
@@ -134,18 +139,19 @@ func (s *Service) ChangeMember(ctx context.Context, a api.Actor, projectID, user
 		if err := tx.Where("project_id = ? AND user_id = ? AND active", projectID, userID).Take(&out).Error; err != nil {
 			return mapMissing(err, "member")
 		}
+		out.Source = "direct" // an explicit role change pins a group member as a direct one
 		if grantsOwner(in, &out) && !ownerLevel(acc, a) {
 			return kernel.Forbidden("owner")
 		}
 		out.RoleKey, out.CustomRoleID = in.roleCols()
 		if err := tx.Model(&Member{}).Where("project_id = ? AND user_id = ?", projectID, userID).
-			Updates(map[string]any{"role_key": out.RoleKey, "custom_role_id": out.CustomRoleID}).Error; err != nil {
+			Updates(map[string]any{"role_key": out.RoleKey, "custom_role_id": out.CustomRoleID, "source": "direct"}).Error; err != nil {
 			return err
 		}
 		if err := ensureOwner(tx, projectID); err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.member.changed", "project", projectID, map[string]any{"user_id": userID})
+		s.audit(ctx, tx, a, "project.member.changed", ref{"project", projectID, map[string]any{"user_id": userID}})
 		return kernel.Emit(ctx, tx, a.TenantID, "project.member.changed", map[string]any{"project_id": projectID, "user_id": userID})
 	})
 	return &out, err
@@ -166,6 +172,13 @@ func (s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, user
 		if _, err := lockProject(tx, a.TenantID, projectID); err != nil {
 			return err
 		}
+		group, cerr := countRows(tx, "project_members", "project_id = ? AND user_id = ? AND source = 'group'", projectID, userID)
+		if cerr != nil {
+			return cerr
+		}
+		if group > 0 {
+			return kernel.Conflict("GROUP_MEMBER", "this member comes from a group rule; remove the rule or change the role to pin them")
+		}
 		res := tx.Exec(`DELETE FROM project_members WHERE project_id = ? AND user_id = ? AND tenant_id = ?`, projectID, userID, a.TenantID)
 		if res.Error != nil {
 			return res.Error
@@ -176,15 +189,17 @@ func (s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, user
 		if err := ensureOwner(tx, projectID); err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.member.removed", "project", projectID, map[string]any{"user_id": userID})
+		s.audit(ctx, tx, a, "project.member.removed", ref{"project", projectID, map[string]any{"user_id": userID}})
 		return kernel.Emit(ctx, tx, a.TenantID, "project.member.removed", map[string]any{"project_id": projectID, "user_id": userID})
 	})
 }
 
 // ensureOwner refuses a change that would leave the project without an owner.
 func ensureOwner(tx *gorm.DB, projectID uuid.UUID) error {
-	var n int64
-	tx.Table("project_members").Where("project_id = ? AND role_key = 'owner' AND active", projectID).Count(&n)
+	n, err := countRows(tx, "project_members", "project_id = ? AND role_key = 'owner' AND active", projectID)
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return kernel.Conflict("LAST_OWNER", "a project needs at least one owner")
 	}

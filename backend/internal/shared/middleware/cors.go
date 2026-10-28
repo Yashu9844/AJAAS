@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const corsAllowedHeaders = "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Request-ID, X-Correlation-ID, Idempotency-Key, X-Platform-Key"
+const corsAllowedHeaders = "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Request-ID, X-Correlation-ID, Idempotency-Key, If-Match, X-Platform-Key"
 
 // corsExposedHeaders lets browsers read the correlation id and the idempotent-replay marker.
 const corsExposedHeaders = "X-Correlation-ID, X-Request-ID, Idempotent-Replayed"

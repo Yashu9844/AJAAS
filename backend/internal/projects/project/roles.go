@@ -97,7 +97,7 @@ func (s *Service) CreateRole(ctx context.Context, a api.Actor, in RoleInput) (*C
 		if err := tx.Create(&r).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.role.created", "project_role", r.ID, nil)
+		s.audit(ctx, tx, a, "project.role.created", ref{"project_role", r.ID, nil})
 		return nil
 	})
 	if isDup(err) {
@@ -124,7 +124,7 @@ func (s *Service) UpdateRole(ctx context.Context, a api.Actor, id uuid.UUID, in 
 		if err := tx.Save(&r).Error; err != nil {
 			return err
 		}
-		s.audit(ctx, tx, a, "project.role.updated", "project_role", id, nil)
+		s.audit(ctx, tx, a, "project.role.updated", ref{"project_role", id, nil})
 		return nil
 	})
 	if isDup(err) {
@@ -139,8 +139,10 @@ func (s *Service) DeleteRole(ctx context.Context, a api.Actor, id uuid.UUID) err
 		return err
 	}
 	return s.inTx(ctx, func(tx *gorm.DB) error {
-		var used int64
-		tx.Table("project_members").Where("custom_role_id = ?", id).Count(&used)
+		used, err := countRows(tx, "project_members", "custom_role_id = ?", id)
+		if err != nil {
+			return err
+		}
 		if used > 0 {
 			return kernel.Conflict("ROLE_IN_USE", "members still hold this role")
 		}
@@ -151,7 +153,7 @@ func (s *Service) DeleteRole(ctx context.Context, a api.Actor, id uuid.UUID) err
 		if res.RowsAffected == 0 {
 			return kernel.NotFound("role")
 		}
-		s.audit(ctx, tx, a, "project.role.deleted", "project_role", id, nil)
+		s.audit(ctx, tx, a, "project.role.deleted", ref{"project_role", id, nil})
 		return nil
 	})
 }

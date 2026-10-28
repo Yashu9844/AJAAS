@@ -34,7 +34,24 @@ func (f *fakeAudit) Log(_ context.Context, _ *gorm.DB, _, _ string, action, _, _
 	return nil
 }
 
+// fakePeople is an in-memory ports.People; members maps a department, team or manager id to its users.
+type fakePeople struct {
+	members map[uuid.UUID][]uuid.UUID
+	err     error
+}
+
+func (f *fakePeople) DepartmentMembers(_ context.Context, _, id uuid.UUID) ([]uuid.UUID, error) {
+	return f.members[id], f.err
+}
+func (f *fakePeople) TeamMembers(_ context.Context, _, id uuid.UUID) ([]uuid.UUID, error) {
+	return f.members[id], f.err
+}
+func (f *fakePeople) DirectReports(_ context.Context, _, id uuid.UUID) ([]uuid.UUID, error) {
+	return f.members[id], f.err
+}
+
 type env struct {
+	people *fakePeople
 	t      *testing.T
 	db     *gorm.DB
 	svc    *Service
@@ -46,8 +63,9 @@ type env struct {
 func newEnv(t *testing.T) *env {
 	t.Helper()
 	db := testdb.Open(t)
-	e := &env{t: t, db: db, audit: &fakeAudit{}, users: fakeUsers{active: map[uuid.UUID]bool{}}, tenant: uuid.New()}
-	e.svc = NewService(db, Ports{Users: e.users, Audit: e.audit})
+	e := &env{t: t, db: db, audit: &fakeAudit{}, users: fakeUsers{active: map[uuid.UUID]bool{}}, tenant: uuid.New(),
+		people: &fakePeople{members: map[uuid.UUID][]uuid.UUID{}}}
+	e.svc = NewService(db, Ports{Users: e.users, Audit: e.audit, People: e.people})
 	return e
 }
 
