@@ -1,7 +1,8 @@
 # M2 Projects & Tasks
 
-**Status:** phases 1-3 BUILT and verified (2026-10-28). Phases 4-5 (custom fields, automation, webhooks, integrations, MCP/CLI,
-product UI) are designed for in `specification.md` section 9 and not built. Branch `module-2`.
+**Status:** phases 1-3 BUILT and verified (2026-10-28) plus phase 4 custom fields (2026-10-29). Automation, webhooks, integrations,
+MCP/CLI and the product UI are designed for in `specification.md` section 9 and not built (they need architecture or permission
+decisions). Branch `module-2`.
 
 **Purpose:** project delivery and work tracking for a tenant: projects, tasks on boards/lists/calendars/Gantt, sprints, comments,
 time tracking, attachments in object storage, My work and search. People are referenced by ids only; M2 never reads M0 or HR tables.
@@ -20,10 +21,11 @@ ids and versions only). **Consumes:** identity deactivation (in-process hook now
 | Comments, mentions, watchers, time, attachments | 21 | `.../collab` |
 | Sprints, backlog, board, calendar, Gantt, My work, search, saved views, feed tokens | 25 | `.../planning` |
 | Group rules | 4 | `.../project` |
-| **Total** | **108** (all in `backend/api/swagger.yaml`) | |
+| Custom fields and task values | 6 | `.../fields` |
+| **Total** | **114** (all in `backend/api/swagger.yaml`) | |
 
 Shared inside M2: `kernel` (errors, ranks, cursors, outbox events, activity), `api` (authorizer, task resolver, hooks), `ports`
-(People), `testdb`. 22 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (five pages).
+(People), `testdb`. 23 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (six pages).
 
 ## Files in this folder
 

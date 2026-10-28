@@ -38,6 +38,7 @@ PM_CONTEXTS = {
     'planning': ('PM_PLANNING', ['/projects/{id}/sprints', '/projects/{id}/backlog', '/projects/{id}/board', '/projects/{id}/calendar', '/projects/{id}/gantt',
                                  '/projects/{id}/plan', '/sprints', '/my-work', '/search', '/saved-views', '/calendar-tokens', '/calendar']),
     'platform': ('PM_PLATFORM', ['/projects/{id}/group-rules']),
+    'fields': ('PM_FIELDS', ['/projects/{id}/custom-fields', '/tasks/{id}/custom-fields']),
 }
 
 

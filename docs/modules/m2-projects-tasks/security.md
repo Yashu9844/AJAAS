@@ -23,5 +23,7 @@ Law: `docs/SECURITY.md` (sections 1, 5, 9, 13, 14). This table is the Definition
 | S17 | Resource exhaustion | Page size <= 100, bulk <= 100, assignees <= 20, mentions and graph walks bounded (10 000 nodes), calendar window <= 62 days, Gantt <= 500 tasks, body limit 1 MiB | validation tests per context |
 | S18 | Permission model change | Four tenant-level entries registered in the M0 catalogue (`projects:create`, `projects:read_all`, `projects:manage_all`, `project_roles:manage`) with predefined-role defaults; project-level permissions live inside M2 | `projects.Catalogue()`, `docs/modules/m2-projects-tasks/decisions.md` |
 
+| S19 | Stored URLs or user ids in custom fields | URL values must be https without credentials and are never fetched; user values must be active members of the project; text is length-bounded; activity records text and URL fields by name only | `fields/validate.go`, `TestValuesByTypeAndVersion`, `TestOptionRemovalClearsValuesAndActivityHidesText` |
+
 Open security items: no malware scanner behind the scan hook (no scanner exists in the platform), platform-wide gaps in
 `docs/modules/m1-hr-management/acceptance-checklist.md` (secret manager, tamper-resistant audit, backups) apply to M2 as well.

@@ -171,3 +171,11 @@ A `/dev-test/projects` page with generated operation forms from the OpenAPI and 
 - **Performance (PG7, 50 000 tasks in one project, p95 over 30 runs):** board walk 111 ms, board first page 113 ms, backlog 19 ms,
   search 78 ms, Gantt page 68 ms, My work 226 ms - all under the 500 ms list budget (details in `notes-planning.md`).
 - **Not built here (extension points kept):** custom fields, automation rules, webhooks, integrations, MCP/CLI, recurrence, public links.
+
+## 10. Custom fields (phase 4, built 2026-10-29)
+
+Package `internal/projects/fields` (depends on `api.Authorizer` and `api.TaskResolver` only). Tables `custom_field_definitions` (project, name, stable
+`key` slug, `type`, `options` JSONB, position) and `custom_field_values` (task, field, JSONB value, `updated_by`; primary key task+field; cascade on task
+and field delete). Routes: `GET/POST /projects/{id}/custom-fields`, `PATCH/DELETE /projects/{id}/custom-fields/{field_id}`, `GET/PUT /tasks/{id}/custom-fields`.
+Values are validated per type before the transaction; the transaction bumps `tasks.version` (with the optional version predicate), upserts or clears the
+values, writes one activity entry and a `task.updated` event carrying field ids only, and one audit entry. Decision DPJ-36.

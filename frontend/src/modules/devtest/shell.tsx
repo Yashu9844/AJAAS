@@ -28,6 +28,7 @@ const NAV = [
   { href: "/dev-test/projects/collab", label: "M2 — Collaboration" },
   { href: "/dev-test/projects/planning", label: "M2 — Planning & Views" },
   { href: "/dev-test/projects/platform", label: "M2 — Group rules" },
+  { href: "/dev-test/projects/fields", label: "M2 — Custom fields" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {

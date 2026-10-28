@@ -3553,3 +3553,192 @@ export const PM_PLATFORM: OpSpec[] = [
   }
 ];
 
+export const PM_FIELDS: OpSpec[] = [
+  {
+    "key": "pm.fields.post.projects.id.custom.fields",
+    "label": "Add a typed custom field; at most 30 per project (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/custom-fields",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "type",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "text",
+          "number",
+          "checkbox",
+          "date",
+          "url",
+          "select",
+          "multiselect",
+          "user"
+        ],
+        "required": true
+      },
+      {
+        "name": "options",
+        "where": "body",
+        "type": "list"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsCustomFieldsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.fields.get.projects.id.custom.fields",
+    "label": "List the custom fields of a project (project.read)",
+    "method": "GET",
+    "path": "/projects/:id/custom-fields",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.fields.patch.projects.id.custom.fields.field.id",
+    "label": "Rename a field or change its options; values using a removed option are cleared (project.update)",
+    "method": "PATCH",
+    "path": "/projects/:id/custom-fields/:field_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "field_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsCustomFieldsId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "options",
+        "where": "body",
+        "type": "list"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.fields.delete.projects.id.custom.fields.field.id",
+    "label": "Delete a field and all its values (project.update)",
+    "method": "DELETE",
+    "path": "/projects/:id/custom-fields/:field_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "field_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsCustomFieldsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.fields.get.tasks.id.custom.fields",
+    "label": "Every field of the task project with the task value (task.read)",
+    "method": "GET",
+    "path": "/tasks/:id/custom-fields",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.fields.put.tasks.id.custom.fields",
+    "label": "Set or clear values by field key; send version (or If-Match) for optimistic concurrency (task.update)",
+    "method": "PUT",
+    "path": "/tasks/:id/custom-fields",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      },
+      {
+        "name": "values",
+        "where": "body",
+        "type": "json",
+        "required": true,
+        "placeholder": "field key to value; null clears"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  }
+];
+

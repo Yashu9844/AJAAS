@@ -1,9 +1,10 @@
 "use client";
-import { PM_COLLAB, PM_PLANNING, PM_PLATFORM, PM_PROJECTS, PM_TASKS } from "./generated/projectsSpecs";
+import { PM_COLLAB, PM_FIELDS, PM_PLANNING, PM_PLATFORM, PM_PROJECTS, PM_TASKS } from "./generated/projectsSpecs";
 import { ContextPage } from "./hrPages";
 import type { Scenario } from "./runner";
 import { S_PROJECTS } from "./scenariosPm";
 import { S_PM_COLLAB } from "./scenariosPmCollab";
+import { S_PM_FIELDS } from "./scenariosPmFields";
 import { S_PM_PLANNING } from "./scenariosPmPlanning";
 import { S_PM_PLATFORM } from "./scenariosPmPlatform";
 import { S_PM_TASKS } from "./scenariosPmTasks";
@@ -21,6 +22,7 @@ export const PM_CHECKLISTS: Record<string, ChecklistItem[]> = {
   collab: items(S_PM_COLLAB),
   planning: items(S_PM_PLANNING),
   platform: items(S_PM_PLATFORM),
+  fields: items(S_PM_FIELDS),
 };
 
 /** Every M2 checklist item, for the overview page. */
@@ -82,6 +84,18 @@ export function PmPlatform() {
       ops={PM_PLATFORM}
       scenarios={S_PM_PLATFORM}
       checklist={PM_CHECKLISTS.platform}
+    />
+  );
+}
+
+export function PmFields() {
+  return (
+    <ContextPage
+      title="M2 Custom fields"
+      intro="Typed, project-scoped custom fields (text, number, checkbox, date, https URL, select, multiselect, project member) and their values on tasks. Defining fields needs project.update; setting values needs task.update and moves the task version."
+      ops={PM_FIELDS}
+      scenarios={S_PM_FIELDS}
+      checklist={PM_CHECKLISTS.fields}
     />
   );
 }

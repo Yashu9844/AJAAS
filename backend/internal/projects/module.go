@@ -12,6 +12,7 @@ import (
 	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/projects/api"
 	"github.com/jaas/jaas/internal/projects/collab"
+	"github.com/jaas/jaas/internal/projects/fields"
 	"github.com/jaas/jaas/internal/projects/kernel"
 	"github.com/jaas/jaas/internal/projects/planning"
 	"github.com/jaas/jaas/internal/projects/ports"
@@ -63,6 +64,7 @@ type Module struct {
 	project  *project.Service
 	task     *task.Service
 	planning *planning.Service
+	fields   *fields.Service
 	collab   *collab.Service
 }
 
@@ -82,6 +84,7 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	if o.Background != nil && o.Logger != nil {
 		go m.collab.Run(o.Background, collabSweepEvery, func(err error) { o.Logger.Error().Err(err).Msg("collaboration sweep failed") })
 	}
+	m.fields = fields.NewService(o.DB, m.project, m.task, fields.Ports{Audit: o.Identity.Audit()}) // wire:fields
 	// wire:platform
 	if err := o.Identity.RegisterPermissions(ctx, Catalogue()); err != nil {
 		return nil, fmt.Errorf("projects permission catalogue: %w", err)
@@ -125,6 +128,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	m.project.Register(g)
 	m.task.Register(g)
 	m.planning.Register(g) // routes:planning
+	m.fields.Register(g)   // routes:fields
 	// routes:collab
 	m.collab.Register(g)
 	// routes:platform

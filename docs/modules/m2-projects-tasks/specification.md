@@ -120,7 +120,7 @@ Envelope version 1 (shared standard), exchange `jaas.projects.events`; payloads 
 
 | Later feature | How it plugs in without breaking phases 1–3 |
 |---|---|
-| Custom fields | New tables `custom_field_definition` / `custom_field_value` (typed, project-scoped); task API gains an optional `custom_fields` object; activity `data` is already JSON. |
+| Custom fields | **BUILT (2026-10-29)**: tables `custom_field_definitions` / `custom_field_values` (typed, project-scoped); values are read and written through `GET/PUT /tasks/{id}/custom-fields` (not inside the task object, so the task contract is unchanged); activity `data` is already JSON. |
 | Workflow rules / automation | `workflow_rule(project, trigger, conditions, action)` evaluated by a consumer of the project's own outbox events; columns already carry `category` for rules like "when PR merged, move to done". |
 | Webhooks | `webhook` + `webhook_delivery` tables; delivery from the outbox with signing and retries. |
 | GitHub / Gitea / chat | `external_link(task, provider, url, state)` plus an `integration` table; incoming webhooks create activity entries and trigger rules; `activity.source` already exists. |
@@ -147,3 +147,6 @@ Envelope version 1 (shared standard), exchange `jaas.projects.events`; payloads 
 - VW-03: the iCalendar feed is the only M2 route without a bearer token (token hash, owner still active, readable projects only).
 - TK-14 search is implemented in the planning context (`GET /search`); the task list also has a `q` filter.
 - Deactivated logins keep their rows: `project_members.active` and `task_assignees.active` become false; history stays (section 7).
+- Custom fields (section 9, built): types text, number, checkbox, date, url (https only, never fetched), select, multiselect, user (active project member);
+  at most 30 per project; the type is fixed at creation; defining needs `project.update`, setting values needs `task.update` and bumps the task version
+  (optional `version` / `If-Match`); free text and URLs are recorded in activity by field only; removing a select option clears the values that used it.

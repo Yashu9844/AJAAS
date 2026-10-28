@@ -26,6 +26,7 @@ excluded from production builds.
 | `/dev-test/projects/collab` | M2 Collaboration | generated (21) | `scenariosPmCollab.ts` `S_PM_COLLAB` |
 | `/dev-test/projects/planning` | M2 Planning & Views | generated (25) | `scenariosPmPlanning.ts` `S_PM_PLANNING` |
 | `/dev-test/projects/platform` | M2 Group rules | generated (4) | `scenariosPmPlatform.ts` `S_PM_PLATFORM` |
+| `/dev-test/projects/fields` | M2 Custom fields | generated (6) | `scenariosPmFields.ts` `S_PM_FIELDS` |
 
 M2 operation forms are generated from the swagger by `scripts/gen_console_specs.py` into `generated/projectsSpecs.ts` (a path belongs to the context with the longest matching prefix); the M2 swagger section is generated from `scripts/pm_routes_*.py` by `scripts/gen_projects_swagger.py`.
 

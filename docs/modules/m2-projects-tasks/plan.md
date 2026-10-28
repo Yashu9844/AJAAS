@@ -4,7 +4,7 @@ Updated 2026-10-28. Branch `module-2` (pushed to `origin` after each phase). Ste
 spec, migrations (up/down/up), service and HTTP, tests on a real PostgreSQL, integration ring, swagger, console scenario, docs,
 full suites, commit.
 
-**Status: phases 1-3 (P0-P7) BUILT and verified; phases 4-5 (P8) are designed for and deliberately not built.** The owner scoped M2 to phases 1-3 ("in a way no hurdle comes or missed later", 2026-10-27/28, `decisions.md` owner answers 1); phases 4-5 start with a scope GO.
+**Status: phases 1-3 (P0-P7) BUILT and verified; phase 4 custom fields BUILT (P8a); the rest of phases 4-5 (P8b) are designed for and deliberately not built.** The owner scoped M2 to phases 1-3 ("in a way no hurdle comes or missed later", 2026-10-27/28, `decisions.md` owner answers 1); phases 4-5 start with a scope GO.
 
 | Step | Scope | Status |
 |---|---|---|
@@ -16,7 +16,8 @@ full suites, commit.
 | P5 | `planning`: sprints, backlog and plan moves, board/calendar/Gantt/My work, search, saved views, calendar feed tokens | DONE (25 operations, `notes-planning.md`) |
 | P6 | Group rules (department/team/reports-of) with an HR people adapter, deactivation of logins out of projects, inbox ledger | DONE (4 operations) |
 | P7 | Performance seed (PG7), docs, `SYSTEM_REFERENCE`, console scenarios, headless/browser UI run | DONE (see `testing.md`) |
-| P8 (later) | Product UI, custom fields, automation rules, webhooks, GitHub/Gitea and chat integrations, MCP and CLI, recurrence, public links | NOT BUILT - extension points in `specification.md` section 9 |
+| P8a | Custom fields: typed project-scoped definitions (text, number, checkbox, date, https URL, select, multiselect, member) and per-task values with the version contract | DONE (6 operations, package `fields`, migration 000050) |
+| P8b | Automation rules, webhooks, GitHub/Gitea and chat integrations, MCP and CLI, recurrence, public links, product UI | NOT BUILT - each needs an architecture or permission decision first (outbound HTTP and secrets, API tokens in M0, new frontend); extension points in `specification.md` section 9 |
 
 Definition of done per step: unit coverage >= 85% on services (>= 90% where stated in `testing.md`), integration ring green with
 `JAAS_REQUIRE_INTEGRATION=1`, swagger drift test green, migrations up/down/up, console scenario passing live, docs current.

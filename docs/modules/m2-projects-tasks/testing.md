@@ -13,9 +13,10 @@ fakes), as integration tests through the production router, and as console scena
 | Task context | `internal/projects/task` | 48 tests + ~35 sub-tests (fault injection per table) | 95% |
 | Collaboration | `internal/projects/collab` | 37 tests incl. a real S3 round trip | 92% |
 | Planning and views | `internal/projects/planning` | 45 tests | 93% |
+| Custom fields | `internal/projects/fields` | tests incl. statement-level fault injection | 86% (HTTP handlers covered by the integration ring) |
 | Boundary | `internal/projects/boundary_test.go` | M2 imports only shared packages, `identity/access` and itself | - |
-| Integration ring | `tests/integration/projects*_test.go`, `inbox_test.go` | 12 tests | production router, real Postgres and Redis |
-| Console scenarios | `frontend/src/modules/devtest/scenariosPm*.ts` | 11 scenarios on five pages | 11/11 pass live in headless Chrome (296 steps, 2026-10-28) |
+| Integration ring | `tests/integration/projects*_test.go`, `inbox_test.go` | 13 tests | production router, real Postgres and Redis |
+| Console scenarios | `frontend/src/modules/devtest/scenariosPm*.ts` | 12 scenarios on six pages | 12/12 pass live in headless Chrome (319 steps, 2026-10-28/29) |
 
 ## Golden tests
 

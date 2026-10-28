@@ -1268,7 +1268,18 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | DELETE | `/api/v1/calendar-tokens/:id` | (from the contract; Revoke one of my feed tokens at once) |
 | GET | `/api/v1/calendar/feed.ics` | (from the contract; iCalendar feed of my assigned tasks, authenticated by the token query parameter only (no bearer token, rate limited per IP)) |
 
-Total routes registered by module route files: **549** (plus `GET /health`).
+### M2 Projects / fields — 6 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| GET | `/api/v1/projects/:id/custom-fields` | (from the contract; List the custom fields of a project (project.read)) |
+| POST | `/api/v1/projects/:id/custom-fields` | (from the contract; Add a typed custom field; at most 30 per project (project.update)) |
+| PATCH | `/api/v1/projects/:id/custom-fields/:field_id` | (from the contract; Rename a field or change its options; values using a removed option are cleared (project.update)) |
+| DELETE | `/api/v1/projects/:id/custom-fields/:field_id` | (from the contract; Delete a field and all its values (project.update)) |
+| GET | `/api/v1/tasks/:id/custom-fields` | (from the contract; Every field of the task project with the task value (task.read)) |
+| PUT | `/api/v1/tasks/:id/custom-fields` | (from the contract; Set or clear values by field key; send version (or If-Match) for optimistic concurrency (task.update)) |
+
+Total routes registered by module route files: **555** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -3729,6 +3740,31 @@ Total routes registered by module route files: **549** (plus `GET /health`).
 - ALTER `project_members` ADD CONSTRAINT project_members_group_not_owner CHECK (source = 'direct' OR role_key IS DISTINCT FROM 'owner')
 - ALTER `task_assignees` ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE
 
+#### `projects/000050_create_custom_fields.up.sql`
+- **table `custom_field_definitions`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `name` VARCHAR(60) — NOT NULL
+  - `key` VARCHAR(40) — NOT NULL
+  - `type` VARCHAR(16) — NOT NULL CHECK (type IN ('text', 'number', 'checkbox', 'date', 'url', 'select', 'multiselect', 'user'))
+  - `options` JSONB — NOT NULL DEFAULT '[]'
+  - `position` INT — NOT NULL DEFAULT 0
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `custom_field_values`**
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `field_id` UUID — NOT NULL REFERENCES custom_field_definitions (id) ON DELETE CASCADE
+  - `tenant_id` UUID — NOT NULL
+  - `value` JSONB — NOT NULL
+  - `updated_by` UUID — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - _constraint:_ PRIMARY KEY (task_id, field_id)
+- UNIQUE index `uq_custom_field_key` on `custom_field_definitions` (project_id, key)
+- UNIQUE index `uq_custom_field_name` on `custom_field_definitions` (project_id, lower(name))
+- index `idx_custom_field_values_field` on `custom_field_values` (field_id)
+
 ## C. Code inventory — every file, type and function
 
 
@@ -4010,7 +4046,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `startIdentityBackground(o Options, id *identity.Module, store idempotency.Store)` — startIdentityBackground runs M0's outbox relay and the idempotency purger while background work is enabled.
 - **func** `registerDevMailbox(v1 *gin.RouterGroup, o Options, id *identity.Module)` — registerDevMailbox exposes one-time secrets (reset and invitation tokens) to developers and the test console in development and test only, behind the platform key: GET /api/v1/dev/mailbox?tenant_id=…&email=…
 
-#### `internal/app/projects.go` (26 lines)
+#### `internal/app/projects.go` (30 lines)
 - **func** `buildProjects(o Options, idp identityport.Port, people ports.People) (*projects.Module, error)` — buildProjects wires M2 Projects & Tasks, including the object-storage provider when one is configured.
 
 ### M0 Identity & Access
@@ -9897,12 +9933,12 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `mapMissing(err error, what string) error`
 - **func** `(s *Service) moveTasksOut(tx *gorm.DB, col Column, moveTo *uuid.UUID) error` — moveTasksOut moves every task of col into target, keeping completion state consistent with the target category.
 
-#### `internal/projects/project/deactivation.go` (69 lines)
+#### `internal/projects/project/deactivation.go` (72 lines)
 - **func** `(s *Service) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenantID, userID, _ uuid.UUID) error` — DeactivateUserMappings marks the user inactive in every project and on every assignment, keeping history. It is the identityport DeactivationHook, so it runs in the same transaction that deactivates the login (specification section 7).
 - **type** `identityEnvelope struct`
 - **func** `(s *Service) HandleIdentityEvent(ctx context.Context, raw []byte) error` — HandleIdentityEvent applies an identity or HR lifecycle event delivered by a broker consumer. Redeliveries are recognised through the inbox ledger and ignored (PG10). Unknown event types are ignored.
 
-#### `internal/projects/project/group_refresh.go` (106 lines)
+#### `internal/projects/project/group_refresh.go` (109 lines)
 - **func** `(s *Service) RefreshGroups(ctx context.Context, tenantID, projectID uuid.UUID) error` — RefreshGroups reconciles the group-sourced members of one project with its rules. Direct members are never touched or overridden. The people lookups happen before the transaction so no external call is made while rows are locked.
 - **func** `(s *Service) reconcile(tx *gorm.DB, tenantID, projectID uuid.UUID, want map[uuid.UUID]string) error`
 - **type** `groupScope struct` — groupScope is the tenant, project and current group rows a reconcile works on.
@@ -9964,7 +10000,7 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(s *Service) SetFavorite(ctx context.Context, a api.Actor, id uuid.UUID, on bool) error` — SetFavorite stars or unstars the project for the caller.
 - **func** `lockProject(tx *gorm.DB, tenantID, id uuid.UUID) (*Project, error)` — lockProject takes a row lock on the project inside tx and returns it; used by operations that must serialise.
 
-#### `internal/projects/project/members.go` (207 lines)
+#### `internal/projects/project/members.go` (210 lines)
 - **type** `MemberInput struct` — MemberInput adds or changes a member. Exactly one of Role (built-in key) and CustomRoleID is set.
 - **type** `MemberView struct` — MemberView is a member with the role name resolved.
 - **func** `(s *Service) Members(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]MemberView, error)` — Members lists the active members of a project.
@@ -10027,7 +10063,7 @@ _Package:_ Package project is the project context of M2: projects, members, role
 - **func** `(s *Service) UpdateRole(ctx context.Context, a api.Actor, id uuid.UUID, in RoleInput) (*CustomRole, error)` — UpdateRole edits a custom role; members pick up the new permissions at once.
 - **func** `(s *Service) DeleteRole(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteRole removes a custom role that no member uses.
 
-#### `internal/projects/project/service.go` (103 lines)
+#### `internal/projects/project/service.go` (113 lines)
 - **type** `Ports struct` — Ports are the services the project context needs from the rest of the platform.
 - **type** `Service struct` — Service holds the project use cases. It also implements api.Authorizer.
 - **func** `NewService(db *gorm.DB, p Ports) *Service { return &Service{db: db, p: p, now: time.Now} }` — NewService builds the service.
@@ -10036,6 +10072,7 @@ _Package:_ Package project is the project context of M2: projects, members, role
 - **func** `text(field, v string, min, max int) (string, error)`
 - **func** `itoa(n int) string`
 - **func** `countRows(db *gorm.DB, table, where string, args ...any) (int64, error)` — countRows counts rows of table matching where, reporting database errors instead of treating them as zero.
+- **func** `dropWatches(tx *gorm.DB, tenantID, projectID, userID uuid.UUID) error` — dropWatches removes a user watches on the tasks of one project (all projects when projectID is the zero uuid): losing access to a project ends the right to follow its tasks (CM-03).
 - **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
 - **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error` — inTx runs fn in a transaction.
 - **type** `ref struct` — ref names the audited resource and carries the metadata (ids and codes only).
@@ -10690,10 +10727,71 @@ _Package:_ Package planning is the planning and views context of M2: sprints, th
 - **func** `normaliseSort(raw json.RawMessage) (RawJSON, error)` — normaliseSort validates the sort keys and returns their canonical encoding (an empty list is "[]").
 - **func** `(in ViewInput) apply(v *SavedView) error` — apply copies the set fields onto v after validating them (shared/project rules are checked by the service).
 
+### M2 Projects / fields
+
+
+#### `internal/projects/fields/apply.go` (87 lines)
+- **func** `bumpVersion(tx *gorm.DB, tenantID, taskID uuid.UUID, expected *int) (int, error)` — bumpVersion increments the task version when it still matches (or always when no version was sent).
+- **func** `(s *Service) apply(ctx context.Context, tx *gorm.DB, a api.Actor, t api.TaskRef, expected *int, changes []change) error` — apply stores the changes in one transaction together with the version bump, the activity entry and the event.
+- **func** `writeValue(tx *gorm.DB, a api.Actor, taskID uuid.UUID, c change) (any, error)` — writeValue upserts or clears one value and returns the previous one.
+- **func** `entry(c change, old any) map[string]any` — entry is the activity record of one change; free text and URLs are recorded by field only (like descriptions).
+
+#### `internal/projects/fields/definitions.go` (190 lines)
+- **type** `DefinitionInput struct` — DefinitionInput creates a field. Type is fixed for the life of the field.
+- **type** `DefinitionUpdate struct` — DefinitionUpdate edits a field; nil Options leaves the options unchanged.
+- **func** `cleanName(name string) (string, error)`
+- **func** `(s *Service) require(ctx context.Context, a api.Actor, projectID uuid.UUID, p api.Perm) error`
+- **func** `(s *Service) Definitions(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Definition, error)` — Definitions lists the fields of a project in display order.
+- **func** `(s *Service) CreateDefinition(ctx context.Context, a api.Actor, projectID uuid.UUID, in DefinitionInput) (*Definition, error)` — CreateDefinition adds a field to a project (project.update); a project has at most 30.
+- **func** `(s *Service) insertDefinition(ctx context.Context, tx *gorm.DB, a api.Actor, d *Definition) error`
+- **func** `(s *Service) UpdateDefinition(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in DefinitionUpdate) (*Definition, error)` — UpdateDefinition renames a field or changes its options; values that use a removed option are cleared.
+- **func** `mapMissing(err error) error`
+- **func** `(in DefinitionUpdate) apply(d *Definition) ([]string, error)` — apply edits d and returns the options that disappeared.
+- **func** `dropRemovedOptions(tx *gorm.DB, d Definition, removed []string) error` — dropRemovedOptions clears the values that still point at an option that was removed.
+- **func** `(s *Service) DeleteDefinition(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — DeleteDefinition removes a field and every value stored for it.
+
+#### `internal/projects/fields/http.go` (65 lines)
+- **func** `act(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the custom-field routes on g (already guarded by tenant resolution and authentication).
+
+#### `internal/projects/fields/models.go` (49 lines)
+_Package:_ Package fields is the custom-fields context of M2 (specification section 9, phase 4): typed, project-scoped field definitions and per-task values. It reaches tasks and project access only through the api contracts.
+- **type** `Definition struct` — Definition is one custom field of a project.
+- **func** `(Definition) TableName() string { return "custom_field_definitions" }` — TableName maps to custom_field_definitions.
+- **type** `Value struct` — Value is a task's value for one field, as returned by the API (nil Value means unset).
+
+#### `internal/projects/fields/service.go` (59 lines)
+- **type** `Ports struct` — Ports are the services the fields context needs from the platform.
+- **type** `Service struct` — Service holds the custom-field use cases.
+- **func** `NewService(db *gorm.DB, authz api.Authorizer, tasks api.TaskResolver, p Ports) *Service` — NewService builds the service; authz resolves project access and tasks resolves a task with its project access.
+- **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error` — inTx runs fn in a short transaction.
+- **type** `ref struct` — ref names the audited resource and carries its metadata (ids and codes only).
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref)` — audit records a successful mutation; failures never fail the request (SECURITY 7).
+- **func** `countRows(db *gorm.DB, table, where string, args ...any) (int64, error)`
+
+#### `internal/projects/fields/validate.go` (166 lines)
+- **func** `slugKey(name string) string` — slugKey derives the stable key of a field from its name.
+- **func** `validType(t string) bool`
+- **func** `cleanOptions(fieldType string, in []string) ([]string, error)` — cleanOptions validates the option list of a select or multiselect field.
+- **func** `checkValue(d Definition, v any, isMember func(uuid.UUID) (bool, error)) (any, error)` — checkValue validates v for the field and returns the normalised value to store. isMember tells whether a user id is an active member of the project (user fields).
+- **func** `checkURL(d Definition, v any) (any, error)` — checkURL accepts https URLs only. Stored URLs are never fetched by the backend (SECURITY.md section 9).
+- **func** `checkMulti(d Definition, v any) (any, error)`
+- **func** `checkUser(d Definition, v any, isMember func(uuid.UUID) (bool, error)) (any, error)`
+- **func** `contains(list []string, s string) bool`
+
+#### `internal/projects/fields/values.go` (115 lines)
+- **type** `SetInput struct` — SetInput sets values by field key; a null value clears the field. Version, when given, must match the task version.
+- **type** `change struct` — change is one validated edit: Value nil clears the field.
+- **func** `(s *Service) TaskFields(ctx context.Context, a api.Actor, taskID uuid.UUID) ([]Value, error)` — TaskFields lists every field of the task project with the task value (nil when unset).
+- **func** `(s *Service) valuesOf(ctx context.Context, db *gorm.DB, tenantID, projectID, taskID uuid.UUID) ([]Value, error)`
+- **func** `(s *Service) SetTaskFields(ctx context.Context, a api.Actor, taskID uuid.UUID, in SetInput) ([]Value, error)` — SetTaskFields validates and stores values for a task (task.update), bumping the task version (TK-03).
+- **func** `(s *Service) validate(ctx context.Context, a api.Actor, projectID uuid.UUID, values map[string]any) ([]change, error)` — validate resolves every key to a definition of the project and checks its value.
+
 ## D. Test inventory
 
 
-### Shared infrastructure — 24 test functions in 14 files
+### Shared infrastructure — 25 test functions in 14 files
 - `internal/shared/config/config_test.go`: TestLoadConfig, TestLoadConfig_EnvOverrides
 - `internal/shared/database/base_test.go`: TestBaseModel_BeforeCreate
 - `internal/shared/database/tx_test.go`: TestBeginTxNilDB, TestFinishNilTx
@@ -10701,7 +10799,7 @@ _Package:_ Package planning is the planning and views context of M2: sprints, th
 - `internal/shared/errors/errors_test.go`: TestAppError_Error
 - `internal/shared/idempotency/middleware_test.go`: TestReplaySameKeySamePayload, TestInProgressExpiredAndServerErrors
 - `internal/shared/middleware/correlation_test.go`: TestCorrelationIDIsValidatedEchoedAndPropagated
-- `internal/shared/middleware/cors_test.go`: TestCORS
+- `internal/shared/middleware/cors_test.go`: TestCORS, TestCORSAllowsVersionAndIdempotencyHeaders
 - `internal/shared/middleware/hardening_test.go`: TestBodyLimit, TestSecurityHeaders, TestBodyLimitGivesChunkedBodiesALength
 - `internal/shared/middleware/rate_limiter_test.go`: TestRateLimiter_BlocksAfterLimitWithRetryAfter, TestFailureRateLimiter_SuccessRefundsSlot, TestRateLimiter_FailsOpenOnStoreError
 - `internal/shared/outbox/relay_test.go`: TestRelayPublishesAndRecordsFailures
@@ -10916,13 +11014,14 @@ _Package:_ Package planning is the planning and views context of M2: sprints, th
 ### M2 Projects / api — 4 test functions in 1 files
 - `internal/projects/api/access_test.go`: TestBuiltinRolesAreNested, TestValidPermAndSortedPerms, TestRequireDistinguishesForbiddenFromArchived, TestActorFrom
 
-### M2 Projects / project — 19 test functions in 6 files
+### M2 Projects / project — 20 test functions in 7 files
 - `internal/projects/project/columns_test.go`: TestColumnLifecycle, TestReorderAndDeleteColumns, TestLabelsAndMilestones
 - `internal/projects/project/faults_test.go`: TestEveryStatementFailureIsReportedAndRolledBack, TestRunGroupRefreshStopsWithContext
 - `internal/projects/project/group_test.go`: TestGroupRulesExpandAndReconcile, TestGroupRuleGuards, TestRefreshAllSweepsActiveProjectsWithRules, TestDeactivationAndInbox
 - `internal/projects/project/harness_test.go`: (helpers only)
 - `internal/projects/project/members_test.go`: TestMembersLifecycle, TestLastOwnerGuard, TestCustomRoles
 - `internal/projects/project/projects_test.go`: TestCreateProjectDefaults, TestCreateProjectValidation, TestAccessRules, TestTenantVisibilityAndArchivedFreeze, TestUpdateProjectVersioned, TestArchiveRestoreDeleteAndFavorite, TestListProjects
+- `internal/projects/project/watch_cleanup_test.go`: TestWatchesEndWhenAccessIsLost
 
 ### M2 Projects / task — 48 test functions in 13 files
 - `internal/projects/task/activity_test.go`: TestActivityReads, TestTicketLookup, TestTenantAndProjectIsolation
@@ -10962,6 +11061,11 @@ _Package:_ Package planning is the planning and views context of M2: sprints, th
 - `internal/projects/planning/sprints_test.go`: TestSprintCrudAndAccess, TestSprintListPagingAndFilters, TestKanbanProjectsHaveNoSprints, TestDeleteSprintReleasesTasks, TestArchivedProjectFreezesPlanning
 - `internal/projects/planning/views_test.go`: TestSavedViewValidation, TestSavedViewVisibility, TestSavedViewUpdateAndDelete
 
+### M2 Projects / fields — 6 test functions in 3 files
+- `internal/projects/fields/faults_test.go`: TestEveryStatementFailureIsReported
+- `internal/projects/fields/fields_test.go`: TestDefinitionsLifecycleAndValidation, TestDefinitionLimitIsThirty, TestValuesByTypeAndVersion, TestOptionRemovalClearsValuesAndActivityHidesText, TestArchivedProjectsFreezeValuesAndDeleteCascades
+- `internal/projects/fields/harness_test.go`: (helpers only)
+
 ### Integration suite (`backend/tests/integration`)
 - `access_test.go`: TestAccessPredefinedRoles, TestAccessScopesInheritanceAndCycles, TestAccessUserGrantsAndBlocks, TestAccessAntiEscalation, TestAccessAutomaticRoles, TestAccessTenantIsolation
 - `attendance_ops_test.go`: TestAttendanceParity
@@ -10990,6 +11094,7 @@ _Package:_ Package planning is the planning and views context of M2: sprints, th
 - `performance_test.go`: TestPerformanceLifecycle
 - `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
 - `projects_collab_test.go`: TestCollabComments, TestCollabTime, TestCollabAttachmentsWithoutStorage
+- `projects_fields_test.go`: TestCustomFieldsThroughTheRouter
 - `projects_groups_test.go`: TestProjectGroupRulesFollowHR
 - `projects_hooks_test.go`: TestTaskDescriptionMentionsAndAutoWatchers
 - `projects_planning_test.go`: TestPlanningSprintsAndPlan, TestPlanningViewsSearchAndFeed
@@ -11564,10 +11669,14 @@ Format: decision - reason - alternatives - trade-off.
 - **DPJ-26 Cross-context behaviour goes through `api` interfaces.** `TaskResolver` (collab and planning find a task and the caller access), `Authorizer`, and `TaskHooks` (description mentions and automatic watchers, bound late with `task.SetHooks`). Alternative: collab imported by task (rejected: a cycle, since collab resolves tasks). Trade-off: one more interface; the task context works without hooks (nil-safe).
 - **DPJ-27 Dependency graph edits use one advisory lock per tenant.** A `blocks` cycle can run through several projects, so a per-project lock lets two inserts in disjoint project pairs both pass the check. Cost: dependency edits of one tenant serialise (rare and short).
 - **DPJ-28 Planning writes exactly one task column (`sprint_id`).** Plan moves and sprint completion touch `tasks.sprint_id`, `version` and `updated_at` with a per-task version predicate; everything else about a task belongs to the task context. Read models read M2 tables by SQL. Alternative: route plan moves through the task service (rejected: planning would depend on task and bulk moves would need a per-task round trip).
-- **DPJ-29 The iCalendar feed is the one public M2 route.** It carries a per-user random token (32 bytes, SHA-256 stored, shown once, revocable), derives the tenant from the token row, lists only tasks assigned to the token owner in projects that owner can read, checks the owner is still active, and is rate limited per process (30/min/IP). Tenant-level flags are not available without a JWT, so tenant admins see only the private projects they belong to.
+- **DPJ-29 The iCalendar feed is the one public M2 route.** It carries a per-user random token (32 bytes, SHA-256 stored, shown once, revocable), derives the tenant from the token row, lists only tasks assigned to the token owner in projects that owner can read, checks the owner is still active, and is rate limited at 30/min/IP (the shared Redis limiter when configured, a per-process one otherwise). Tenant-level flags are not available without a JWT, so tenant admins see only the private projects they belong to.
 - **DPJ-30 Attachments never pass through the API.** Clients upload with a presigned PUT and the server verifies the object (existence, size, type, checksum) before `ready`; the object key is `t/<tenant>/p/<project>/a/<attachment>`; the bucket is private; storage calls happen outside DB transactions; with no storage configured every attachment route answers 503 `STORAGE_UNAVAILABLE` and the rest of M2 works.
 - **DPJ-31 Time tracking.** One running timer per user (partial unique index), entries editable by their author within a 30-day lock window and by `time.manage`, projects can switch tracking off, timers running more than 24 h are stopped by a sweep and marked `auto_stopped`.
 - **DPJ-32 Permission model.** Four tenant-level catalogue entries were added to M0 (`projects:create` defaults to the Employee template; `projects:read_all` to Executive, Auditor, IT Admin; `projects:manage_all` and `project_roles:manage` to IT Admin). Project-level permissions are owned by M2 and are not M0 permissions. No M0 role or permission behaviour was changed.
+- **DPJ-33 `If-Match` joins the CORS allow-list (shared change).** The first browser run of the console showed that versioned edits (`PATCH` with `If-Match`) failed with "Failed to fetch": the preflight did not allow the header, so no browser client could use header-based concurrency (curl and the Go tests could). `internal/shared/middleware/cors.go` now allows `If-Match`; `TestCORSAllowsVersionAndIdempotencyHeaders` guards it; the full backend suite was re-run (shared change rule).
+- **DPJ-34 Watches end with access.** Removing a member, a group rule that drops a member, and deactivating a login delete the user's `task_watchers` rows (in the same transaction) for the affected project, or for all projects on deactivation. Alternative: filter at delivery time in M10 only (rejected: stale rows would leak who followed what, and M10 does not exist yet). The project context deletes from the collaboration table directly; both live in schema `projects` and the statement is a single scoped `DELETE`.
+- **DPJ-35 Phases 4-5 stay unbuilt by owner scope.** The owner confirmed phases 1-3 as the scope. Custom fields, automation, webhooks, integrations, MCP/CLI, recurrence, public links and a product UI use the reserved extension points (specification section 9) and need a new scope GO; nothing in phases 1-3 has to change to add them.
+- **DPJ-36 Custom fields live in their own context and are read and written beside the task, not inside it.** Values travel through `GET/PUT /tasks/{id}/custom-fields`, so the task contract and the task context stay unchanged; the fields context bumps `tasks.version` (the one task column it writes) so a field edit takes part in optimistic concurrency like any other edit. Types are fixed at creation (changing a type would invalidate stored values); `required` fields were left out because enforcing them needs a hook on task create that would couple the contexts. URL fields accept https only and are never fetched (SECURITY.md section 9); user fields accept active project members only; the permissions reuse `project.update` (define) and `task.update` (set), so no permission model change was needed. Alternative: embed `custom_fields` in the task payload (rejected: it couples the task context to the fields context and makes every task read join the values).
 
 ### m1-hr-management/contexts/organization  _(from specification.md)_
 

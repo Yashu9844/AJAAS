@@ -5822,6 +5822,70 @@ paths:
         '403': {description: 'FORBIDDEN'}
         '404': {description: 'NOT_FOUND'}
         '409': {description: 'CONFLICT'}
+  /projects/{id}/custom-fields:
+    get:
+      summary: 'List the custom fields of a project (project.read)'
+      tags: [Custom fields]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Add a typed custom field; at most 30 per project (project.update)'
+      tags: [Custom fields]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CustomFieldInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /projects/{id}/custom-fields/{field_id}:
+    patch:
+      summary: 'Rename a field or change its options; values using a removed option are cleared (project.update)'
+      tags: [Custom fields]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: field_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CustomFieldUpdate'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Delete a field and all its values (project.update)'
+      tags: [Custom fields]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: field_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /tasks/{id}/custom-fields:
+    get:
+      summary: 'Every field of the task project with the task value (task.read)'
+      tags: [Custom fields]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    put:
+      summary: 'Set or clear values by field key; send version (or If-Match) for optimistic concurrency (task.update)'
+      tags: [Custom fields]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CustomFieldValuesInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
   /projects/{id}/sprints:
     post:
       summary: 'Create a planned sprint in a scrum project (sprint.manage)'
@@ -7761,6 +7825,9 @@ components:
     TimeUpdateInput: {type: object, properties: {started_at: {type: string, format: date-time}, minutes: {type: integer}, note: {type: string}}}
     TimerStartInput: {type: object, properties: {task_id: {type: string, format: uuid}}, required: [task_id]}
     AttachmentInitInput: {type: object, properties: {filename: {type: string}, size: {type: integer}, content_type: {type: string}, sha256: {type: string, description: 'optional lowercase hex checksum the object must match'}}, required: [filename, size, content_type]}
+    CustomFieldInput: {type: object, properties: {name: {type: string}, type: {type: string, enum: [text, number, checkbox, date, url, select, multiselect, user]}, options: {type: array, items: {type: string}}}, required: [name, type]}
+    CustomFieldUpdate: {type: object, properties: {name: {type: string}, options: {type: array, items: {type: string}}}}
+    CustomFieldValuesInput: {type: object, properties: {values: {type: object, description: 'field key to value; null clears'}, version: {type: integer}}, required: [values]}
     SprintInput: {type: object, properties: {name: {type: string}, goal: {type: string}, start_on: {type: string, format: date}, end_on: {type: string, format: date}, version: {type: integer}}, required: [name]}
     SprintCompleteInput: {type: object, properties: {move_unfinished_to: {type: string, description: 'backlog or the id of the next planned sprint'}}, required: [move_unfinished_to]}
     PlanInput: {type: object, properties: {task_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}, sprint_id: {type: string, format: uuid, nullable: true}, versions: {type: object, additionalProperties: {type: integer}}}, required: [task_ids]}
