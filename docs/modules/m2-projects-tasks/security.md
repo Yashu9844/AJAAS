@@ -14,7 +14,7 @@ Law: `docs/SECURITY.md` (sections 1, 5, 9, 13, 14). This table is the Definition
 | S8 | Unsafe file upload | 50 MB cap, per-tenant quota, content-type allow-list, executable extensions refused, sanitised filename, size/type/checksum verified on `complete`, scan hook before `ready`, private bucket, presigned URLs (5 min up, 2 min down) | collab attachment tests, real S3 round trip |
 | S9 | SSRF | M2 never fetches user-supplied URLs; storage endpoints come from configuration only | no outbound HTTP in `internal/projects` |
 | S10 | Secrets in code or logs | Storage credentials come from config/environment (dev values only in `development.yaml`); calendar tokens are random 32 bytes, only the SHA-256 hash is stored and shown once | `configs/*.yaml`, planning token tests |
-| S11 | Public endpoint abuse | The only token-authenticated route is the iCalendar feed: tenant is derived from the token row, only the owner assigned tasks in readable projects are listed, owner must still be active, revocable, rate limited (30/min/IP per process) | planning feed tests |
+| S11 | Public endpoint abuse | The only token-authenticated route is the iCalendar feed: tenant is derived from the token row, only the owner assigned tasks in readable projects are listed, owner must still be active, revocable, rate limited (30/min/IP, shared Redis limiter when Redis is configured, per process otherwise) | planning feed tests |
 | S12 | Personal data in events or audit | Events and audit hold ids, versions and codes only; field values only in activity (old/new) and never free text in events | PG12 tests per context |
 | S13 | Repudiation | Every mutation writes an audit entry (M0 trail) and an append-only activity row (DB trigger blocks `UPDATE`) | `faults_test.go`, activity tests |
 | S14 | Replay / duplicate creation | Global `Idempotency-Key` middleware on writes; inbox ledger for consumed events | PG1, PG10 |
@@ -23,5 +23,5 @@ Law: `docs/SECURITY.md` (sections 1, 5, 9, 13, 14). This table is the Definition
 | S17 | Resource exhaustion | Page size <= 100, bulk <= 100, assignees <= 20, mentions and graph walks bounded (10 000 nodes), calendar window <= 62 days, Gantt <= 500 tasks, body limit 1 MiB | validation tests per context |
 | S18 | Permission model change | Four tenant-level entries registered in the M0 catalogue (`projects:create`, `projects:read_all`, `projects:manage_all`, `project_roles:manage`) with predefined-role defaults; project-level permissions live inside M2 | `projects.Catalogue()`, `docs/modules/m2-projects-tasks/decisions.md` |
 
-Open security items: no malware scanner behind the scan hook, per-process rate limiter on the calendar feed, platform-wide gaps in
+Open security items: no malware scanner behind the scan hook (no scanner exists in the platform), platform-wide gaps in
 `docs/modules/m1-hr-management/acceptance-checklist.md` (secret manager, tamper-resistant audit, backups) apply to M2 as well.

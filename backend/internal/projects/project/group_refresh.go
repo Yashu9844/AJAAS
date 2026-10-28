@@ -49,6 +49,9 @@ func (s *Service) reconcile(tx *gorm.DB, tenantID, projectID uuid.UUID, want map
 			if err := tx.Exec(`DELETE FROM project_members WHERE project_id = ? AND user_id = ? AND source = 'group'`, projectID, uid).Error; err != nil {
 				return err
 			}
+			if err := dropWatches(tx, tenantID, projectID, uid); err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Exec(`UPDATE project_group_rules SET refreshed_at = ? WHERE project_id = ?`, s.now().UTC(), projectID).Error

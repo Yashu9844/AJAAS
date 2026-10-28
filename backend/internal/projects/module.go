@@ -18,6 +18,7 @@ import (
 	"github.com/jaas/jaas/internal/projects/project"
 	"github.com/jaas/jaas/internal/projects/task"
 	"github.com/jaas/jaas/internal/shared/identityport"
+	"github.com/jaas/jaas/internal/shared/middleware"
 	"github.com/jaas/jaas/internal/shared/outbox"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"github.com/jaas/jaas/internal/shared/storage"
@@ -35,6 +36,9 @@ const (
 	Exchange = "jaas.projects.events"
 )
 
+// feedRatePerMinute caps requests per client IP on the public iCalendar feed.
+const feedRatePerMinute = 30
+
 // groupRefreshEvery is how often group membership rules are re-resolved against HR data.
 const groupRefreshEvery = 10 * time.Minute
 
@@ -47,9 +51,10 @@ type Options struct {
 	Publisher  queue.EventPublisher
 	Logger     *zerolog.Logger
 	Identity   identityport.Port
-	Storage    storage.Store   // nil: attachments answer 503 until storage is configured
-	People     ports.People    // nil: group rules answer 503 until organisation data is wired
-	Background context.Context // nil: no relays or sweeps (tests)
+	Storage    storage.Store             // nil: attachments answer 503 until storage is configured
+	People     ports.People              // nil: group rules answer 503 until organisation data is wired
+	RateLimits middleware.RateLimitStore // nil: the public feed keeps its per-process limiter
+	Background context.Context           // nil: no relays or sweeps (tests)
 }
 
 // Module is the M2 service.
@@ -67,7 +72,10 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	m.project = project.NewService(o.DB, project.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit(), People: o.People})
 	m.task = task.NewService(o.DB, m.project, task.Ports{Audit: o.Identity.Audit()})
 	m.planning = planning.NewService(o.DB, m.project, planning.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit()}) // wire:planning
-	o.Identity.OnUserDeactivated(m.project)                                                                                 // specification section 7: deactivated logins leave projects, history stays
+	if o.RateLimits != nil {                                                                                                // the shared (Redis) limiter replaces the per-process default of the public feed
+		m.planning.SetFeedLimiter(middleware.RateLimiter(o.RateLimits, feedRatePerMinute, time.Minute))
+	}
+	o.Identity.OnUserDeactivated(m.project) // specification section 7: deactivated logins leave projects, history stays
 	// wire:collab
 	m.collab = collab.NewService(o.DB, collab.Ports{Authorizer: m.project, Tasks: m.task, Storage: o.Storage, Users: o.Identity.Users(), Audit: o.Identity.Audit()})
 	m.task.SetHooks(m.collab.TaskHooks()) // CM-02/CM-03: description mentions and automatic watchers

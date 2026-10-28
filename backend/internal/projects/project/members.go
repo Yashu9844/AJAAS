@@ -189,6 +189,9 @@ func (s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, user
 		if err := ensureOwner(tx, projectID); err != nil {
 			return err
 		}
+		if err := dropWatches(tx, a.TenantID, projectID, userID); err != nil {
+			return err
+		}
 		s.audit(ctx, tx, a, "project.member.removed", ref{"project", projectID, map[string]any{"user_id": userID}})
 		return kernel.Emit(ctx, tx, a.TenantID, "project.member.removed", map[string]any{"project_id": projectID, "user_id": userID})
 	})

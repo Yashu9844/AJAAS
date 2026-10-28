@@ -4,7 +4,7 @@ Updated 2026-10-28. Branch `module-2` (pushed to `origin` after each phase). Ste
 spec, migrations (up/down/up), service and HTTP, tests on a real PostgreSQL, integration ring, swagger, console scenario, docs,
 full suites, commit.
 
-**Status: phases 1-3 (P0-P7) BUILT and verified; phases 4-5 (P8) are designed for and not built.**
+**Status: phases 1-3 (P0-P7) BUILT and verified; phases 4-5 (P8) are designed for and deliberately not built.** The owner scoped M2 to phases 1-3 ("in a way no hurdle comes or missed later", 2026-10-27/28, `decisions.md` owner answers 1); phases 4-5 start with a scope GO.
 
 | Step | Scope | Status |
 |---|---|---|
@@ -23,12 +23,11 @@ Definition of done per step: unit coverage >= 85% on services (>= 90% where stat
 
 ## Known gaps (carried to the next phase)
 
-- Watchers are not removed when a user loses access to a project; delivery filtering belongs to M10 (notifications are not built).
-- The iCalendar feed limiter is per process; use the shared Redis limiter when `projects.Options` gets a Redis handle.
+- Delivery filtering of notifications belongs to M10 (not built). Watches end when access is lost (member removal, group-rule change, login deactivation).
 - Group-rule membership lags HR by up to ten minutes unless refreshed explicitly (`POST /projects/{id}/group-rules/refresh`).
 - No broker consumer exists yet; `HandleIdentityEvent` is ready (inbox-deduplicated) and the in-process deactivation hook covers
   identity deactivation and HR terminations today.
 - No real product UI: the test console (`/dev-test/projects*`) is the only frontend.
-- Attachment upload bytes are not malware-scanned (a no-op scan hook exists).
+- Attachment upload bytes are not malware-scanned: there is no scanner in the platform yet; the scan hook runs before `ready` and is a no-op.
 - Subtree moves between projects and re-parenting tasks that have subtasks are refused (409), not implemented.
 - Generic platform gaps shared with M1 (CI pipeline, metrics, tracing, backups, runbooks, secret manager, load tests).

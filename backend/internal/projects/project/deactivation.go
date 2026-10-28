@@ -25,6 +25,9 @@ func (s *Service) DeactivateUserMappings(ctx context.Context, tx *gorm.DB, tenan
 	if err := db.Exec(`UPDATE task_assignees SET active = FALSE WHERE tenant_id = ? AND user_id = ? AND active`, tenantID, userID).Error; err != nil {
 		return err
 	}
+	if err := dropWatches(tx, tenantID, uuid.Nil, userID); err != nil {
+		return err
+	}
 	for _, pid := range projectIDs {
 		if err := kernel.LogActivity(ctx, tx, kernel.Activity{TenantID: tenantID, ProjectID: pid, ActorID: &userID, Type: "member.deactivated",
 			Data: map[string]any{"user_id": userID}, Source: "system"}); err != nil {

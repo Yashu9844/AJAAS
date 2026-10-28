@@ -21,6 +21,10 @@ func buildProjects(o Options, idp identityport.Port, people ports.People) (*proj
 		}
 		store = s3
 	}
-	return projects.New(context.Background(), projects.Options{DB: o.DB, Publisher: o.Publisher, Logger: &o.Logger.Logger,
-		Identity: idp, Storage: store, People: people, Background: o.Background})
+	opts := projects.Options{DB: o.DB, Publisher: o.Publisher, Logger: &o.Logger.Logger,
+		Identity: idp, Storage: store, People: people, Background: o.Background}
+	if o.Redis != nil { // a nil *RedisClient inside the interface would not be nil
+		opts.RateLimits = o.Redis
+	}
+	return projects.New(context.Background(), opts)
 }

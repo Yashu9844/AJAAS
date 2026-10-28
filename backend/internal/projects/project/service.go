@@ -80,6 +80,16 @@ func countRows(db *gorm.DB, table, where string, args ...any) (int64, error) {
 	return n, err
 }
 
+// dropWatches removes a user watches on the tasks of one project (all projects when projectID is the zero uuid): losing
+// access to a project ends the right to follow its tasks (CM-03).
+func dropWatches(tx *gorm.DB, tenantID, projectID, userID uuid.UUID) error {
+	if projectID == uuid.Nil {
+		return tx.Exec(`DELETE FROM task_watchers WHERE tenant_id = ? AND user_id = ?`, tenantID, userID).Error
+	}
+	return tx.Exec(`DELETE FROM task_watchers WHERE tenant_id = ? AND user_id = ? AND task_id IN (SELECT id FROM tasks WHERE project_id = ?)`,
+		tenantID, userID, projectID).Error
+}
+
 func isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }
 
 // inTx runs fn in a transaction.
