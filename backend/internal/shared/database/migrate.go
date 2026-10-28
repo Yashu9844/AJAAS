@@ -14,7 +14,7 @@ import (
 // SearchPath is the schema search path of the in-process monolith: every service's schema, then public. Each
 // service's tables live in its own schema; the shared path lets the single process reach both while separate
 // deployments get one schema each (docs/ARCHITECTURE.md §12).
-const SearchPath = "identity,hr,public"
+const SearchPath = "identity,hr,projects,public"
 
 const migrationsTable = "schema_migrations"
 

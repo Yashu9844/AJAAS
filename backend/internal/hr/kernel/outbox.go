@@ -1,91 +1,9 @@
 package kernel
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"regexp"
-	"time"
+import "github.com/jaas/jaas/internal/shared/outbox"
 
-	"github.com/jaas/jaas/internal/shared/queue"
-	"gorm.io/gorm"
-)
+// OutboxRelay is the shared table relay (internal/shared/outbox), kept under its HR name for the HR contexts.
+type OutboxRelay = outbox.TableRelay
 
-// Relay defaults, the same as the older per-context relays.
-const (
-	RelayInterval    = 30 * time.Second
-	RelayBatchSize   = 100
-	RelayMaxAttempts = 10
-)
-
-var tableName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-
-// OutboxRelay publishes the rows of one context's `<prefix>_events_outbox` table (id, routing_key, payload, published,
-// published_at, attempts, last_error) to the message bus (HR-009). Rows are claimed with FOR UPDATE SKIP LOCKED, so
-// several instances can run side by side; a row that fails RelayMaxAttempts times is left for an operator.
-type OutboxRelay struct {
-	db        *gorm.DB
-	table     string
-	exchange  string
-	publisher queue.EventPublisher
-	interval  time.Duration
-	now       func() time.Time
-}
-
-// NewOutboxRelay builds a relay for table (a trusted constant, validated) publishing to exchange.
-func NewOutboxRelay(db *gorm.DB, table, exchange string, publisher queue.EventPublisher) *OutboxRelay {
-	if !tableName.MatchString(table) {
-		panic(fmt.Sprintf("kernel: invalid outbox table name %q", table))
-	}
-	return &OutboxRelay{db: db, table: table, exchange: exchange, publisher: publisher, interval: RelayInterval, now: time.Now}
-}
-
-type outboxRow struct {
-	ID         string
-	RoutingKey string
-	Payload    []byte
-}
-
-// RelayOnce publishes one batch and returns how many rows were published.
-func (r *OutboxRelay) RelayOnce(ctx context.Context) (int, error) {
-	published := 0
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var rows []outboxRow
-		err := tx.Raw(`SELECT id::text AS id, routing_key, payload::text AS payload FROM `+r.table+
-			` WHERE published = FALSE AND attempts < ? ORDER BY created_at LIMIT ? FOR UPDATE SKIP LOCKED`, RelayMaxAttempts, RelayBatchSize).Scan(&rows).Error
-		if err != nil {
-			return err
-		}
-		for _, row := range rows {
-			if perr := r.publisher.Publish(ctx, r.exchange, row.RoutingKey, json.RawMessage(row.Payload)); perr != nil {
-				if err := tx.Exec(`UPDATE `+r.table+` SET attempts = attempts + 1, last_error = ? WHERE id = ?::uuid`, perr.Error(), row.ID).Error; err != nil {
-					return err
-				}
-				continue
-			}
-			if err := tx.Exec(`UPDATE `+r.table+` SET published = TRUE, published_at = ?, attempts = attempts + 1, last_error = NULL WHERE id = ?::uuid`,
-				r.now().UTC(), row.ID).Error; err != nil {
-				return err
-			}
-			published++
-		}
-		return nil
-	})
-	return published, err
-}
-
-// Run ticks RelayOnce until ctx is cancelled. A failed tick is reported through onErr (may be nil) and retried.
-func (r *OutboxRelay) Run(ctx context.Context, onErr func(error)) {
-	t := time.NewTicker(r.interval)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			if _, err := r.RelayOnce(ctx); err != nil && onErr != nil {
-				onErr(err)
-			}
-		}
-	}
-}
+// NewOutboxRelay builds a relay for table publishing to exchange.
+var NewOutboxRelay = outbox.NewTableRelay

@@ -10,7 +10,7 @@ import (
 	"github.com/jaas/jaas/internal/shared/database"
 )
 
-//go:embed identity/*.sql hr/*.sql
+//go:embed identity/*.sql hr/*.sql projects/*.sql
 var all embed.FS
 
 func sub(dir string) fs.FS {
@@ -27,7 +27,10 @@ var Identity = sub("identity")
 // HR is M1's migration set (schema hr).
 var HR = sub("hr")
 
+// Projects is M2's migration set (schema projects).
+var Projects = sub("projects")
+
 // Sets lists every service's migrations in dependency order.
 func Sets() []database.MigrationSet {
-	return []database.MigrationSet{{Schema: "identity", FS: Identity}, {Schema: "hr", FS: HR}}
+	return []database.MigrationSet{{Schema: "identity", FS: Identity}, {Schema: "hr", FS: HR}, {Schema: "projects", FS: Projects}}
 }

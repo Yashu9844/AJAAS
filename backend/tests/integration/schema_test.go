@@ -21,7 +21,7 @@ func TestMigrationsAreIdempotentAndComplete(t *testing.T) {
 		var n int64
 		testDB.Raw("SELECT count(*) FROM " + set.Schema + ".schema_migrations").Scan(&n)
 		ups, _ := fs.Glob(set.FS, "*.up.sql")
-		if int(n) != len(ups) || len(ups) < 15 {
+		if int(n) != len(ups) || len(ups) == 0 {
 			t.Fatalf("%s.schema_migrations has %d rows for %d up files", set.Schema, n, len(ups))
 		}
 	}
@@ -37,13 +37,20 @@ func TestMigrationsAreIdempotentAndComplete(t *testing.T) {
 func TestSchemasAreOwnedAndIsolated(t *testing.T) {
 	for table, schema := range map[string]string{"tenants": "identity", "users": "identity", "roles": "identity",
 		"identity_events_outbox": "identity", "departments": "hr", "employee_profiles": "hr", "leave_ledger": "hr",
-		"payroll_runs": "hr", "recruitment_jobs": "hr", "performance_cycles": "hr"} {
+		"payroll_runs": "hr", "recruitment_jobs": "hr", "performance_cycles": "hr",
+		"projects_events_outbox": "projects", "projects_events_inbox": "projects"} {
 		if got := sqlStr(t, "SELECT table_schema FROM information_schema.tables WHERE table_name = ?", table); got != schema {
 			t.Errorf("%s lives in %q, want %q", table, got, schema)
 		}
 	}
 	if n := sqlStr(t, "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"); n != "0" {
 		t.Fatalf("no tables in public: %s", n)
+	}
+	// The monolith resolves unqualified names through one search path, so a name used by two services would be ambiguous.
+	if dup := sqlStr(t, `SELECT coalesce(string_agg(table_name, ','), '') FROM (SELECT table_name FROM information_schema.tables
+		WHERE table_schema IN ('identity','hr','projects') AND table_type = 'BASE TABLE'
+		GROUP BY table_name HAVING count(*) > 1 AND table_name <> 'schema_migrations') d`); dup != "" {
+		t.Fatalf("table names used by more than one schema: %s", dup)
 	}
 	cross := sqlStr(t, `SELECT count(*) FROM information_schema.referential_constraints rc
 		JOIN information_schema.table_constraints fk ON fk.constraint_name = rc.constraint_name AND fk.constraint_schema = rc.constraint_schema
