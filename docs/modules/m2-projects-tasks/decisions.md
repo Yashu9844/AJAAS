@@ -19,13 +19,15 @@ Proposed decisions (DPJ) take effect when the design is approved. Open questions
 - **DPJ-13 Shared identity port.** Move `identityport` to `internal/shared/identityport`; `shared/identityport` becomes a thin alias package so no HR file changes.
 - **DPJ-14 Notifications.** M2 only publishes events. Until M10 exists nothing is delivered; per-user preferences belong to M10. In-app "unread" for My work uses read markers owned by M2 only if M10 slips (revisit at phase 3).
 
-## Open questions (please answer)
+## Owner answers (2026-10-28)
 
-1. **Scope:** phases 1–3 as written in the specification (projects, tasks, comments, time, attachments, sprints, board/list/calendar/Gantt/my-work, search, saved views). Confirm, or move items between phases.
-2. **Product UI:** besides the test console, do you want a real Kanban/list UI inside this module (a new `frontend/src/modules/projects` app, using Kaneo as UX reference)? Proposed: console first, product UI as a separate phase after phase 2.
-3. **MinIO in the dev compose** and a new Go dependency (AWS SDK v2) for storage: approved?
-4. **Hard WIP limits** (refuse) or soft (warn) as the default?
-5. **Subtask depth** limit 3: acceptable?
-6. **Time-entry lock window** 30 days: acceptable? Should projects be able to disable time tracking?
-7. **Tenant-wide labels** in addition to project labels: keep?
-8. **Public project links** and recurring tasks stay in phase 4+ as listed: confirm.
+1. **Scope:** phases 1-3 confirmed; later phases must not be blocked (extension points in specification section 9).
+2. **UI:** one test console for every module (`/dev-test`), with an M2 page of its own that depends on the identity pages for sign-in. A product UI is a later phase.
+3. **Storage:** approved, behind a provider interface (`shared/storage`). The AWS SDK v2 is added. **MinIO's official images are no longer published** (Docker Hub repository removed, Quay returns 401), so the dev service is `adobe/s3mock` on port 9090; the adapter speaks plain S3, so MinIO, AWS S3 or another compatible server is a configuration change. HR documents and other modules can adopt the same port later; HR is not changed now.
+4. **Decided by the implementer (owner delegated 4-8):**
+   - WIP limit: **soft by default**, with a per-column `wip_hard` switch (a hard column refuses the move with 409 `WIP_LIMIT`).
+   - Subtask depth: **3**.
+   - Time-entry lock window: **30 days**, and a project can **disable time tracking**.
+   - Labels: **tenant-wide and project labels** both kept.
+   - Public project links and recurring tasks: **phase 4+**.
+5. **Branching:** `module-2` is pushed to `origin` and pushed again after each phase.

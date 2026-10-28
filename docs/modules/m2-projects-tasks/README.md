@@ -1,6 +1,6 @@
 # M2 Projects & Tasks
 
-**Status:** DESIGN — specification, design, decisions, plan and testing written 2026-10-27; **awaiting owner approval** (open questions in `decisions.md`). No code yet.
+**Status:** BUILDING — design approved 2026-10-28 (answers in `decisions.md`). P1 foundations done; P2 (project context) next.
 
 **Purpose:** Project delivery and work tracking; employee identity is referenced by IDs.
 

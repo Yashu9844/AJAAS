@@ -107,7 +107,7 @@ type Store interface {
 
 Adapter: S3-compatible (AWS SDK v2) configured by endpoint, region, bucket and credentials from the environment; **MinIO** container in the dev compose
 so developers and tests run it locally. Key layout `t/<tenant>/p/<project>/a/<attachment-id>`; buckets are private; only presigned URLs leave the system
-(5-minute upload, 2-minute download). Unit tests use an in-memory fake; an integration test runs against MinIO. HR documents and M8 can adopt the same port later.
+(5-minute upload, 2-minute download). Unit tests use an in-memory fake; an integration test runs against the dev service. HR documents and M8 can adopt the same port later.
 
 Upload flow: `POST /tasks/{id}/attachments` (init, authorised, writes a `pending` row, returns id + presigned PUT) → client PUT → `POST /attachments/{id}/complete`
 (HEAD the object, compare size/type/checksum, scan hook, then `ready` and an activity entry). A sweep removes `pending` rows and objects older than 24 h.
