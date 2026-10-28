@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/organization/dto"
 	"github.com/jaas/jaas/internal/hr/organization/events"
 	"github.com/jaas/jaas/internal/hr/organization/models"

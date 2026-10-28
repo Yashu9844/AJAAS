@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	coreAPI "github.com/jaas/jaas/internal/hr/core/api"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/identity/access"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"

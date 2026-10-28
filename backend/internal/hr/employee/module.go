@@ -13,7 +13,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee/repositories"
 	employeeRoutes "github.com/jaas/jaas/internal/hr/employee/routes"
 	"github.com/jaas/jaas/internal/hr/employee/services"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	sharedCache "github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"github.com/rs/zerolog"

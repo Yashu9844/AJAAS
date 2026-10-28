@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/hr"
-	"github.com/jaas/jaas/internal/hr/identityport/inprocess"
+	"github.com/jaas/jaas/internal/shared/identityport/inprocess"
 	"github.com/jaas/jaas/internal/identity"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/shared/cache"

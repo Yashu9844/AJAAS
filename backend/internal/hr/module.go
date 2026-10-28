@@ -16,7 +16,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/compensation"
 	"github.com/jaas/jaas/internal/hr/core"
 	"github.com/jaas/jaas/internal/hr/employee"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/kernel"
 	"github.com/jaas/jaas/internal/hr/learning"
 	"github.com/jaas/jaas/internal/hr/leave"

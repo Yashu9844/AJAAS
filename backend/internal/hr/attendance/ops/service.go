@@ -13,7 +13,7 @@ import (
 	attDTO "github.com/jaas/jaas/internal/hr/attendance/dto"
 	attServices "github.com/jaas/jaas/internal/hr/attendance/services"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	leaveAPI "github.com/jaas/jaas/internal/hr/leave/api"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"gorm.io/gorm"

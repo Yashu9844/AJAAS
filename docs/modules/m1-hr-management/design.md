@@ -34,7 +34,7 @@ Client ─▶ Gateway ─▶ HR service (/api/v1/hr/...)
 | Context | `models, dto, validators, repositories, services, controllers, routes, events, module.go`, plus pure engines (`calc` in attendance/leave/payroll, `score` + `lifecycle` in performance, pipeline graphs in recruitment) | same internal layers; adds `api/` (exported read ports + DTOs other contexts may use) |
 | Shared HR kernel | duplicated per context (Actor, TxRunner, ParsePage, money/days types) | `backend/internal/hr/kernel/` — `Actor`, scope evaluation (self/manager/permission), effective-dating helpers, request lifecycle (HR-013), `Money`, `Days`, `Fixed` |
 | Platform shared | `backend/internal/shared/` (config, database, errors, logger, cache, queue, middleware, utils) | adds `idempotency`, `outbox`, `inbox`, `events` (versioned envelope) used by M0 and HR alike |
-| Identity access | contexts import `identity/middleware` and `identity/repositories` | `backend/internal/hr/identityport/` interface + in-process adapter over M0; HR packages never import `internal/identity/...` (import-boundary test) |
+| Identity access | contexts import `identity/middleware` and `identity/repositories` | `backend/internal/shared/identityport/` interface + in-process adapter over M0; HR packages never import `internal/identity/...` (import-boundary test) |
 
 ## 3. Context map
 

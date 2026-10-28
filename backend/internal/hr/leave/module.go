@@ -4,7 +4,7 @@ package leave
 import (
 	"context"
 	attendanceAPI "github.com/jaas/jaas/internal/hr/attendance/api"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/leave/api"
 	"github.com/jaas/jaas/internal/hr/leave/plus"
 	"time"

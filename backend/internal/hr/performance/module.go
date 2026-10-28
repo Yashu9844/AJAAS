@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/performance/api"
 	"github.com/jaas/jaas/internal/hr/performance/controllers"
 	"github.com/jaas/jaas/internal/hr/performance/models"

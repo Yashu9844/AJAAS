@@ -13,7 +13,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/core/routes"
 	"github.com/jaas/jaas/internal/hr/core/services"
 	employeeAPI "github.com/jaas/jaas/internal/hr/employee/api"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/shared/queue"
 	"gorm.io/gorm"
 )

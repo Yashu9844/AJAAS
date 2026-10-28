@@ -2,7 +2,7 @@
 package payroll
 
 import (
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"time"
 
 	"github.com/gin-gonic/gin"

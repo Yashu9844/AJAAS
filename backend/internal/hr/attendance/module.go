@@ -4,7 +4,7 @@ package attendance
 import (
 	"context"
 	"github.com/jaas/jaas/internal/hr/attendance/api"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"time"
 
 	"github.com/gin-gonic/gin"

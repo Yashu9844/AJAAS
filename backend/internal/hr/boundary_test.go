@@ -11,7 +11,7 @@ import (
 )
 
 // TestImportBoundaries enforces docs/modules/m1-hr-management/design.md Ã‚Â§2Ã¢â‚¬â€œ4:
-//   - HR never imports M0 internals; only identityport/inprocess may, and every HR package may use the published
+//   - HR never imports M0 internals; only the contract package internal/identity/access may be used (the port is internal/shared/identityport), and every HR package may use the published
 //     contract package internal/identity/access;
 //   - a context reaches another context only through that context's dto or api package;
 //   - kernel and identityport are shared by every context.
@@ -37,7 +37,7 @@ func TestImportBoundaries(t *testing.T) {
 			rel := strings.TrimPrefix(p, mod)
 			switch {
 			case strings.HasPrefix(rel, "identity/") || rel == "identity":
-				if rel != "identity/access" && !strings.HasPrefix(slash, "identityport/inprocess/") {
+				if rel != "identity/access" {
 					t.Errorf("%s imports M0 internals %s (use identityport)", slash, p)
 				}
 			case strings.HasPrefix(rel, "hr/"):

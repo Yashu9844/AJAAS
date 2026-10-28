@@ -15,7 +15,7 @@ import (
 	attModels "github.com/jaas/jaas/internal/hr/attendance/models"
 	attServices "github.com/jaas/jaas/internal/hr/attendance/services"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/identity/access"
 	sharedErrors "github.com/jaas/jaas/internal/shared/errors"
 	"gorm.io/gorm"

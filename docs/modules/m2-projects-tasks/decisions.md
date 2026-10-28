@@ -16,7 +16,7 @@ Proposed decisions (DPJ) take effect when the design is approved. Open questions
 - **DPJ-10 Ticket ids** `KEY-N` with a per-project counter; moving a task to another project keeps the old id resolving through `task_ticket_alias`.
 - **DPJ-11 HR-aware membership.** Add a department, a team or a manager's direct reports to a project through group rules resolved with the People port. This is the main product difference from a generic tracker.
 - **DPJ-12 Extension points over speculative tables.** Phase 4–5 tables are reserved by name and their plug-in points are documented in the specification (section 9); no empty tables are created now.
-- **DPJ-13 Shared identity port.** Move `identityport` to `internal/shared/identityport`; `hr/identityport` becomes a thin alias package so no HR file changes.
+- **DPJ-13 Shared identity port.** Move `identityport` to `internal/shared/identityport`; `shared/identityport` becomes a thin alias package so no HR file changes.
 - **DPJ-14 Notifications.** M2 only publishes events. Until M10 exists nothing is delivered; per-user preferences belong to M10. In-app "unread" for My work uses read markers owned by M2 only if M10 slips (revisit at phase 3).
 
 ## Open questions (please answer)

@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	coreAPI "github.com/jaas/jaas/internal/hr/core/api"
 	employeeDTO "github.com/jaas/jaas/internal/hr/employee/dto"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/hr/kernel"
 	payrollAPI "github.com/jaas/jaas/internal/hr/payroll/api"
 	performanceAPI "github.com/jaas/jaas/internal/hr/performance/api"

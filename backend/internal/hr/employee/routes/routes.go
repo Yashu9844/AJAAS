@@ -3,7 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/hr/employee/controllers"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 )
 
 // RegisterRoutes wires employee endpoint groups with Module 0 middleware and RBAC.

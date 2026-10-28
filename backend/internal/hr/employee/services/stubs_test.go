@@ -9,7 +9,7 @@ import (
 	"github.com/jaas/jaas/internal/hr/employee/dto"
 	"github.com/jaas/jaas/internal/hr/employee/models"
 	"github.com/jaas/jaas/internal/hr/employee/repositories"
-	"github.com/jaas/jaas/internal/hr/identityport"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"gorm.io/gorm"
 )
 

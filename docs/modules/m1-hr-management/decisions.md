@@ -72,7 +72,7 @@ Service-level decisions. Context-level decisions (D1-…, D3-…, D4-…, D5-…
   (`backend/migrations/identity`, `backend/migrations/hr`, tracked in `<schema>.schema_migrations`). The in-process
   monolith connects with `search_path=identity,hr,public` so SQL stays unqualified; a separately deployed service gets
   only its own schema. No foreign key crosses a schema (integration test).
-- **Ports:** HR reaches M0 only through `internal/hr/identityport` (in-process adapter in `identityport/inprocess`);
+- **Ports:** HR reaches M0 only through `internal/shared/identityport` (in-process adapter in `identityport/inprocess`);
   contexts reach each other only through `<context>/dto` and `<context>/api`; shared value types (`Days`, `Money`)
   live in `internal/hr/kernel`. `TestImportBoundaries` enforces all three.
 - **Events:** every envelope carries `event_version` (1) and optional `causation_id`. Outboxes and exchanges stay per
