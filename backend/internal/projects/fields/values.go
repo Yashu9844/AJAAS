@@ -74,7 +74,7 @@ func (s *Service) SetTaskFields(ctx context.Context, a api.Actor, taskID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	err = s.inTx(ctx, func(tx *gorm.DB) error { return s.apply(ctx, tx, a, ref, in.Version, changes) })
+	err = s.inTx(ctx, func(tx *gorm.DB) error { return s.apply(ctx, tx, a, ref, edit{in.Version, changes}) })
 	if err != nil {
 		return nil, err
 	}

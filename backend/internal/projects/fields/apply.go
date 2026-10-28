@@ -29,8 +29,15 @@ func bumpVersion(tx *gorm.DB, tenantID, taskID uuid.UUID, expected *int) (int, e
 }
 
 // apply stores the changes in one transaction together with the version bump, the activity entry and the event.
-func (s *Service) apply(ctx context.Context, tx *gorm.DB, a api.Actor, t api.TaskRef, expected *int, changes []change) error {
-	version, err := bumpVersion(tx, a.TenantID, t.ID, expected)
+// edit is a validated set of changes with the version the caller expects.
+type edit struct {
+	expected *int
+	changes  []change
+}
+
+func (s *Service) apply(ctx context.Context, tx *gorm.DB, a api.Actor, t api.TaskRef, e edit) error {
+	changes := e.changes
+	version, err := bumpVersion(tx, a.TenantID, t.ID, e.expected)
 	if err != nil {
 		return err
 	}
