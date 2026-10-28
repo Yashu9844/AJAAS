@@ -7,7 +7,8 @@
 //	JAAS_TEST_DB_HOST (localhost)  JAAS_TEST_DB_PORT (5432)  JAAS_TEST_DB_USER (postgres)  JAAS_TEST_DB_PASSWORD (postgres)
 //	JAAS_TEST_REDIS_HOST (localhost)  JAAS_TEST_REDIS_PORT (6379)
 //
-// A throw-away database `jaas_itest` is dropped and recreated on every run; Redis DB 15 is used and flushed.
+// A throw-away database (JAAS_TEST_DB_NAME, default `jaas_itest`) is dropped and recreated on every run; Redis DB
+// JAAS_TEST_REDIS_DB (default 15) is used and flushed. Parallel runs must use different names.
 package integration
 
 import (
@@ -71,6 +72,7 @@ func TestMain(m *testing.M) {
 }
 
 func setup(m *testing.M) (int, error) {
+	dbName := env("JAAS_TEST_DB_NAME", "jaas_itest")
 	host, port := env("JAAS_TEST_DB_HOST", "localhost"), env("JAAS_TEST_DB_PORT", "5432")
 	user, pass := env("JAAS_TEST_DB_USER", "postgres"), env("JAAS_TEST_DB_PASSWORD", "postgres")
 	dsn := func(db string) string {
@@ -83,23 +85,24 @@ func setup(m *testing.M) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := admin.Exec("DROP DATABASE IF EXISTS jaas_itest WITH (FORCE)").Error; err != nil {
+	if err := admin.Exec("DROP DATABASE IF EXISTS "+dbName+" WITH (FORCE)").Error; err != nil {
 		return 0, err
 	}
-	if err := admin.Exec("CREATE DATABASE jaas_itest").Error; err != nil {
+	if err := admin.Exec("CREATE DATABASE "+dbName).Error; err != nil {
 		return 0, err
 	}
 	if sqlDB, e := admin.DB(); e == nil {
 		_ = sqlDB.Close()
 	}
 
-	testDB, err = gorm.Open(postgres.Open(dsn("jaas_itest")), quiet)
+	testDB, err = gorm.Open(postgres.Open(dsn(dbName)), quiet)
 	if err != nil {
 		return 0, err
 	}
 
 	rport, _ := strconv.Atoi(env("JAAS_TEST_REDIS_PORT", "6379"))
-	rdb, err = cache.NewRedisClient(env("JAAS_TEST_REDIS_HOST", "localhost"), rport, "", 15)
+	rdbIndex, _ := strconv.Atoi(env("JAAS_TEST_REDIS_DB", "15"))
+	rdb, err = cache.NewRedisClient(env("JAAS_TEST_REDIS_HOST", "localhost"), rport, "", rdbIndex)
 	if err != nil {
 		return 0, err
 	}
