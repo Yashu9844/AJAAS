@@ -14,6 +14,18 @@ type Config struct {
 	RabbitMQ RabbitMQConfig `mapstructure:"rabbitmq"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
 	Platform PlatformConfig `mapstructure:"platform"`
+	Storage  StorageConfig  `mapstructure:"storage"`
+}
+
+// StorageConfig holds the S3-compatible object-storage settings (MinIO in development). An empty Bucket leaves file
+// features disabled; services that need storage report a clear error instead of failing at startup.
+type StorageConfig struct {
+	Endpoint  string `mapstructure:"endpoint"`
+	Region    string `mapstructure:"region"`
+	Bucket    string `mapstructure:"bucket"`
+	AccessKey string `mapstructure:"access_key"`
+	SecretKey string `mapstructure:"secret_key"`
+	PathStyle bool   `mapstructure:"path_style"`
 }
 
 // PlatformConfig holds platform-operator (super admin) settings.

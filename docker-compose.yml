@@ -26,6 +26,15 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
 
+  # S3-compatible object storage for development and tests (the adapter speaks plain S3, so MinIO, AWS S3 or any
+  # compatible service replaces it by configuration; MinIO's official images are no longer published).
+  s3:
+    image: adobe/s3mock:latest
+    ports:
+      - "9090:9090"
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: jaas-files
+
   frontend:
     build:
       context: ./frontend
@@ -66,6 +75,12 @@ services:
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=guest
       - RABBITMQ_PASSWORD=guest
+      - STORAGE_ENDPOINT=http://s3:9090
+      - STORAGE_REGION=us-east-1
+      - STORAGE_BUCKET=jaas-files
+      - STORAGE_ACCESS_KEY=test
+      - STORAGE_SECRET_KEY=test
+      - STORAGE_PATH_STYLE=true
     depends_on:
       - postgres
       - redis
