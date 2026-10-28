@@ -33,3 +33,11 @@ jwt:
 
 platform:
   admin_key: "" # Must be injected via PLATFORM_ADMIN_KEY env variable in production
+
+storage:
+  endpoint: "" # empty for AWS S3; inject STORAGE_ENDPOINT for another S3-compatible service
+  region: ""
+  bucket: "" # inject STORAGE_BUCKET; empty disables file attachments
+  access_key: "" # inject STORAGE_ACCESS_KEY
+  secret_key: "" # inject STORAGE_SECRET_KEY
+  path_style: false

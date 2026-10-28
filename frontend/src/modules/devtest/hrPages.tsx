@@ -28,7 +28,7 @@ interface ContextPageProps {
   checklist: ChecklistItem[];
 }
 
-function ContextPage({ title, intro, ops, scenarios, checklist }: ContextPageProps) {
+export function ContextPage({ title, intro, ops, scenarios, checklist }: ContextPageProps) {
   return (
     <div>
       <h2>{title}</h2>

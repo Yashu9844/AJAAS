@@ -28,6 +28,24 @@ CONTEXTS = {
     'employee_records': ('HR_EMPLOYEE_RECORDS', [b + r for b in ('/hr/employees/me', '/hr/employees/{id}') for r in
                          ('/emergency-contacts', '/education', '/prior-employment', '/change-requests')] + ['/hr/employee-change-requests']),
 }
+# M2 Projects & Tasks: routes live at the /api/v1 root, written to their own generated file.
+# A path belongs to the context with the longest matching prefix, so nested prefixes can be split between contexts.
+PM_CONTEXTS = {
+    'projects': ('PM_PROJECTS', ['/projects', '/project-roles', '/project-permissions', '/project-labels']),
+    'tasks': ('PM_TASKS', ['/projects/{id}/tasks', '/projects/{id}/activity', '/projects/{id}/time', '/tasks', '/tickets', '/comments', '/time-entries', '/attachments']),
+    'planning': ('PM_PLANNING', ['/projects/{id}/sprints', '/projects/{id}/backlog', '/projects/{id}/board', '/projects/{id}/calendar', '/projects/{id}/gantt',
+                                 '/projects/{id}/plan', '/sprints', '/my-work', '/search', '/saved-views', '/calendar-tokens', '/calendar']),
+    'platform': ('PM_PLATFORM', ['/projects/{id}/group-rules']),
+}
+
+
+def pm_owner(path):
+    best, owner = -1, None
+    for ctx, (_, prefixes) in PM_CONTEXTS.items():
+        for p in prefixes:
+            if (path == p or path.startswith(p + '/')) and len(p) > best:
+                best, owner = len(p), ctx
+    return owner
 METHODS = ['post', 'get', 'put', 'patch', 'delete']
 
 
@@ -144,10 +162,13 @@ def op_fields(doc, path, op, shared=()):
     return fields
 
 
-def ops_for(doc, prefixes, ctx):
+def ops_for(doc, prefixes, ctx, ns='hr'):
     out = []
     for path in sorted(doc['paths']):
-        if not any(path == p or path.startswith(p + '/') for p in prefixes):
+        if ns == 'pm':
+            if pm_owner(path) != ctx:
+                continue
+        elif not any(path == p or path.startswith(p + '/') for p in prefixes):
             continue
         item = doc['paths'][path]
         for method in METHODS:
@@ -156,7 +177,7 @@ def ops_for(doc, prefixes, ctx):
                 continue
             expect = sorted(int(c) for c in op.get('responses', {}) if str(c).isdigit() and 200 <= int(c) < 300) or [200]
             console_path = re.sub(r'\{(\w+)\}', r':\1', path)
-            spec = {'key': 'hr.%s.%s.%s' % (ctx, method, re.sub(r'[^a-z0-9]+', '.', console_path.lower()).strip('.')),
+            spec = {'key': '%s.%s.%s.%s' % (ns, ctx, method, re.sub(r'[^a-z0-9]+', '.', console_path.lower()).strip('.')),
                     'label': op.get('summary', method.upper() + ' ' + path), 'method': method.upper(), 'path': console_path,
                     'scope': 'tenant', 'auth': True, 'fields': op_fields(doc, path, op, item.get('parameters', [])), 'expect': expect}
             if method == 'post' and 201 in expect and not path.endswith('}'):
@@ -183,6 +204,14 @@ def main(repo):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write('\n'.join(lines))
+    pm = lines[:2] + ['']
+    for ctx, (name, prefixes) in PM_CONTEXTS.items():
+        ops = ops_for(doc, prefixes, ctx, 'pm')
+        pm.append('export const %s: OpSpec[] = %s;' % (name, json.dumps(ops, indent=2, ensure_ascii=False)))
+        pm.append('')
+        print('pm', ctx, len(ops), 'operations')
+    with open(out.replace('hrSpecs.ts', 'projectsSpecs.ts'), 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write('\n'.join(pm) + '\n')
 
 
 main(sys.argv[1])

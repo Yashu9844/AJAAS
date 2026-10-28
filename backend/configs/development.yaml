@@ -33,3 +33,11 @@ jwt:
 
 platform:
   admin_key: dev-platform-admin-key-change-me # override with PLATFORM_ADMIN_KEY
+
+storage:
+  endpoint: http://localhost:9090 # S3-compatible server (docker compose service s3); empty for AWS S3
+  region: us-east-1
+  bucket: jaas-files # empty disables file attachments
+  access_key: test
+  secret_key: test
+  path_style: true

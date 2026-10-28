@@ -9,13 +9,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/hr"
-	"github.com/jaas/jaas/internal/shared/identityport/inprocess"
 	"github.com/jaas/jaas/internal/identity"
 	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/shared/cache"
 	"github.com/jaas/jaas/internal/shared/config"
 	"github.com/jaas/jaas/internal/shared/database"
 	"github.com/jaas/jaas/internal/shared/idempotency"
+	"github.com/jaas/jaas/internal/shared/identityport/inprocess"
 	"github.com/jaas/jaas/internal/shared/logger"
 	sharedMiddleware "github.com/jaas/jaas/internal/shared/middleware"
 	"github.com/jaas/jaas/internal/shared/queue"
@@ -88,8 +88,13 @@ func Build(o Options) (*gin.Engine, error) {
 		return nil, fmt.Errorf("seeding permission catalogue failed: %w", err)
 	}
 
+	idp := inprocess.New(identityModule, o.DB)
 	hrModule, err := hr.New(context.Background(), hr.Options{DB: o.DB, Redis: o.Redis, Publisher: o.Publisher, Logger: &log.Logger,
-		Identity: inprocess.New(identityModule, o.DB), AutoMigrate: cfg.Database.AutoMigrate, Background: o.Background})
+		Identity: idp, AutoMigrate: cfg.Database.AutoMigrate, Background: o.Background})
+	if err != nil {
+		return nil, err
+	}
+	projectsModule, err := buildProjects(o, idp)
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +127,8 @@ func Build(o Options) (*gin.Engine, error) {
 	identityModule.RegisterRoutes(v1)
 	// M1 HR Management: every HR route lives under /api/v1/hr (docs/modules/m1-hr-management/decisions.md DHR-03).
 	hrModule.RegisterRoutes(v1.Group("/hr"))
+	// M2 Projects & Tasks: its own routes at the /api/v1 root (docs/modules/m2-projects-tasks/design.md).
+	projectsModule.RegisterRoutes(v1)
 
 	registerHealth(router, o.DB, o.Redis)
 	identityModule.RegisterWellKnown(router)

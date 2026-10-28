@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AuthPanel, Badge, Checklist, ExchangeView } from "./components";
 import { clearHistory, clearResults, setConfig, setPlatformKey, useDevStore } from "./store";
 import { HR_CHECKLISTS } from "./hrPages";
+import { PM_CHECKLIST } from "./projectsPages";
 import { CHECKLIST } from "./specs";
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/dev-test/hr/payroll", label: "M1 HR — Payroll" },
   { href: "/dev-test/hr/recruitment", label: "M1 HR — Recruitment" },
   { href: "/dev-test/hr/performance", label: "M1 HR — Performance & OKRs" },
+  { href: "/dev-test/projects", label: "M2 — Projects & Tasks" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -133,6 +135,7 @@ export function Overview() {
         <Checklist title="M1 HR — Onboarding" items={HR_CHECKLISTS.onboarding} />
         <Checklist title="M1 HR — Learning" items={HR_CHECKLISTS.learning} />
         <Checklist title="M1 HR — Benefits" items={HR_CHECKLISTS.benefits} />
+        <Checklist title="M2 — Projects & Tasks" items={PM_CHECKLIST} />
       </div>
       <h3>How to start</h3>
       <ol className="dt-note">
