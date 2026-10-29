@@ -4,7 +4,7 @@ import { useState } from "react";
 import { deleteRule, setRuleActive, updateRule } from "../../api/automation-api";
 import { useGuardedAction } from "../../hooks/use-guarded-action";
 import { useToast } from "../../hooks/use-toast";
-import { buildRuleInput, ruleToForm, type RuleForm } from "../../lib/automation-form";
+import { buildRuleFromDraft, ruleToDraft, type RuleDraft } from "../../lib/rule-draft";
 import { formatDateTime } from "../../lib/dates";
 import type { Column, Label, Member } from "../../types/project";
 import type { Rule } from "../../types/settings";
@@ -29,12 +29,11 @@ export function RuleRow({ projectId, rule, editable, columns, labels, members, o
   const toast = useToast();
   const { run } = useGuardedAction(onChanged);
   const [panel, setPanel] = useState<Panel>("none");
-  const initial = ruleToForm(rule);
-  const [form, setForm] = useState<RuleForm>(initial.form);
+  const [draft, setDraft] = useState<RuleDraft>(ruleToDraft(rule));
   const toggle = (p: Panel) => setPanel((cur) => (cur === p ? "none" : p));
 
   function save() {
-    const built = buildRuleInput(form);
+    const built = buildRuleFromDraft(draft, rule.active);
     if (!built.ok) return toast.show(built.error, "error");
     const { name, trigger, conditions, actions } = built.input;
     void run(() => updateRule(projectId, rule, { name, trigger, conditions, actions })).then((ok) => ok && setPanel("none"));
@@ -75,29 +74,26 @@ export function RuleRow({ projectId, rule, editable, columns, labels, members, o
       </div>
       {panel === "runs" && <RuleRuns projectId={projectId} ruleId={rule.id} />}
       {panel === "test" && <RuleTestPanel projectId={projectId} rule={rule} />}
-      {panel === "edit" &&
-        (initial.editable ? (
-          <form
-            className="pm-form pm-deliveries"
-            aria-label={`Edit rule ${rule.name}`}
-            onSubmit={(e) => {
-              e.preventDefault();
-              save();
-            }}
-          >
-            <RuleFormFields idPrefix={`edit-${rule.id}`} form={form} columns={columns} labels={labels} members={members} onChange={setForm} />
-            <div className="pm-actions">
-              <button type="submit" className="pm-btn pm-btn-primary pm-btn-small">
-                Save rule
-              </button>
-              <button type="button" className="pm-btn pm-btn-small" onClick={() => setPanel("none")}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <p className="pm-muted pm-deliveries">This rule has several conditions or actions, which this form cannot show without losing parts. Edit it through the API.</p>
-        ))}
+      {panel === "edit" && (
+        <form
+          className="pm-form pm-deliveries"
+          aria-label={`Edit rule ${rule.name}`}
+          onSubmit={(e) => {
+            e.preventDefault();
+            save();
+          }}
+        >
+          <RuleFormFields idPrefix={`edit-${rule.id}`} draft={draft} columns={columns} labels={labels} members={members} onChange={setDraft} />
+          <div className="pm-actions">
+            <button type="submit" className="pm-btn pm-btn-primary pm-btn-small">
+              Save rule
+            </button>
+            <button type="button" className="pm-btn pm-btn-small" onClick={() => setPanel("none")}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
     </li>
   );
 }

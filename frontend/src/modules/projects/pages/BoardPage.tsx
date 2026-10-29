@@ -30,6 +30,7 @@ export function BoardPage() {
 
   return (
     <>
+      <h2 className="pm-sr-only">Board</h2>
       {board.loading && <SkeletonRows rows={3} height={90} />}
       {board.error !== undefined && !board.board && <ErrorNotice error={board.error} onRetry={board.reload} />}
       {board.board && board.board.columns.length === 0 && <EmptyState title="This board has no columns" hint="Add columns in Settings." />}

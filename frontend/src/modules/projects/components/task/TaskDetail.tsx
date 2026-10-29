@@ -17,6 +17,7 @@ import { TaskLinksSection } from "./TaskLinksSection";
 import { TaskHeaderEditor } from "./TaskHeaderEditor";
 import { TaskProperties } from "./TaskProperties";
 import { TimeSection } from "./TimeSection";
+import { WatchersSection } from "./WatchersSection";
 
 interface Props {
   idOrKey: string;
@@ -55,13 +56,14 @@ export function TaskDetail({ idOrKey, onChanged, showProjectLink }: Props) {
         {task.blocked && <StatusPill kind="blocked">Blocked</StatusPill>}
         {task.archived_at && <StatusPill kind="warning">Archived</StatusPill>}
       </div>
-      <TaskHeaderEditor key={`${task.id}-${task.version}`} task={task} canEdit={ctx.canWrite} onSave={detail.save} />
+      <TaskHeaderEditor key={`${task.id}-${task.version}`} task={task} canEdit={ctx.canWrite} onSave={detail.save} asPage={showProjectLink} />
       <TaskProperties task={task} columns={ctx.columns} labels={ctx.labels} members={ctx.members} canWrite={ctx.canWrite} onSave={detail.save} onReload={reloadAll} />
       <TaskActions task={task} canWrite={ctx.canWrite} onChanged={reloadAll} />
       <CustomFieldsSection task={task} members={ctx.members} canWrite={ctx.canWrite} onReload={reloadAll} />
       <SubtasksSection task={task} canWrite={ctx.canWrite} />
       <TaskLinksSection task={task} />
       <RelationsSection task={task} canWrite={ctx.canWrite} />
+      <WatchersSection task={task} />
       <CommentsSection task={task} members={ctx.members} canComment={ctx.canWrite} />
       <TimeSection task={task} canLog={ctx.canWrite} enabled={ctx.project.time_tracking_enabled} />
       <AttachmentsSection task={task} canUpload={ctx.canWrite} />

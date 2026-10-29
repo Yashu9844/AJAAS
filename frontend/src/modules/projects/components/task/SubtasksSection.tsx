@@ -34,9 +34,9 @@ export function SubtasksSection({ task, canWrite }: { task: Task; canWrite: bool
 
   return (
     <section className="pm-section" aria-labelledby={`sub-${task.id}`}>
-      <h3 id={`sub-${task.id}`}>
+      <h2 id={`sub-${task.id}`}>
         Subtasks {task.subtask_total > 0 && <span className="pm-muted">{task.subtask_done}/{task.subtask_total} done</span>}
-      </h3>
+      </h2>
       {res.loading && <SkeletonRows rows={2} height={28} />}
       {res.error !== undefined && <ErrorNotice error={res.error} onRetry={res.reload} />}
       {res.data && res.data.length === 0 && <EmptyState title="No subtasks" />}

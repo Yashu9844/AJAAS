@@ -50,7 +50,7 @@ export function SignInPage() {
   }
 
   return (
-    <div className="pm-signin">
+    <main className="pm-signin">
       <form ref={formRef} className="pm-card pm-signin-card" onSubmit={submit} aria-labelledby="pm-signin-title">
         <h1 id="pm-signin-title">Sign in</h1>
         <p className="pm-muted">Projects &amp; Tasks</p>
@@ -88,6 +88,6 @@ export function SignInPage() {
           {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>
-    </div>
+    </main>
   );
 }

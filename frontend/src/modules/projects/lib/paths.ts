@@ -9,7 +9,7 @@ export const ROUTES = {
 const ID_RE = /^[0-9a-fA-F-]{36}$/;
 const TICKET_RE = /^[A-Za-z][A-Za-z0-9]{1,9}-[0-9]+$/;
 
-export type ProjectTab = "board" | "list" | "calendar" | "gantt" | "backlog" | "settings";
+export type ProjectTab = "board" | "list" | "calendar" | "gantt" | "time" | "backlog" | "settings";
 
 export function isProjectId(s: string): boolean {
   return ID_RE.test(s);

@@ -55,7 +55,7 @@ export function AttachmentsSection({ task, canUpload }: { task: Task; canUpload:
   const items = res.data?.items ?? [];
   return (
     <section className="pm-section" aria-labelledby={`at-${task.id}`}>
-      <h3 id={`at-${task.id}`}>Attachments</h3>
+      <h2 id={`at-${task.id}`}>Attachments</h2>
       {res.loading && <SkeletonRows rows={1} height={28} />}
       {res.error !== undefined && <ErrorNotice error={res.error} onRetry={res.reload} />}
       {res.data && items.length === 0 && <EmptyState title="No attachments" />}

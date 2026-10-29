@@ -69,3 +69,5 @@
 .pm-secret { border-color: var(--pm-warn); background: var(--pm-warn-bg); }
 .pm-secret input { flex: 1 1 280px; }
 .pm-deliveries { margin-top: 8px; border-top: 1px solid var(--pm-border); padding-top: 8px; }
+.pm-deliveries { flex-basis: 100%; }
+.pm-progress { width: 100%; max-width: 480px; height: 10px; accent-color: var(--pm-accent); }

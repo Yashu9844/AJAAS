@@ -27,7 +27,7 @@ export function ActivitySection({ task, columns }: { task: Task; columns: Column
   const list = usePagedList<ActivityEntry>(`activity:${task.id}:${task.version}`, (cursor) => listActivity(task.id, cursor));
   return (
     <section className="pm-section" aria-labelledby={`ac-${task.id}`}>
-      <h3 id={`ac-${task.id}`}>Activity</h3>
+      <h2 id={`ac-${task.id}`}>Activity</h2>
       {list.loading && <SkeletonRows rows={3} height={22} />}
       {list.error !== undefined && <ErrorNotice error={list.error} onRetry={list.reload} />}
       {!list.loading && list.items.length === 0 && list.error === undefined && <EmptyState title="No activity yet" />}

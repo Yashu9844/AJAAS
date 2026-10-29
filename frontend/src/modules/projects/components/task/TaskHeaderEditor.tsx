@@ -7,11 +7,14 @@ import { MarkdownText } from "./MarkdownText";
 interface Props {
   task: Task;
   canEdit: boolean;
+  /** The full task page has no other h1, so its title is the h1; in a drawer it stays an h2. */
+  asPage?: boolean;
   onSave: (changes: TaskUpdate) => Promise<boolean>;
 }
 
 /** Title and description editing. Saving sends the task version, so a stale edit is refused by the server (409). */
-export function TaskHeaderEditor({ task, canEdit, onSave }: Props) {
+export function TaskHeaderEditor({ task, canEdit, onSave, asPage }: Props) {
+  const Heading = asPage ? "h1" : "h2";
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
@@ -43,7 +46,7 @@ export function TaskHeaderEditor({ task, canEdit, onSave }: Props) {
             </button>
           )}
         </div>
-        <h2 className="pm-task-heading">{task.title}</h2>
+        <Heading className="pm-task-heading">{task.title}</Heading>
         {task.description ? <MarkdownText text={task.description} /> : <p className="pm-muted">No description.</p>}
       </div>
     );

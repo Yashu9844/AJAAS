@@ -13,6 +13,7 @@ import { PublicLinksSettings } from "../components/settings/PublicLinksSettings"
 import { RecurrencesSettings } from "../components/settings/RecurrencesSettings";
 import { RolesSettings } from "../components/settings/RolesSettings";
 import { RulesSettings } from "../components/settings/RulesSettings";
+import { TenantLabelsSettings } from "../components/settings/TenantLabelsSettings";
 import { WebhooksSettings } from "../components/settings/WebhooksSettings";
 import { useGuardedAction } from "../hooks/use-guarded-action";
 import { useProject } from "../hooks/use-project";
@@ -48,6 +49,7 @@ export function SettingsPage() {
         <>
           <ColumnsSettings projectId={project.id} columns={columns} canManage={canManage} onChanged={reload} />
           <LabelsSettings projectId={project.id} labels={labels} canManage={canManage} onChanged={reload} />
+          <TenantLabelsSettings onChanged={reload} />
           <MilestonesSettings projectId={project.id} canManage={manage} />
           <CustomFieldsSettings projectId={project.id} canManage={manage} />
           {mayArchive && (

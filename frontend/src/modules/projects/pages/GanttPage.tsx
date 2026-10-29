@@ -26,6 +26,7 @@ export function GanttPage() {
 
   return (
     <>
+      <h2 className="pm-sr-only">Gantt chart</h2>
       <div className="pm-toolbar">
         <button type="button" className="pm-btn" onClick={() => setWindow((w) => shiftWindow(w, -SHIFT_DAYS))} aria-label="Earlier">
           ‹ Earlier

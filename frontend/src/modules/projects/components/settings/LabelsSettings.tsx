@@ -33,7 +33,9 @@ export function LabelsSettings({ projectId, labels, canManage, onChanged }: Prop
       <ul className="pm-plain-list">
         {labels.map((l) => (
           <li key={l.id} className="pm-row-between">
-            <LabelChip label={l} />
+            <span>
+              <LabelChip label={l} /> {l.project_id === null && <span className="pm-muted">organisation</span>}
+            </span>
             {editable && l.project_id !== null && (
               <button type="button" className="pm-btn pm-btn-small" onClick={() => void run(() => deleteLabel(projectId, l.id))} aria-label={`Delete label ${l.name}`}>
                 Delete

@@ -112,7 +112,7 @@ export function CustomFieldsSection({ task, members, canWrite, onReload }: { tas
   if (res.data && res.data.values.length === 0) return null;
   return (
     <section className="pm-section" aria-labelledby={`cf-${task.id}`}>
-      <h3 id={`cf-${task.id}`}>Custom fields</h3>
+      <h2 id={`cf-${task.id}`}>Custom fields</h2>
       {res.loading && <SkeletonRows rows={2} height={32} />}
       {res.error !== undefined && <ErrorNotice error={res.error} onRetry={res.reload} />}
       <div className="pm-props">

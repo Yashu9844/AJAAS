@@ -15,6 +15,7 @@ function tabsFor(ctx: ProjectContextValue): { tab: ProjectTab; label: string }[]
     { tab: "calendar", label: "Calendar" },
     { tab: "gantt", label: "Gantt" },
   ];
+  tabs.push({ tab: "time", label: "Time" });
   if (ctx.project.mode === "scrum") tabs.push({ tab: "backlog", label: "Backlog & sprints" });
   tabs.push({ tab: "settings", label: "Settings" });
   return tabs;

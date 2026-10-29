@@ -14,6 +14,7 @@
   --pm-warn-bg: #fff4d6;
   --pm-ok: #146c43;
   --pm-focus: #1d4ed8;
+  --pm-star: #8a5a00;
   --pm-radius: 8px;
   min-height: 100vh;
   background: var(--pm-bg);
@@ -39,6 +40,7 @@
     --pm-warn-bg: #3b2f12;
     --pm-ok: #6fd6a0;
     --pm-focus: #8fb0ff;
+    --pm-star: #f2c14e;
   }
 }
 
@@ -91,7 +93,7 @@
 .pm-icon-btn { border: 0; background: transparent; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
 .pm-link-btn { border: 0; background: transparent; color: var(--pm-accent); cursor: pointer; font: inherit; text-align: left; padding: 0; }
 .pm-link-btn:hover { text-decoration: underline; }
-.pm-star { border: 0; background: transparent; font-size: 20px; cursor: pointer; color: #d99a00; min-width: 32px; min-height: 32px; }
+.pm-star { border: 0; background: transparent; font-size: 20px; cursor: pointer; color: var(--pm-star); min-width: 32px; min-height: 32px; }
 
 .pm-root input:not([type="checkbox"]):not([type="color"]), .pm-root select, .pm-root textarea {
   font: inherit; color: var(--pm-text); background: var(--pm-surface); border: 1px solid var(--pm-border); border-radius: 6px; padding: 6px 8px; min-height: 36px; max-width: 100%;

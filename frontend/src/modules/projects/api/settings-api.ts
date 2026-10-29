@@ -1,4 +1,5 @@
 import type { GroupRule, GroupRuleKind, Milestone } from "../types/settings";
+import type { Label } from "../types/project";
 import type { CustomFieldDefinition, CustomFieldType } from "../types/task";
 import { del, getData, patch, post } from "./client";
 import { seg } from "./query";
@@ -51,4 +52,20 @@ export function removeGroupRule(projectId: string, id: string): Promise<unknown>
 
 export function refreshGroupRules(projectId: string): Promise<unknown> {
   return post(`/projects/${seg(projectId)}/group-rules/refresh`);
+}
+
+export function listTenantLabels(): Promise<Label[]> {
+  return list<Label>("/project-labels");
+}
+
+export function createTenantLabel(name: string, color: string): Promise<Label> {
+  return post<Label>("/project-labels", { name, color });
+}
+
+export function updateTenantLabel(id: string, name: string, color: string): Promise<Label> {
+  return patch<Label>(`/project-labels/${seg(id)}`, { name, color });
+}
+
+export function deleteTenantLabel(id: string): Promise<unknown> {
+  return del(`/project-labels/${seg(id)}`);
 }

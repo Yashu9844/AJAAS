@@ -1,3 +1,4 @@
+import type { SprintReport, TimeReport } from "../types/reports";
 import type { CalendarData, GanttData, MyWork, SearchHit, Sprint } from "../types/planning";
 import type { Page } from "../types/common";
 import type { TaskCard } from "../types/task";
@@ -55,4 +56,12 @@ export function getBacklog(projectId: string): Promise<Page<TaskCard>> {
 /** One page of the Gantt window; the cursor for the next page is part of the data. */
 export function getGantt(projectId: string, from: string, to: string, cursor?: string): Promise<GanttData> {
   return getData<GanttData>(`/projects/${seg(projectId)}/gantt`, { query: { from, to, cursor, limit: 100 } });
+}
+
+export function getSprintReport(sprintId: string): Promise<SprintReport> {
+  return getData<SprintReport>(`/sprints/${seg(sprintId)}/report`);
+}
+
+export function getTimeReport(projectId: string, from: string, to: string, groupBy: "task" | "user"): Promise<TimeReport> {
+  return getData<TimeReport>(`/projects/${seg(projectId)}/time/report`, { query: { from, to, group_by: groupBy } });
 }

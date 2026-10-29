@@ -6,13 +6,11 @@ import { useGuardedAction } from "../../hooks/use-guarded-action";
 import { useProject } from "../../hooks/use-project";
 import { useResource } from "../../hooks/use-resource";
 import { useToast } from "../../hooks/use-toast";
-import { buildRuleInput, type RuleForm } from "../../lib/automation-form";
+import { buildRuleFromDraft, NEW_RULE_DRAFT, type RuleDraft } from "../../lib/rule-draft";
 import { EmptyState } from "../ui/States";
 import { RuleFormFields } from "./RuleFormFields";
 import { RuleRow } from "./RuleRow";
 import { SectionFrame } from "./SectionState";
-
-const INITIAL: RuleForm = { name: "", trigger: "task.moved", conditionField: "", conditionValue: "", actionType: "set_priority", actionValue: "" };
 
 /** Automation rules: list with enable/disable, edit, runs, dry-run test and delete, plus a form for a new rule. */
 export function RulesSettings({ projectId, canManage }: { projectId: string; canManage: boolean }) {
@@ -20,15 +18,15 @@ export function RulesSettings({ projectId, canManage }: { projectId: string; can
   const toast = useToast();
   const res = useResource(`rules:${projectId}`, () => listRules(projectId));
   const { run, denied } = useGuardedAction(res.reload);
-  const [form, setForm] = useState<RuleForm>(INITIAL);
+  const [form, setForm] = useState<RuleDraft>(NEW_RULE_DRAFT);
   const editable = canManage && !denied;
   const items = res.data ?? [];
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const built = buildRuleInput(form);
+    const built = buildRuleFromDraft(form, true);
     if (!built.ok) return toast.show(built.error, "error");
-    void run(() => createRule(projectId, built.input)).then((ok) => ok && setForm(INITIAL));
+    void run(() => createRule(projectId, built.input)).then((ok) => ok && setForm(NEW_RULE_DRAFT));
   }
 
   return (
@@ -41,7 +39,7 @@ export function RulesSettings({ projectId, canManage }: { projectId: string; can
       </ul>
       {editable && (
         <form className="pm-form pm-card" onSubmit={submit} aria-label="New automation rule">
-          <RuleFormFields idPrefix="rule" form={form} columns={columns} labels={labels} members={members} onChange={setForm} />
+          <RuleFormFields idPrefix="rule" draft={form} columns={columns} labels={labels} members={members} onChange={setForm} />
           <div className="pm-actions">
             <button type="submit" className="pm-btn pm-btn-primary">
               Create rule

@@ -8,7 +8,7 @@
 .pm-section { margin-top: 8px; }
 .pm-section .pm-empty { padding: 8px; }
 .pm-section h2, .pm-section h3 { font-size: 15px; margin-bottom: 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.pm-section h3 .pm-muted { font-size: 12px; font-weight: 400; }
+.pm-section h2 .pm-muted, .pm-section h3 .pm-muted { font-size: 12px; font-weight: 400; }
 .pm-plain-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .pm-comments { list-style: none; display: flex; flex-direction: column; gap: 12px; }
 .pm-comment { display: flex; gap: 8px; }

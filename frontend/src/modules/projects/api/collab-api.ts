@@ -1,7 +1,7 @@
 import type { Page } from "../types/common";
-import type { ActivityEntry, Attachment, AttachmentInit, Comment, TimeEntry } from "../types/collab";
+import type { ActivityEntry, Attachment, AttachmentInit, Comment, TimeEntry, WatchState, Watcher } from "../types/collab";
 import { ApiError } from "./errors";
-import { del, getData, getPage, patch, post } from "./client";
+import { del, getData, getPage, patch, post, put } from "./client";
 import { seg } from "./query";
 
 export function listComments(taskId: string): Promise<Page<Comment>> {
@@ -91,4 +91,20 @@ export async function uploadAttachment(taskId: string, file: File): Promise<Atta
   }
   if (!res.ok) throw new ApiError(res.status, "UPLOAD_FAILED", `Storage refused the file (${res.status}).`);
   return post<Attachment>(`/attachments/${seg(init.attachment.id)}/complete`);
+}
+
+export function getWatchState(taskId: string): Promise<WatchState> {
+  return getData<WatchState>(`/tasks/${seg(taskId)}/watch`);
+}
+
+export function watchTask(taskId: string): Promise<unknown> {
+  return put(`/tasks/${seg(taskId)}/watch`);
+}
+
+export function unwatchTask(taskId: string): Promise<unknown> {
+  return del(`/tasks/${seg(taskId)}/watch`);
+}
+
+export async function listWatchers(taskId: string): Promise<Watcher[]> {
+  return (await getPage<Watcher>(`/tasks/${seg(taskId)}/watchers`, { limit: 100 })).items;
 }

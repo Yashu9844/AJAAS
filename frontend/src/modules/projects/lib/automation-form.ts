@@ -1,5 +1,5 @@
 import type { Priority } from "../types/common";
-import { RULE_TRIGGERS, type Recurrence, type RecurrenceFrequency, type RecurrenceInput, type Rule, type RuleAction, type RuleCondition, type RuleInput, type RuleTrigger } from "../types/settings";
+import type { Recurrence, RecurrenceFrequency, RecurrenceInput, RuleAction } from "../types/settings";
 
 /** Pure helpers for the automation, recurrence and webhook forms: payload building and validation. */
 
@@ -20,7 +20,7 @@ const BASE_CONDITIONS: FieldChoice[] = [
 ];
 
 /** Condition fields offered for a trigger (moves and assignments add their own). */
-export function conditionChoices(trigger: RuleTrigger): FieldChoice[] {
+export function conditionChoices(trigger: string): FieldChoice[] {
   if (trigger === "task.moved") {
     return [{ value: "to_column_id", label: "Moved to column", kind: "column" }, { value: "from_column_id", label: "Moved from column", kind: "column" }, ...BASE_CONDITIONS];
   }
@@ -58,51 +58,12 @@ export function buildAction(type: string, value: string): RuleAction | null {
   return { type, [key]: value.trim() } as RuleAction;
 }
 
-export interface RuleForm {
-  name: string;
-  trigger: RuleTrigger;
-  conditionField: string;
-  conditionValue: string;
-  actionType: string;
-  actionValue: string;
-}
-
 export type FormResult<T> = { ok: true; input: T } | { ok: false; error: string };
-
-export function buildRuleInput(f: RuleForm): FormResult<RuleInput> {
-  const name = f.name.trim();
-  if (!name) return { ok: false, error: "Give the rule a name." };
-  const action = buildAction(f.actionType, f.actionValue);
-  if (!action) return { ok: false, error: "Choose an action and fill in its value." };
-  const conditions: RuleCondition[] = f.conditionField && f.conditionValue ? [{ field: f.conditionField, value: f.conditionValue }] : [];
-  return { ok: true, input: { name, trigger: f.trigger, conditions, actions: [action], active: true } };
-}
 
 /** The value an action carries, as the form control holds it. */
 export function actionValueOf(a: RuleAction): string {
   const v = a.column_id ?? a.priority ?? a.label_id ?? a.user_id ?? a.text ?? (a.days !== undefined ? String(a.days) : "");
   return String(v);
-}
-
-/**
- * Fills the rule form from a stored rule. The form holds one condition and one action, so a rule with more is not editable
- * here (`editable: false`) instead of being silently cut down.
- */
-export function ruleToForm(rule: Pick<Rule, "name" | "trigger" | "conditions" | "actions">): { form: RuleForm; editable: boolean } {
-  const known = (RULE_TRIGGERS as readonly string[]).includes(rule.trigger);
-  const cond = rule.conditions[0];
-  const act = rule.actions[0];
-  return {
-    editable: known && rule.conditions.length <= 1 && rule.actions.length === 1,
-    form: {
-      name: rule.name,
-      trigger: (known ? rule.trigger : "task.created") as RuleTrigger,
-      conditionField: cond?.field ?? "",
-      conditionValue: cond?.value ?? "",
-      actionType: act?.type ?? "set_priority",
-      actionValue: act ? actionValueOf(act) : "",
-    },
-  };
 }
 
 export interface RecurrenceForm {

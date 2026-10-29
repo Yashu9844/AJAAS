@@ -6,6 +6,7 @@ import { describeError } from "../../api/errors";
 import { useToast } from "../../hooks/use-toast";
 import type { Sprint } from "../../types/planning";
 import { EmptyState } from "../ui/States";
+import { SprintReportPanel } from "./SprintReportPanel";
 
 interface Props {
   projectId: string;
@@ -18,6 +19,7 @@ interface Props {
 export function SprintsPanel({ projectId, sprints, canManage, onChanged }: Props) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [reportFor, setReportFor] = useState<string | null>(null);
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -53,6 +55,11 @@ export function SprintsPanel({ projectId, sprints, canManage, onChanged }: Props
               <strong>{s.name}</strong> <span className={`pm-chip pm-sprint-${s.status}`}>{s.status}</span>
               <span className="pm-muted"> {s.start_on ?? "?"} to {s.end_on ?? "?"} · {s.task_count} tasks</span>
             </span>
+            {s.status !== "planned" && (
+              <button type="button" className="pm-btn pm-btn-small" aria-expanded={reportFor === s.id} onClick={() => setReportFor((cur) => (cur === s.id ? null : s.id))}>
+                Report
+              </button>
+            )}
             {canManage && s.status === "planned" && (
               <button type="button" className="pm-btn pm-btn-small" disabled={busy} onClick={() => void run(() => startSprint(s.id))}>
                 Start
@@ -70,6 +77,7 @@ export function SprintsPanel({ projectId, sprints, canManage, onChanged }: Props
                 )}
               </span>
             )}
+            {reportFor === s.id && <SprintReportPanel sprintId={s.id} />}
           </li>
         ))}
       </ul>

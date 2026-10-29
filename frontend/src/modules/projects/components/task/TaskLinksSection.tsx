@@ -13,7 +13,7 @@ export function TaskLinksSection({ task }: { task: Task }) {
   if (res.data && items.length === 0) return null;
   return (
     <section className="pm-section" aria-labelledby={`ln-${task.id}`}>
-      <h3 id={`ln-${task.id}`}>Linked code</h3>
+      <h2 id={`ln-${task.id}`}>Linked code</h2>
       {res.error !== undefined && <ErrorNotice error={res.error} onRetry={res.reload} />}
       <ul className="pm-plain-list">
         {items.map((l) => {

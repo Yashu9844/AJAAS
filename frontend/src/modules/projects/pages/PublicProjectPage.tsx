@@ -69,6 +69,7 @@ export function PublicProjectPage({ token }: { token: string }) {
         </h1>
         <span className="pm-chip">Read-only public view</span>
       </div>
+      <h2 className="pm-sr-only">Board</h2>
       <PublicProjectView data={data} />
       {moreFailed && (
         <p className="pm-error" role="alert">

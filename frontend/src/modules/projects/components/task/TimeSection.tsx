@@ -56,9 +56,9 @@ export function TimeSection({ task, canLog, enabled }: { task: Task; canLog: boo
 
   return (
     <section className="pm-section" aria-labelledby={`tm-${task.id}`}>
-      <h3 id={`tm-${task.id}`}>
+      <h2 id={`tm-${task.id}`}>
         Time <span className="pm-muted">{formatMinutes(total)} logged{task.estimate_minutes ? ` of ${formatMinutes(task.estimate_minutes)}` : ""}</span>
-      </h3>
+      </h2>
       {!enabled && <p className="pm-muted">Time tracking is turned off for this project.</p>}
       {enabled && canLog && (
         <>

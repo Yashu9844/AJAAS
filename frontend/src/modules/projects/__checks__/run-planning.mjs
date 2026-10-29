@@ -6,6 +6,8 @@ const bulk = await load("lib/bulk.mjs");
 const gantt = await load("lib/gantt.mjs");
 const views = await load("lib/saved-views.mjs");
 const auto = await load("lib/automation-form.mjs");
+const draft = await load("lib/rule-draft.mjs");
+const reports = await load("lib/reports.mjs");
 
 await check("bulk: selection toggling, page select, pruning and the 100 cap", () => {
   const s1 = bulk.toggleSelection(new Set(["a"]), "b");
@@ -73,8 +75,8 @@ await check("saved views: filters map to the server allow-list and back", () => 
   assert.ok(views.viewHasUnshownParts({ filters: { priorities: ["low", "high"] } }));
 });
 await check("automation forms: rule, recurrence, webhook and id validation", () => {
-  assert.equal(auto.buildRuleInput({ name: "", trigger: "task.moved", conditionField: "", conditionValue: "", actionType: "set_priority", actionValue: "low" }).ok, false);
-  const rule = auto.buildRuleInput({ name: "R", trigger: "task.moved", conditionField: "to_column_id", conditionValue: "c1", actionType: "set_priority", actionValue: "low" });
+  assert.equal(draft.buildRuleFromDraft({ name: "", trigger: "task.moved", conditions: [], actions: [{ type: "set_priority", value: "low" }] }, true).ok, false);
+  const rule = draft.buildRuleFromDraft({ name: "R", trigger: "task.moved", conditions: [{ field: "to_column_id", value: "c1" }], actions: [{ type: "set_priority", value: "low" }] }, true);
   assert.deepEqual(rule.input, { name: "R", trigger: "task.moved", conditions: [{ field: "to_column_id", value: "c1" }], actions: [{ type: "set_priority", priority: "low" }], active: true });
   assert.deepEqual(auto.buildAction("set_due_in_days", "3"), { type: "set_due_in_days", days: 3 });
   assert.equal(auto.buildAction("set_due_in_days", "-1"), null);
@@ -135,18 +137,51 @@ await check("paths: integration payload URL and the public page address", () => 
   assert.equal(paths2.parsePublicTarget(get({ t: "x", h: "evil.com/path", p: "" })), null);
   assert.equal(paths2.parsePublicTarget(get({ t: "x", h: "h.com", p: "99999999" })), null);
 });
-await check("automation: stored rules and recurrences fill the edit forms; complex rules are not editable", () => {
-  const rule = { name: "R", trigger: "task.moved", conditions: [{ field: "to_column_id", value: "c1" }], actions: [{ type: "set_priority", priority: "low" }] };
-  const f = auto.ruleToForm(rule);
-  assert.ok(f.editable);
-  assert.deepEqual(f.form, { name: "R", trigger: "task.moved", conditionField: "to_column_id", conditionValue: "c1", actionType: "set_priority", actionValue: "low" });
-  assert.ok(!auto.ruleToForm({ ...rule, actions: [rule.actions[0], rule.actions[0]] }).editable);
-  assert.ok(!auto.ruleToForm({ ...rule, conditions: [rule.conditions[0], rule.conditions[0]] }).editable);
-  assert.ok(!auto.ruleToForm({ ...rule, trigger: "task.unknown" }).editable);
+await check("rule editor: multi-condition / multi-action rules round-trip without losing parts; recurrences fill the edit form", () => {
+  const rule = { name: "R", trigger: "task.moved", conditions: [{ field: "to_column_id", value: "c1" }, { field: "priority", value: "high" }], actions: [{ type: "set_priority", priority: "low" }, { type: "add_comment", text: "moved" }, { type: "future_action", foo: 1 }] };
+  const d = draft.ruleToDraft(rule);
+  assert.equal(d.conditions.length, 2);
+  assert.deepEqual(d.actions.map((a) => a.type), ["set_priority", "add_comment", "future_action"]);
+  assert.deepEqual(d.actions[2].raw, { type: "future_action", foo: 1 });
+  const back = draft.buildRuleFromDraft(d, false);
+  assert.deepEqual(back.input.conditions, rule.conditions);
+  assert.deepEqual(back.input.actions, rule.actions);
+  assert.equal(back.input.active, false);
+  assert.equal(draft.buildRuleFromDraft({ ...d, conditions: [{ field: "priority", value: "" }] }, true).ok, false);
+  assert.equal(draft.buildRuleFromDraft({ ...d, actions: [] }, true).ok, false);
+  assert.equal(draft.buildRuleFromDraft({ ...d, actions: [{ type: "set_due_in_days", value: "x" }] }, true).ok, false);
+  const edited = draft.ruleToDraft(rule);
+  edited.conditions.push({ field: "label_id", value: "l1" });
+  edited.actions.push({ type: "assign_user", value: "u1" });
+  assert.equal(draft.buildRuleFromDraft(edited, true).input.conditions.length, 3);
+  assert.deepEqual(draft.buildRuleFromDraft(edited, true).input.actions[3], { type: "assign_user", user_id: "u1" });
+  const many = { ...d, conditions: Array.from({ length: 11 }, () => ({ field: "priority", value: "low" })) };
+  assert.equal(draft.buildRuleFromDraft(many, true).ok, false);
+  assert.deepEqual(draft.conditionsForTrigger("task.created", [{ field: "to_column_id", value: "c" }, { field: "priority", value: "low" }, { field: "custom_x", value: "1" }]).map((c) => c.field), ["priority", "custom_x"]);
+  assert.equal(draft.conditionKind("task.moved", "to_column_id"), "column");
+  assert.equal(draft.conditionKind("task.moved", "unknown"), "text");
+  assert.equal(draft.actionKind("add_label"), "label");
   assert.equal(auto.actionValueOf({ type: "set_due_in_days", days: 0 }), "0");
   assert.equal(auto.actionValueOf({ type: "add_comment", text: "hi" }), "hi");
   const rec = { template_task_id: "t", frequency: "weekly", interval: 2, weekday: 3, day_of_month: null };
   assert.deepEqual(auto.recurrenceToForm(rec), { templateId: "t", frequency: "weekly", interval: "2", weekday: "3", dayOfMonth: "1" });
   assert.deepEqual(auto.buildRecurrenceEdit(auto.recurrenceToForm(rec)).input, { frequency: "weekly", interval: 2, weekday: 3 });
   assert.equal(auto.buildRecurrenceEdit({ ...auto.recurrenceToForm(rec), interval: "99" }).ok, false);
+});
+
+await check("reports: logged vs estimate, period validation, sprint summary and feed address", () => {
+  assert.deepEqual(reports.loggedVsEstimate(90, 60), { percent: 150, over: true });
+  assert.deepEqual(reports.loggedVsEstimate(30, 60), { percent: 50, over: false });
+  assert.deepEqual(reports.loggedVsEstimate(30, 0), { percent: null, over: false });
+  assert.ok(reports.isValidReportRange("2026-10-01", "2026-10-31"));
+  assert.ok(!reports.isValidReportRange("2026-10-31", "2026-10-01"));
+  assert.ok(!reports.isValidReportRange("2026-10-01", "2028-10-01"));
+  assert.ok(!reports.isValidReportRange("", "2026-10-01"));
+  const s = reports.summarizeSprintReport({ committed_count: 8, completed_count: 6, committed_estimate_minutes: 480, completed_estimate_minutes: 360, moved_unfinished_count: 2 });
+  assert.equal(s.completionPercent, 75);
+  assert.equal(reports.summarizeSprintReport({ committed_count: 0, completed_count: 0, committed_estimate_minutes: 0, completed_estimate_minutes: 0, moved_unfinished_count: 0 }).completionPercent, null);
+  const tok = "1k7DwnGU1lPR626dFq3x9h4zfriJKylzagGFUNO4FTc";
+  assert.equal(reports.feedUrl("http://acme.localhost:8091", `/api/v1/calendar/feed.ics?token=${tok}`), `http://acme.localhost:8091/api/v1/calendar/feed.ics?token=${tok}`);
+  assert.equal(reports.feedUrl("http://acme.localhost:8091", "/api/v1/other?token=abc"), null);
+  assert.equal(reports.feedUrl(null, `/api/v1/calendar/feed.ics?token=${tok}`), null);
 });

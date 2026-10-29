@@ -126,7 +126,7 @@ export function CommentsSection({ task, members, canComment }: Props) {
   const comments = res.data?.items ?? [];
   return (
     <section className="pm-section" aria-labelledby={`cm-${task.id}`}>
-      <h3 id={`cm-${task.id}`}>Comments</h3>
+      <h2 id={`cm-${task.id}`}>Comments</h2>
       {res.loading && <SkeletonRows rows={2} height={48} />}
       {res.error !== undefined && <ErrorNotice error={res.error} onRetry={res.reload} />}
       {res.data && comments.length === 0 && <EmptyState title="No comments yet" />}

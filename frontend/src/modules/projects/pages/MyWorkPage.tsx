@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { getMyWork } from "../api/planning-api";
+import { CalendarFeedSection } from "../components/feed/CalendarFeedSection";
 import { PriorityChip, StatusPill } from "../components/ui/Chips";
 import { EmptyState, ErrorNotice, SkeletonRows } from "../components/ui/States";
 import { useNow } from "../hooks/use-now";
@@ -68,6 +69,7 @@ export function MyWorkPage() {
             </section>
           );
         })}
+      <CalendarFeedSection />
     </div>
   );
 }

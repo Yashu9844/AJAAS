@@ -54,3 +54,15 @@ export interface ActivityEntry {
   data: Record<string, unknown>;
   occurred_at: string;
 }
+
+export interface WatchState {
+  watching: boolean;
+  reason: string;
+}
+
+export interface Watcher {
+  task_id: string;
+  user_id: string;
+  reason: string;
+  created_at: string;
+}

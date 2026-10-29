@@ -53,7 +53,7 @@ export interface Rule {
 
 export interface RuleInput {
   name: string;
-  trigger: RuleTrigger;
+  trigger: string;
   conditions: RuleCondition[];
   actions: RuleAction[];
   active: boolean;

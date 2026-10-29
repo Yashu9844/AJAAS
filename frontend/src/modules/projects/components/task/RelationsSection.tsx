@@ -53,7 +53,7 @@ export function RelationsSection({ task, canWrite }: { task: Task; canWrite: boo
 
   return (
     <section className="pm-section" aria-labelledby={`rel-${task.id}`}>
-      <h3 id={`rel-${task.id}`}>Relations</h3>
+      <h2 id={`rel-${task.id}`}>Relations</h2>
       {res.loading && <SkeletonRows rows={2} height={28} />}
       {res.error !== undefined && <ErrorNotice error={res.error} onRetry={res.reload} />}
       {res.data && res.data.length === 0 && <EmptyState title="No relations" />}

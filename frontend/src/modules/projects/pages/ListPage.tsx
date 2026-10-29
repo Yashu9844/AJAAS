@@ -31,6 +31,7 @@ export function ListPage() {
 
   return (
     <>
+      <h2 className="pm-sr-only">Task list</h2>
       <SavedViewsBar projectId={project.id} current={filters} canShare={canManage} onApply={setFilters} />
       <ListFilters value={filters} columns={columns} members={members} onChange={setFilters} />
       {canWrite && (
