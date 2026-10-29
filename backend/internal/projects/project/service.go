@@ -21,6 +21,7 @@ type Ports struct {
 	Users  identityport.Users
 	Audit  identityport.Auditor
 	People ports.People // nil: group rules answer 503 PEOPLE_UNAVAILABLE
+	Names  ports.Names  // nil: members carry no display names
 }
 
 // Service holds the project use cases. It also implements api.Authorizer.

@@ -26,6 +26,9 @@ func buildProjects(o Options, idp identityport.Port, people ports.People) (*proj
 	}
 	opts := projects.Options{DB: o.DB, Publisher: o.Publisher, Logger: &o.Logger.Logger,
 		Identity: idp, Storage: store, People: people, Background: o.Background, SecretsKey: projectsSecretsKey(o.Config)}
+	if n, ok := idp.(ports.Names); ok { // the in-process identity adapter can resolve display names
+		opts.Names = n
+	}
 	if o.Redis != nil { // a nil *RedisClient inside the interface would not be nil
 		opts.RateLimits = o.Redis
 	}

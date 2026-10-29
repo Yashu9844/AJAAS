@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -74,4 +75,27 @@ func TestProjectsContext(t *testing.T) {
 	expectErr(t, tc.asTok(t, creator, "DELETE", "/projects/"+pid), 403, "FORBIDDEN", "owner cannot delete")
 	expect(t, tc.do(t, "DELETE", "/projects/"+pid), 200, "tenant admin deletes")
 	expectErr(t, tc.asTok(t, creator, "GET", "/projects/"+pid), 404, "NOT_FOUND", "deleted")
+}
+
+// The product UI needs people names: the members list carries display_name (first and last name, never the e-mail address).
+func TestMembersListCarriesDisplayNamesNotEmails(t *testing.T) {
+	tc := newTenant(t)
+	owner, _, _ := tc.limitedUser(t, [2]string{"projects", "create"})
+	memberID, memberEmail := tc.newUser(t, "nam")
+	pid := tc.asTok(t, owner, "POST", "/projects", body(map[string]any{"key": "NM" + uniq()[:3], "name": "Names"})).str("data.id")
+	expect(t, tc.asTok(t, owner, "POST", "/projects/"+pid+"/members", body(map[string]any{"user_id": memberID, "role": "member"})), 201, "member")
+	list := tc.asTok(t, owner, "GET", "/projects/"+pid+"/members")
+	found := false
+	for _, it := range list.list("data") {
+		m := it.(map[string]any)
+		if m["user_id"] == memberID {
+			found = true
+			if m["display_name"] != "Fnam Lnam" {
+				t.Fatalf("display name: %v", m["display_name"])
+			}
+		}
+	}
+	if !found || strings.Contains(list.Raw, memberEmail) {
+		t.Fatalf("member listed without the e-mail address: found=%v", found)
+	}
 }

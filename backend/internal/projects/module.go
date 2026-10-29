@@ -63,6 +63,7 @@ type Options struct {
 	Identity   identityport.Port
 	Storage    storage.Store             // nil: attachments answer 503 until storage is configured
 	People     ports.People              // nil: group rules answer 503 until organisation data is wired
+	Names      ports.Names               // nil: members carry no display names
 	RateLimits middleware.RateLimitStore // nil: the public feed keeps its per-process limiter
 	Background context.Context           // nil: no relays or sweeps (tests)
 	SecretsKey string                    // base64 32-byte key for webhook and integration secrets; empty: those routes answer 503
@@ -84,7 +85,7 @@ type Module struct {
 // New builds the module and registers its permissions with M0.
 func New(ctx context.Context, o Options) (*Module, error) {
 	m := &Module{o: o}
-	m.project = project.NewService(o.DB, project.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit(), People: o.People})
+	m.project = project.NewService(o.DB, project.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit(), People: o.People, Names: o.Names})
 	m.task = task.NewService(o.DB, m.project, task.Ports{Audit: o.Identity.Audit()})
 	m.planning = planning.NewService(o.DB, m.project, planning.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit()}) // wire:planning
 	if o.RateLimits != nil {                                                                                                // the shared (Redis) limiter replaces the per-process default of the public feed

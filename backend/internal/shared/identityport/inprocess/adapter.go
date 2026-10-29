@@ -5,6 +5,7 @@ package inprocess
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -98,4 +99,27 @@ func (u users) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, 
 		return nil, err
 	}
 	return toUser(tenantID, res)
+}
+
+// DisplayNames returns "First Last" for the given users of the tenant with one query; it never returns e-mail addresses.
+// It satisfies projects/ports.Names structurally, so M2 can show names without importing M0.
+func (p *port) DisplayNames(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]string, error) {
+	out := make(map[uuid.UUID]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		ID        uuid.UUID
+		FirstName string
+		LastName  string
+	}
+	err := p.db.WithContext(ctx).Table("users").Select("id, first_name, last_name").
+		Where("tenant_id = ? AND id IN ?", tenantID, ids).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.ID] = strings.TrimSpace(r.FirstName + " " + r.LastName)
+	}
+	return out, nil
 }

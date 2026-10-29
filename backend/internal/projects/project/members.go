@@ -19,7 +19,8 @@ type MemberInput struct {
 // MemberView is a member with the role name resolved.
 type MemberView struct {
 	Member
-	RoleName string `gorm:"column:role_name" json:"role_name"`
+	RoleName    string `gorm:"column:role_name" json:"role_name"`
+	DisplayName string `gorm:"-" json:"display_name,omitempty"`
 }
 
 // Members lists the active members of a project.
@@ -31,7 +32,10 @@ func (s *Service) Members(ctx context.Context, a api.Actor, projectID uuid.UUID)
 	err := s.db.WithContext(ctx).Raw(`SELECT m.*, COALESCE(m.role_key, cr.name) AS role_name FROM project_members m
 		LEFT JOIN project_roles cr ON cr.id = m.custom_role_id WHERE m.project_id = ? AND m.tenant_id = ? AND m.active
 		ORDER BY m.added_at, m.user_id LIMIT 1000`, projectID, a.TenantID).Scan(&rows).Error
-	return rows, err
+	if err != nil {
+		return nil, err
+	}
+	return rows, s.addNames(ctx, a.TenantID, rows)
 }
 
 func (in MemberInput) validate(db *gorm.DB, tenantID uuid.UUID) error {
@@ -205,6 +209,25 @@ func ensureOwner(tx *gorm.DB, projectID uuid.UUID) error {
 	}
 	if n == 0 {
 		return kernel.Conflict("LAST_OWNER", "a project needs at least one owner")
+	}
+	return nil
+}
+
+// addNames fills display names for the members; a failing lookup degrades to ids only rather than failing the list.
+func (s *Service) addNames(ctx context.Context, tenantID uuid.UUID, rows []MemberView) error {
+	if s.p.Names == nil || len(rows) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		ids[i] = r.UserID
+	}
+	names, err := s.p.Names.DisplayNames(ctx, tenantID, ids)
+	if err != nil {
+		return nil
+	}
+	for i := range rows {
+		rows[i].DisplayName = names[rows[i].UserID]
 	}
 	return nil
 }

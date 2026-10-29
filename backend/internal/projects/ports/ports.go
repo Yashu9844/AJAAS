@@ -20,3 +20,9 @@ type People interface {
 	// DirectReports lists the users whose primary active placement reports to managerUserID.
 	DirectReports(ctx context.Context, tenantID, managerUserID uuid.UUID) ([]uuid.UUID, error)
 }
+
+// Names resolves display names ("First Last") for users of a tenant, so a project can show who is a member or an author
+// without the UI needing access to the user directory. It never returns e-mail addresses. Implementations omit unknown ids.
+type Names interface {
+	DisplayNames(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]string, error)
+}
