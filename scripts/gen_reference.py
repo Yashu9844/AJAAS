@@ -9,17 +9,20 @@ BACKEND = os.path.join(ROOT, 'backend')
 INTERNAL = os.path.join(BACKEND, 'internal')
 
 # M2 Projects & Tasks packages live under internal/projects/<dir>.
-M2 = {'m2_kernel': 'kernel', 'm2_api': 'api', 'm2_project': 'project', 'm2_task': 'task', 'm2_collab': 'collab', 'm2_planning': 'planning', 'm2_fields': 'fields'}
+M2 = {'m2_kernel': 'kernel', 'm2_api': 'api', 'm2_project': 'project', 'm2_task': 'task', 'm2_collab': 'collab', 'm2_planning': 'planning', 'm2_fields': 'fields', 'm2_webhooks': 'webhooks', 'm2_aihooks': 'aihooks',
+      'm2_automation': 'automation', 'm2_recurrence': 'recurrence', 'm2_publiclink': 'publiclink'}
 
 MODULE_ORDER = ['shared', 'app', 'identity', 'organization', 'employee', 'attendance', 'leave', 'payroll',
                 'recruitment', 'performance', 'core', 'compensation', 'onboarding', 'learning', 'benefits',
-                'm2_kernel', 'm2_api', 'm2_project', 'm2_task', 'm2_collab', 'm2_planning', 'm2_fields']
+                'm2_kernel', 'm2_api', 'm2_project', 'm2_task', 'm2_collab', 'm2_planning', 'm2_fields', 'm2_webhooks', 'm2_aihooks',
+                'm2_automation', 'm2_recurrence', 'm2_publiclink']
 TITLES = {'shared': 'Shared infrastructure', 'app': 'Application wiring (internal/app)', 'identity': 'M0 Identity & Access',
           'organization': 'M1 HR / Organization', 'employee': 'M1 HR / Employee', 'attendance': 'M1 HR / Attendance',
           'leave': 'M1 HR / Leave', 'payroll': 'M1 HR / Payroll', 'recruitment': 'M1 HR / Recruitment',
           'performance': 'M1 HR / Performance & OKRs', 'core': 'M1 HR / Core HCM', 'compensation': 'M1 HR / Compensation', 'onboarding': 'M1 HR / Onboarding', 'learning': 'M1 HR / Learning', 'benefits': 'M1 HR / Benefits',
           'm2_kernel': 'M2 Projects / kernel', 'm2_api': 'M2 Projects / api', 'm2_project': 'M2 Projects / project',
-          'm2_task': 'M2 Projects / task', 'm2_collab': 'M2 Projects / collab', 'm2_planning': 'M2 Projects / planning', 'm2_fields': 'M2 Projects / fields'}
+          'm2_task': 'M2 Projects / task', 'm2_collab': 'M2 Projects / collab', 'm2_planning': 'M2 Projects / planning', 'm2_fields': 'M2 Projects / fields', 'm2_webhooks': 'M2 Projects / webhooks', 'm2_aihooks': 'M2 Projects / aihooks',
+          'm2_automation': 'M2 Projects / automation', 'm2_recurrence': 'M2 Projects / recurrence', 'm2_publiclink': 'M2 Projects / publiclink'}
 
 
 def read(path):
@@ -123,7 +126,7 @@ def m2_routes(module):
     import glob
     import importlib.util
     here = os.path.dirname(os.path.abspath(__file__))
-    owner = {'tasks': 'm2_task', 'collab': 'm2_collab', 'planning': 'm2_planning', 'platform': 'm2_project', 'fields': 'm2_fields'}
+    owner = {'tasks': 'm2_task', 'collab': 'm2_collab', 'planning': 'm2_planning', 'platform': 'm2_project', 'fields': 'm2_fields', 'webhooks': 'm2_webhooks', 'aihooks': 'm2_aihooks', 'automation': 'm2_automation'}
     spec = importlib.util.spec_from_file_location('gen_projects_swagger', os.path.join(here, 'gen_projects_swagger.py'))
     base = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(base)

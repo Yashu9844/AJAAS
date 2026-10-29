@@ -1,0 +1,19 @@
+/* Task detail (drawer and page) */
+.pm-task { display: flex; flex-direction: column; gap: 16px; }
+.pm-task-flags { display: flex; gap: 6px; min-height: 0; }
+.pm-task-head { display: flex; flex-direction: column; gap: 8px; }
+.pm-task-head-top { display: flex; justify-content: space-between; align-items: center; }
+.pm-task-heading { font-size: 20px; overflow-wrap: anywhere; }
+.pm-props { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.pm-section { margin-top: 8px; }
+.pm-section .pm-empty { padding: 8px; }
+.pm-section h2, .pm-section h3 { font-size: 15px; margin-bottom: 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.pm-section h3 .pm-muted { font-size: 12px; font-weight: 400; }
+.pm-plain-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.pm-comments { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.pm-comment { display: flex; gap: 8px; }
+.pm-comment-body { flex: 1; min-width: 0; }
+.pm-comment-meta { font-size: 13px; }
+.pm-comment-form { margin-top: 8px; }
+.pm-drawer-link { margin-bottom: 8px; font-size: 13px; }
+.pm-page-narrow { max-width: 860px; margin: 0 auto; }

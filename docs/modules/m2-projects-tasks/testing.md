@@ -13,6 +13,10 @@ fakes), as integration tests through the production router, and as console scena
 | Task context | `internal/projects/task` | 48 tests + ~35 sub-tests (fault injection per table) | 95% |
 | Collaboration | `internal/projects/collab` | 37 tests incl. a real S3 round trip | 92% |
 | Planning and views | `internal/projects/planning` | 45 tests | 93% |
+| Webhooks and Git integrations | `internal/projects/webhooks` | SSRF tables, HMAC, retries, fault injection | 97% |
+| Automation, recurrence, public links | `internal/projects/{automation,automation/bridge,recurrence,publiclink}` | loop protection, idempotence, allow-lists, fault injection | 93-98% |
+| AI hooks | `internal/projects/aihooks` | catalogue, packs, feed | 73% (HTTP covered by the integration ring) |
+| CLI / MCP libraries | `pkg/pmclient`, `pkg/pmmcp` | client, protocol, compact tools | 55% / 86% |
 | Custom fields | `internal/projects/fields` | tests incl. statement-level fault injection | 86% (HTTP handlers covered by the integration ring) |
 | Boundary | `internal/projects/boundary_test.go` | M2 imports only shared packages, `identity/access` and itself | - |
 | Integration ring | `tests/integration/projects*_test.go`, `inbox_test.go` | 13 tests | production router, real Postgres and Redis |

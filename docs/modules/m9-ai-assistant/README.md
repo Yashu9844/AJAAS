@@ -16,6 +16,7 @@ service diagram in `model/`.
 | File | Holds |
 |---|---|
 | `specification.md` | proposed purpose, data model, API shapes, rules, events and acceptance tests (from `docs/ARCHITECTURE.md` section 5) plus the proposed entities |
+| `ai-integration.md` | design note: how AI plugs into modules (hook contract), the model-agnostic client, context and token management, safety checklist, open decisions, and the Plane review |
 | `model/db-model.md` | proposed tables, relationships, dependencies, reliability tables, indexes (owner bundle, verbatim) |
 | `model/erd.mmd` | Mermaid ER diagram |
 | `model/architecture.mmd` | Mermaid service interaction diagram |

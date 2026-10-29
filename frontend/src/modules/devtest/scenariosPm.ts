@@ -38,7 +38,9 @@ export const S_PROJECTS: Scenario[] = [
       await r.call("Duplicate key → 409", tn(owner.S, "POST", "/projects", { key, name: "Again" }), 409);
       await r.call("Default columns exist", tn(owner.S, "GET", `/projects/${pid}/columns`), 200, (e) => (list(e).length === 4 ? null : "expected 4 default columns"));
       await r.call("A stranger cannot see a private project → 404 (PG4)", tn(stranger.S, "GET", `/projects/${pid}`), 404);
-      await r.call("The stranger's list is empty", tn(stranger.S, "GET", "/projects"), 200, (e) => (list(e).length === 0 ? null : "list must be empty"));
+      await r.call("The private project is absent from the stranger's list", tn(stranger.S, "GET", "/projects"), 200, (e) =>
+        list(e).some((x) => x.id === pid) ? "a private project must not be listed for a stranger" : null,
+      );
       await r.call("Add the stranger as a viewer", tn(owner.S, "POST", `/projects/${pid}/members`, { user_id: stranger.userId, role: "viewer" }), 201);
       await r.call("The viewer reads", tn(stranger.S, "GET", `/projects/${pid}`), 200);
       await r.call("The viewer cannot edit → 403", tn(stranger.S, "PATCH", `/projects/${pid}`, { name: "Hacked" }), 403);

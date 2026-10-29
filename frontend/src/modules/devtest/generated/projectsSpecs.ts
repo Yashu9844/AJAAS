@@ -3742,3 +3742,1157 @@ export const PM_FIELDS: OpSpec[] = [
   }
 ];
 
+export const PM_WEBHOOKS: OpSpec[] = [
+  {
+    "key": "pm.webhooks.post.integrations.provider.integration.id",
+    "label": "Provider call (pull_request opened/closed/reopened, push): verifies the HMAC of the raw body before parsing, links tasks of the integration project named by KEY-123; unknown ids and bad signatures answer the same 404; rate limited per IP",
+    "method": "POST",
+    "path": "/integrations/:provider/:integration_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "provider",
+        "where": "path",
+        "required": true,
+        "ref": "integrationsXId"
+      },
+      {
+        "name": "integration_id",
+        "where": "path",
+        "required": true,
+        "ref": "integrationsXId"
+      },
+      {
+        "name": "action",
+        "where": "body"
+      },
+      {
+        "name": "ref",
+        "where": "body"
+      },
+      {
+        "name": "pull_request",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "commits",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "repository",
+        "where": "body",
+        "type": "json"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 429 RATE_LIMITED"
+  },
+  {
+    "key": "pm.webhooks.post.projects.id.integrations",
+    "label": "Add a GitHub or Gitea integration; at most 10 per project; the secret and the incoming path are returned once (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/integrations",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "provider",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "github",
+          "gitea"
+        ],
+        "required": true
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsIntegrationsId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.webhooks.get.projects.id.integrations",
+    "label": "List the git integrations of a project; secrets are never returned (project.update)",
+    "method": "GET",
+    "path": "/projects/:id/integrations",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.webhooks.delete.projects.id.integrations.integration.id",
+    "label": "Delete an integration; the links it created stay (project.update)",
+    "method": "DELETE",
+    "path": "/projects/:id/integrations/:integration_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "integration_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsIntegrationsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.webhooks.post.projects.id.integrations.integration.id.rotate.secret",
+    "label": "Replace the integration secret; the new one is returned once (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/integrations/:integration_id/rotate-secret",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "integration_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsIntegrationsId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.webhooks.post.projects.id.webhooks",
+    "label": "Add a webhook (https URL on port 443/8443, never a private address); at most 20 per project; the signing secret is returned once; 503 SECRETS_UNAVAILABLE when no secrets key is configured (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/webhooks",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "url",
+        "where": "body",
+        "required": true,
+        "placeholder": "https only, ports 443 and 8443, no credentials, no private o"
+      },
+      {
+        "name": "format",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "generic",
+          "slack",
+          "discord"
+        ]
+      },
+      {
+        "name": "event_types",
+        "where": "body",
+        "type": "list",
+        "placeholder": "\"*\" or event names such as task.created, task.moved, sprint."
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsWebhooksId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.webhooks.get.projects.id.webhooks",
+    "label": "List the webhooks of a project; the signing secret is never returned (project.update)",
+    "method": "GET",
+    "path": "/projects/:id/webhooks",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.webhooks.patch.projects.id.webhooks.webhook.id",
+    "label": "Edit a webhook; active=true re-enables an automatically disabled one (project.update)",
+    "method": "PATCH",
+    "path": "/projects/:id/webhooks/:webhook_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "webhook_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsWebhooksId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "url",
+        "where": "body"
+      },
+      {
+        "name": "format",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "generic",
+          "slack",
+          "discord"
+        ]
+      },
+      {
+        "name": "event_types",
+        "where": "body",
+        "type": "list",
+        "placeholder": "\"*\" or event names such as task.created, task.moved, sprint."
+      },
+      {
+        "name": "active",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.webhooks.delete.projects.id.webhooks.webhook.id",
+    "label": "Delete a webhook and its deliveries (project.update)",
+    "method": "DELETE",
+    "path": "/projects/:id/webhooks/:webhook_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "webhook_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsWebhooksId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.webhooks.get.projects.id.webhooks.webhook.id.deliveries",
+    "label": "Deliveries of a webhook, newest first, with status, attempts and the short last error (project.read)",
+    "method": "GET",
+    "path": "/projects/:id/webhooks/:webhook_id/deliveries",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "webhook_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsWebhooksId"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "pending",
+          "delivered",
+          "failed",
+          "dead"
+        ]
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.webhooks.post.projects.id.webhooks.webhook.id.deliveries.delivery.id.redeliver",
+    "label": "Queue a settled delivery for another round of attempts (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/webhooks/:webhook_id/deliveries/:delivery_id/redeliver",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "webhook_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsWebhooksId"
+      },
+      {
+        "name": "delivery_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsWebhooksId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.webhooks.post.projects.id.webhooks.webhook.id.rotate.secret",
+    "label": "Replace the signing secret; the new one is returned once (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/webhooks/:webhook_id/rotate-secret",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "webhook_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsWebhooksId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.webhooks.post.projects.id.webhooks.webhook.id.test",
+    "label": "Send a signed test ping now; the outcome (also a failure) is recorded as a delivery (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/webhooks/:webhook_id/test",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "webhook_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsWebhooksId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 429 RATE_LIMITED"
+  },
+  {
+    "key": "pm.webhooks.get.tasks.id.links",
+    "label": "Pull requests, branches and commits linked to a task: provider, kind, id, https url and state (task.read)",
+    "method": "GET",
+    "path": "/tasks/:id/links",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "tasksXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  }
+];
+
+export const PM_AIHOOKS: OpSpec[] = [
+  {
+    "key": "pm.aihooks.get.ai.hooks.context.projects.id",
+    "label": "Compact project context pack for a model: columns, counts, planning, setup and the caller permissions (project.read)",
+    "method": "GET",
+    "path": "/ai-hooks/context/projects/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "aiHooksContextId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.aihooks.get.ai.hooks.context.tasks.id",
+    "label": "Compact task context pack: task, subtasks, relations, latest comments, activity and custom fields; id or ticket key (task.read)",
+    "method": "GET",
+    "path": "/ai-hooks/context/tasks/:id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "aiHooksContextId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.aihooks.get.ai.hooks.documents",
+    "label": "Incremental text feed (tasks or comments, with tombstones) of one project for indexing (task.read)",
+    "method": "GET",
+    "path": "/ai-hooks/documents",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "project_id",
+        "where": "query"
+      },
+      {
+        "name": "kind",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "task",
+          "comment"
+        ]
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.aihooks.get.ai.hooks.readable.projects",
+    "label": "Ids of the projects the caller can read, for filtering retrieval results to what this user may see",
+    "method": "GET",
+    "path": "/ai-hooks/readable-projects",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [],
+    "expect": [
+      200
+    ]
+  },
+  {
+    "key": "pm.aihooks.get.ai.hooks.tools",
+    "label": "Machine-readable catalogue of the actions M2 offers to an AI; with project_id only the tools the caller may use there",
+    "method": "GET",
+    "path": "/ai-hooks/tools",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "project_id",
+        "where": "query"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  }
+];
+
+export const PM_AUTOMATION: OpSpec[] = [
+  {
+    "key": "pm.automation.post.projects.id.public.links",
+    "label": "Create a read-only public link; the secret token is shown once in this response; at most 3 active per project (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/public-links",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "show_descriptions",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsPublicLinksId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.automation.get.projects.id.public.links",
+    "label": "List the active public links of a project, never their secrets (project.update)",
+    "method": "GET",
+    "path": "/projects/:id/public-links",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.delete.projects.id.public.links.link.id",
+    "label": "Revoke a public link at once (project.update)",
+    "method": "DELETE",
+    "path": "/projects/:id/public-links/:link_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "link_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsPublicLinksId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.post.projects.id.recurrences",
+    "label": "Schedule copies of a template task daily, weekly or monthly; at most 20 per project (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/recurrences",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "template_task_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      },
+      {
+        "name": "frequency",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "daily",
+          "weekly",
+          "monthly"
+        ],
+        "required": true
+      },
+      {
+        "name": "interval",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "weekday",
+        "where": "body",
+        "type": "number",
+        "placeholder": "0 = Sunday; weekly only"
+      },
+      {
+        "name": "day_of_month",
+        "where": "body",
+        "type": "number",
+        "placeholder": "monthly only; clamped to the last day of short months"
+      },
+      {
+        "name": "first_run_at",
+        "where": "body",
+        "type": "datetime"
+      },
+      {
+        "name": "until_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsRecurrencesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.automation.get.projects.id.recurrences",
+    "label": "List the recurring tasks of a project (project.read)",
+    "method": "GET",
+    "path": "/projects/:id/recurrences",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.patch.projects.id.recurrences.recurrence.id",
+    "label": "Edit, pause or re-plan a recurrence; send version (or If-Match) (project.update)",
+    "method": "PATCH",
+    "path": "/projects/:id/recurrences/:recurrence_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "recurrence_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsRecurrencesId"
+      },
+      {
+        "name": "frequency",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "daily",
+          "weekly",
+          "monthly"
+        ]
+      },
+      {
+        "name": "interval",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "weekday",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "day_of_month",
+        "where": "body",
+        "type": "number"
+      },
+      {
+        "name": "next_run_at",
+        "where": "body",
+        "type": "datetime"
+      },
+      {
+        "name": "until_on",
+        "where": "body",
+        "placeholder": "YYYY-MM-DD"
+      },
+      {
+        "name": "active",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.automation.delete.projects.id.recurrences.recurrence.id",
+    "label": "Delete a recurrence; tasks it already created stay (project.update)",
+    "method": "DELETE",
+    "path": "/projects/:id/recurrences/:recurrence_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "recurrence_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsRecurrencesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.post.projects.id.recurrences.recurrence.id.run.now",
+    "label": "Create the next copy now, as the caller, without moving the schedule; returns the new task id (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/recurrences/:recurrence_id/run-now",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "recurrence_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsRecurrencesId"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsRecurrencesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.automation.post.projects.id.rules",
+    "label": "Create a rule: trigger, all-of conditions, up to 10 actions; it runs as the caller; at most 50 per project (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/rules",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "name",
+        "where": "body",
+        "required": true
+      },
+      {
+        "name": "trigger",
+        "where": "body",
+        "type": "select",
+        "options": [
+          "",
+          "task.created",
+          "task.moved",
+          "task.assigned",
+          "task.completed",
+          "task.commented",
+          "task.due_changed",
+          "task.pr_merged"
+        ],
+        "required": true
+      },
+      {
+        "name": "conditions",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "actions",
+        "where": "body",
+        "type": "json",
+        "required": true
+      },
+      {
+        "name": "active",
+        "where": "body",
+        "type": "bool"
+      }
+    ],
+    "expect": [
+      201
+    ],
+    "capture": [
+      {
+        "idKey": "projectsRulesId",
+        "from": "data.id"
+      }
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.automation.get.projects.id.rules",
+    "label": "List the automation rules of a project (project.read)",
+    "method": "GET",
+    "path": "/projects/:id/rules",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.patch.projects.id.rules.rule.id",
+    "label": "Edit, enable or disable a rule; any edit clears its failure flag; send version (or If-Match) (project.update)",
+    "method": "PATCH",
+    "path": "/projects/:id/rules/:rule_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "rule_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsRulesId"
+      },
+      {
+        "name": "name",
+        "where": "body"
+      },
+      {
+        "name": "trigger",
+        "where": "body"
+      },
+      {
+        "name": "conditions",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "actions",
+        "where": "body",
+        "type": "json"
+      },
+      {
+        "name": "active",
+        "where": "body",
+        "type": "bool"
+      },
+      {
+        "name": "version",
+        "where": "body",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.automation.delete.projects.id.rules.rule.id",
+    "label": "Delete a rule and its run history (project.update)",
+    "method": "DELETE",
+    "path": "/projects/:id/rules/:rule_id",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "rule_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsRulesId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.get.projects.id.rules.rule.id.runs",
+    "label": "What a rule did, newest first; status ok, skipped or failed (project.update)",
+    "method": "GET",
+    "path": "/projects/:id/rules/:rule_id/runs",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "rule_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsRulesId"
+      },
+      {
+        "name": "status",
+        "where": "query",
+        "type": "select",
+        "options": [
+          "",
+          "ok",
+          "skipped",
+          "failed"
+        ]
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.post.projects.id.rules.rule.id.test",
+    "label": "Dry run against a task of the project: which conditions fail and which actions would run; changes nothing (project.update)",
+    "method": "POST",
+    "path": "/projects/:id/rules/:rule_id/test",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      },
+      {
+        "name": "rule_id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsRulesId"
+      },
+      {
+        "name": "task_id",
+        "where": "body",
+        "required": true,
+        "placeholder": "uuid"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND"
+  },
+  {
+    "key": "pm.automation.get.public.projects.token",
+    "label": "Read-only page of a project (name, columns, tasks without people), authenticated by the secret token in the path only (no bearer token, rate limited per IP, never cached); unknown, revoked and archived answer the same 404",
+    "method": "GET",
+    "path": "/public/projects/:token",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "token",
+        "where": "path",
+        "required": true,
+        "ref": "publicProjectsId"
+      },
+      {
+        "name": "cursor",
+        "where": "query"
+      },
+      {
+        "name": "limit",
+        "where": "query",
+        "type": "number"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 400 VALIDATION_ERROR; 404 NOT_FOUND; 429 RATE_LIMITED"
+  }
+];
+

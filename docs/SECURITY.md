@@ -127,6 +127,8 @@ At rest: passwords bcrypt (one-way), refresh/reset tokens SHA-256 (one-way), MFA
 In transit: TLS 1.2+ client→Kong; HTTP inside VPC; `sslmode=require` PG prod; TLS Redis/RabbitMQ prod.
 Keys: `JWT_SECRET` (rotate 90d), `MFA_ENCRYPTION_KEY` (re-encrypt on rotate), DB password (secrets manager). Empty defaults in `production.yaml` — must inject via env. Never commit.
 
+M2 webhook and git-integration signing secrets are AES-256-GCM encrypted with `PROJECTS_SECRETS_KEY` (`projects.secrets_key`, base64 32 bytes; required in production, derived from the JWT secret in development only); they are shown once and never logged.
+
 ## 9. API hardening
 
 - Envelope: success `{data, meta}`, error `{error:{code,message,details[]}}`. No stack traces.

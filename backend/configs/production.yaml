@@ -41,3 +41,6 @@ storage:
   access_key: "" # inject STORAGE_ACCESS_KEY
   secret_key: "" # inject STORAGE_SECRET_KEY
   path_style: false
+
+projects:
+  secrets_key: "" # base64 32-byte key for webhook/integration secrets; REQUIRED, inject PROJECTS_SECRETS_KEY

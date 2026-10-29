@@ -51,6 +51,9 @@ func ValidateConfig(cfg *config.Config) error {
 	} else if cfg.Server.Env == "production" {
 		return errors.New("jwt.signing_key (base64 Ed25519 seed) is required in production (set JWT_SIGNING_KEY)")
 	}
+	if err := validateProjectsKey(cfg); err != nil {
+		return err
+	}
 	if cfg.JWT.AccessTokenTTL <= 0 || cfg.JWT.RefreshTokenTTL <= 0 {
 		return errors.New("jwt token TTLs must be positive")
 	}

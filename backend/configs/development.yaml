@@ -41,3 +41,6 @@ storage:
   access_key: test
   secret_key: test
   path_style: true
+
+projects:
+  secrets_key: "" # base64 32-byte key; PROJECTS_SECRETS_KEY. Development derives one from jwt.secret.

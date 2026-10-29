@@ -1,0 +1,37 @@
+/* Pages: projects, my work, workspace tabs, list, calendar */
+.pm-page { display: flex; flex-direction: column; gap: 12px; }
+.pm-page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.pm-page-head h1 { font-size: 22px; overflow-wrap: anywhere; }
+.pm-head-badges { display: flex; gap: 6px; }
+.pm-workspace { display: flex; flex-direction: column; gap: 12px; }
+.pm-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--pm-border); overflow-x: auto; }
+.pm-tab { padding: 8px 14px; color: var(--pm-text) !important; border-bottom: 3px solid transparent; white-space: nowrap; }
+.pm-tab[aria-current="page"] { border-bottom-color: var(--pm-accent); font-weight: 600; }
+
+.pm-project-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.pm-project-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 56px; }
+.pm-project-link { flex: 1 1 200px; display: flex; gap: 8px; align-items: baseline; color: var(--pm-text) !important; min-width: 0; }
+.pm-project-name { font-weight: 600; overflow-wrap: anywhere; }
+
+.pm-work-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.pm-work-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; background: var(--pm-surface); border: 1px solid var(--pm-border); border-radius: 6px; }
+.pm-work-link { flex: 1 1 220px; display: flex; gap: 8px; align-items: baseline; color: var(--pm-text) !important; min-width: 0; }
+
+.pm-table-wrap { overflow-x: auto; border: 1px solid var(--pm-border); border-radius: var(--pm-radius); background: var(--pm-surface); }
+.pm-table { width: 100%; border-collapse: collapse; min-width: 640px; }
+.pm-table th, .pm-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--pm-border); vertical-align: middle; }
+.pm-table th { font-size: 12px; color: var(--pm-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.pm-table tr:last-child td { border-bottom: 0; }
+
+.pm-month-title { font-size: 16px; min-width: 160px; text-align: center; }
+.pm-cal-scroll { overflow-x: auto; }
+.pm-cal { display: grid; grid-template-columns: repeat(7, minmax(92px, 1fr)); min-width: 644px; border: 1px solid var(--pm-border); border-radius: var(--pm-radius); overflow: hidden; background: var(--pm-surface); }
+.pm-cal-head { padding: 6px; text-align: center; font-size: 12px; color: var(--pm-muted); background: var(--pm-surface-2); }
+.pm-cal-cell { min-height: 96px; padding: 4px; border-top: 1px solid var(--pm-border); border-left: 1px solid var(--pm-border); display: flex; flex-direction: column; gap: 3px; }
+.pm-cal-out { background: var(--pm-surface-2); opacity: 0.7; }
+.pm-cal-day { font-size: 12px; color: var(--pm-muted); }
+.pm-cal-task { border: 0; border-radius: 4px; padding: 2px 6px; font-size: 12px; text-align: left; cursor: pointer; background: var(--pm-surface-2); color: var(--pm-text); font-family: ui-monospace, Menlo, Consolas, monospace; }
+.pm-cal-task:hover { filter: brightness(0.95); }
+.pm-cal-more { font-size: 11px; }
+.pm-sprint-active { background: var(--pm-warn-bg); color: var(--pm-warn); }
+.pm-sprint-completed { color: var(--pm-ok); }

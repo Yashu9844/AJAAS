@@ -4,7 +4,7 @@ Updated 2026-10-28. Branch `module-2` (pushed to `origin` after each phase). Ste
 spec, migrations (up/down/up), service and HTTP, tests on a real PostgreSQL, integration ring, swagger, console scenario, docs,
 full suites, commit.
 
-**Status: phases 1-3 (P0-P7) BUILT and verified; phase 4 custom fields BUILT (P8a); the rest of phases 4-5 (P8b) are designed for and deliberately not built.** The owner scoped M2 to phases 1-3 ("in a way no hurdle comes or missed later", 2026-10-27/28, `decisions.md` owner answers 1); phases 4-5 start with a scope GO.
+**Status: phases 1-3 (P0-P7) and the whole of phases 4-5 (P8a-P8d) BUILT and verified, except the items listed under Known gaps.** The owner scoped M2 to phases 1-3 ("in a way no hurdle comes or missed later", 2026-10-27/28, `decisions.md` owner answers 1); phases 4-5 start with a scope GO.
 
 | Step | Scope | Status |
 |---|---|---|
@@ -17,7 +17,9 @@ full suites, commit.
 | P6 | Group rules (department/team/reports-of) with an HR people adapter, deactivation of logins out of projects, inbox ledger | DONE (4 operations) |
 | P7 | Performance seed (PG7), docs, `SYSTEM_REFERENCE`, console scenarios, headless/browser UI run | DONE (see `testing.md`) |
 | P8a | Custom fields: typed project-scoped definitions (text, number, checkbox, date, https URL, select, multiselect, member) and per-task values with the version contract | DONE (6 operations, package `fields`, migration 000050) |
-| P8b | Automation rules, webhooks, GitHub/Gitea and chat integrations, MCP and CLI, recurrence, public links, product UI | NOT BUILT - each needs an architecture or permission decision first (outbound HTTP and secrets, API tokens in M0, new frontend); extension points in `specification.md` section 9 |
+| P8b | Webhooks, chat notifications (Slack, Discord) and GitHub/Gitea integrations with an SSRF-guarded sender | DONE (14 operations, package `webhooks`, migrations 000060-000061, new config key `projects.secrets_key`) |
+| P8c | Automation rules (run as their creator, loop-protected), recurring tasks, anonymous public project links | DONE (15 operations, packages `automation`, `recurrence`, `publiclink`, migrations 000070-000072) |
+| P8d | CLI (`jaas-pm`), MCP server (`jaas-pm-mcp`), AI hooks (`/ai-hooks/*`, `X-JAAS-Agent`), product UI (`/workspace`) | DONE; the AI itself is M9 (`docs/modules/m9-ai-assistant/ai-integration.md`) |
 
 Definition of done per step: unit coverage >= 85% on services (>= 90% where stated in `testing.md`), integration ring green with
 `JAAS_REQUIRE_INTEGRATION=1`, swagger drift test green, migrations up/down/up, console scenario passing live, docs current.
@@ -31,4 +33,7 @@ Definition of done per step: unit coverage >= 85% on services (>= 90% where stat
 - No real product UI: the test console (`/dev-test/projects*`) is the only frontend.
 - Attachment upload bytes are not malware-scanned: there is no scanner in the platform yet; the scan hook runs before `ready` and is a no-op.
 - Subtree moves between projects and re-parenting tasks that have subtasks are refused (409), not implemented.
+- Per-user API tokens (Plane-style) for long-lived agent access need an M0 permission-model change; CLI/MCP use the normal login for now.
+- Product UI: no names for other users (the API carries ids; `GET /users/{id}` is admin-only) - needs a people directory readable by project members; no Gantt, saved views, bulk actions or group-rule/field-definition screens; drag and drop is mouse-only (a select is the keyboard/touch path).
+- Automation fires 3-8 s after an event (outbox settle delay); recurrence catch-up collapses missed occurrences; the webhook secrets key has no re-encryption tool yet.
 - Generic platform gaps shared with M1 (CI pipeline, metrics, tracing, backups, runbooks, secret manager, load tests).

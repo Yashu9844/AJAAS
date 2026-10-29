@@ -15,6 +15,14 @@ type Config struct {
 	JWT      JWTConfig      `mapstructure:"jwt"`
 	Platform PlatformConfig `mapstructure:"platform"`
 	Storage  StorageConfig  `mapstructure:"storage"`
+	Projects ProjectsConfig `mapstructure:"projects"`
+}
+
+// ProjectsConfig holds M2 Projects & Tasks settings.
+type ProjectsConfig struct {
+	// SecretsKey is the base64 32-byte AES-256-GCM key that encrypts webhook and integration signing secrets.
+	// Empty outside production: a development key is derived from the JWT secret. Inject via PROJECTS_SECRETS_KEY.
+	SecretsKey string `mapstructure:"secrets_key"`
 }
 
 // StorageConfig holds the S3-compatible object-storage settings (MinIO in development). An empty Bucket leaves file

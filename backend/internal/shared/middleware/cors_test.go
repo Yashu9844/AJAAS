@@ -64,3 +64,11 @@ func TestCORSAllowsVersionAndIdempotencyHeaders(t *testing.T) {
 		}
 	}
 }
+
+// Browsers can only read response headers the server exposes: clients must see Retry-After to honour rate limits.
+func TestCORSExposesRetryAfter(t *testing.T) {
+	w := corsReq([]string{"*"}, "GET", "http://a.test")
+	if !strings.Contains(w.Header().Get("Access-Control-Expose-Headers"), "Retry-After") {
+		t.Fatalf("expose headers: %q", w.Header().Get("Access-Control-Expose-Headers"))
+	}
+}

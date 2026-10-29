@@ -125,7 +125,7 @@ Envelope version 1 (shared standard), exchange `jaas.projects.events`; payloads 
 | Webhooks | `webhook` + `webhook_delivery` tables; delivery from the outbox with signing and retries. |
 | GitHub / Gitea / chat | `external_link(task, provider, url, state)` plus an `integration` table; incoming webhooks create activity entries and trigger rules; `activity.source` already exists. |
 | Public project views | `project.visibility` gains `public` with a read-only token route. |
-| MCP / CLI / AI | Generated from the same OpenAPI contract; no extra server-side work. |
+| MCP / CLI / AI | **BUILT (2026-10-29)** as clients of the public API: `jaas-pm` (CLI), `jaas-pm-mcp` (MCP, stdio), libraries `pkg/pmclient` and `pkg/pmmcp`; plus read-only AI hooks (`/ai-hooks/*`) and the `X-JAAS-Agent` attribution. The AI itself is M9 (`docs/modules/m9-ai-assistant/ai-integration.md`). |
 | Recurrence | `task_recurrence(task, rule, next_run)` and a scheduler; tasks already have `start_on`/`due_at`. |
 
 ## 10. Golden tests (frozen when approved)

@@ -39,6 +39,9 @@ PM_CONTEXTS = {
                                  '/projects/{id}/plan', '/sprints', '/my-work', '/search', '/saved-views', '/calendar-tokens', '/calendar']),
     'platform': ('PM_PLATFORM', ['/projects/{id}/group-rules']),
     'fields': ('PM_FIELDS', ['/projects/{id}/custom-fields', '/tasks/{id}/custom-fields']),
+    'webhooks': ('PM_WEBHOOKS', ['/projects/{id}/webhooks', '/projects/{id}/integrations', '/tasks/{id}/links', '/integrations']),
+    'aihooks': ('PM_AIHOOKS', ['/ai-hooks']),
+    'automation': ('PM_AUTOMATION', ['/projects/{id}/rules', '/projects/{id}/recurrences', '/projects/{id}/public-links', '/public/projects']),
 }
 
 

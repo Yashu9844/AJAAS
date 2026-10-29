@@ -1279,7 +1279,56 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/tasks/:id/custom-fields` | (from the contract; Every field of the task project with the task value (task.read)) |
 | PUT | `/api/v1/tasks/:id/custom-fields` | (from the contract; Set or clear values by field key; send version (or If-Match) for optimistic concurrency (task.update)) |
 
-Total routes registered by module route files: **555** (plus `GET /health`).
+### M2 Projects / webhooks — 14 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| GET | `/api/v1/projects/:id/webhooks` | (from the contract; List the webhooks of a project; the signing secret is never returned (project.update)) |
+| POST | `/api/v1/projects/:id/webhooks` | (from the contract; Add a webhook (https URL on port 443/8443, never a private address); at most 20 per project; the signing secret is returned once; 503 SECRETS_UNAVAILABLE when no secrets key is configured (project.update)) |
+| PATCH | `/api/v1/projects/:id/webhooks/:webhook_id` | (from the contract; Edit a webhook; active=true re-enables an automatically disabled one (project.update)) |
+| DELETE | `/api/v1/projects/:id/webhooks/:webhook_id` | (from the contract; Delete a webhook and its deliveries (project.update)) |
+| POST | `/api/v1/projects/:id/webhooks/:webhook_id/rotate-secret` | (from the contract; Replace the signing secret; the new one is returned once (project.update)) |
+| POST | `/api/v1/projects/:id/webhooks/:webhook_id/test` | (from the contract; Send a signed test ping now; the outcome (also a failure) is recorded as a delivery (project.update)) |
+| GET | `/api/v1/projects/:id/webhooks/:webhook_id/deliveries` | (from the contract; Deliveries of a webhook, newest first, with status, attempts and the short last error (project.read)) |
+| POST | `/api/v1/projects/:id/webhooks/:webhook_id/deliveries/:delivery_id/redeliver` | (from the contract; Queue a settled delivery for another round of attempts (project.update)) |
+| GET | `/api/v1/projects/:id/integrations` | (from the contract; List the git integrations of a project; secrets are never returned (project.update)) |
+| POST | `/api/v1/projects/:id/integrations` | (from the contract; Add a GitHub or Gitea integration; at most 10 per project; the secret and the incoming path are returned once (project.update)) |
+| DELETE | `/api/v1/projects/:id/integrations/:integration_id` | (from the contract; Delete an integration; the links it created stay (project.update)) |
+| POST | `/api/v1/projects/:id/integrations/:integration_id/rotate-secret` | (from the contract; Replace the integration secret; the new one is returned once (project.update)) |
+| GET | `/api/v1/tasks/:id/links` | (from the contract; Pull requests, branches and commits linked to a task: provider, kind, id, https url and state (task.read)) |
+| POST | `/api/v1/integrations/:provider/:integration_id` | (from the contract; Provider call (pull_request opened/closed/reopened, push): verifies the HMAC of the raw body before parsing, links tasks of the integration project named by KEY-123; unknown ids and bad signatures answer the same 404; rate limited per IP) |
+
+### M2 Projects / aihooks — 5 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| GET | `/api/v1/ai-hooks/tools` | (from the contract; Machine-readable catalogue of the actions M2 offers to an AI; with project_id only the tools the caller may use there) |
+| GET | `/api/v1/ai-hooks/readable-projects` | (from the contract; Ids of the projects the caller can read, for filtering retrieval results to what this user may see) |
+| GET | `/api/v1/ai-hooks/context/projects/:id` | (from the contract; Compact project context pack for a model: columns, counts, planning, setup and the caller permissions (project.read)) |
+| GET | `/api/v1/ai-hooks/context/tasks/:id` | (from the contract; Compact task context pack: task, subtasks, relations, latest comments, activity and custom fields; id or ticket key (task.read)) |
+| GET | `/api/v1/ai-hooks/documents` | (from the contract; Incremental text feed (tasks or comments, with tombstones) of one project for indexing (task.read)) |
+
+### M2 Projects / automation — 15 routes
+
+| Method | Path | Middleware / permission → handler |
+|---|---|---|
+| GET | `/api/v1/projects/:id/rules` | (from the contract; List the automation rules of a project (project.read)) |
+| POST | `/api/v1/projects/:id/rules` | (from the contract; Create a rule: trigger, all-of conditions, up to 10 actions; it runs as the caller; at most 50 per project (project.update)) |
+| PATCH | `/api/v1/projects/:id/rules/:rule_id` | (from the contract; Edit, enable or disable a rule; any edit clears its failure flag; send version (or If-Match) (project.update)) |
+| DELETE | `/api/v1/projects/:id/rules/:rule_id` | (from the contract; Delete a rule and its run history (project.update)) |
+| GET | `/api/v1/projects/:id/rules/:rule_id/runs` | (from the contract; What a rule did, newest first; status ok, skipped or failed (project.update)) |
+| POST | `/api/v1/projects/:id/rules/:rule_id/test` | (from the contract; Dry run against a task of the project: which conditions fail and which actions would run; changes nothing (project.update)) |
+| GET | `/api/v1/projects/:id/recurrences` | (from the contract; List the recurring tasks of a project (project.read)) |
+| POST | `/api/v1/projects/:id/recurrences` | (from the contract; Schedule copies of a template task daily, weekly or monthly; at most 20 per project (project.update)) |
+| PATCH | `/api/v1/projects/:id/recurrences/:recurrence_id` | (from the contract; Edit, pause or re-plan a recurrence; send version (or If-Match) (project.update)) |
+| DELETE | `/api/v1/projects/:id/recurrences/:recurrence_id` | (from the contract; Delete a recurrence; tasks it already created stay (project.update)) |
+| POST | `/api/v1/projects/:id/recurrences/:recurrence_id/run-now` | (from the contract; Create the next copy now, as the caller, without moving the schedule; returns the new task id (project.update)) |
+| GET | `/api/v1/projects/:id/public-links` | (from the contract; List the active public links of a project, never their secrets (project.update)) |
+| POST | `/api/v1/projects/:id/public-links` | (from the contract; Create a read-only public link; the secret token is shown once in this response; at most 3 active per project (project.update)) |
+| DELETE | `/api/v1/projects/:id/public-links/:link_id` | (from the contract; Revoke a public link at once (project.update)) |
+| GET | `/api/v1/public/projects/:token` | (from the contract; Read-only page of a project (name, columns, tasks without people), authenticated by the secret token in the path only (no bearer token, rate limited per IP, never cached); unknown, revoked and archived answer the same 404) |
+
+Total routes registered by module route files: **589** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -3765,6 +3814,152 @@ Total routes registered by module route files: **555** (plus `GET /health`).
 - UNIQUE index `uq_custom_field_name` on `custom_field_definitions` (project_id, lower(name))
 - index `idx_custom_field_values_field` on `custom_field_values` (field_id)
 
+#### `projects/000060_create_webhooks.up.sql`
+- **table `webhooks`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `name` VARCHAR(60) — NOT NULL
+  - `url` VARCHAR(500) — NOT NULL
+  - `format` VARCHAR(8) — NOT NULL DEFAULT 'generic' CHECK (format IN ('generic', 'slack', 'discord'))
+  - `event_types` JSONB — NOT NULL DEFAULT '["*"]'
+  - `active` BOOLEAN — NOT NULL DEFAULT TRUE
+  - `secret_enc` BYTEA — NOT NULL
+  - `secret_hint` VARCHAR(8) — NOT NULL DEFAULT ''
+  - `failure_count` INT — NOT NULL DEFAULT 0
+  - `disabled_at` TIMESTAMPTZ
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `webhook_deliveries`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `webhook_id` UUID — NOT NULL REFERENCES webhooks (id) ON DELETE CASCADE
+  - `event_id` UUID — NOT NULL
+  - `event_type` VARCHAR(100) — NOT NULL
+  - `status` VARCHAR(10) — NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'failed', 'dead'))
+  - `attempts` INT — NOT NULL DEFAULT 0
+  - `next_attempt_at` TIMESTAMPTZ
+  - `response_status` INT
+  - `last_error` VARCHAR(120) — NOT NULL DEFAULT ''
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `delivered_at` TIMESTAMPTZ
+- **table `projects_dispatch_cursor`**
+  - `id` SMALLINT — PRIMARY KEY CHECK (id = 1)
+  - `last_created_at` TIMESTAMPTZ — NOT NULL
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_webhooks_project_name` on `webhooks` (project_id, lower(name))
+- index `idx_webhooks_project` on `webhooks` (tenant_id, project_id)
+- UNIQUE index `uq_webhook_deliveries_event` on `webhook_deliveries` (webhook_id, event_id)
+- index `idx_webhook_deliveries_due` on `webhook_deliveries` (next_attempt_at) WHERE status IN ('pending', 'failed') AND next_attempt_at IS NOT NULL
+- index `idx_webhook_deliveries_list` on `webhook_deliveries` (tenant_id, webhook_id, created_at DESC, id DESC)
+- index `idx_projects_outbox_created` on `projects_events_outbox` (created_at, id)
+
+#### `projects/000061_create_integrations.up.sql`
+- **table `integrations`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `provider` VARCHAR(8) — NOT NULL CHECK (provider IN ('github', 'gitea'))
+  - `name` VARCHAR(60) — NOT NULL
+  - `secret_enc` BYTEA — NOT NULL
+  - `secret_hint` VARCHAR(8) — NOT NULL DEFAULT ''
+  - `active` BOOLEAN — NOT NULL DEFAULT TRUE
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `external_links`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `provider` VARCHAR(8) — NOT NULL CHECK (provider IN ('github', 'gitea'))
+  - `kind` VARCHAR(8) — NOT NULL CHECK (kind IN ('pr', 'branch', 'commit'))
+  - `external_id` VARCHAR(200) — NOT NULL
+  - `url` VARCHAR(500) — NOT NULL
+  - `state` VARCHAR(8) — NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'merged', 'closed'))
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_integrations_project_name` on `integrations` (project_id, lower(name))
+- index `idx_integrations_project` on `integrations` (tenant_id, project_id)
+- UNIQUE index `uq_external_links_ref` on `external_links` (task_id, provider, kind, external_id)
+- index `idx_external_links_task` on `external_links` (tenant_id, task_id, created_at)
+
+#### `projects/000070_create_workflow_rules.up.sql`
+- **table `workflow_rules`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `name` VARCHAR(80) — NOT NULL
+  - `trigger` VARCHAR(30) — NOT NULL CHECK (trigger IN ('task.created', 'task.moved', 'task.assigned', 'task.completed', 'task.commented', 'task.due_changed', 'task.pr_merged'))
+  - `conditions` JSONB — NOT NULL DEFAULT '[]'
+  - `actions` JSONB — NOT NULL DEFAULT '[]'
+  - `active` BOOLEAN — NOT NULL DEFAULT TRUE
+  - `run_count` INT — NOT NULL DEFAULT 0
+  - `last_run_at` TIMESTAMPTZ
+  - `consecutive_failures` INT — NOT NULL DEFAULT 0
+  - `flagged_code` VARCHAR(40)
+  - `created_by` UUID — NOT NULL
+  - `version` INT — NOT NULL DEFAULT 1
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `workflow_rule_runs`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `rule_id` UUID — NOT NULL REFERENCES workflow_rules (id) ON DELETE CASCADE
+  - `event_id` UUID — NOT NULL
+  - `task_id` UUID
+  - `status` VARCHAR(10) — NOT NULL CHECK (status IN ('ok', 'skipped', 'failed'))
+  - `error_code` VARCHAR(40)
+  - `action_count` INT — NOT NULL DEFAULT 0
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- **table `automation_cursor`**
+  - `name` VARCHAR(40) — PRIMARY KEY
+  - `last_created_at` TIMESTAMPTZ — NOT NULL
+  - `last_id` UUID — NOT NULL
+  - `lease_until` TIMESTAMPTZ
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- UNIQUE index `uq_workflow_rules_name` on `workflow_rules` (project_id, lower(name))
+- index `idx_workflow_rules_trigger` on `workflow_rules` (tenant_id, project_id, trigger) WHERE active
+- UNIQUE index `uq_workflow_rule_runs_event` on `workflow_rule_runs` (rule_id, event_id)
+- index `idx_workflow_rule_runs_rule` on `workflow_rule_runs` (rule_id, created_at DESC, id DESC)
+- index `idx_workflow_rule_runs_age` on `workflow_rule_runs` (created_at)
+
+#### `projects/000071_create_task_recurrences.up.sql`
+- **table `task_recurrences`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `template_task_id` UUID — NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
+  - `frequency` VARCHAR(8) — NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly'))
+  - `interval` INT — NOT NULL DEFAULT 1 CHECK (interval BETWEEN 1 AND 52)
+  - `weekday` INT — CHECK (weekday IS NULL OR weekday BETWEEN 0 AND 6)
+  - `day_of_month` INT — CHECK (day_of_month IS NULL OR day_of_month BETWEEN 1 AND 31)
+  - `next_run_at` TIMESTAMPTZ — NOT NULL
+  - `until_on` DATE
+  - `active` BOOLEAN — NOT NULL DEFAULT TRUE
+  - `flagged_code` VARCHAR(40)
+  - `last_run_at` TIMESTAMPTZ
+  - `last_task_id` UUID
+  - `created_by` UUID — NOT NULL
+  - `version` INT — NOT NULL DEFAULT 1
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_task_recurrences_project` on `task_recurrences` (tenant_id, project_id, created_at)
+- index `idx_task_recurrences_due` on `task_recurrences` (next_run_at) WHERE active
+
+#### `projects/000072_create_public_links.up.sql`
+- **table `public_links`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL
+  - `project_id` UUID — NOT NULL REFERENCES projects (id) ON DELETE CASCADE
+  - `token_hash` CHAR(64) — NOT NULL
+  - `show_descriptions` BOOLEAN — NOT NULL DEFAULT FALSE
+  - `created_by` UUID — NOT NULL
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `revoked_at` TIMESTAMPTZ
+- UNIQUE index `uq_public_links_hash` on `public_links` (token_hash)
+- index `idx_public_links_project` on `public_links` (tenant_id, project_id) WHERE revoked_at IS NULL
+
 ## C. Code inventory — every file, type and function
 
 
@@ -3785,8 +3980,9 @@ Total routes registered by module route files: **555** (plus `GET /health`).
 - **func** `(r *RedisClient) TTL(ctx context.Context, key string) (time.Duration, error)` — TTL returns the remaining time-to-live of key (negative when absent / no expiry).
 - **func** `(r *RedisClient) Ping(ctx context.Context) error` — Ping checks the connection (readiness probes).
 
-#### `internal/shared/config/config.go` (105 lines)
+#### `internal/shared/config/config.go` (113 lines)
 - **type** `Config struct` — Config holds all configurations of the application.
+- **type** `ProjectsConfig struct` — ProjectsConfig holds M2 Projects & Tasks settings.
 - **type** `StorageConfig struct` — StorageConfig holds the S3-compatible object-storage settings (MinIO in development). An empty Bucket leaves file features disabled; services that need storage report a clear error instead of failing at startup.
 - **type** `PlatformConfig struct` — PlatformConfig holds platform-operator (super admin) settings.
 - **type** `ServerConfig struct` — ServerConfig holds server configuration details.
@@ -4031,7 +4227,7 @@ _Package:_ Package storage is the object-storage port shared by every service (d
 ### Application wiring (internal/app)
 
 
-#### `internal/app/app.go` (136 lines)
+#### `internal/app/app.go` (139 lines)
 _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go and the integration tests share it so the tested router is exactly the production router.
 - **type** `Options struct` — Options carries the infrastructure handles and runtime policy the engine needs.
 - **func** `ValidateConfig(cfg *config.Config) error` — ValidateConfig rejects configurations that are unsafe to run.
@@ -4046,8 +4242,10 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `startIdentityBackground(o Options, id *identity.Module, store idempotency.Store)` — startIdentityBackground runs M0's outbox relay and the idempotency purger while background work is enabled.
 - **func** `registerDevMailbox(v1 *gin.RouterGroup, o Options, id *identity.Module)` — registerDevMailbox exposes one-time secrets (reset and invitation tokens) to developers and the test console in development and test only, behind the platform key: GET /api/v1/dev/mailbox?tenant_id=…&email=…
 
-#### `internal/app/projects.go` (30 lines)
+#### `internal/app/projects.go` (56 lines)
 - **func** `buildProjects(o Options, idp identityport.Port, people ports.People) (*projects.Module, error)` — buildProjects wires M2 Projects & Tasks, including the object-storage provider when one is configured.
+- **func** `projectsSecretsKey(cfg *config.Config) string` — projectsSecretsKey is the key that encrypts webhook and integration secrets: the configured one, or outside production a development key derived from the JWT secret (production requires an explicit key, see validateProjectsKey).
+- **func** `validateProjectsKey(cfg *config.Config) error` — validateProjectsKey requires a valid projects.secrets_key in production and rejects an invalid one anywhere.
 
 ### M0 Identity & Access
 
@@ -9814,9 +10012,15 @@ _Package:_ Package benefits is HR/Benefits (docs/modules/m1-hr-management/contex
 ### M2 Projects / kernel
 
 
-#### `internal/projects/kernel/activity.go` (40 lines)
+#### `internal/projects/kernel/activity.go` (44 lines)
 - **type** `Activity struct` — Activity is one append-only history entry (CM-04). Data carries ids and field values; no free-text personal data.
 - **func** `LogActivity(ctx context.Context, tx *gorm.DB, a Activity) error` — LogActivity appends an entry in the caller transaction and bumps the project recent-activity time.
+
+#### `internal/projects/kernel/agent.go` (28 lines)
+- **type** `agentKey struct{}`
+- **func** `ValidAgent(name string) bool { return agentName.MatchString(name) }` — ValidAgent reports whether name is an acceptable agent label (lowercase, 1-40 characters).
+- **func** `WithAgent(ctx context.Context, name string) context.Context` — WithAgent returns a context that carries the agent label.
+- **func** `AgentFrom(ctx context.Context) string` — AgentFrom returns the agent label of the context ("" for a person acting directly).
 
 #### `internal/projects/kernel/cursor.go` (55 lines)
 - **func** `EncodeCursor(v any) string` — EncodeCursor turns a position into an opaque token.
@@ -9845,7 +10049,7 @@ _Package:_ Package kernel holds what every M2 context shares: error constructors
 - **func** `(e *VersionConflict) Error() string`
 - **func** `AsVersionConflict(err error) (*VersionConflict, bool)` — AsVersionConflict unwraps a VersionConflict.
 
-#### `internal/projects/kernel/events.go` (28 lines)
+#### `internal/projects/kernel/events.go` (32 lines)
 - **func** `Emit(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payload map[string]any) error` — Emit writes one event, version 1, in the caller transaction. Payloads hold ids and versions only (EV, PG12).
 
 #### `internal/projects/kernel/http.go` (109 lines)
@@ -10730,9 +10934,10 @@ _Package:_ Package planning is the planning and views context of M2: sprints, th
 ### M2 Projects / fields
 
 
-#### `internal/projects/fields/apply.go` (87 lines)
+#### `internal/projects/fields/apply.go` (94 lines)
 - **func** `bumpVersion(tx *gorm.DB, tenantID, taskID uuid.UUID, expected *int) (int, error)` — bumpVersion increments the task version when it still matches (or always when no version was sent).
-- **func** `(s *Service) apply(ctx context.Context, tx *gorm.DB, a api.Actor, t api.TaskRef, expected *int, changes []change) error` — apply stores the changes in one transaction together with the version bump, the activity entry and the event.
+- **type** `edit struct` — apply stores the changes in one transaction together with the version bump, the activity entry and the event. edit is a validated set of changes with the version the caller expects.
+- **func** `(s *Service) apply(ctx context.Context, tx *gorm.DB, a api.Actor, t api.TaskRef, e edit) error`
 - **func** `writeValue(tx *gorm.DB, a api.Actor, taskID uuid.UUID, c change) (any, error)` — writeValue upserts or clears one value and returns the previous one.
 - **func** `entry(c change, old any) map[string]any` — entry is the activity record of one change; free text and URLs are recorded by field only (like descriptions).
 
@@ -10788,24 +10993,561 @@ _Package:_ Package fields is the custom-fields context of M2 (specification sect
 - **func** `(s *Service) SetTaskFields(ctx context.Context, a api.Actor, taskID uuid.UUID, in SetInput) ([]Value, error)` — SetTaskFields validates and stores values for a task (task.update), bumping the task version (TK-03).
 - **func** `(s *Service) validate(ctx context.Context, a api.Actor, projectID uuid.UUID, values map[string]any) ([]change, error)` — validate resolves every key to a definition of the project and checks its value.
 
+### M2 Projects / webhooks
+
+
+#### `internal/projects/webhooks/client.go` (227 lines)
+- **type** `Request struct` — Request is one outgoing delivery.
+- **type** `Result struct` — Result is the outcome of one send: Status is 0 when no response was received, Err is a short fixed description.
+- **func** `(r Result) OK() bool { return r.Err == "" && r.Status >= 200 && r.Status < 300 }` — OK reports a 2xx response.
+- **type** `Doer interface` — Doer sends one request; the Service uses a Sender and tests substitute a fake.
+- **method** `Doer.Do(ctx context.Context, r Request) Result`
+- **type** `lookupFunc func(ctx context.Context, host string) ([]netip.Addr, error)` — lookupFunc resolves a host to addresses (net.Resolver in production, a fake in rebinding tests).
+- **type** `senderOptions struct` — senderOptions are the test-only relaxations; NewSender uses the zero value and nothing reads them from configuration.
+- **type** `Sender struct` — Sender sends requests through the SSRF guard: https only, ports 443/8443, no credentials, no redirects, validated connected IPs, a 5 s total timeout, bounded request and response sizes, and no proxy.
+- **func** `NewSender() *Sender { return newSender(senderOptions{}) }` — NewSender returns the production sender.
+- **func** `newSender(o senderOptions) *Sender`
+- **func** `systemLookup(ctx context.Context, host string) ([]netip.Addr, error)`
+- **func** `(s *Sender) dial(ctx context.Context, network, addr string) (net.Conn, error)` — dial resolves the host, refuses the whole host when any answer is blocked, then connects to a validated address literal. The socket control re-checks the address actually connected, so a resolver that answers differently the next time (DNS rebinding) cannot change where the connection goes.
+- **func** `(s *Sender) resolve(ctx context.Context, host string) ([]netip.Addr, error)`
+- **func** `(s *Sender) checked(ips []netip.Addr) ([]netip.Addr, error)`
+- **func** `(s *Sender) control(_, address string, _ syscall.RawConn) error` — control runs on the socket before connect with the real destination.
+- **func** `(s *Sender) Do(ctx context.Context, r Request) Result` — Do validates the URL again, sends the request and classifies the outcome. The response body is read up to 4 KB and discarded; nothing from the response is kept.
+- **func** `classify(err error) string`
+
+#### `internal/projects/webhooks/deliveries.go` (139 lines)
+- **type** `DeliveryFilter struct` — DeliveryFilter selects and pages deliveries.
+- **type** `deliveryCursor struct`
+- **func** `(s *Service) Deliveries(ctx context.Context, a api.Actor, projectID, webhookID uuid.UUID, f DeliveryFilter) ([]Delivery, string, error)` — Deliveries lists the deliveries of a webhook, newest first (project.read).
+- **func** `validStatus(s string) bool`
+- **func** `(s *Service) Redeliver(ctx context.Context, a api.Actor, projectID, webhookID, deliveryID uuid.UUID) (*Delivery, error)` — Redeliver queues a settled delivery for another full round of attempts (project.update).
+- **func** `(s *Service) TestWebhook(ctx context.Context, a api.Actor, projectID, webhookID uuid.UUID) (*Delivery, error)` — TestWebhook sends a ping now and returns the recorded delivery (project.update). The ping goes through the same guard as every delivery, so a destination that is refused or unreachable is recorded as failed.
+
+#### `internal/projects/webhooks/dispatch.go` (54 lines)
+- **func** `(s *Service) DispatchOnce(ctx context.Context) (int, error)` — DispatchOnce queues a delivery for every active webhook that matches a new event of its project and returns how many it queued. It reads projects_events_outbox through its own cursor (projects_dispatch_cursor), so it does not depend on the broker relay's published flag. Events without a project_id are skipped.
+- **func** `intervalLiteral(d time.Duration) string { return strconv.Itoa(int(d.Seconds())) + " seconds" }`
+- **func** `(s *Service) queueMatches(tx *gorm.DB, from, to time.Time) (int64, error)` — queueMatches inserts one pending delivery per (matching webhook, event) in the window. Webhooks only see events created after they were; "*" matches every event type.
+
+#### `internal/projects/webhooks/gitscan.go` (163 lines)
+- **type** `gitPayload struct` — gitPayload is the part of a GitHub or Gitea webhook body the integration reads. Titles and messages are scanned for ticket keys and then dropped: they are never stored.
+- **type** `candidate struct` — candidate is one link a provider event asks for; number is the task number inside the integration's project.
+- **func** `scanKeys(key string, texts ...string) []int` — scanKeys returns the task numbers of every KEY-<n> in the texts. The key must stand alone (not part of a longer word or number) and is matched case-insensitively, so branch names like proj-12-fix work.
+- **func** `isWordByte(b byte) bool`
+- **func** `extract(provider, event, key string, p gitPayload) []candidate` — extract turns a provider event into the links it asks for (pull_request opened/reopened/closed, push).
+- **func** `pullRequestLinks(key string, p gitPayload) []candidate`
+- **func** `pushLinks(provider, key string, p gitPayload) []candidate`
+- **func** `branchURL(provider, repo, branch string) (string, bool)` — branchURL builds the branch page link from the repository page: /tree/<branch> on GitHub, /src/branch/<branch> on Gitea.
+
+#### `internal/projects/webhooks/guard.go` (145 lines)
+_Package:_ Package webhooks is the outgoing-webhook and git-integration context of M2 (specification section 9, phase 4).  It holds the ONE controlled exception to "the backend never fetches user-controlled URLs" (SECURITY section 9): the webhook sender. Every outgoing request goes through Sender.Do, which enforces the guard in guard.go and client.go.
+- **func** `parsePrefixes(list ...string) []netip.Prefix`
+- **func** `BlockedAddr(ip netip.Addr) bool` — BlockedAddr reports whether a connection to ip must be refused: loopback, private, link-local (including the cloud metadata address 169.254.169.254), carrier-grade NAT, multicast, unspecified, reserved and their IPv6 equivalents.
+- **type** `urlRules struct` — urlRules relax the guard for tests only; the production value is the zero value.
+- **func** `ValidateURL(raw string) (*url.URL, error) { return validateURL(raw, urlRules{}) }` — ValidateURL checks a webhook URL at create/update time: https only, no credentials, ports 443 and 8443, and a host that is not an internal or numeric-looking name or a blocked address literal. The send path validates again.
+- **func** `validateURL(raw string, rules urlRules) (*url.URL, error)`
+- **func** `portAllowed(p string) bool { return p == "" || p == "443" || p == "8443" }`
+- **func** `hostRefused(host string, rules urlRules) bool` — hostRefused rejects internal names, address literals that are blocked, and numeric-looking hosts (0x7f.1, 2130706433, 127.1) that some resolvers read as IPv4 addresses.
+- **func** `numericLooking(h string) bool` — numericLooking is true when every dot-separated label is a decimal or 0x-prefixed number.
+- **func** `ValidateStoredURL(raw string) (string, error)` — ValidateStoredURL checks a URL that is only stored and shown (git links): https, no credentials, bounded length. It is never fetched by the backend, so address checks are not needed.
+
+#### `internal/projects/webhooks/http.go` (144 lines)
+- **func** `act(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `actSub(param string, fn func(c *gin.Context, a api.Actor, id, sub uuid.UUID)) gin.HandlerFunc` — actSub is act plus a second path id (webhook_id or integration_id).
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the webhook and integration routes on g (already guarded by tenant resolution and authentication).
+- **func** `(s *Service) webhookRoutes(g *gin.RouterGroup)`
+- **func** `(s *Service) deliveryRoutes(g *gin.RouterGroup)`
+- **func** `(s *Service) integrationRoutes(g *gin.RouterGroup)`
+- **func** `(s *Service) RegisterPublic(rg *gin.RouterGroup)` — RegisterPublic mounts the one other route without a bearer token (besides the calendar feed): the provider call. It is authenticated by the HMAC of the raw body and rate limited per client IP.
+- **func** `(s *Service) serveIncoming(c *gin.Context)`
+- **func** `firstHeader(c *gin.Context, names ...string) string`
+
+#### `internal/projects/webhooks/incoming.go` (126 lines)
+- **type** `Incoming struct` — Incoming is one provider call as the HTTP layer read it.
+- **type** `IncomingResult struct` — IncomingResult is the answer to a verified call.
+- **func** `errUnauthorized() error { return kernel.NotFound("integration") }` — errUnauthorized is what an unknown id, an inactive integration and a bad signature all answer: the same 404.
+- **func** `(s *Service) Receive(ctx context.Context, in Incoming) (*IncomingResult, error)` — Receive handles a provider call. The signature is verified over the RAW body before anything is parsed; tenant and project come only from the integration row. Unknown ids and bad signatures are indistinguishable (404).
+- **func** `(s *Service) findIntegration(ctx context.Context, provider, rawID string) (Integration, bool, error)` — findIntegration looks the integration up by id and provider; a database failure is an error, never "not found".
+- **func** `signatureMatches(provider, header, expectedHex string) bool` — signatureMatches compares the provider header with the expected HMAC in constant time.
+- **func** `(s *Service) process(ctx context.Context, it Integration, in Incoming) (*IncomingResult, error)`
+- **func** `(s *Service) activeProjectKey(ctx context.Context, it Integration) (string, error)` — activeProjectKey returns the key of the integration's project; deleted and archived projects take no new links.
+
+#### `internal/projects/webhooks/integrations.go` (125 lines)
+- **type** `IntegrationInput struct` — IntegrationInput creates a git integration.
+- **func** `incomingPath(provider string, id uuid.UUID) string` — incomingPath is the path (below /api/v1) a provider posts to.
+- **func** `(s *Service) Integrations(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Integration, error)` — Integrations lists the integrations of a project (project.update).
+- **func** `(s *Service) CreateIntegration(ctx context.Context, a api.Actor, projectID uuid.UUID, in IntegrationInput) (*IntegrationWithSecret, error)` — CreateIntegration adds an integration (project.update); a project has at most 10. The secret is returned once.
+- **func** `(s *Service) insertIntegration(ctx context.Context, tx *gorm.DB, a api.Actor, it *Integration) error`
+- **func** `(s *Service) DeleteIntegration(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — DeleteIntegration removes an integration; the links it created stay (project.update).
+- **func** `(s *Service) RotateIntegrationSecret(ctx context.Context, a api.Actor, projectID, id uuid.UUID) (*IntegrationWithSecret, error)` — RotateIntegrationSecret replaces the integration secret (project.update) and returns the new one once.
+
+#### `internal/projects/webhooks/limiter.go` (67 lines)
+- **type** `limitWindow struct`
+- **type** `ipLimiter struct` — ipLimiter is a fixed-window per-IP limiter in process memory; production swaps in the shared Redis limiter via Service.SetLimiter.
+- **func** `newLimiter(limit int, window time.Duration) gin.HandlerFunc`
+- **func** `(l *ipLimiter) allow(key string) (bool, int)` — allow counts a hit for key and reports whether it is within the limit plus the seconds until the window resets.
+- **func** `(l *ipLimiter) handle(c *gin.Context)`
+
+#### `internal/projects/webhooks/links.go` (127 lines)
+- **func** `(s *Service) TaskLinks(ctx context.Context, a api.Actor, taskID uuid.UUID) ([]ExternalLink, error)` — TaskLinks lists the pull requests, branches and commits linked to a task (task.read).
+- **type** `linkTarget struct` — linkTarget is the integration, task and requested link an effect belongs to.
+- **type** `linkRow struct` — linkRow is what the upsert reports for a link whose state is new or changed.
+- **func** `(s *Service) applyLinks(ctx context.Context, it Integration, cands []candidate) (int, error)` — applyLinks writes the links, their activity and their events in one transaction and returns how many links are new or changed. Replays of the same provider call change nothing, so they emit nothing (idempotent).
+- **func** `taskIDsByNumber(ctx context.Context, tx *gorm.DB, it Integration, cands []candidate) (map[int]uuid.UUID, error)` — taskIDsByNumber finds the tasks of THIS project only: a key of another project never links (tenant and project come from the integration row).
+- **func** `(s *Service) upsertLink(ctx context.Context, tx *gorm.DB, it Integration, taskID uuid.UUID, c candidate) (linkRow, bool, error)`
+- **func** `(s *Service) linkEffects(ctx context.Context, tx *gorm.DB, t linkTarget, row linkRow) error` — linkEffects records the activity (source "integration", ids and state only) and the events for a new or changed link.
+
+#### `internal/projects/webhooks/models.go` (124 lines)
+- **type** `Webhook struct` — Webhook is one outgoing endpoint of a project. The signing secret is never part of the model's JSON.
+- **func** `(Webhook) TableName() string { return "webhooks" }` — TableName maps to webhooks.
+- **type** `WebhookWithSecret struct` — WebhookWithSecret is returned once, when a secret is created or rotated.
+- **type** `Delivery struct` — Delivery is one event sent (or to be sent) to one webhook. It never holds the body or the response.
+- **func** `(Delivery) TableName() string { return "webhook_deliveries" }` — TableName maps to webhook_deliveries.
+- **type** `Integration struct` — Integration is a git provider hooked to one project; its incoming URL is /integrations/{provider}/{id}.
+- **func** `(Integration) TableName() string { return "integrations" }` — TableName maps to integrations.
+- **type** `IntegrationWithSecret struct` — IntegrationWithSecret is returned once, when a secret is created or rotated.
+- **type** `ExternalLink struct` — ExternalLink ties a task to a pull request, branch or commit of a git provider. No titles or messages are stored.
+- **func** `(ExternalLink) TableName() string { return "external_links" }` — TableName maps to external_links.
+
+#### `internal/projects/webhooks/payload.go` (111 lines)
+- **func** `(s *Service) loadEnvelope(ctx context.Context, tenantID, eventID uuid.UUID) (map[string]any, error)` — loadEnvelope reads the stored event envelope (ids and versions only; an AI agent label may ride along).
+- **type** `envelopeError string`
+- **func** `(e envelopeError) Error() string { return string(e) }` — Error implements error.
+- **func** `(s *Service) pingEnvelope(c claim, projectID uuid.UUID) map[string]any` — pingEnvelope is the synthetic event of a test delivery.
+- **func** `(s *Service) body(ctx context.Context, w Webhook, env map[string]any, deliveryID uuid.UUID) ([]byte, error)` — body renders the request body for the webhook format. Generic sends the envelope plus the delivery id; slack and discord send one short line built only from the event name, the project key and the ticket key.
+- **func** `(s *Service) chatText(ctx context.Context, w Webhook, env map[string]any) (string, error)` — chatText is "[JAAS] <event> in <KEY>" with " (<KEY>-<n>)" when the event names a task. No titles or other free text.
+- **type** `signing struct` — signing is what a delivery signature covers: the secret, the time, the event and the delivery id.
+- **func** `signedHeaders(g signing, body []byte) map[string]string` — signedHeaders are the headers every delivery carries.
+
+#### `internal/projects/webhooks/run.go` (43 lines)
+- **func** `(s *Service) Run(ctx context.Context, onErr func(error))` — Run dispatches new events and sends due deliveries until ctx is cancelled. Errors are reported to onErr and never stop the loop; they carry no URLs or secrets.
+- **func** `(s *Service) RunOnce(ctx context.Context, onErr func(error))` — RunOnce is one dispatch pass followed by one send pass.
+
+#### `internal/projects/webhooks/secrets.go` (114 lines)
+- **func** `ParseSecretsKey(raw string) ([]byte, error)` — ParseSecretsKey decodes a base64 (standard or URL, padded or not) 32-byte key.
+- **func** `DeriveDevelopmentKey(jwtSecret string) string` — DeriveDevelopmentKey derives a secrets key from the JWT secret. It exists so development works with an empty configuration; production requires an explicit key (app.ValidateConfig).
+- **type** `Sealer struct{ aead cipher.AEAD }` — Sealer encrypts secrets with AES-256-GCM; the random nonce is prefixed to the ciphertext.
+- **func** `NewSealer(keyB64 string) (*Sealer, error)` — NewSealer builds a Sealer from a base64 key.
+- **func** `(s *Sealer) Seal(plain []byte) ([]byte, error)` — Seal encrypts plain.
+- **func** `(s *Sealer) Open(sealed []byte) ([]byte, error)` — Open decrypts what Seal produced; tampered or truncated input is an error.
+- **func** `NewSecret() (string, error)` — NewSecret returns 32 random bytes as a printable secret ("whsec_" + 64 hex characters).
+- **func** `Hint(secret string) string` — Hint is the last four characters of a secret, enough to tell two secrets apart.
+- **func** `Sign(secret []byte, unix int64, body []byte) string` — Sign returns the X-JAAS-Signature value "t=<unix>,v1=<hex hmac-sha256 over t + "." + body>".
+- **func** `hmacHex(secret, body []byte) string` — hmacHex is the hex HMAC-SHA256 of body, the form GitHub and Gitea send.
+
+#### `internal/projects/webhooks/service.go` (127 lines)
+- **type** `Ports struct` — Ports are the services the webhooks context needs from the platform.
+- **type** `Service struct` — Service holds the webhook, delivery and git-integration use cases.
+- **func** `NewService(db *gorm.DB, authz api.Authorizer, tasks api.TaskResolver, p Ports) (*Service, error)` — NewService builds the service. A configured but invalid secrets key is an error; an empty one leaves secrets disabled.
+- **func** `(s *Service) SetSender(d Doer) { s.sender = d }` — SetSender replaces the outgoing sender (tests only; production always uses the guarded Sender).
+- **func** `(s *Service) SetLimiter(h gin.HandlerFunc) { s.limiter = h }` — SetLimiter replaces the per-process limiter of the public integration route with a shared (Redis) one.
+- **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **func** `(s *Service) stamp() time.Time { return s.now().UTC().Truncate(time.Microsecond) }`
+- **type** `ref struct` — ref names the audited resource and carries its metadata (ids and codes only; never URLs or secrets).
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref)` — audit records a successful mutation; failures never fail the request (SECURITY 7).
+- **func** `(s *Service) require(ctx context.Context, a api.Actor, projectID uuid.UUID, p api.Perm) (api.Access, error)`
+- **func** `countRows(db *gorm.DB, table, where string, args ...any) (int64, error)`
+- **func** `mapMissing(err error, what string) error`
+- **func** `(s *Service) secretsOff() error`
+- **func** `(s *Service) newSealedSecret() (secret string, sealed []byte, err error)` — newSealedSecret creates a secret and its encrypted form.
+- **func** `(s *Service) openSecret(sealed []byte) ([]byte, bool)` — openSecret decrypts a stored secret; ok is false when secrets are off or the value cannot be opened.
+
+#### `internal/projects/webhooks/webhook_input.go` (141 lines)
+- **type** `WebhookInput struct` — WebhookInput creates a webhook; Format defaults to generic and EventTypes to every event.
+- **type** `WebhookUpdate struct` — WebhookUpdate edits a webhook; nil fields stay unchanged. Setting Active to true re-enables a disabled webhook.
+- **func** `cleanName(name string) (string, error)`
+- **func** `cleanURL(raw string) (string, error)`
+- **func** `cleanFormat(f string) (string, error)`
+- **func** `cleanEventTypes(in []string) (kernel.StringList, error)` — cleanEventTypes accepts "*" or routing keys such as task.created; duplicates collapse and "*" absorbs the rest.
+- **func** `(in WebhookInput) build() (Webhook, error)` — build validates a create request into a Webhook (without ids).
+- **func** `(in WebhookUpdate) apply(w *Webhook) error` — apply validates the changes and writes them onto w.
+
+#### `internal/projects/webhooks/webhooks.go` (155 lines)
+- **func** `(s *Service) Webhooks(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Webhook, error)` — Webhooks lists the webhooks of a project (project.update: a chat webhook URL is itself a secret).
+- **func** `(s *Service) CreateWebhook(ctx context.Context, a api.Actor, projectID uuid.UUID, in WebhookInput) (*WebhookWithSecret, error)` — CreateWebhook adds a webhook (project.update); a project has at most 20. The signing secret is returned once.
+- **func** `(s *Service) insertWebhook(ctx context.Context, tx *gorm.DB, a api.Actor, w *Webhook) error`
+- **func** `lockProject(tx *gorm.DB, projectID uuid.UUID) error` — lockProject serialises creations per project so the per-project limits hold under concurrency.
+- **func** `(s *Service) loadWebhook(ctx context.Context, db *gorm.DB, a api.Actor, projectID, id uuid.UUID) (Webhook, error)`
+- **func** `(s *Service) UpdateWebhook(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in WebhookUpdate) (*Webhook, error)` — UpdateWebhook edits a webhook (project.update). Setting active clears the automatic disable and the failure count.
+- **func** `(s *Service) DeleteWebhook(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — DeleteWebhook removes a webhook and its deliveries (project.update).
+- **func** `(s *Service) RotateWebhookSecret(ctx context.Context, a api.Actor, projectID, id uuid.UUID) (*WebhookWithSecret, error)` — RotateWebhookSecret replaces the signing secret (project.update) and returns the new one once.
+
+#### `internal/projects/webhooks/worker.go` (189 lines)
+- **func** `backoff(attempt int, jitter float64) time.Duration` — backoff is the wait after the given failed attempt (1-based); jitter is a number in [0,1).
+- **type** `claim struct` — claim is a delivery leased to this worker.
+- **func** `claimOf(d Delivery) claim`
+- **func** `(s *Service) claimDue(ctx context.Context, limit int) ([]claim, error)` — claimDue leases due deliveries of enabled webhooks by pushing their next attempt out; a crashed worker's lease simply expires and the delivery is picked up again.
+- **func** `(s *Service) SendOnce(ctx context.Context) (int, error)` — SendOnce sends the deliveries that are due and returns how many it handled.
+- **func** `(s *Service) deliver(ctx context.Context, c claim) error` — deliver sends one claimed delivery (no transaction is open while the network is used) and records the result.
+- **func** `(s *Service) sendOne(ctx context.Context, c claim) (Result, error)`
+- **func** `(s *Service) outcome(c claim, res Result, now time.Time) (status string, next, delivered *time.Time)` — outcome decides the delivery state after an attempt.
+- **func** `(s *Service) settle(ctx context.Context, c claim, res Result) error` — settle stores the attempt result and updates the webhook failure counter in one short transaction.
+- **func** `(s *Service) countOutcome(ctx context.Context, tx *gorm.DB, c claim, ok bool, now time.Time) error` — countOutcome resets the failure counter on success, or counts the failure and disables the webhook at the threshold.
+- **func** `(s *Service) auditSystem(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, action string, r ref)` — auditSystem records an action no person took.
+- **func** `(s *Service) Purge(ctx context.Context) error` — Purge deletes deliveries older than the retention window.
+
+### M2 Projects / aihooks
+
+
+#### `internal/projects/aihooks/documents.go` (158 lines)
+- **type** `Document struct` — Document is one piece of text an AI runtime may index (for retrieval) together with what it needs to keep the index current: a stable id, a content hash, the last change time and a deletion marker.
+- **type** `DocQuery struct` — DocQuery selects a page of the document feed.
+- **type** `docScan struct` — docScan is the decoded position and page size of one feed query.
+- **type** `docCursor struct`
+- **type** `docRow struct`
+- **func** `(s *Service) Documents(ctx context.Context, a api.Actor, q DocQuery) ([]Document, string, error)` — Documents pages through the tasks (kind task) or comments (kind comment) of one project that changed after the cursor, oldest change first, including tombstones for deleted items so an index can drop them. The caller needs task.read in the project; an index built from this feed must still filter its results by ReadableProjects when it answers a user.
+- **func** `clampLimit(n int) int`
+- **func** `(s *Service) taskDocs(ctx context.Context, a api.Actor, d docScan, out *[]docRow) error`
+- **func** `(s *Service) commentDocs(ctx context.Context, a api.Actor, d docScan, out *[]docRow) error`
+- **func** `toDocuments(kind string, rows []docRow) []Document`
+
+#### `internal/projects/aihooks/http.go` (56 lines)
+- **func** `act(fn func(c *gin.Context, a api.Actor)) gin.HandlerFunc`
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the AI hooks on g (already guarded by tenant resolution and authentication). All routes are reads.
+
+#### `internal/projects/aihooks/project_context.go` (144 lines)
+- **type** `columnRow struct`
+- **type** `countsRow struct`
+- **func** `(s *Service) ProjectContext(ctx context.Context, a api.Actor, projectID uuid.UUID) (Pack, error)` — ProjectContext returns a compact overview of a project for a model: shape, workload, planning and the caller permissions.
+- **func** `(s *Service) columns(ctx context.Context, a api.Actor, pid uuid.UUID) ([]columnRow, error)`
+- **func** `(s *Service) counts(ctx context.Context, a api.Actor, pid uuid.UUID) (countsRow, error)`
+- **func** `(s *Service) planning(ctx context.Context, a api.Actor, pid uuid.UUID) (map[string]any, error)`
+- **func** `(s *Service) setup(ctx context.Context, a api.Actor, pid uuid.UUID, cut *[]string) (map[string]any, error)`
+
+#### `internal/projects/aihooks/service.go` (75 lines)
+- **type** `Service struct` — Service builds AI-facing views. It owns no tables and writes nothing.
+- **func** `NewService(db *gorm.DB, authz api.Authorizer, tasks api.TaskResolver) *Service` — NewService builds the service.
+- **type** `Pack struct` — Pack wraps a context payload with sizing hints so a runtime can budget its context window.
+- **func** `(s *Service) seal(kind string, a api.Actor, data map[string]any, truncated []string) Pack` — seal fills the sizing hints (about four characters per token).
+- **func** `(s *Service) ToolsFor(ctx context.Context, a api.Actor, projectID *uuid.UUID) ([]Tool, error)` — ToolsFor returns the catalogue. With a project id the list is limited to the tools the caller may use there, so an AI never even sees an action its user could not perform (the API would refuse it anyway).
+- **func** `(s *Service) ReadableProjects(ctx context.Context, a api.Actor) ([]uuid.UUID, error)` — ReadableProjects lists the ids of the projects the caller can read, so an AI runtime can filter retrieval results (for example from its own vector index) to what this user is allowed to see before using them.
+
+#### `internal/projects/aihooks/task_context.go` (132 lines)
+- **type** `taskRow struct`
+- **type** `miniTask struct`
+- **type** `relationRow struct`
+- **func** `(s *Service) resolveTask(ctx context.Context, a api.Actor, ref string) (uuid.UUID, error)` — resolveTask accepts a task id or a ticket key (ENG-12) and returns the id; it checks nothing about access.
+- **func** `(s *Service) TaskContext(ctx context.Context, a api.Actor, ref string) (Pack, error)` — TaskContext returns a task with its surroundings in one compact pack. Everything in it is readable by the caller: the task resolver checks project access first, and relations to tasks in projects the caller cannot read are left out.
+- **func** `(s *Service) taskData(ctx context.Context, a api.Actor, t api.TaskRef) (map[string]any, []string, error)`
+- **func** `capList[T any](items []T, n int, name string, cut *[]string) []T`
+
+#### `internal/projects/aihooks/task_parts.go` (107 lines)
+- **type** `commentRow struct`
+- **type** `activityRow struct`
+- **type** `fieldRow struct`
+- **func** `(s *Service) taskParts(ctx context.Context, a api.Actor, t api.TaskRef, data map[string]any, cut *[]string) error` — taskParts adds the related sections to the pack: people, labels, subtasks, relations, comments, activity, fields, time.
+- **func** `(s *Service) relations(ctx context.Context, a api.Actor, id uuid.UUID) ([]relationRow, error)`
+- **func** `(s *Service) taskHistory(ctx context.Context, a api.Actor, id uuid.UUID, data map[string]any) error`
+
+#### `internal/projects/aihooks/tools.go` (81 lines)
+_Package:_ Package aihooks is the seam between Module 2 and a separate AI module (M9). It contains no model, no prompt and no provider: only what an AI needs from M2 and cannot safely get any other way - a machine-readable catalogue of the actions M2 offers (with the permission each needs and its risk), compact context packs sized for a model context, and an incremental document feed for indexing. Every read is authorised through the same Authorizer as the REST API, so an AI acting with a user token can see and do exactly what that user may - never more. See docs/modules/m9-ai-assistant/ai-integration.md.
+- **type** `Route struct` — Route is the REST call behind a tool; {id} and {key} placeholders are filled from the tool arguments.
+- **type** `Tool struct` — Tool is one action an AI may take. It mirrors an existing REST operation - there is no separate AI-only write path.
+- **func** `str(desc string) map[string]any { return map[string]any{"type": "string", "description": desc} }`
+- **func** `schema(required []string, props map[string]any) map[string]any`
+- **func** `Catalogue() []Tool` — Catalogue is every tool, in a stable order. It is the single list both the MCP server and the AI module should offer; TestEveryToolRouteExists keeps it in step with the router.
+
+### M2 Projects / automation
+
+
+#### `internal/projects/automation/actions.go` (44 lines)
+- **func** `(s *Service) runAction(ctx context.Context, a api.Actor, taskID uuid.UUID, act Action) error` — runAction performs one action through the task use cases as the rule creator. The context carries the automation agent label, so the activity entry and the event of the change say who acted and the engine ignores the event.
+- **func** `(s *Service) dueIn(days int) time.Time` — dueIn is midnight UTC of today plus the given number of days.
+
+#### `internal/projects/automation/conditions.go` (125 lines)
+- **type** `eventFacts struct` — eventFacts are the event-specific values a condition can test; missing ones never match.
+- **func** `hasID(ids []uuid.UUID, want string) bool`
+- **func** `idIs(id *uuid.UUID, want string) bool { return id != nil && id.String() == want }`
+- **func** `(c Condition) isEvent() bool` — isEvent reports whether the condition reads the event rather than the task.
+- **func** `(c Condition) holds(st TaskState, ev eventFacts) bool` — holds evaluates one condition against the task now and the event.
+- **func** `(cs Conditions) failing(st TaskState, ev eventFacts, assume bool) []string` — failing lists the fields of the conditions that do not hold; event conditions are skipped when assume is true (a dry run has no event).
+- **func** `(cs Conditions) assumed() []string` — assumed lists the event conditions a dry run could not check.
+- **func** `(a Action) needs() string` — needs is the project permission an action requires from the rule creator.
+- **func** `(a Action) noop(st TaskState) bool` — noop reports whether the action would change nothing for the task in state st.
+- **func** `(a Action) applied(st TaskState) TaskState` — applied returns the state after the action ran, so later actions of the same run see its effect.
+
+#### `internal/projects/automation/dryrun.go` (74 lines)
+- **type** `TestAction struct` — TestAction says what one action would do in a dry run.
+- **type** `TestResult struct` — TestResult is the outcome of a dry run: nothing was changed and nothing was recorded.
+- **func** `(s *Service) Test(ctx context.Context, a api.Actor, projectID, ruleID, taskID uuid.UUID) (*TestResult, error)` — Test checks a rule against a task of the project without running it (project.update): which conditions fail, whether the creator may still act, and which actions would change something. Conditions on the triggering event are assumed true.
+- **func** `planActions(r Rule, st TaskState, res *TestResult) []TestAction` — planActions walks the actions with the state each would see, as a real run does.
+
+#### `internal/projects/automation/engine.go` (118 lines)
+- **type** `Engine struct` — Engine reads new rows of the M2 outbox, independently of the broker relay, and runs the rules they trigger. Rows are read only after a short settle delay so a transaction that committed late is not skipped by the cursor.
+- **func** `NewEngine(s *Service) *Engine { return &Engine{s: s, batch: batchSize, settle: settleDelay} }` — NewEngine builds the engine on a rule service.
+- **func** `(e *Engine) SetSettle(d time.Duration) { e.settle = d }` — SetSettle changes how long an outbox row must have existed before the engine reads it (tests use zero).
+- **func** `(e *Engine) Run(ctx context.Context, every time.Duration, onErr func(error))` — Run ticks until ctx ends; a failed tick is reported and retried on the next one.
+- **type** `position struct`
+- **func** `(e *Engine) Tick(ctx context.Context) (int, error)` — Tick handles one batch of outbox events and returns how many it read. Only one instance works at a time (a lease on the cursor row); the cursor moves past the events that were handled, so a failure retries from the failed event.
+- **func** `(e *Engine) lease(ctx context.Context) (position, time.Time, bool, error)` — lease takes the single-reader lease and returns the cursor position and the read horizon (database time minus the settle delay); ok is false when another instance holds the lease.
+- **func** `(e *Engine) release(ctx context.Context, p position) error` — release stores the new position and frees the lease.
+- **func** `(e *Engine) prune(ctx context.Context, now time.Time) error` — prune drops run history older than 30 days, at most once an hour (storage minimisation).
+- **func** `(e *Engine) Rewind(ctx context.Context, at time.Time) error` — Rewind moves the cursor to a position (tests and operators replaying history; runs stay idempotent per rule and event).
+
+#### `internal/projects/automation/engine_apply.go` (168 lines)
+- **type** `outcome struct` — outcome is how one rule run ended.
+- **func** `(e *Engine) apply(ctx context.Context, r Rule, ev event) error` — apply runs one rule for one event: permission check, conditions, then an idempotent claim and the actions. A rule whose conditions do not hold leaves no trace (the check is read-only, so a redelivered event is simply evaluated again).
+- **func** `(e *Engine) matches(ctx context.Context, r Rule, actor api.Actor, ev event) (bool, error)` — matches reads the task as the creator and tests the conditions; a task the creator cannot read matches nothing.
+- **func** `isNotFound(err error) bool`
+- **func** `(s *Service) creatorCan(ctx context.Context, r Rule) (bool, error)` — creatorCan re-checks, at run time, that the rule creator is still an active member of the project and holds the permission every action needs (a custom role may have lost it since the rule was written).
+- **func** `(e *Engine) claim(ctx context.Context, r Rule, ev event) (uuid.UUID, bool, error)` — claim records the run before its actions so a redelivered event is applied once per rule; a crash between the claim and the result leaves the run failed with INTERRUPTED rather than repeating actions.
+- **func** `(e *Engine) execute(ctx context.Context, r Rule, actor api.Actor, ev event) outcome` — execute applies the flood cap and runs the actions in order, stopping at the first failure.
+- **func** `(e *Engine) recentActions(ctx context.Context, r Rule) (int, error)` — recentActions counts what the rule did in the last minute.
+- **func** `errCode(err error) string` — errCode is the stable code stored for a failed action.
+- **func** `(e *Engine) finalize(ctx context.Context, r Rule, runID uuid.UUID, out outcome) error` — finalize stores the outcome of a claimed run and updates the rule counters, flags and the auto-disable (20 in a row).
+
+#### `internal/projects/automation/engine_events.go` (84 lines)
+- **type** `outboxRow struct` — outboxRow is one M2 event as stored in projects_events_outbox.
+- **type** `envelope struct` — envelope is the part of the event envelope the engine reads (ids only; see kernel.Emit).
+- **func** `(e *Engine) events(ctx context.Context, pos position, horizon time.Time) ([]outboxRow, error)` — events reads the next batch after pos that is older than the horizon and that some rule can react to.
+- **func** `(e *Engine) handleAll(ctx context.Context, rows []outboxRow) (int, error)` — handleAll applies the rules to each event in order and returns how many events were handled before a failure.
+- **func** `(e *Engine) handle(ctx context.Context, row outboxRow) error` — handle runs every active rule of the event project and trigger. Events caused by a rule carry an agent label that starts with "automation" and are never handled: rules do not cascade (loop protection).
+- **type** `event struct` — event is one triggering event as the rules see it.
+
+#### `internal/projects/automation/http.go` (77 lines)
+- **func** `act(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `onRule(fn func(c *gin.Context, a api.Actor, id, rule uuid.UUID)) gin.HandlerFunc` — onRule adds the rule id of the path to a project handler.
+- **type** `testInput struct` — testInput names the task a dry run checks the rule against.
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the rule routes on g (already guarded by tenant resolution and authentication).
+
+#### `internal/projects/automation/models.go` (180 lines)
+_Package:_ Package automation is the workflow-rules context of M2 (specification section 9): when a task event happens and every condition holds, a fixed list of actions runs as the rule creator. There is no free text matching, no expression language and no code: conditions and actions are closed vocabularies validated on write.
+- **type** `Condition struct` — Condition is one all-of test: Field equals Value (a UUID, a priority or a column category depending on the field).
+- **type** `Action struct` — Action is one step of a rule; only the member that belongs to Type is set.
+- **type** `Conditions []Condition` — Conditions is the JSONB list of conditions of a rule.
+- **type** `Actions []Action` — Actions is the JSONB list of actions of a rule.
+- **func** `(c Conditions) Value() (driver.Value, error) { return jsonValue(c, c == nil) }` — Value stores the conditions as JSON; nil is an empty array.
+- **func** `(c *Conditions) Scan(src any) error { return jsonScan(src, c) }` — Scan reads a JSONB array.
+- **func** `(a Actions) Value() (driver.Value, error) { return jsonValue(a, a == nil) }` — Value stores the actions as JSON; nil is an empty array.
+- **func** `(a *Actions) Scan(src any) error { return jsonScan(src, a) }` — Scan reads a JSONB array.
+- **func** `jsonValue(v any, empty bool) (driver.Value, error)`
+- **func** `jsonScan(src any, dst any) error`
+- **type** `Rule struct` — Rule is one automation rule of a project.
+- **func** `(Rule) TableName() string { return "workflow_rules" }` — TableName maps to workflow_rules.
+- **type** `Run struct` — Run is the outcome of one rule for one event.
+- **func** `(Run) TableName() string { return "workflow_rule_runs" }` — TableName maps to workflow_rule_runs.
+- **type** `RuleInput struct` — RuleInput creates a rule; an omitted Active means active.
+- **type** `RuleUpdate struct` — RuleUpdate edits a rule; absent members stay. Version, when given, must match.
+- **type** `TaskState struct` — TaskState is the part of a task the rules read.
+
+#### `internal/projects/automation/rules.go` (162 lines)
+- **func** `(s *Service) Rules(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Rule, error)` — Rules lists the rules of a project, oldest first (project.read); a project has at most 50, so the list is not paged.
+- **func** `(s *Service) CreateRule(ctx context.Context, a api.Actor, projectID uuid.UUID, in RuleInput) (*Rule, error)` — CreateRule adds a rule that runs as the caller (project.update); a project has at most 50.
+- **func** `(s *Service) insertRule(ctx context.Context, tx *gorm.DB, a api.Actor, r *Rule) error`
+- **func** `lockProject(tx *gorm.DB, tenantID, projectID uuid.UUID) error` — lockProject serialises writers of one project so the rule count limit holds under concurrency.
+- **func** `(s *Service) UpdateRule(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in RuleUpdate) (*Rule, error)` — UpdateRule edits a rule (project.update). Any edit clears the failure flag and counter; Active true re-enables it.
+- **func** `(in RuleUpdate) merge(r Rule) RuleInput` — merge lays the given members over the stored rule as a full definition to validate.
+- **type** `ruleKey struct{ tenantID, projectID, id uuid.UUID }` — ruleKey identifies one rule inside its project and tenant.
+- **func** `lockRule(tx *gorm.DB, k ruleKey, dst *Rule) error`
+- **func** `(s *Service) DeleteRule(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — DeleteRule removes a rule and its run history (project.update).
+- **func** `(s *Service) load(ctx context.Context, tenantID, projectID, id uuid.UUID) (*Rule, error)` — load reads one rule of a project.
+
+#### `internal/projects/automation/runs.go` (57 lines)
+- **type** `runCursor struct`
+- **type** `RunFilter struct` — RunFilter narrows and pages the run history of a rule.
+- **func** `(s *Service) Runs(ctx context.Context, a api.Actor, projectID, ruleID uuid.UUID, f RunFilter) ([]Run, string, error)` — Runs lists what a rule did, newest first (project.update). Statuses are ok, skipped and failed.
+
+#### `internal/projects/automation/service.go` (86 lines)
+- **type** `Tasks interface` — Tasks is what rules need from the task context. Every method acts as the given actor and goes through the same use cases a person would, so permissions, WIP limits, done rules and versions apply unchanged. The composition root binds the real task and collaboration services to it (see the bridge package); tests use a fake.
+- **method** `Tasks.State(ctx context.Context, a api.Actor, id uuid.UUID) (TaskState, error)` — State reads the task with the actor's access (404 when the actor cannot read it).
+- **method** `Tasks.Move(ctx context.Context, a api.Actor, id, columnID uuid.UUID) error`
+- **method** `Tasks.SetPriority(ctx context.Context, a api.Actor, id uuid.UUID, priority string) error`
+- **method** `Tasks.AddLabel(ctx context.Context, a api.Actor, id, labelID uuid.UUID) error`
+- **method** `Tasks.Assign(ctx context.Context, a api.Actor, id, userID uuid.UUID) error`
+- **method** `Tasks.SetDue(ctx context.Context, a api.Actor, id uuid.UUID, due time.Time) error`
+- **method** `Tasks.Comment(ctx context.Context, a api.Actor, id uuid.UUID, text string) error`
+- **type** `Ports struct` — Ports are the services the automation context needs from the platform.
+- **type** `Service struct` — Service holds the rule use cases; Engine (engine.go) runs them.
+- **func** `NewService(db *gorm.DB, authz api.Authorizer, tasks Tasks, p Ports) *Service` — NewService builds the service; authz resolves project access and tasks acts on tasks.
+- **func** `isDup(err error) bool { return errors.Is(err, gorm.ErrDuplicatedKey) }`
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **type** `ref struct` — ref names the audited resource and carries its metadata (ids and codes only).
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref)` — audit records a successful mutation; failures never fail the request (SECURITY 7).
+- **func** `(s *Service) require(ctx context.Context, a api.Actor, projectID uuid.UUID, p api.Perm) error`
+- **func** `countRows(db *gorm.DB, table, where string, args ...any) (int64, error)`
+- **func** `agentOf(ruleID uuid.UUID) string { return AgentPrefix + "." + ruleID.String()[:8] }` — agentOf is the context label every change made by a rule carries; the engine never reacts to events with it.
+
+#### `internal/projects/automation/validate.go` (216 lines)
+- **func** `validTrigger(t string) bool`
+- **func** `cleanName(name string) (string, error)`
+- **type** `scope struct` — scope is where the ids of a rule are checked: the project and tenant the rule belongs to.
+- **func** `(sc scope) check(ctx context.Context, in RuleInput) (RuleInput, error)` — check validates a whole rule definition and returns it normalised.
+- **func** `(sc scope) condition(ctx context.Context, trigger string, c Condition) error`
+- **func** `(sc scope) condRef(ctx context.Context, field string, id uuid.UUID) error` — condRef checks that a column or label named by a condition belongs to this project (users are matched, not resolved).
+- **func** `(sc scope) column(ctx context.Context, id uuid.UUID) error`
+- **func** `(sc scope) label(ctx context.Context, id uuid.UUID) error`
+- **func** `(sc scope) member(ctx context.Context, id uuid.UUID) error`
+- **func** `(sc scope) action(ctx context.Context, a Action) error` — action validates one action: exactly the member of its type is set.
+- **func** `(sc scope) sole(extra Action, err error) error` — sole fails with err, or when the action carries members that do not belong to its type.
+- **func** `itoa(n int) string`
+
+#### `internal/projects/automation/bridge/bridge.go` (129 lines)
+_Package:_ Package bridge is composition code: it binds the real task and collaboration services to the small interfaces the automation and recurrence contexts define, so those contexts never import the task context. Every call goes through the same use cases a person would run, so permissions, WIP limits, done rules and numbering apply unchanged.
+- **type** `Tasks struct` — Tasks implements automation.Tasks and recurrence.Tasks on the task and collaboration services.
+- **func** `New(t *task.Service, c *collab.Service) *Tasks { return &Tasks{task: t, collab: c} }` — New binds the services.
+- **func** `(b *Tasks) State(ctx context.Context, a api.Actor, id uuid.UUID) (automation.TaskState, error)` — State reads the task as the actor.
+- **func** `(b *Tasks) Move(ctx context.Context, a api.Actor, id, columnID uuid.UUID) error` — Move puts the task in a column through the move use case (done rules and WIP limits apply).
+- **func** `(b *Tasks) SetPriority(ctx context.Context, a api.Actor, id uuid.UUID, priority string) error` — SetPriority edits the priority.
+- **func** `(b *Tasks) AddLabel(ctx context.Context, a api.Actor, id, labelID uuid.UUID) error` — AddLabel labels the task.
+- **func** `(b *Tasks) Assign(ctx context.Context, a api.Actor, id, userID uuid.UUID) error` — Assign assigns a project member to the task.
+- **func** `(b *Tasks) SetDue(ctx context.Context, a api.Actor, id uuid.UUID, due time.Time) error` — SetDue sets the due date.
+- **func** `(b *Tasks) Comment(ctx context.Context, a api.Actor, id uuid.UUID, text string) error` — Comment adds a comment authored by the actor.
+- **func** `(b *Tasks) versioned(ctx context.Context, a api.Actor, id uuid.UUID, fn func(version int) error) error` — versioned reads the current version and runs fn, repeating when the version moved underneath.
+- **func** `(b *Tasks) Template(ctx context.Context, a api.Actor, id uuid.UUID) (recurrence.Template, error)` — Template reads the template task for a recurrence.
+- **func** `(b *Tasks) Spawn(ctx context.Context, a api.Actor, templateID uuid.UUID, d recurrence.Dates) (uuid.UUID, error)` — Spawn duplicates the template (labels and assignees included), then titles the copy like the template and sets its dates. The copy exists after the first step; if the second fails the id is returned with the error.
+
+#### `internal/projects/automation/bridge/suite.go` (71 lines)
+- **type** `Suite struct` — Suite bundles the automation rules, recurring tasks and public links so the module wires them in one place.
+- **type** `Deps struct` — Deps are what the suite is built on.
+- **func** `NewSuite(d Deps) *Suite` — NewSuite builds the three services on the task and collaboration services.
+- **func** `(s *Suite) SetPublicLimiter(h gin.HandlerFunc) { s.Links.SetLimiter(h) }` — SetPublicLimiter replaces the in-process limiter of the public project route (the shared Redis limiter).
+- **func** `(s *Suite) Run(ctx context.Context, onErr func(string, error))` — Run starts the rule engine and the recurrence scheduler and returns; both stop when ctx ends.
+- **func** `(s *Suite) Register(g *gin.RouterGroup)` — Register mounts the authenticated routes of the three contexts.
+- **func** `(s *Suite) RegisterPublic(rg *gin.RouterGroup) { s.Links.RegisterPublic(rg) }` — RegisterPublic mounts the anonymous public project route.
+
+### M2 Projects / recurrence
+
+
+#### `internal/projects/recurrence/crud.go` (223 lines)
+- **func** `normalise(in *Input, now time.Time) error` — normalise validates the schedule and fills the defaults; first is the first run (or the zero time when unknown).
+- **func** `dayRules(in *Input, probe time.Time) error` — dayRules checks weekday and day_of_month against the frequency and defaults them from the day of probe.
+- **func** `(s *Service) List(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Recurrence, error)` — List lists the recurrences of a project, oldest first (project.read); at most 20, so the list is not paged.
+- **func** `(s *Service) Create(ctx context.Context, a api.Actor, projectID uuid.UUID, in Input) (*Recurrence, error)` — Create schedules copies of a template task of the project (project.update); the caller must be able to create tasks.
+- **func** `(s *Service) insert(ctx context.Context, tx *gorm.DB, a api.Actor, r *Recurrence) error`
+- **func** `(s *Service) Patch(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in Update) (*Recurrence, error)` — Patch edits a recurrence (project.update). Re-activating or changing the schedule clears the flag.
+- **func** `(s *Service) applyUpdate(r *Recurrence, in Update) error` — applyUpdate lays the edit over r and re-validates the schedule.
+- **func** `(s *Service) Delete(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — Delete removes a recurrence; tasks it already created stay (project.update).
+
+#### `internal/projects/recurrence/http.go` (63 lines)
+- **func** `act(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `onRecurrence(fn func(c *gin.Context, a api.Actor, id, rec uuid.UUID)) gin.HandlerFunc`
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the recurrence routes on g (already guarded by tenant resolution and authentication).
+
+#### `internal/projects/recurrence/models.go` (128 lines)
+_Package:_ Package recurrence is the recurring-tasks context of M2 (specification section 9): a scheduler copies a template task on a daily, weekly or monthly schedule, as the person who set the recurrence up. It reaches tasks only through the Tasks interface that the composition root binds, and project access only through the api contracts.
+- **type** `Recurrence struct` — Recurrence is one recurring task schedule of a project.
+- **func** `(Recurrence) TableName() string { return "task_recurrences" }` — TableName maps to task_recurrences.
+- **type** `Input struct` — Input creates a recurrence. Interval defaults to 1; Weekday applies to weekly and DayOfMonth to monthly schedules and default to the day of the first run. FirstRunAt defaults to the first occurrence after now (00:00 UTC).
+- **type** `OptDate struct` — OptDate is an optional date that may be absent (leave), null (clear) or a value (set).
+- **func** `(o *OptDate) UnmarshalJSON(b []byte) error` — UnmarshalJSON records presence and keeps null as a clear.
+- **type** `Update struct` — Update edits a recurrence; absent members stay. Changing the schedule re-plans the next run unless NextRunAt is given.
+- **type** `Template struct` — Template is the part of a template task a recurrence needs to date the copies.
+- **type** `Dates struct` — Dates are the schedule dates of a new copy; nil clears the date.
+- **type** `Tasks interface` — Tasks is what recurrences need from the task context. Spawn copies the template as the actor (same use case a person runs: permissions, WIP limits and numbering apply), titles the copy like the template and sets its dates.
+- **method** `Tasks.Template(ctx context.Context, a api.Actor, id uuid.UUID) (Template, error)` — Template reads the template with the actor's access (404 when gone or unreadable).
+- **method** `Tasks.Spawn(ctx context.Context, a api.Actor, templateID uuid.UUID, d Dates) (uuid.UUID, error)` — Spawn creates the copy. When the copy exists but its dates could not be set, it returns the id with the error.
+
+#### `internal/projects/recurrence/schedule.go` (94 lines)
+- **func** `kernelDate(t time.Time) kernel.Date { return kernel.Date{Time: day(t)} }`
+- **func** `day(t time.Time) time.Time` — day truncates t to midnight UTC.
+- **func** `daysIn(year int, month time.Month) int`
+- **func** `onMonthDay(t time.Time, dom int) time.Time` — onMonthDay is the date in the month of t on dom, clamped to the last day of a short month.
+- **func** `step(cur time.Time, r Recurrence) time.Time` — step is the occurrence after cur: daily and weekly add whole days, monthly moves interval months and lands on the configured day of month (clamped), so a 31st never drifts to the 28th for good.
+- **func** `firstAfter(now time.Time, r Recurrence) time.Time` — firstAfter is the first occurrence strictly after now (00:00 UTC of a later day).
+- **func** `advancePast(cur, now time.Time, r Recurrence) time.Time` — advancePast moves from the occurrence that just ran to the first one after now: missed occurrences are dropped, so a scheduler that was down creates one catch-up task, never a burst.
+- **func** `datesFor(t Template, run time.Time) Dates` — datesFor dates a copy relative to the run: the start moves to the run day and the due date keeps its distance from the template start (or from the day the template was created when it has no start), with the same time of day.
+
+#### `internal/projects/recurrence/scheduler.go` (201 lines)
+- **func** `(s *Service) Run(ctx context.Context, every time.Duration, onErr func(error))` — Run ticks until ctx ends (module.go uses 60 s); a failed tick is reported and retried on the next one.
+- **type** `due struct` — due is one claimed occurrence: the recurrence and the scheduled time that is being run.
+- **func** `(s *Service) Tick(ctx context.Context) (int, error)` — Tick runs every recurrence whose time has come and returns how many tasks it created. At most one task per recurrence per tick: a recurrence is claimed (next run moved ahead, past now) in a short transaction with SKIP LOCKED, so several instances never run the same occurrence, and missed occurrences collapse into this one catch-up run.
+- **func** `(s *Service) claim(ctx context.Context) ([]due, error)`
+- **func** `(s *Service) advance(tx *gorm.DB, r Recurrence, now time.Time) (*due, error)` — advance moves one claimed recurrence to its next run, or ends it when the until date has passed; it returns the occurrence to run, or nil when the recurrence has ended without one.
+- **func** `(s *Service) execute(ctx context.Context, d due) (bool, error)` — execute creates the copy as the recurrence creator after re-checking that they still may; a recurrence that cannot run is flagged (and a missing template ends it) but keeps its schedule.
+- **func** `(s *Service) blocked(ctx context.Context, a api.Actor, r Recurrence) (string, error)` — blocked returns the flag that stops a run: the creator lost access, the project is archived or the template is gone.
+- **func** `isNotFound(err error) bool`
+- **func** `(s *Service) spawn(ctx context.Context, a api.Actor, r Recurrence, runAt time.Time) (uuid.UUID, error)` — spawn copies the template as the actor with the recurrence agent label and dates relative to the run.
+- **func** `(s *Service) flag(ctx context.Context, r Recurrence, code string, end bool) error` — flag stores why a recurrence could not run; end deactivates it.
+- **func** `(s *Service) finish(ctx context.Context, r Recurrence, task uuid.UUID, flag string) error` — finish records the created task; a flag is kept when only the dates failed.
+- **func** `(s *Service) RunNow(ctx context.Context, a api.Actor, projectID, id uuid.UUID) (uuid.UUID, error)` — RunNow creates the copy at once as the caller (project.update + task.create) without moving the schedule.
+
+#### `internal/projects/recurrence/service.go` (65 lines)
+- **type** `Ports struct` — Ports are the services the recurrence context needs from the platform.
+- **type** `Service struct` — Service holds the recurrence use cases; Scheduler (scheduler.go) runs them on time.
+- **func** `NewService(db *gorm.DB, authz api.Authorizer, tasks Tasks, p Ports) *Service` — NewService builds the service; authz resolves project access and tasks copies template tasks.
+- **func** `(s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error`
+- **type** `ref struct`
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref)` — audit records a successful mutation; failures never fail the request (SECURITY 7).
+- **func** `(s *Service) access(ctx context.Context, a api.Actor, projectID uuid.UUID) (api.Access, error)`
+- **func** `(s *Service) require(ctx context.Context, a api.Actor, projectID uuid.UUID, p api.Perm) error`
+- **func** `agentOf(id uuid.UUID) string { return AgentPrefix + "." + id.String()[:8] }` — agentOf is the label of tasks created by a recurrence.
+
+### M2 Projects / publiclink
+
+
+#### `internal/projects/publiclink/http.go` (70 lines)
+- **func** `act(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
+- **func** `(s *Service) Register(g *gin.RouterGroup)` — Register mounts the link management routes on g (already guarded by tenant resolution and authentication).
+- **func** `noIndex(c *gin.Context)` — noIndex marks every answer of the public route (found or not) as uncacheable, unindexable and referrer-free.
+- **func** `(s *Service) RegisterPublic(rg *gin.RouterGroup)` — RegisterPublic mounts the one route without a bearer token: the read-only project page authenticated by the secret in its path. The tenant and the project are resolved from the token row, never from the client; the route is rate limited per IP and its answers are never cached.
+
+#### `internal/projects/publiclink/limiter.go` (65 lines)
+- **type** `window struct`
+- **type** `ipLimiter struct` — ipLimiter is a fixed-window per-IP limiter held in process memory; production swaps it for the shared Redis middleware.
+- **func** `newLimiter(limit int, d time.Duration) gin.HandlerFunc`
+- **func** `(l *ipLimiter) allow(key string) (bool, int)` — allow counts a hit for key and reports whether it is within the limit, plus the seconds until the window resets.
+- **func** `(l *ipLimiter) handle(c *gin.Context)`
+
+#### `internal/projects/publiclink/models.go` (74 lines)
+_Package:_ Package publiclink is the public project links context of M2 (specification section 9): a revocable secret URL that shows a strict allow-list of a project (name, columns, tasks without people) to anyone who holds it, read-only and without a login. The tenant and the project come from the token row only, never from the client.
+- **type** `Link struct` — Link is one public link. Token and Path are set once, in the response to creation; only the hash is stored.
+- **func** `(Link) TableName() string { return "public_links" }` — TableName maps to public_links.
+- **type** `Input struct` — Input creates a link.
+- **type** `Project struct` — Project is the public identity of a project.
+- **type** `Column struct` — Column is a board column as the public sees it.
+- **type** `Task struct` — Task is a task as the public sees it: no people, comments, files, time or history.
+- **type** `Page struct` — Page is one page of the public view; the project and columns repeat on every page.
+
+#### `internal/projects/publiclink/public.go` (198 lines)
+- **func** `notFound() error { return kernel.NotFound("public project") }`
+- **func** `(s *Service) resolve(ctx context.Context, raw string) (*Link, error)` — resolve finds the active link of a raw token. Unknown, revoked and malformed tokens all answer the same 404, and the stored hash is compared in constant time.
+- **type** `pageCursor struct`
+- **func** `(s *Service) View(ctx context.Context, raw, cursor string, limit int) (*Page, error)` — View renders the public page for a raw token. The tenant and the project come from the link row; an archived or deleted project answers the same 404 as an unknown token.
+- **func** `(s *Service) project(ctx context.Context, l *Link) (*Project, error)`
+- **func** `(s *Service) columns(ctx context.Context, l *Link) ([]Column, error)`
+- **type** `taskRow struct`
+- **func** `(s *Service) tasks(ctx context.Context, l *Link, key string, after, limit int) ([]Task, string, error)` — tasks reads one page of the live, unarchived tasks in ticket order, plus their label names.
+- **func** `publicTask(r taskRow, key string, labels []string, withDesc bool) Task`
+- **func** `progress(r taskRow) int` — progress is the share of finished subtasks, or 100 for a finished task without subtasks.
+- **func** `cleanDescription(d string) string` — cleanDescription hides mentions (a user id and a name) and caps the length.
+- **func** `(s *Service) labelNames(ctx context.Context, l *Link, rows []taskRow) (map[uuid.UUID][]string, error)`
+- **func** `itoa(n int) string`
+
+#### `internal/projects/publiclink/service.go` (139 lines)
+- **type** `Ports struct` — Ports are the services the public link context needs from the platform.
+- **type** `Service struct` — Service holds the link management and the public read.
+- **func** `NewService(db *gorm.DB, authz api.Authorizer, p Ports) *Service` — NewService builds the service with the default per-IP limiter for the public route.
+- **func** `(s *Service) SetLimiter(h gin.HandlerFunc) { s.limiter = h }` — SetLimiter replaces the default in-process limiter of the public route (for example with the shared Redis middleware).
+- **func** `hashToken(raw string) string` — hashToken is the stored form of a token.
+- **func** `newRawToken() (string, error)` — newRawToken returns 32 random bytes, base64url encoded.
+- **type** `ref struct` — ref names the audited link and carries its metadata (ids and flags only).
+- **func** `(s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, r ref)`
+- **func** `(s *Service) require(ctx context.Context, a api.Actor, projectID uuid.UUID, p api.Perm) error`
+- **func** `(s *Service) List(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]Link, error)` — List lists the active links of a project, never their secrets (project.update).
+- **func** `(s *Service) Create(ctx context.Context, a api.Actor, projectID uuid.UUID, in Input) (*Link, error)` — Create issues a link (project.update); the raw token is returned only here and at most 3 links are active per project.
+- **func** `(s *Service) Revoke(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — Revoke disables a link at once (project.update); an unknown or already revoked link is a 404.
+
 ## D. Test inventory
 
 
-### Shared infrastructure — 25 test functions in 14 files
-- `internal/shared/config/config_test.go`: TestLoadConfig, TestLoadConfig_EnvOverrides
+### Shared infrastructure — 27 test functions in 14 files
+- `internal/shared/config/config_test.go`: TestLoadConfig, TestLoadConfig_EnvOverrides, TestLoadConfig_ProjectsSecretsKey
 - `internal/shared/database/base_test.go`: TestBaseModel_BeforeCreate
 - `internal/shared/database/tx_test.go`: TestBeginTxNilDB, TestFinishNilTx
 - `internal/shared/errors/db_test.go`: TestNormalize
 - `internal/shared/errors/errors_test.go`: TestAppError_Error
 - `internal/shared/idempotency/middleware_test.go`: TestReplaySameKeySamePayload, TestInProgressExpiredAndServerErrors
 - `internal/shared/middleware/correlation_test.go`: TestCorrelationIDIsValidatedEchoedAndPropagated
-- `internal/shared/middleware/cors_test.go`: TestCORS, TestCORSAllowsVersionAndIdempotencyHeaders
+- `internal/shared/middleware/cors_test.go`: TestCORS, TestCORSAllowsVersionAndIdempotencyHeaders, TestCORSExposesRetryAfter
 - `internal/shared/middleware/hardening_test.go`: TestBodyLimit, TestSecurityHeaders, TestBodyLimitGivesChunkedBodiesALength
 - `internal/shared/middleware/rate_limiter_test.go`: TestRateLimiter_BlocksAfterLimitWithRetryAfter, TestFailureRateLimiter_SuccessRefundsSlot, TestRateLimiter_FailsOpenOnStoreError
 - `internal/shared/outbox/relay_test.go`: TestRelayPublishesAndRecordsFailures
 - `internal/shared/storage/storage_test.go`: TestMemoryStore, TestS3RoundTrip
 - `internal/shared/utils/pagination_test.go`: TestNormalizePagination, TestParsePaginationToleratesJunk, TestBindErrorDetails
 - `internal/shared/utils/validator_test.go`: TestValidateStruct
+
+### Application wiring (internal/app) — 1 test functions in 1 files
+- `internal/app/projects_key_test.go`: TestProjectsSecretsKeyRules
 
 ### M0 Identity & Access — 111 test functions in 34 files
 - `internal/identity/access/access_test.go`: TestScopeOrderAndValidity, TestResolveInheritanceAndWidestScope, TestResolveUserGrantsExpiryAndBlocks, TestResolveRejectsCyclesAndDeepChains, TestCheckParent, TestCoversAll, TestParseScopeAndCheckParentEdges
@@ -11066,6 +11808,41 @@ _Package:_ Package fields is the custom-fields context of M2 (specification sect
 - `internal/projects/fields/fields_test.go`: TestDefinitionsLifecycleAndValidation, TestDefinitionLimitIsThirty, TestValuesByTypeAndVersion, TestOptionRemovalClearsValuesAndActivityHidesText, TestArchivedProjectsFreezeValuesAndDeleteCascades
 - `internal/projects/fields/harness_test.go`: (helpers only)
 
+### M2 Projects / webhooks — 51 test functions in 11 files
+- `internal/projects/webhooks/client_test.go`: TestSenderDeliversSignedRequest, TestSenderStatusAndTLSFailures, TestSenderRefusesRedirects, TestSenderTimeout, TestSenderSizeLimits, TestSenderIgnoresProxyEnvironment, TestSenderRefusesBadURLsAndAddresses, TestSenderStopsDNSRebinding, TestSocketControlChecksTheConnectedAddress, TestClassifyErrors
+- `internal/projects/webhooks/delivery_test.go`: TestBackoffSchedule, TestDispatchMatchesProjectAndEventTypes, TestDispatchLookbackCatchesLateCommits, TestSendSignedGenericBody, TestChatFormatsCarryOnlyKeys, TestRetriesBackOffThenDie, TestTwentyFailuresDisableTheWebhook, TestPingIsRecordedAndNeverRetried, TestPingWithRealSenderFailsSafely, TestRedeliver, TestDeliveryListing, TestMissingEventOrSecretFailsTheAttempt, TestParallelWorkersSendEachDeliveryOnce, TestPurgeAndRunOnce
+- `internal/projects/webhooks/faults_test.go`: TestEveryStatementFailureIsReported
+- `internal/projects/webhooks/gitscan_test.go`: TestScanKeys, TestExtractPullRequestStates, TestExtractPush, TestExtractIsBounded, TestSignatureMatches
+- `internal/projects/webhooks/guard_test.go`: TestValidateURLRefusals, TestValidateURLAccepts, TestBlockedAddr, TestValidateStoredURL, TestNumericLooking
+- `internal/projects/webhooks/harness_test.go`: (helpers only)
+- `internal/projects/webhooks/http_test.go`: TestWebhookRoutes, TestIntegrationRoutesAndTaskLinks
+- `internal/projects/webhooks/incoming_test.go`: TestGitHubPullRequestFlow, TestGiteaPushFlow, TestIncomingSignatureAndNoOracle, TestIncomingIgnoresArchivedAndDeletedProjects, TestIncomingRateLimitPerIP, TestIntegrationManagement
+- `internal/projects/webhooks/secrets_test.go`: TestSealerRoundTripAndTamper, TestParseSecretsKey, TestSecretsAndSignature
+- `internal/projects/webhooks/util_test.go`: (helpers only)
+- `internal/projects/webhooks/webhooks_test.go`: TestWebhookLifecycle, TestWebhookValidation, TestWebhookLimitPerProject, TestWebhookAccessRules, TestSecretsDisabledWithoutKey
+
+### M2 Projects / aihooks — 5 test functions in 2 files
+- `internal/projects/aihooks/aihooks_test.go`: TestCatalogueIsWellFormed, TestToolsAreFilteredByWhatTheUserMayDo, TestProjectContextIsCompactAndPermissionAware, TestTaskContextByKeyHidesUnreadableRelationsAndCapsText, TestDocumentsFeedIsIncrementalWithTombstones
+- `internal/projects/aihooks/harness_test.go`: (helpers only)
+
+### M2 Projects / automation — 30 test functions in 6 files
+- `internal/projects/automation/engine_test.go`: TestRuleMovesUrgentTaskAndDoesNotCascade, TestSelfTriggeringRuleStopsAfterOneRun, TestRedeliveredEventIsAppliedOnce, TestAllActionsRunInOrder, TestConditionsAreAllOf, TestMovedEventConditions, TestNotAllowedCreatorIsSkippedAndFlagged, TestRemovedCreatorIsNotAllowed, TestRuleDisablesAfterTwentyFailures, TestErrorCodes, TestFloodCapSkipsRun, TestArchivedProjectAndDeletedTaskAreIgnored, TestEngineReportsTaskFailures, TestLeaseAllowsOneReaderAndRunStops, TestPruneDropsOldRuns, TestRunsListing, TestDryRunChangesNothing, TestConditionEvaluation
+- `internal/projects/automation/faults_test.go`: TestEveryStatementFailureIsReported
+- `internal/projects/automation/harness_test.go`: (helpers only)
+- `internal/projects/automation/http_test.go`: TestRoutes, TestJSONTypes
+- `internal/projects/automation/rules_test.go`: TestRuleCrudAndPermissions, TestRuleValidation, TestRuleLimitPerProject, TestArchivedProjectBlocksRuleWrites
+- `internal/projects/automation/bridge/bridge_test.go`: TestRulesActThroughTheRealTaskService, TestRuleHonoursWipLimitsLikeAPerson, TestRecurrenceSpawnsThroughTheRealTaskService, TestSuiteRegistersRoutes, TestBridgeEntryPointsAndErrors
+
+### M2 Projects / recurrence — 17 test functions in 4 files
+- `internal/projects/recurrence/faults_test.go`: TestEveryStatementFailureIsReported
+- `internal/projects/recurrence/harness_test.go`: (helpers only)
+- `internal/projects/recurrence/http_test.go`: TestRoutes, TestOptDate
+- `internal/projects/recurrence/recurrence_test.go`: TestScheduleArithmetic, TestDatesAreRelativeToTheRun, TestCreateValidationAndPermissions, TestRecurrenceLimit, TestPatchAndDelete, TestSchedulerCreatesOneCopyAndAdvances, TestMissedRunsCollapseIntoOneCatchUp, TestUntilEndsTheRecurrence, TestArchivedProjectAndLostAccessAreFlagged, TestMissingTemplateEndsTheRecurrence, TestSpawnFailuresAreFlagged, TestRunNow, TestConcurrentTicksNeverDuplicate, TestRunLoopStops
+
+### M2 Projects / publiclink — 9 test functions in 2 files
+- `internal/projects/publiclink/faults_test.go`: TestEveryStatementFailureIsReported
+- `internal/projects/publiclink/publiclink_test.go`: TestLinkLifecycleAndPermissions, TestPublicViewIsAStrictAllowList, TestPublicViewPaging, TestUnknownRevokedMalformedAndHiddenProjectsAnswerIdentically, TestOnlyTheTokenProjectIsReadable, TestPublicRouteIsRateLimited, TestManagementRoutes, TestDescriptionIsCapped
+
 ### Integration suite (`backend/tests/integration`)
 - `access_test.go`: TestAccessPredefinedRoles, TestAccessScopesInheritanceAndCycles, TestAccessUserGrantsAndBlocks, TestAccessAntiEscalation, TestAccessAutomaticRoles, TestAccessTenantIsolation
 - `attendance_ops_test.go`: TestAttendanceParity
@@ -11093,6 +11870,8 @@ _Package:_ Package fields is the custom-fields context of M2 (specification sect
 - `performance_parity_test.go`: TestPerformanceCalibrationAndFeedback
 - `performance_test.go`: TestPerformanceLifecycle
 - `platform_test.go`: TestHealthLivenessAndReadiness, TestCorrelationIDReachesAuditTrail, TestIdentityEventsGoThroughTheOutbox, TestIdempotencyKeyReplaysAndRejectsReuse, TestJWKSPublishesTheEdDSAKey
+- `projects_aihooks_test.go`: TestEveryAIToolRouteExists, TestAIHooksFollowTheCallerPermissions
+- `projects_automation_test.go`: TestAutomationRecurrenceAndPublicLinksThroughTheRouter
 - `projects_collab_test.go`: TestCollabComments, TestCollabTime, TestCollabAttachmentsWithoutStorage
 - `projects_fields_test.go`: TestCustomFieldsThroughTheRouter
 - `projects_groups_test.go`: TestProjectGroupRulesFollowHR
@@ -11100,6 +11879,7 @@ _Package:_ Package fields is the custom-fields context of M2 (specification sect
 - `projects_planning_test.go`: TestPlanningSprintsAndPlan, TestPlanningViewsSearchAndFeed
 - `projects_tasks_test.go`: TestProjectTasksCore, TestTasksListingAndSubtasks, TestTaskRelationsAssigneesBulkAndMove
 - `projects_test.go`: TestProjectsContext
+- `projects_webhooks_test.go`: TestWebhooksThroughTheRouter, TestGitIntegrationThroughTheRouter
 - `recruitment_plus_test.go`: TestRecruitmentParity
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
 - `relay_test.go`: TestOutboxRelay, TestOutboxRelayRejectsBadTableNames
@@ -11677,6 +12457,17 @@ Format: decision - reason - alternatives - trade-off.
 - **DPJ-34 Watches end with access.** Removing a member, a group rule that drops a member, and deactivating a login delete the user's `task_watchers` rows (in the same transaction) for the affected project, or for all projects on deactivation. Alternative: filter at delivery time in M10 only (rejected: stale rows would leak who followed what, and M10 does not exist yet). The project context deletes from the collaboration table directly; both live in schema `projects` and the statement is a single scoped `DELETE`.
 - **DPJ-35 Phases 4-5 stay unbuilt by owner scope.** The owner confirmed phases 1-3 as the scope. Custom fields, automation, webhooks, integrations, MCP/CLI, recurrence, public links and a product UI use the reserved extension points (specification section 9) and need a new scope GO; nothing in phases 1-3 has to change to add them.
 - **DPJ-36 Custom fields live in their own context and are read and written beside the task, not inside it.** Values travel through `GET/PUT /tasks/{id}/custom-fields`, so the task contract and the task context stay unchanged; the fields context bumps `tasks.version` (the one task column it writes) so a field edit takes part in optimistic concurrency like any other edit. Types are fixed at creation (changing a type would invalidate stored values); `required` fields were left out because enforcing them needs a hook on task create that would couple the contexts. URL fields accept https only and are never fetched (SECURITY.md section 9); user fields accept active project members only; the permissions reuse `project.update` (define) and `task.update` (set), so no permission model change was needed. Alternative: embed `custom_fields` in the task payload (rejected: it couples the task context to the fields context and makes every task read join the values).
+- **DPJ-37 AI is a separate module; M2 only provides seams.** M2 offers read-only AI hooks (`/ai-hooks/tools`, `/context/*`, `/documents`, `/readable-projects`), the `X-JAAS-Agent` attribution and compact machine interfaces (CLI, MCP). It contains no model, prompt or provider. Assistants act with the user token so the API remains the only authorization path. Reason: the same RBAC for people and agents, no secrets or providers in a domain module, and a model that can be swapped by configuration in M9. Alternatives: AI endpoints inside M2, direct database access for M9, a broad service account (all rejected, see `ai-readiness.md`). Reference: Plane keeps AI in a thin proxy plus separate MCP/assistant services over per-user API tokens.
+- **DPJ-38 CLI and MCP sign in as the user; no new credential type yet.** They use e-mail/password login and the normal JWT refresh, store tokens in an owner-only config file and never store the password. Per-user API tokens (Plane-style) would be an M0 permission-model change and are deferred until M9 needs remote agents (see `ai-readiness.md`, gaps).
+- **DPJ-39 Machine interfaces return compact results by design.** MCP tool results are projected to the fields that drive decisions, long text is truncated with an explicit marker, lists are capped (default 20, max 50) with `next_cursor`, and a `detail` flag returns full text on request; the whole result is capped at 12 000 characters. Reason: token economy and context safety; the same projections serve the CLI.
+- **DPJ-40 The agent label labels, it never authorizes.** `X-JAAS-Agent` must match `[a-z0-9][a-z0-9._-]{0,39}`; an invalid value is ignored (not rejected). It only changes `activity.source` and the event envelope; permissions are always the token owner's.
+- **DPJ-41 One SSRF-guarded sender is the only outgoing-HTTP exception to SECURITY.md section 9** (webhooks). Every call goes through `webhooks.Sender.Do`: https only, ports 443/8443, no userinfo, host resolved at dial time and every answer must be public (loopback, private, link-local incl. cloud metadata, multicast, IPv4-mapped IPv6 and numeric host forms refused), the socket opens to the validated IP so DNS rebinding cannot swap it, no redirects, 5 s timeout, 64 KB request, 4 KB response read and discarded, proxy variables ignored; validation at save and at send. Test-only relaxations are unexported. Detail: `notes-webhooks.md` decisions 1-4.
+- **DPJ-42 Secrets that must be readable again are encrypted with a new config key.** Webhook and integration signing secrets are shown once and stored AES-256-GCM under `projects.secrets_key` (`PROJECTS_SECRETS_KEY`, base64 32 bytes; development derives one from the JWT secret, production requires it; with no key the secret routes answer 503 and the rest of M2 works). Alternative: store only hashes (impossible for HMAC signing). Open item: a re-encryption tool for key rotation. This is a configuration addition, not a permission change.
+- **DPJ-43 Webhook delivery model.** The dispatcher reads `projects_events_outbox` through its own cursor (independent of the broker relay), one delivery row per (webhook, event), retries at 1 m/5 m/30 m/2 h/12 h with jitter then `dead`, 20 consecutive failures disable the webhook and write an audit entry, workers claim with `FOR UPDATE SKIP LOCKED` and a lease, no network I/O inside a transaction. Chat formats (Slack, Discord) carry only the event name, project key and ticket key. Listing webhooks needs `project.update` because a chat URL is itself a secret. Detail: `notes-webhooks.md` decisions 5-14.
+- **DPJ-44 Git integrations (GitHub, Gitea).** The one other unauthenticated endpoint besides the calendar feed (`POST /integrations/{provider}/{integration_id}`): HMAC verified in constant time over the raw body before parsing, 1 MiB limit, per-IP limiter, tenant and project only from the integration row, identical 404 for every rejection. Only ids and states are stored (never titles or messages); links are idempotent; `task.external_linked` and `task.pr_merged` are emitted for automation.
+- **DPJ-45 Automation rules run as their creator through the same task use cases a person uses.** The creator is re-checked (active member holding the permission) at every run; otherwise the run is skipped `NOT_ALLOWED` and counts toward auto-disable (20). Loop protection: rule changes carry agent label `automation.<8 hex>` and the engine ignores events from automation; 100 actions per rule per minute; closed vocabulary of triggers, conditions and actions (no expressions or code). Idempotence by claiming `(rule, event)` before acting. The engine has its own outbox cursor and waits 3 s (settle delay) so late-committing transactions are not skipped; rules therefore fire 3-8 s after the event. The `automation/bridge` package is the only one that imports `task` and `collab`. Detail: `notes-automation.md` decisions (numbered locally there).
+- **DPJ-46 Recurrence.** Claim-then-copy at most once per occurrence, catch-up collapses to one task after an outage, creator re-check, archived projects flagged, copy goes into the template column (keep templates in a backlog column), `run-now` runs as the caller and does not move the schedule.
+- **DPJ-47 Public project links.** Anonymous read-only page `GET /public/projects/{token}`: 256-bit token shown once (hash only stored, constant-time compare, revocable, max 3 per project), strict allow-list (project key and name, columns, task key/title/column/priority/due/label names/progress, optional descriptions), never user ids or names, comments, attachments, time, activity or members; mentions are scrubbed from descriptions; unknown, revoked, archived and deleted all answer one identical 404; `no-store`, `noindex`, `no-referrer`.
 
 ### m1-hr-management/contexts/organization  _(from specification.md)_
 

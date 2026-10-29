@@ -7,10 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const corsAllowedHeaders = "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Request-ID, X-Correlation-ID, Idempotency-Key, If-Match, X-Platform-Key"
+const corsAllowedHeaders = "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Request-ID, X-Correlation-ID, Idempotency-Key, If-Match, X-JAAS-Agent, X-Platform-Key"
 
 // corsExposedHeaders lets browsers read the correlation id and the idempotent-replay marker.
-const corsExposedHeaders = "X-Correlation-ID, X-Request-ID, Idempotent-Replayed"
+const corsExposedHeaders = "X-Correlation-ID, X-Request-ID, Idempotent-Replayed, Retry-After"
 
 // CORS handles Cross-Origin Resource Sharing. allowedOrigins is an explicit allow-list; a single "*" entry allows any
 // origin (development only; credentials are then NOT allowed, per the CORS spec). An empty list disables CORS headers.

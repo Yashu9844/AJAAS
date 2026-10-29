@@ -21,11 +21,15 @@ type Activity struct {
 
 // LogActivity appends an entry in the caller transaction and bumps the project recent-activity time.
 func LogActivity(ctx context.Context, tx *gorm.DB, a Activity) error {
-	if a.Source == "" {
-		a.Source = "user"
-	}
 	if a.Data == nil {
 		a.Data = map[string]any{}
+	}
+	if agent := AgentFrom(ctx); agent != "" && (a.Source == "" || a.Source == "user") {
+		a.Source = "ai"
+		a.Data["agent"] = agent
+	}
+	if a.Source == "" {
+		a.Source = "user"
 	}
 	raw, err := json.Marshal(a.Data)
 	if err != nil {

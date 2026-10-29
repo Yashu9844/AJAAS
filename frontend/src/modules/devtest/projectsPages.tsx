@@ -1,13 +1,16 @@
 "use client";
-import { PM_COLLAB, PM_FIELDS, PM_PLANNING, PM_PLATFORM, PM_PROJECTS, PM_TASKS } from "./generated/projectsSpecs";
+import { PM_AIHOOKS, PM_AUTOMATION, PM_COLLAB, PM_FIELDS, PM_PLANNING, PM_PLATFORM, PM_PROJECTS, PM_TASKS, PM_WEBHOOKS } from "./generated/projectsSpecs";
 import { ContextPage } from "./hrPages";
 import type { Scenario } from "./runner";
 import { S_PROJECTS } from "./scenariosPm";
+import { S_PM_AIHOOKS } from "./scenariosPmAiHooks";
+import { S_PM_AUTOMATION } from "./scenariosPmAutomation";
 import { S_PM_COLLAB } from "./scenariosPmCollab";
 import { S_PM_FIELDS } from "./scenariosPmFields";
 import { S_PM_PLANNING } from "./scenariosPmPlanning";
 import { S_PM_PLATFORM } from "./scenariosPmPlatform";
 import { S_PM_TASKS } from "./scenariosPmTasks";
+import { S_PM_WEBHOOKS } from "./scenariosPmWebhooks";
 import type { ChecklistItem } from "./types";
 
 // M2 Projects & Tasks pages of the test console (docs/TEST_CONSOLE.md). Operation forms are generated from the swagger
@@ -23,6 +26,9 @@ export const PM_CHECKLISTS: Record<string, ChecklistItem[]> = {
   planning: items(S_PM_PLANNING),
   platform: items(S_PM_PLATFORM),
   fields: items(S_PM_FIELDS),
+  webhooks: items(S_PM_WEBHOOKS),
+  automation: items(S_PM_AUTOMATION),
+  aihooks: items(S_PM_AIHOOKS),
 };
 
 /** Every M2 checklist item, for the overview page. */
@@ -96,6 +102,42 @@ export function PmFields() {
       ops={PM_FIELDS}
       scenarios={S_PM_FIELDS}
       checklist={PM_CHECKLISTS.fields}
+    />
+  );
+}
+
+export function PmWebhooks() {
+  return (
+    <ContextPage
+      title="M2 Webhooks & Git integrations"
+      intro="Outgoing webhooks (generic JSON, Slack, Discord) with signed deliveries, retries and an SSRF-guarded sender, and GitHub/Gitea integrations that link pull requests to tasks by ticket key. Managing needs project.update; secrets are shown once."
+      ops={PM_WEBHOOKS}
+      scenarios={S_PM_WEBHOOKS}
+      checklist={PM_CHECKLISTS.webhooks}
+    />
+  );
+}
+
+export function PmAutomation() {
+  return (
+    <ContextPage
+      title="M2 Automation, recurrence & public links"
+      intro="Rules (trigger, conditions, actions) that run as their creator, recurring tasks, and anonymous read-only public project pages with revocable tokens. Rules fire a few seconds after the event."
+      ops={PM_AUTOMATION}
+      scenarios={S_PM_AUTOMATION}
+      checklist={PM_CHECKLISTS.automation}
+    />
+  );
+}
+
+export function PmAiHooks() {
+  return (
+    <ContextPage
+      title="M2 AI hooks"
+      intro="Read-only seams for a separate AI module: the tool catalogue (filtered by what the caller may do), compact context packs, the document feed and readable projects. No model lives here."
+      ops={PM_AIHOOKS}
+      scenarios={S_PM_AIHOOKS}
+      checklist={PM_CHECKLISTS.aihooks}
     />
   );
 }

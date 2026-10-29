@@ -1,8 +1,9 @@
 # M2 Projects & Tasks
 
-**Status:** phases 1-3 BUILT and verified (2026-10-28) plus phase 4 custom fields (2026-10-29). Automation, webhooks, integrations,
-MCP/CLI and the product UI are designed for in `specification.md` section 9 and not built (they need architecture or permission
-decisions). Branch `module-2`.
+**Status:** phases 1-5 BUILT (2026-10-28/29): projects, tasks, collaboration, planning, group rules, custom fields, webhooks and Git
+integrations, automation rules, recurring tasks, public links, CLI and MCP server, AI hooks, and a product UI at `/workspace`.
+Not built: per-user API tokens (an M0 permission-model decision), a people directory for names in the UI, Gantt/saved views/bulk actions in
+the product UI. Branch `module-2`.
 
 **Purpose:** project delivery and work tracking for a tenant: projects, tasks on boards/lists/calendars/Gantt, sprints, comments,
 time tracking, attachments in object storage, My work and search. People are referenced by ids only; M2 never reads M0 or HR tables.
@@ -22,10 +23,13 @@ ids and versions only). **Consumes:** identity deactivation (in-process hook now
 | Sprints, backlog, board, calendar, Gantt, My work, search, saved views, feed tokens | 25 | `.../planning` |
 | Group rules | 4 | `.../project` |
 | Custom fields and task values | 6 | `.../fields` |
-| **Total** | **114** (all in `backend/api/swagger.yaml`) | |
+| AI hooks (read-only seams for M9) | 5 | `.../aihooks` |
+| Webhooks, chat notifications, Git integrations | 14 | `.../webhooks` |
+| Automation rules, recurring tasks, public links | 15 | `.../automation` (+ `automation/bridge`), `.../recurrence`, `.../publiclink` |
+| **Total** | **148** (all in `backend/api/swagger.yaml`) | |
 
 Shared inside M2: `kernel` (errors, ranks, cursors, outbox events, activity), `api` (authorizer, task resolver, hooks), `ports`
-(People), `testdb`. 23 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (six pages).
+(People), `testdb`. 28 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (nine pages). Product UI: `/workspace` (`docs/modules/m2-projects-tasks/notes-ui.md`). Command line: `backend/cmd/jaas-pm`, MCP server: `backend/cmd/jaas-pm-mcp`.
 
 ## Files in this folder
 
@@ -38,6 +42,8 @@ Shared inside M2: `kernel` (errors, ranks, cursors, outbox events, activity), `a
 | `testing.md` | test inventory, golden-test evidence, commands |
 | `security.md` | threat to evidence table |
 | `notes-tasks.md`, `notes-collab.md`, `notes-planning.md` | per-context build notes: decisions, deviations, tests, gaps |
+| `notes-webhooks.md`, `notes-automation.md`, `notes-ui.md` | per-feature build notes: decisions, deviations, tests, gaps (decision numbers there are local; the project-wide ones are in `decisions.md`) |
+| `ai-readiness.md` | the AI seams M2 offers (tool catalogue, context packs, document feed, agent attribution, MCP/CLI) and why; the AI design itself is in `docs/modules/m9-ai-assistant/ai-integration.md` |
 | `reference-kaneo.md` | feature matrix against the open-source Kaneo reference (no code copied) |
 | `model/` | owner bundle: proposed tables, ER and architecture diagrams (verbatim) |
 

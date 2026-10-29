@@ -49,3 +49,29 @@ func TestLoadConfig_EnvOverrides(t *testing.T) {
 		t.Errorf("expected overridden database port 9999, got %d", cfg.Database.Port)
 	}
 }
+
+func TestLoadConfig_ProjectsSecretsKey(t *testing.T) {
+	cfg, err := LoadConfig("../../../configs", "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Projects.SecretsKey != "" {
+		t.Errorf("development leaves the secrets key empty (derived at start), got %q", cfg.Projects.SecretsKey)
+	}
+	os.Setenv("PROJECTS_SECRETS_KEY", "injected")
+	defer os.Unsetenv("PROJECTS_SECRETS_KEY")
+	cfg, err = LoadConfig("../../../configs", "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Projects.SecretsKey != "injected" {
+		t.Errorf("PROJECTS_SECRETS_KEY must override projects.secrets_key, got %q", cfg.Projects.SecretsKey)
+	}
+	prod, err := LoadConfig("../../../configs", "production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prod.Projects.SecretsKey != "injected" {
+		t.Errorf("production reads the same variable, got %q", prod.Projects.SecretsKey)
+	}
+}

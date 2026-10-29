@@ -10,7 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jaas/jaas/internal/identity/access"
+	"github.com/jaas/jaas/internal/projects/aihooks"
 	"github.com/jaas/jaas/internal/projects/api"
+	"github.com/jaas/jaas/internal/projects/automation/bridge"
 	"github.com/jaas/jaas/internal/projects/collab"
 	"github.com/jaas/jaas/internal/projects/fields"
 	"github.com/jaas/jaas/internal/projects/kernel"
@@ -18,6 +20,7 @@ import (
 	"github.com/jaas/jaas/internal/projects/ports"
 	"github.com/jaas/jaas/internal/projects/project"
 	"github.com/jaas/jaas/internal/projects/task"
+	"github.com/jaas/jaas/internal/projects/webhooks"
 	"github.com/jaas/jaas/internal/shared/identityport"
 	"github.com/jaas/jaas/internal/shared/middleware"
 	"github.com/jaas/jaas/internal/shared/outbox"
@@ -40,6 +43,12 @@ const (
 // feedRatePerMinute caps requests per client IP on the public iCalendar feed.
 const feedRatePerMinute = 30
 
+// publicRatePerMinute caps requests per client IP on the public project page.
+const publicRatePerMinute = 60
+
+// incomingRatePerMinute caps provider calls per client IP on the public git-integration route.
+const incomingRatePerMinute = 120
+
 // groupRefreshEvery is how often group membership rules are re-resolved against HR data.
 const groupRefreshEvery = 10 * time.Minute
 
@@ -56,6 +65,7 @@ type Options struct {
 	People     ports.People              // nil: group rules answer 503 until organisation data is wired
 	RateLimits middleware.RateLimitStore // nil: the public feed keeps its per-process limiter
 	Background context.Context           // nil: no relays or sweeps (tests)
+	SecretsKey string                    // base64 32-byte key for webhook and integration secrets; empty: those routes answer 503
 }
 
 // Module is the M2 service.
@@ -65,7 +75,10 @@ type Module struct {
 	task     *task.Service
 	planning *planning.Service
 	fields   *fields.Service
+	aihooks  *aihooks.Service
+	webhooks *webhooks.Service
 	collab   *collab.Service
+	suite    *bridge.Suite
 }
 
 // New builds the module and registers its permissions with M0.
@@ -85,6 +98,14 @@ func New(ctx context.Context, o Options) (*Module, error) {
 		go m.collab.Run(o.Background, collabSweepEvery, func(err error) { o.Logger.Error().Err(err).Msg("collaboration sweep failed") })
 	}
 	m.fields = fields.NewService(o.DB, m.project, m.task, fields.Ports{Audit: o.Identity.Audit()}) // wire:fields
+	m.aihooks = aihooks.NewService(o.DB, m.project, m.task)                                        // wire:aihooks
+	if err := m.wireWebhooks(); err != nil {                                                       // wire:webhooks
+		return nil, err
+	}
+	m.suite = bridge.NewSuite(bridge.Deps{DB: o.DB, Authz: m.project, Tasks: m.task, Collab: m.collab, Audit: o.Identity.Audit()}) // wire:automation - rules, recurring tasks, public links
+	if o.RateLimits != nil {
+		m.suite.SetPublicLimiter(middleware.RateLimiter(o.RateLimits, publicRatePerMinute, time.Minute))
+	}
 	// wire:platform
 	if err := o.Identity.RegisterPermissions(ctx, Catalogue()); err != nil {
 		return nil, fmt.Errorf("projects permission catalogue: %w", err)
@@ -108,6 +129,9 @@ func Catalogue() []access.PermissionDef {
 }
 
 func (m *Module) startBackground() {
+	if m.o.Background != nil && m.o.Logger != nil { // rule engine and recurrence scheduler read the database, not the broker
+		m.suite.Run(m.o.Background, func(msg string, err error) { m.o.Logger.Error().Err(err).Msg(msg) })
+	}
 	if m.o.Background == nil || m.o.Publisher == nil {
 		return
 	}
@@ -124,14 +148,37 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	idp := m.o.Identity
 	g := rg.Group("", idp.TenantResolver(), idp.Authenticate(),
 		idp.Flag("projects", "create", api.FlagCreate), idp.Flag("projects", "read_all", api.FlagReadAll),
-		idp.Flag("projects", "manage_all", api.FlagManageAll), idp.Flag("project_roles", "manage", api.FlagRoles))
+		idp.Flag("projects", "manage_all", api.FlagManageAll), idp.Flag("project_roles", "manage", api.FlagRoles), agentLabel())
 	m.project.Register(g)
 	m.task.Register(g)
 	m.planning.Register(g) // routes:planning
 	m.fields.Register(g)   // routes:fields
+	m.aihooks.Register(g)  // routes:aihooks
+	m.webhooks.Register(g) // routes:webhooks
+	m.suite.Register(g)    // routes:automation
 	// routes:collab
 	m.collab.Register(g)
 	// routes:platform
 	// routes:planning-public
+	m.suite.RegisterPublic(rg)    // routes:publiclink-public - read-only project page authenticated by a secret token + per-IP limit
 	m.planning.RegisterPublic(rg) // the iCalendar feed is the one M2 route without a bearer token (token + per-IP limit)
+	m.webhooks.RegisterPublic(rg) // routes:webhooks-public - provider calls, authenticated by the HMAC of the raw body + per-IP limit
+}
+
+// wireWebhooks builds the webhooks context (outgoing webhooks, chat messages, git integrations) and starts its dispatcher
+// and sender when background work is enabled.
+func (m *Module) wireWebhooks() error {
+	o := m.o
+	svc, err := webhooks.NewService(o.DB, m.project, m.task, webhooks.Ports{Audit: o.Identity.Audit(), SecretsKey: o.SecretsKey})
+	if err != nil {
+		return fmt.Errorf("projects webhooks: %w", err)
+	}
+	m.webhooks = svc
+	if o.RateLimits != nil {
+		svc.SetLimiter(middleware.RateLimiter(o.RateLimits, incomingRatePerMinute, time.Minute))
+	}
+	if o.Background != nil && o.Logger != nil {
+		go svc.Run(o.Background, func(err error) { o.Logger.Error().Err(err).Msg("webhook dispatch failed") })
+	}
+	return nil
 }

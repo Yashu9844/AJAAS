@@ -27,6 +27,9 @@ excluded from production builds.
 | `/dev-test/projects/planning` | M2 Planning & Views | generated (25) | `scenariosPmPlanning.ts` `S_PM_PLANNING` |
 | `/dev-test/projects/platform` | M2 Group rules | generated (4) | `scenariosPmPlatform.ts` `S_PM_PLATFORM` |
 | `/dev-test/projects/fields` | M2 Custom fields | generated (6) | `scenariosPmFields.ts` `S_PM_FIELDS` |
+| `/dev-test/projects/webhooks` | M2 Webhooks & Git integrations | generated (14) | `scenariosPmWebhooks.ts` `S_PM_WEBHOOKS` |
+| `/dev-test/projects/automation` | M2 Automation, recurrence & public links | generated (15) | `scenariosPmAutomation.ts` `S_PM_AUTOMATION` |
+| `/dev-test/projects/aihooks` | M2 AI hooks | generated (5) | `scenariosPmAiHooks.ts` `S_PM_AIHOOKS` |
 
 M2 operation forms are generated from the swagger by `scripts/gen_console_specs.py` into `generated/projectsSpecs.ts` (a path belongs to the context with the longest matching prefix); the M2 swagger section is generated from `scripts/pm_routes_*.py` by `scripts/gen_projects_swagger.py`.
 

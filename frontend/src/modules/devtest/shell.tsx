@@ -29,6 +29,9 @@ const NAV = [
   { href: "/dev-test/projects/planning", label: "M2 — Planning & Views" },
   { href: "/dev-test/projects/platform", label: "M2 — Group rules" },
   { href: "/dev-test/projects/fields", label: "M2 — Custom fields" },
+  { href: "/dev-test/projects/webhooks", label: "M2 — Webhooks & Git" },
+  { href: "/dev-test/projects/automation", label: "M2 — Automation" },
+  { href: "/dev-test/projects/aihooks", label: "M2 — AI hooks" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
