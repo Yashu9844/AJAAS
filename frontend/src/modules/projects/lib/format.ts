@@ -22,10 +22,10 @@ export function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-export function personName(p: Person | undefined, fallbackId: string): string {
-  if (!p) return `User ${shortId(fallbackId)}`;
+/** Label for the administrator's user picker only: name plus e-mail so same-named people can be told apart. */
+export function directoryLabel(p: Person): string {
   const full = `${p.first_name} ${p.last_name}`.trim();
-  return full || p.email;
+  return full ? `${full} (${p.email})` : p.email;
 }
 
 export function initials(name: string): string {

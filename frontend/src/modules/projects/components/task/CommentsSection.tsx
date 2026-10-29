@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { addComment, deleteComment, editComment, listComments } from "../../api/collab-api";
 import { describeError } from "../../api/errors";
-import { useEnsureNames, usePeople } from "../../hooks/use-people";
+import { usePeople } from "../../hooks/use-people";
 import { useResource } from "../../hooks/use-resource";
 import { useSession } from "../../hooks/use-session";
 import { useToast } from "../../hooks/use-toast";
@@ -124,7 +124,6 @@ export function CommentsSection({ task, members, canComment }: Props) {
   }
 
   const comments = res.data?.items ?? [];
-  useEnsureNames(comments.map((c) => c.author_user_id));
   return (
     <section className="pm-section" aria-labelledby={`cm-${task.id}`}>
       <h3 id={`cm-${task.id}`}>Comments</h3>

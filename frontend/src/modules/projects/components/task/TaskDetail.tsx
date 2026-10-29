@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEnsureNames } from "../../hooks/use-people";
 import { useTaskDetail } from "../../hooks/use-task-detail";
 import { useProjectLoader } from "../../hooks/use-project";
 import { projectPath } from "../../lib/paths";
@@ -13,6 +12,8 @@ import { CommentsSection } from "./CommentsSection";
 import { CustomFieldsSection } from "./CustomFieldsSection";
 import { RelationsSection } from "./RelationsSection";
 import { SubtasksSection } from "./SubtasksSection";
+import { TaskActions } from "./TaskActions";
+import { TaskLinksSection } from "./TaskLinksSection";
 import { TaskHeaderEditor } from "./TaskHeaderEditor";
 import { TaskProperties } from "./TaskProperties";
 import { TimeSection } from "./TimeSection";
@@ -29,7 +30,6 @@ export function TaskDetail({ idOrKey, onChanged, showProjectLink }: Props) {
   const detail = useTaskDetail(idOrKey, onChanged);
   const project = useProjectLoader(detail.task?.project_id ?? null);
   const { task } = detail;
-  useEnsureNames([...(task ? [task.reporter_user_id, ...task.assignee_ids] : []), ...(project.value?.members.map((m) => m.user_id) ?? [])]);
 
   if (detail.error !== undefined && !task) return <ErrorNotice error={detail.error} onRetry={detail.reload} />;
   if (!task || !project.value) {
@@ -57,8 +57,10 @@ export function TaskDetail({ idOrKey, onChanged, showProjectLink }: Props) {
       </div>
       <TaskHeaderEditor key={`${task.id}-${task.version}`} task={task} canEdit={ctx.canWrite} onSave={detail.save} />
       <TaskProperties task={task} columns={ctx.columns} labels={ctx.labels} members={ctx.members} canWrite={ctx.canWrite} onSave={detail.save} onReload={reloadAll} />
+      <TaskActions task={task} canWrite={ctx.canWrite} onChanged={reloadAll} />
       <CustomFieldsSection task={task} members={ctx.members} canWrite={ctx.canWrite} onReload={reloadAll} />
       <SubtasksSection task={task} canWrite={ctx.canWrite} />
+      <TaskLinksSection task={task} />
       <RelationsSection task={task} canWrite={ctx.canWrite} />
       <CommentsSection task={task} members={ctx.members} canComment={ctx.canWrite} />
       <TimeSection task={task} canLog={ctx.canWrite} enabled={ctx.project.time_tracking_enabled} />

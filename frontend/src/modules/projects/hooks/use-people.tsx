@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
-import { personName } from "../lib/format";
-import { cachedPerson, clearNames, ensureNames, namesVersion, subscribeNames } from "./people-store";
+import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
+import { clearNames, nameFor, namesVersion, subscribeNames } from "./people-store";
 import { useSession } from "./use-session";
 
 interface PeopleValue {
-  /** Display name for a user id; a short id until (or unless) the name could be resolved. */
-  nameOf: (userId: string) => string;
+  /** Display name for a user id; a short id when the person is not a known member. */
+  nameOf: (userId: string | null | undefined) => string;
 }
 
-/** Clears cached names when the signed-in user changes. */
+/** Clears remembered names when the signed-in user changes. */
 export function PeopleProvider({ children }: { children: ReactNode }) {
   const session = useSession();
   useEffect(() => {
@@ -19,15 +18,9 @@ export function PeopleProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** The one cached project-people lookup: names come from the members responses that the app has loaded. */
 export function usePeople(): PeopleValue {
-  useSyncExternalStore(subscribeNames, namesVersion, namesVersion);
-  return { nameOf: (id) => personName(cachedPerson(id), id) };
-}
-
-/** Asks for the names of these ids (call with every id a view is about to show). */
-export function useEnsureNames(ids: readonly string[]): void {
-  const key = ids.join(",");
-  useEffect(() => {
-    ensureNames(key ? key.split(",") : []);
-  }, [key]);
+  const version = useSyncExternalStore(subscribeNames, namesVersion, namesVersion);
+  // A new function identity per names version makes memoised callers (React Compiler) render the new names.
+  return useMemo(() => ({ nameOf: (id: string | null | undefined) => (version >= 0 ? nameFor(id) : "") }), [version]);
 }

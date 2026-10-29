@@ -53,5 +53,8 @@ Law: `docs/SECURITY.md` (sections 1, 5, 9, 13, 14). This table is the Definition
 | S45 | Runaway failing receiver | backoff, dead after 6, webhook disabled after 20 consecutive failures, audit entry | `TestRetriesBackOffThenDie`, `TestTwentyFailuresDisableTheWebhook` |
 | S46 | Using test pings as a request cannon | 10 pings per minute per webhook, `project.update` required | `TestPingIsRecordedAndNeverRetried` |
 
+| S47 | Product UI session handling | Access token in memory, refresh token in `sessionStorage` (the API has no cookie mode), one shared refresh, redirect to sign-in on a lost session; secrets and tokens shown once live only in component memory; all text rendered as React text nodes; links shown only when `https://` without credentials; the public page sends no auth header and is `noindex`/`no-referrer`; a CSP on the frontend host is required in production | `notes-ui.md`, node checks, browser walk |
+| S48 | Names leaking e-mail addresses to project members | Members list carries `display_name` only, from a names port that never returns e-mail | `TestMembersListCarriesDisplayNamesNotEmails` |
+
 Open security items: no malware scanner behind the scan hook (no scanner exists in the platform), platform-wide gaps in
 `docs/modules/m1-hr-management/acceptance-checklist.md` (secret manager, tamper-resistant audit, backups) apply to M2 as well.

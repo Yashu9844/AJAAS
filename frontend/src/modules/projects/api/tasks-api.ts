@@ -100,3 +100,16 @@ export function listCustomFieldValues(id: string): Promise<CustomFieldValue[]> {
 export function setCustomFieldValues(id: string, version: number, values: Record<string, unknown>): Promise<unknown> {
   return put(`/tasks/${seg(id)}/custom-fields`, { values, version });
 }
+
+export function duplicateTask(id: string, copyLabels: boolean, copyAssignees: boolean): Promise<Task> {
+  return post<Task>(`/tasks/${seg(id)}/duplicate`, { copy_labels: copyLabels, copy_assignees: copyAssignees });
+}
+
+export function restoreTask(id: string): Promise<Task> {
+  return post<Task>(`/tasks/${seg(id)}/restore`);
+}
+
+/** Moves a task to another project: it gets a new ticket key there; the old key keeps resolving. */
+export function moveTaskToProject(id: string, projectId: string, version: number): Promise<Task> {
+  return post<Task>(`/tasks/${seg(id)}/move-project`, { project_id: projectId, version });
+}

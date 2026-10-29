@@ -48,7 +48,8 @@ export interface ActivityEntry {
   seq: number;
   id: string;
   task_id: string | null;
-  actor_user_id: string;
+  /** Null for system activity (rules, git integrations, recurrences). */
+  actor_user_id: string | null;
   type: string;
   data: Record<string, unknown>;
   occurred_at: string;

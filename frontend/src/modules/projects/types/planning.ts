@@ -49,3 +49,27 @@ export interface CalendarData {
   tasks: TaskCard[];
   truncated: boolean;
 }
+
+export interface GanttTask extends TaskCard {
+  dependency_count: number;
+}
+
+export interface GanttMilestone {
+  id: string;
+  name: string;
+  due_on: string | null;
+  status: string;
+}
+
+export interface GanttDependency {
+  source_task_id: string;
+  target_task_id: string;
+  type: string;
+}
+
+export interface GanttData {
+  tasks: GanttTask[];
+  milestones: GanttMilestone[];
+  dependencies: GanttDependency[];
+  next_cursor: string | null;
+}

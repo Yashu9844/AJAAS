@@ -26,7 +26,7 @@ export interface RequestOptions {
 const DEFAULT_RETRY_SECONDS = 2;
 const MAX_RETRY_SECONDS = 30;
 
-/** Seconds to wait from a Retry-After header; browsers hide it on cross-origin calls, so a short default applies. */
+/** Seconds to wait from the Retry-After header (the API exposes it to browsers); a short default applies only when it is absent or unreadable. */
 export function retryAfterSeconds(header: string | null): number {
   const n = header === null ? NaN : Number.parseInt(header, 10);
   if (!Number.isFinite(n) || n < 0) return DEFAULT_RETRY_SECONDS;

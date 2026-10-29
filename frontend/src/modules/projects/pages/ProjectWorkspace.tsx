@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { RoleBadge, StatusPill } from "../components/ui/Chips";
 import { EmptyState, ErrorNotice, SkeletonRows } from "../components/ui/States";
-import { useEnsureNames } from "../hooks/use-people";
 import { ProjectProvider, useProjectLoader, type ProjectContextValue } from "../hooks/use-project";
 import { isProjectId, projectPath, ROUTES, type ProjectTab } from "../lib/paths";
 
@@ -14,6 +13,7 @@ function tabsFor(ctx: ProjectContextValue): { tab: ProjectTab; label: string }[]
     { tab: "board", label: "Board" },
     { tab: "list", label: "List" },
     { tab: "calendar", label: "Calendar" },
+    { tab: "gantt", label: "Gantt" },
   ];
   if (ctx.project.mode === "scrum") tabs.push({ tab: "backlog", label: "Backlog & sprints" });
   tabs.push({ tab: "settings", label: "Settings" });
@@ -40,7 +40,6 @@ function Tabs({ ctx }: { ctx: ProjectContextValue }) {
 export function ProjectWorkspace({ projectId, children }: { projectId: string; children: ReactNode }) {
   const valid = isProjectId(projectId);
   const load = useProjectLoader(valid ? projectId : null);
-  useEnsureNames((load.value?.members ?? []).map((m) => m.user_id));
 
   if (!valid) return <EmptyState title="Project not found" action={<Link href={ROUTES.projects}>Back to projects</Link>} />;
   if (load.error !== undefined) return <ErrorNotice error={load.error} />;

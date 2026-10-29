@@ -1,5 +1,6 @@
-import type { Page, ProjectRoleKey } from "../types/common";
-import type { Column, ColumnInput, CreateProjectInput, Label, Member, Person, Project } from "../types/project";
+import type { Page } from "../types/common";
+import type { ProjectPermissions, ProjectRole } from "../types/settings";
+import type { Column, ColumnInput, RoleChoice, CreateProjectInput, Label, Member, Person, Project } from "../types/project";
 import { del, getData, getPage, idempotencyHeader, patch, post, put } from "./client";
 import { seg } from "./query";
 
@@ -71,25 +72,40 @@ export function listMembers(projectId: string): Promise<Member[]> {
   return getData<Member[]>(`/projects/${seg(projectId)}/members`);
 }
 
-export function addMember(projectId: string, userId: string, role: ProjectRoleKey): Promise<Member> {
-  return post<Member>(`/projects/${seg(projectId)}/members`, { user_id: userId, role });
+export function addMember(projectId: string, userId: string, choice: RoleChoice): Promise<Member> {
+  return post<Member>(`/projects/${seg(projectId)}/members`, { user_id: userId, ...choice });
 }
 
-export function changeMemberRole(projectId: string, userId: string, role: ProjectRoleKey): Promise<Member> {
-  return patch<Member>(`/projects/${seg(projectId)}/members/${seg(userId)}`, { role });
+export function changeMemberRole(projectId: string, userId: string, choice: RoleChoice): Promise<Member> {
+  return patch<Member>(`/projects/${seg(projectId)}/members/${seg(userId)}`, choice);
 }
 
 export function removeMember(projectId: string, userId: string): Promise<unknown> {
   return del(`/projects/${seg(projectId)}/members/${seg(userId)}`);
 }
 
-/** One tenant user by id. Only administrators may read users; callers treat a refusal as "name unavailable". */
-export function getPerson(id: string): Promise<Person> {
-  return getData<Person>(`/users/${seg(id)}`);
-}
-
 /** The first page (100) of the user directory, for choosing people to add to a project. */
 export async function listPeople(): Promise<Person[]> {
   const res = await getData<Person[] | null>("/users", { query: { per_page: 100 } });
   return res ?? [];
+}
+
+export async function listProjectRoles(): Promise<ProjectRole[]> {
+  return (await getData<ProjectRole[] | null>("/project-roles")) ?? [];
+}
+
+export async function listProjectPermissions(): Promise<string[]> {
+  return (await getData<ProjectPermissions>("/project-permissions")).permissions ?? [];
+}
+
+export function createProjectRole(name: string, description: string, permissions: string[]): Promise<ProjectRole> {
+  return post<ProjectRole>("/project-roles", { name, description, permissions });
+}
+
+export function updateProjectRole(id: string, name: string, description: string, permissions: string[]): Promise<ProjectRole> {
+  return patch<ProjectRole>(`/project-roles/${seg(id)}`, { name, description, permissions });
+}
+
+export function deleteProjectRole(id: string): Promise<unknown> {
+  return del(`/project-roles/${seg(id)}`);
 }

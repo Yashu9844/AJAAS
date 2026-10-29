@@ -1,15 +1,12 @@
-import { getPerson } from "../api/projects-api";
-import type { Person } from "../types/project";
+import type { Member } from "../types/project";
 
 /**
- * Names for user ids. The API only carries ids, and the user directory is paged and administrator-only, so names are
- * resolved one id at a time on demand and cached for the session. A refused or failed lookup is remembered as "unknown"
- * and the UI shows a short id instead.
+ * Display names for user ids. The API carries ids only; the project members list returns `display_name` (first and last
+ * name, never the e-mail). Names are remembered for the session as members are loaded, and a person who is no longer
+ * a member (or an API without the field) shows as a short id.
  */
 
-const MAX_PER_CALL = 40;
-const cache = new Map<string, Person | null>();
-const inflight = new Set<string>();
+const names = new Map<string, string>();
 const listeners = new Set<() => void>();
 let version = 0;
 
@@ -27,33 +24,30 @@ export function namesVersion(): number {
   return version;
 }
 
-export function cachedPerson(id: string): Person | undefined {
-  return cache.get(id) ?? undefined;
+/** Name for a user id. Activity written by the system (rules, git integrations, recurrences) has no user: it shows as "System". */
+export function nameFor(id: string | null | undefined): string {
+  if (!id) return "System";
+  return names.get(id) ?? `User ${id.slice(0, 8)}`;
 }
 
-/** Stores people that were loaded another way (for example a directory page). */
-export function rememberPeople(people: readonly Person[]): void {
-  people.forEach((p) => cache.set(p.id, p));
-  bump();
+export function hasName(id: string): boolean {
+  return names.has(id);
 }
 
-/** Looks up the ids that are not known yet. Safe to call repeatedly. */
-export function ensureNames(ids: readonly string[]): void {
-  const wanted = [...new Set(ids)].filter((id) => id && !cache.has(id) && !inflight.has(id)).slice(0, MAX_PER_CALL);
-  for (const id of wanted) {
-    inflight.add(id);
-    getPerson(id)
-      .then((p) => cache.set(id, p))
-      .catch(() => cache.set(id, null))
-      .finally(() => {
-        inflight.delete(id);
-        bump();
-      });
+/** Remembers the display names that a members response carries. */
+export function rememberMembers(members: readonly Pick<Member, "user_id" | "display_name">[]): void {
+  let changed = false;
+  for (const m of members) {
+    const name = m.display_name?.trim();
+    if (name && names.get(m.user_id) !== name) {
+      names.set(m.user_id, name);
+      changed = true;
+    }
   }
+  if (changed) bump();
 }
 
 export function clearNames(): void {
-  cache.clear();
-  inflight.clear();
+  names.clear();
   bump();
 }

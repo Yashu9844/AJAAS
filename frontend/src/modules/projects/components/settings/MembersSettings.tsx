@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { addMember, changeMemberRole, listPeople, removeMember } from "../../api/projects-api";
-import { rememberPeople } from "../../hooks/people-store";
-import { useResource } from "../../hooks/use-resource";
+import { addMember, changeMemberRole, listPeople, listProjectRoles, removeMember } from "../../api/projects-api";
 import { useGuardedAction } from "../../hooks/use-guarded-action";
 import { usePeople } from "../../hooks/use-people";
+import { useResource } from "../../hooks/use-resource";
 import { useSession } from "../../hooks/use-session";
-import type { ProjectRoleKey } from "../../types/common";
+import { directoryLabel } from "../../lib/format";
+import { currentRoleValue, decodeRole, roleOptions } from "../../lib/role-picker";
 import type { Member, Person } from "../../types/project";
-
-const ROLES: ProjectRoleKey[] = ["owner", "manager", "member", "viewer"];
+import type { ProjectRole } from "../../types/settings";
 
 interface Props {
   projectId: string;
@@ -19,20 +18,23 @@ interface Props {
   onChanged: () => void;
 }
 
-/** Members and roles. Adding people needs the user directory (administrators); others see names as short ids. */
+/** Members and roles (built-in and custom). Adding people needs the user directory (administrators). */
 export function MembersSettings({ projectId, members, canManage, onChanged }: Props) {
   const { run, denied } = useGuardedAction(onChanged);
   const { nameOf } = usePeople();
   const session = useSession();
   const [newUser, setNewUser] = useState("");
-  const [newRole, setNewRole] = useState<ProjectRoleKey>("member");
+  const [newRole, setNewRole] = useState("member");
   const editable = canManage && !denied;
-  const directory = useResource<Person[]>(editable ? "people-directory" : null, async () => {
-    const page = await listPeople().catch(() => []);
-    rememberPeople(page);
-    return page;
-  });
+  const directory = useResource<Person[]>(editable ? "people-directory" : null, () => listPeople().catch(() => []));
+  const customRoles = useResource<ProjectRole[]>(editable ? "project-roles-picker" : null, () => listProjectRoles().catch(() => []));
+  const options = roleOptions(customRoles.data ?? []);
   const candidates = (directory.data ?? []).filter((p) => !members.some((m) => m.user_id === p.id));
+
+  function change(userId: string, value: string) {
+    const choice = decodeRole(value);
+    if (choice) void run(() => changeMemberRole(projectId, userId, choice));
+  }
 
   return (
     <section className="pm-section" aria-labelledby="pm-members-h">
@@ -49,11 +51,11 @@ export function MembersSettings({ projectId, members, canManage, onChanged }: Pr
               <span className="pm-actions">
                 <label>
                   <span className="pm-sr-only">Role of {nameOf(m.user_id)}</span>
-                  <select value={m.role_key ?? ""} onChange={(e) => void run(() => changeMemberRole(projectId, m.user_id, e.target.value as ProjectRoleKey))}>
-                    {m.role_key === null && <option value="">{m.role_name}</option>}
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
+                  <select value={currentRoleValue(m)} onChange={(e) => change(m.user_id, e.target.value)}>
+                    {currentRoleValue(m) === "" && <option value="">{m.role_name}</option>}
+                    {options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
                       </option>
                     ))}
                   </select>
@@ -70,20 +72,24 @@ export function MembersSettings({ projectId, members, canManage, onChanged }: Pr
       </ul>
       {editable && candidates.length > 0 && (
         <div className="pm-inline-form">
-          <label className="pm-sr-only" htmlFor="mem-user">Person to add</label>
+          <label className="pm-sr-only" htmlFor="mem-user">
+            Person to add
+          </label>
           <select id="mem-user" value={newUser} onChange={(e) => setNewUser(e.target.value)}>
             <option value="">Add a person…</option>
             {candidates.map((p) => (
               <option key={p.id} value={p.id}>
-                {nameOf(p.id)}
+                {directoryLabel(p)}
               </option>
             ))}
           </select>
-          <label className="pm-sr-only" htmlFor="mem-role">Role</label>
-          <select id="mem-role" value={newRole} onChange={(e) => setNewRole(e.target.value as ProjectRoleKey)}>
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
+          <label className="pm-sr-only" htmlFor="mem-role">
+            Role
+          </label>
+          <select id="mem-role" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
@@ -91,7 +97,10 @@ export function MembersSettings({ projectId, members, canManage, onChanged }: Pr
             type="button"
             className="pm-btn"
             disabled={!newUser}
-            onClick={() => void run(() => addMember(projectId, newUser, newRole)).then((ok) => ok && setNewUser(""))}
+            onClick={() => {
+              const choice = decodeRole(newRole);
+              if (choice) void run(() => addMember(projectId, newUser, choice)).then((ok) => ok && setNewUser(""));
+            }}
           >
             Add
           </button>

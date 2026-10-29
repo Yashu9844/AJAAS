@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { deleteTimeEntry, getRunningTimer, listTimeEntries, logTime, startTimer, stopTimer } from "../../api/collab-api";
 import { describeError } from "../../api/errors";
-import { useEnsureNames, usePeople } from "../../hooks/use-people";
+import { usePeople } from "../../hooks/use-people";
 import { useNow } from "../../hooks/use-now";
 import { useResource } from "../../hooks/use-resource";
 import { useSession } from "../../hooks/use-session";
@@ -52,7 +52,6 @@ export function TimeSection({ task, canLog, enabled }: { task: Task; canLog: boo
   const runningHere = running !== null && running.task_id === task.id;
   const elapsed = running ? Math.max(0, Math.floor((now - new Date(running.started_at).getTime()) / 60000)) : 0;
   const rows = entries.data?.items ?? [];
-  useEnsureNames(rows.map((r) => r.user_id));
   const total = rows.reduce((sum, r) => sum + r.minutes, 0);
 
   return (

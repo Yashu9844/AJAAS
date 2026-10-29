@@ -2,8 +2,8 @@
 
 **Status:** phases 1-5 BUILT (2026-10-28/29): projects, tasks, collaboration, planning, group rules, custom fields, webhooks and Git
 integrations, automation rules, recurring tasks, public links, CLI and MCP server, AI hooks, and a product UI at `/workspace`.
-Not built: per-user API tokens (an M0 permission-model decision), a people directory for names in the UI, Gantt/saved views/bulk actions in
-the product UI. Branch `module-2`.
+Not built: per-user API tokens (an M0 permission-model decision) and the smaller UI gaps listed in `notes-ui.md` (multi-condition rule editing, tenant-wide
+label and watcher screens, report screens). Branch `module-2`.
 
 **Purpose:** project delivery and work tracking for a tenant: projects, tasks on boards/lists/calendars/Gantt, sprints, comments,
 time tracking, attachments in object storage, My work and search. People are referenced by ids only; M2 never reads M0 or HR tables.
@@ -29,7 +29,7 @@ ids and versions only). **Consumes:** identity deactivation (in-process hook now
 | **Total** | **148** (all in `backend/api/swagger.yaml`) | |
 
 Shared inside M2: `kernel` (errors, ranks, cursors, outbox events, activity), `api` (authorizer, task resolver, hooks), `ports`
-(People), `testdb`. 28 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (nine pages). Product UI: `/workspace` (`docs/modules/m2-projects-tasks/notes-ui.md`). Command line: `backend/cmd/jaas-pm`, MCP server: `backend/cmd/jaas-pm-mcp`.
+(People), `testdb`. 28 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (nine pages). Product UI: `/workspace` (board, list with saved views and bulk actions, calendar, Gantt, backlog, settings, task drawer, My work, search) and the anonymous public page `/public/projects/{token}` (`docs/modules/m2-projects-tasks/notes-ui.md`). Command line: `backend/cmd/jaas-pm`, MCP server: `backend/cmd/jaas-pm-mcp`.
 
 ## Files in this folder
 

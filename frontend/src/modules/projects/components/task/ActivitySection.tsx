@@ -1,7 +1,7 @@
 "use client";
 
 import { listActivity } from "../../api/collab-api";
-import { useEnsureNames, usePeople } from "../../hooks/use-people";
+import { usePeople } from "../../hooks/use-people";
 import { usePagedList } from "../../hooks/use-paged-list";
 import { formatDateTime } from "../../lib/dates";
 import { humanize } from "../../lib/format";
@@ -25,7 +25,6 @@ function summarize(entry: ActivityEntry, columns: Column[]): string {
 export function ActivitySection({ task, columns }: { task: Task; columns: Column[] }) {
   const { nameOf } = usePeople();
   const list = usePagedList<ActivityEntry>(`activity:${task.id}:${task.version}`, (cursor) => listActivity(task.id, cursor));
-  useEnsureNames(list.items.map((a) => a.actor_user_id));
   return (
     <section className="pm-section" aria-labelledby={`ac-${task.id}`}>
       <h3 id={`ac-${task.id}`}>Activity</h3>

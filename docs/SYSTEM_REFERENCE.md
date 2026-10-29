@@ -4082,7 +4082,7 @@ _Package:_ Package identityport is M1 HR Management's only view of M0 Identity &
 - **method** `Port.OnUserDeactivated(h DeactivationHook)` — OnUserDeactivated registers a hook run when M0 deactivates a user.
 - **method** `Port.ProvideRoleFacts(f RoleFacts)` — ProvideRoleFacts installs HR as the source of the automatic Employee and Manager roles.
 
-#### `internal/shared/identityport/inprocess/adapter.go` (101 lines)
+#### `internal/shared/identityport/inprocess/adapter.go` (125 lines)
 _Package:_ Package inprocess adapts the in-process M0 identity module to identityport.Port. It is the only HR package that imports internal/identity/... packages.
 - **type** `port struct`
 - **func** `New(m *identity.Module, db *gorm.DB) identityport.Port` — New returns the in-process Port over the identity module; db is used for route-level audit writes.
@@ -4103,6 +4103,7 @@ _Package:_ Package inprocess adapts the in-process M0 identity module to identit
 - **func** `(u users) DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id, correlationID uuid.UUID) error`
 - **func** `(u users) ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error`
 - **func** `(u users) InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in identityport.Invite, correlationID uuid.UUID) (*identityport.User, error)`
+- **func** `(p *port) DisplayNames(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]string, error)` — DisplayNames returns "First Last" for the given users of the tenant with one query; it never returns e-mail addresses. It satisfies projects/ports.Names structurally, so M2 can show names without importing M0.
 
 #### `internal/shared/inbox/inbox.go` (26 lines)
 _Package:_ Package inbox makes event handlers idempotent. The broker delivers at least once, so a handler calls Claim inside the transaction that applies the event's effect: the first delivery records the event id and proceeds, a redelivery finds the row and the handler skips it. Each service owns one inbox table (consumer, event_id, tenant_id, event_type).
@@ -4242,7 +4243,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `startIdentityBackground(o Options, id *identity.Module, store idempotency.Store)` — startIdentityBackground runs M0's outbox relay and the idempotency purger while background work is enabled.
 - **func** `registerDevMailbox(v1 *gin.RouterGroup, o Options, id *identity.Module)` — registerDevMailbox exposes one-time secrets (reset and invitation tokens) to developers and the test console in development and test only, behind the platform key: GET /api/v1/dev/mailbox?tenant_id=…&email=…
 
-#### `internal/app/projects.go` (56 lines)
+#### `internal/app/projects.go` (59 lines)
 - **func** `buildProjects(o Options, idp identityport.Port, people ports.People) (*projects.Module, error)` — buildProjects wires M2 Projects & Tasks, including the object-storage provider when one is configured.
 - **func** `projectsSecretsKey(cfg *config.Config) string` — projectsSecretsKey is the key that encrypts webhook and integration secrets: the configured one, or outside production a development key derived from the JWT secret (production requires an explicit key, see validateProjectsKey).
 - **func** `validateProjectsKey(cfg *config.Config) error` — validateProjectsKey requires a valid projects.secrets_key in production and rejects an invalid one anywhere.
@@ -10204,7 +10205,7 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(s *Service) SetFavorite(ctx context.Context, a api.Actor, id uuid.UUID, on bool) error` — SetFavorite stars or unstars the project for the caller.
 - **func** `lockProject(tx *gorm.DB, tenantID, id uuid.UUID) (*Project, error)` — lockProject takes a row lock on the project inside tx and returns it; used by operations that must serialise.
 
-#### `internal/projects/project/members.go` (210 lines)
+#### `internal/projects/project/members.go` (233 lines)
 - **type** `MemberInput struct` — MemberInput adds or changes a member. Exactly one of Role (built-in key) and CustomRoleID is set.
 - **type** `MemberView struct` — MemberView is a member with the role name resolved.
 - **func** `(s *Service) Members(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]MemberView, error)` — Members lists the active members of a project.
@@ -10217,6 +10218,7 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(s *Service) ChangeMember(ctx context.Context, a api.Actor, projectID, userID uuid.UUID, in MemberInput) (*Member, error)` — ChangeMember changes a member role; the last owner cannot be demoted (PR-04).
 - **func** `(s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, userID uuid.UUID) error` — RemoveMember removes a member; anyone may remove themselves. The last owner stays (PR-04).
 - **func** `ensureOwner(tx *gorm.DB, projectID uuid.UUID) error` — ensureOwner refuses a change that would leave the project without an owner.
+- **func** `(s *Service) addNames(ctx context.Context, tenantID uuid.UUID, rows []MemberView) error` — addNames fills display names for the members; a failing lookup degrades to ids only rather than failing the list.
 
 #### `internal/projects/project/milestones.go` (121 lines)
 - **type** `MilestoneInput struct` — MilestoneInput creates or edits a milestone; nil fields are unchanged on edit.
@@ -10267,7 +10269,7 @@ _Package:_ Package project is the project context of M2: projects, members, role
 - **func** `(s *Service) UpdateRole(ctx context.Context, a api.Actor, id uuid.UUID, in RoleInput) (*CustomRole, error)` — UpdateRole edits a custom role; members pick up the new permissions at once.
 - **func** `(s *Service) DeleteRole(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteRole removes a custom role that no member uses.
 
-#### `internal/projects/project/service.go` (113 lines)
+#### `internal/projects/project/service.go` (114 lines)
 - **type** `Ports struct` — Ports are the services the project context needs from the rest of the platform.
 - **type** `Service struct` — Service holds the project use cases. It also implements api.Authorizer.
 - **func** `NewService(db *gorm.DB, p Ports) *Service { return &Service{db: db, p: p, now: time.Now} }` — NewService builds the service.
@@ -11756,12 +11758,13 @@ _Package:_ Package publiclink is the public project links context of M2 (specifi
 ### M2 Projects / api — 4 test functions in 1 files
 - `internal/projects/api/access_test.go`: TestBuiltinRolesAreNested, TestValidPermAndSortedPerms, TestRequireDistinguishesForbiddenFromArchived, TestActorFrom
 
-### M2 Projects / project — 20 test functions in 7 files
+### M2 Projects / project — 21 test functions in 8 files
 - `internal/projects/project/columns_test.go`: TestColumnLifecycle, TestReorderAndDeleteColumns, TestLabelsAndMilestones
 - `internal/projects/project/faults_test.go`: TestEveryStatementFailureIsReportedAndRolledBack, TestRunGroupRefreshStopsWithContext
 - `internal/projects/project/group_test.go`: TestGroupRulesExpandAndReconcile, TestGroupRuleGuards, TestRefreshAllSweepsActiveProjectsWithRules, TestDeactivationAndInbox
 - `internal/projects/project/harness_test.go`: (helpers only)
 - `internal/projects/project/members_test.go`: TestMembersLifecycle, TestLastOwnerGuard, TestCustomRoles
+- `internal/projects/project/names_test.go`: TestMembersCarryDisplayNames
 - `internal/projects/project/projects_test.go`: TestCreateProjectDefaults, TestCreateProjectValidation, TestAccessRules, TestTenantVisibilityAndArchivedFreeze, TestUpdateProjectVersioned, TestArchiveRestoreDeleteAndFavorite, TestListProjects
 - `internal/projects/project/watch_cleanup_test.go`: TestWatchesEndWhenAccessIsLost
 
@@ -11878,7 +11881,7 @@ _Package:_ Package publiclink is the public project links context of M2 (specifi
 - `projects_hooks_test.go`: TestTaskDescriptionMentionsAndAutoWatchers
 - `projects_planning_test.go`: TestPlanningSprintsAndPlan, TestPlanningViewsSearchAndFeed
 - `projects_tasks_test.go`: TestProjectTasksCore, TestTasksListingAndSubtasks, TestTaskRelationsAssigneesBulkAndMove
-- `projects_test.go`: TestProjectsContext
+- `projects_test.go`: TestProjectsContext, TestMembersListCarriesDisplayNamesNotEmails
 - `projects_webhooks_test.go`: TestWebhooksThroughTheRouter, TestGitIntegrationThroughTheRouter
 - `recruitment_plus_test.go`: TestRecruitmentParity
 - `recruitment_test.go`: TestRecruitmentLifecycle, TestRecruitmentRBACAndIsolation
@@ -12468,6 +12471,7 @@ Format: decision - reason - alternatives - trade-off.
 - **DPJ-45 Automation rules run as their creator through the same task use cases a person uses.** The creator is re-checked (active member holding the permission) at every run; otherwise the run is skipped `NOT_ALLOWED` and counts toward auto-disable (20). Loop protection: rule changes carry agent label `automation.<8 hex>` and the engine ignores events from automation; 100 actions per rule per minute; closed vocabulary of triggers, conditions and actions (no expressions or code). Idempotence by claiming `(rule, event)` before acting. The engine has its own outbox cursor and waits 3 s (settle delay) so late-committing transactions are not skipped; rules therefore fire 3-8 s after the event. The `automation/bridge` package is the only one that imports `task` and `collab`. Detail: `notes-automation.md` decisions (numbered locally there).
 - **DPJ-46 Recurrence.** Claim-then-copy at most once per occurrence, catch-up collapses to one task after an outage, creator re-check, archived projects flagged, copy goes into the template column (keep templates in a backlog column), `run-now` runs as the caller and does not move the schedule.
 - **DPJ-47 Public project links.** Anonymous read-only page `GET /public/projects/{token}`: 256-bit token shown once (hash only stored, constant-time compare, revocable, max 3 per project), strict allow-list (project key and name, columns, task key/title/column/priority/due/label names/progress, optional descriptions), never user ids or names, comments, attachments, time, activity or members; mentions are scrubbed from descriptions; unknown, revoked, archived and deleted all answer one identical 404; `no-store`, `noindex`, `no-referrer`.
+- **DPJ-48 People names come from a read-only names port, never from the user directory.** `ports.Names.DisplayNames` (implemented by the in-process identity adapter with one query) fills `display_name` on the project members list; the UI shows names for members and falls back to a short id for former members and "System" for system actions. E-mail addresses are never returned to project members. Alternative: let members read `GET /users/{id}` (rejected: it exposes e-mail and HR-adjacent data to every project member).
 
 ### m1-hr-management/contexts/organization  _(from specification.md)_
 

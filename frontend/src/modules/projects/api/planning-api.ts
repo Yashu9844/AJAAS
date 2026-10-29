@@ -1,4 +1,4 @@
-import type { CalendarData, MyWork, SearchHit, Sprint } from "../types/planning";
+import type { CalendarData, GanttData, MyWork, SearchHit, Sprint } from "../types/planning";
 import type { Page } from "../types/common";
 import type { TaskCard } from "../types/task";
 import { getData, getPage, patch, post } from "./client";
@@ -50,4 +50,9 @@ export function planTasks(projectId: string, taskIds: string[], sprintId: string
 
 export function getBacklog(projectId: string): Promise<Page<TaskCard>> {
   return getPage<TaskCard>(`/projects/${seg(projectId)}/backlog`, { limit: 50 });
+}
+
+/** One page of the Gantt window; the cursor for the next page is part of the data. */
+export function getGantt(projectId: string, from: string, to: string, cursor?: string): Promise<GanttData> {
+  return getData<GanttData>(`/projects/${seg(projectId)}/gantt`, { query: { from, to, cursor, limit: 100 } });
 }

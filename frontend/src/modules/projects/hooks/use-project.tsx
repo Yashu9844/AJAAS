@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { isForbidden } from "../api/errors";
 import { getProject, listColumns, listLabels, listMembers } from "../api/projects-api";
 import type { Column, Label, Member, Project } from "../types/project";
+import { rememberMembers } from "./people-store";
 import { useResource } from "./use-resource";
 import { useSession } from "./use-session";
 
@@ -43,6 +44,9 @@ export function useProjectLoader(projectId: string | null): ProjectLoad {
     return { project, columns, labels, members };
   });
   const { data, reload } = res;
+  useEffect(() => {
+    if (data) rememberMembers(data.members);
+  }, [data]);
   const isAdmin = session.roles.includes("tenant_admin");
   const value = useMemo<ProjectContextValue | null>(() => {
     if (!data) return null;

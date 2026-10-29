@@ -61,6 +61,8 @@ export interface Member {
   user_id: string;
   role_key: ProjectRoleKey | null;
   role_name: string;
+  /** First and last name; absent when the API predates it. Never the e-mail. */
+  display_name?: string;
   custom_role_id: string | null;
   active: boolean;
   source: string;
@@ -80,3 +82,23 @@ export interface Person {
   first_name: string;
   last_name: string;
 }
+
+export interface PublicTask {
+  key: string;
+  title: string;
+  column: string;
+  priority: string;
+  due_at: string | null;
+  labels: string[];
+  progress: number;
+  description?: string;
+}
+
+export interface PublicProject {
+  project: { key: string; name: string };
+  columns: { name: string; category: string; color: string }[];
+  tasks: PublicTask[];
+}
+
+/** A role choice is either a built-in role key or a custom role id (see lib/role-picker.ts). */
+export type RoleChoice = { role: ProjectRoleKey } | { custom_role_id: string };

@@ -34,6 +34,6 @@ Definition of done per step: unit coverage >= 85% on services (>= 90% where stat
 - Attachment upload bytes are not malware-scanned: there is no scanner in the platform yet; the scan hook runs before `ready` and is a no-op.
 - Subtree moves between projects and re-parenting tasks that have subtasks are refused (409), not implemented.
 - Per-user API tokens (Plane-style) for long-lived agent access need an M0 permission-model change; CLI/MCP use the normal login for now.
-- Product UI: no names for other users (the API carries ids; `GET /users/{id}` is admin-only) - needs a people directory readable by project members; no Gantt, saved views, bulk actions or group-rule/field-definition screens; drag and drop is mouse-only (a select is the keyboard/touch path).
+- Product UI gaps (details in `notes-ui.md`): rules with several conditions or actions cannot be edited there, a recurrence template cannot be changed, no saved-view editing, no tenant-wide label / watcher / time-report / sprint-report / feed-token screens, group-rule reference ids are typed by hand (no department directory), drag and drop is mouse-only (a select is the keyboard/touch path), attachment upload to the object store needs CORS on the store, no screen-reader audit.
 - Automation fires 3-8 s after an event (outbox settle delay); recurrence catch-up collapses missed occurrences; the webhook secrets key has no re-encryption tool yet.
 - Generic platform gaps shared with M1 (CI pipeline, metrics, tracing, backups, runbooks, secret manager, load tests).
