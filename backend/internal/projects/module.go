@@ -85,7 +85,7 @@ type Module struct {
 // New builds the module and registers its permissions with M0.
 func New(ctx context.Context, o Options) (*Module, error) {
 	m := &Module{o: o}
-	m.project = project.NewService(o.DB, project.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit(), People: o.People, Names: o.Names})
+	m.project = project.NewService(o.DB, project.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit(), Resources: o.Identity.Resources(), People: o.People, Names: o.Names})
 	m.task = task.NewService(o.DB, m.project, task.Ports{Audit: o.Identity.Audit()})
 	m.planning = planning.NewService(o.DB, m.project, planning.Ports{Users: o.Identity.Users(), Audit: o.Identity.Audit()}) // wire:planning
 	if o.RateLimits != nil {                                                                                                // the shared (Redis) limiter replaces the per-process default of the public feed
@@ -115,16 +115,19 @@ func New(ctx context.Context, o Options) (*Module, error) {
 	return m, nil
 }
 
-// Catalogue is M2 tenant-level permission catalogue (specification section 8); project-level permissions live in M2.
+// Catalogue is the M2 permission catalogue registered in M0 (specification section 8): the tenant-level permissions and the
+// project-level permissions that project roles are built from (DPJ-49).
 func Catalogue() []access.PermissionDef {
+	return append(projectPermissionDefs(), tenantPermissionDefs()...)
+}
+
+func tenantPermissionDefs() []access.PermissionDef {
 	return []access.PermissionDef{
 		{Module: "projects", Resource: "projects", Action: "create", Description: "Create projects",
 			Defaults: map[string]access.Scope{access.TemplateEmployee: access.ScopeTenant}},
 		{Module: "projects", Resource: "projects", Action: "read_all", Description: "See every project, including private ones",
 			Defaults: map[string]access.Scope{access.TemplateExecutive: access.ScopeTenant, access.TemplateAuditor: access.ScopeTenant, access.TemplateITAdmin: access.ScopeTenant}},
 		{Module: "projects", Resource: "projects", Action: "manage_all", Description: "Administer any project: members, settings, archive and delete",
-			Defaults: map[string]access.Scope{access.TemplateITAdmin: access.ScopeTenant}},
-		{Module: "projects", Resource: "project_roles", Action: "manage", Description: "Create and edit custom project roles",
 			Defaults: map[string]access.Scope{access.TemplateITAdmin: access.ScopeTenant}},
 	}
 }
@@ -149,7 +152,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	idp := m.o.Identity
 	g := rg.Group("", idp.TenantResolver(), idp.Authenticate(),
 		idp.Flag("projects", "create", api.FlagCreate), idp.Flag("projects", "read_all", api.FlagReadAll),
-		idp.Flag("projects", "manage_all", api.FlagManageAll), idp.Flag("project_roles", "manage", api.FlagRoles), agentLabel())
+		idp.Flag("projects", "manage_all", api.FlagManageAll), agentLabel())
 	m.project.Register(g)
 	m.task.Register(g)
 	m.planning.Register(g) // routes:planning

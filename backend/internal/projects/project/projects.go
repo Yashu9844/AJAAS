@@ -112,9 +112,15 @@ func (s *Service) Create(ctx context.Context, a api.Actor, in CreateInput) (*Pro
 		if err := tx.Create(&p).Error; err != nil {
 			return err
 		}
-		owner := api.RoleOwner
-		m := Member{ProjectID: p.ID, UserID: a.UserID, TenantID: a.TenantID, RoleKey: &owner, Active: true, AddedBy: a.UserID, AddedAt: now}
+		m := Member{ProjectID: p.ID, UserID: a.UserID, TenantID: a.TenantID, Active: true, AddedBy: a.UserID, AddedAt: now}
 		if err := tx.Create(&m).Error; err != nil {
+			return err
+		}
+		ownerRole, rerr := s.p.Resources.RoleByTemplate(ctx, tx, a.TenantID, templatePrefix+api.RoleOwner)
+		if rerr != nil {
+			return rerr
+		}
+		if err := s.assign(ctx, tx, a, a.UserID, ownerRole, p.ID, "manual"); err != nil {
 			return err
 		}
 		if err := createDefaultColumns(tx, p); err != nil {

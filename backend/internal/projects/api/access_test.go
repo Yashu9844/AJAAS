@@ -81,7 +81,7 @@ func TestActorFrom(t *testing.T) {
 		c.Set(FlagCreate, true)
 		c.Set(FlagManageAll, true)
 	})
-	if !ok || a.TenantID != tid || a.UserID != uid || !a.CreateProject || !a.ManageAll || a.ReadAll || a.ManageRoles {
+	if !ok || a.TenantID != tid || a.UserID != uid || !a.CreateProject || !a.ManageAll || a.ReadAll {
 		t.Fatalf("actor: %+v", a)
 	}
 	if _, ok, _ = run(func(c *gin.Context) { c.Set("tenant_id", "x"); c.Set("user_id", uid) }); ok {

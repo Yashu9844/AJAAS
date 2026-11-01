@@ -16,6 +16,8 @@ type CreateRoleRequest struct {
 	PermissionIDs []string     `json:"permission_ids" binding:"omitempty,dive,uuid"`
 	Grants        []GrantInput `json:"grants" binding:"omitempty,dive"`
 	ParentRoleID  *string      `json:"parent_role_id" binding:"omitempty,uuid"`
+	// AppliesTo is "tenant" (default) or "project" (a role assigned to a user on one project).
+	AppliesTo string `json:"applies_to" binding:"omitempty,oneof=tenant project"`
 }
 
 // UpdateRoleRequest is a partial payload to update role metadata. parent_role_id "" removes the parent.
@@ -59,6 +61,7 @@ type RoleResponse struct {
 	// ParentRoleID is the role this one inherits from; TemplateKey marks a predefined role.
 	ParentRoleID    *string             `json:"parent_role_id,omitempty"`
 	TemplateKey     *string             `json:"template_key,omitempty"`
+	AppliesTo       string              `json:"applies_to"`
 	IsAutomatic     bool                `json:"is_automatic"`
 	TemplateManaged bool                `json:"template_managed"`
 	Permissions     []PermissionSummary `json:"permissions,omitempty"`

@@ -40,36 +40,19 @@ type Project struct {
 // TableName maps to projects.projects.
 func (Project) TableName() string { return "projects" }
 
-// Member links a user to a project with a built-in or custom role (PR-04, PR-05).
+// Member records that a user belongs to a project (PR-04); the role is an M0 assignment on the project (DPJ-49).
 type Member struct {
-	ProjectID    uuid.UUID  `gorm:"type:uuid;primaryKey" json:"project_id"`
-	UserID       uuid.UUID  `gorm:"type:uuid;primaryKey" json:"user_id"`
-	TenantID     uuid.UUID  `gorm:"type:uuid" json:"-"`
-	RoleKey      *string    `json:"role_key"`
-	CustomRoleID *uuid.UUID `gorm:"type:uuid" json:"custom_role_id"`
-	Active       bool       `json:"active"`
-	Source       string     `gorm:"default:direct" json:"source"`
-	AddedBy      uuid.UUID  `gorm:"type:uuid" json:"added_by"`
-	AddedAt      time.Time  `json:"added_at"`
+	ProjectID uuid.UUID `gorm:"type:uuid;primaryKey" json:"project_id"`
+	UserID    uuid.UUID `gorm:"type:uuid;primaryKey" json:"user_id"`
+	TenantID  uuid.UUID `gorm:"type:uuid" json:"-"`
+	Active    bool      `json:"active"`
+	Source    string    `gorm:"default:direct" json:"source"`
+	AddedBy   uuid.UUID `gorm:"type:uuid" json:"added_by"`
+	AddedAt   time.Time `json:"added_at"`
 }
 
 // TableName maps to project_members.
 func (Member) TableName() string { return "project_members" }
-
-// CustomRole is a tenant-defined named set of project permissions (PR-05).
-type CustomRole struct {
-	ID          uuid.UUID         `gorm:"type:uuid;primaryKey" json:"id"`
-	TenantID    uuid.UUID         `gorm:"type:uuid" json:"-"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Permissions kernel.StringList `gorm:"type:jsonb" json:"permissions"`
-	CreatedBy   uuid.UUID         `gorm:"type:uuid" json:"created_by"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
-}
-
-// TableName maps to project_roles.
-func (CustomRole) TableName() string { return "project_roles" }
 
 // Column is a board status of a project (PR-06).
 type Column struct {

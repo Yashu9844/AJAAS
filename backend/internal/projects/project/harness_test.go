@@ -58,6 +58,7 @@ type env struct {
 	audit  *fakeAudit
 	users  fakeUsers
 	tenant uuid.UUID
+	res    *testdb.Resources
 }
 
 func newEnv(t *testing.T) *env {
@@ -65,7 +66,8 @@ func newEnv(t *testing.T) *env {
 	db := testdb.Open(t)
 	e := &env{t: t, db: db, audit: &fakeAudit{}, users: fakeUsers{active: map[uuid.UUID]bool{}}, tenant: uuid.New(),
 		people: &fakePeople{members: map[uuid.UUID][]uuid.UUID{}}}
-	e.svc = NewService(db, Ports{Users: e.users, Audit: e.audit, People: e.people})
+	e.res = testdb.NewResources()
+	e.svc = NewService(db, Ports{Users: e.users, Audit: e.audit, People: e.people, Resources: e.res})
 	return e
 }
 
@@ -81,9 +83,7 @@ func (e *env) user(flags ...string) api.Actor {
 		case "readall":
 			a.ReadAll = true
 		case "admin":
-			a.ManageAll, a.CreateProject, a.ManageRoles = true, true, true
-		case "roles":
-			a.ManageRoles = true
+			a.ManageAll, a.CreateProject = true, true
 		}
 	}
 	return a
@@ -126,4 +126,11 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// mustRole returns the built-in role key the user holds on the project in the M0 stand-in.
+func (e *env) mustRole(p *Project, u api.Actor) string {
+	roles, _ := e.res.RolesFor(bg, e.db, e.tenant, u.UserID, "project", []uuid.UUID{p.ID})
+	key, _ := roleLabel(roles[p.ID])
+	return key
 }

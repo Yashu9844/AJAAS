@@ -162,24 +162,6 @@ func faultScenarios(e *env) []scenario {
 				return e.svc.DeleteMilestone(ctx, o, p.ID, m.ID)
 			}, nil
 		}},
-		{"roles", func(e *env, o api.Actor) (func() error, error) {
-			admin := e.user("roles")
-			return func() error {
-				in := RoleInput{Name: "R" + itoa(seq), Permissions: []string{"project.read", "task.read"}}
-				seq++
-				r, err := e.svc.CreateRole(ctx, admin, in)
-				if err != nil {
-					return err
-				}
-				if _, err = e.svc.UpdateRole(ctx, admin, r.ID, RoleInput{Name: in.Name + "b", Permissions: in.Permissions}); err != nil {
-					return err
-				}
-				if _, err = e.svc.Roles(ctx, admin); err != nil {
-					return err
-				}
-				return e.svc.DeleteRole(ctx, admin, r.ID)
-			}, nil
-		}},
 		{"group rules and deactivation", func(e *env, o api.Actor) (func() error, error) {
 			p, u, dept := e.fresh(o, key()), e.user(), uuid.New()
 			e.people.members[dept] = []uuid.UUID{u.UserID}

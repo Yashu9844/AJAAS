@@ -8,7 +8,7 @@ label and watcher screens, report screens). Branch `module-2`.
 **Purpose:** project delivery and work tracking for a tenant: projects, tasks on boards/lists/calendars/Gantt, sprints, comments,
 time tracking, attachments in object storage, My work and search. People are referenced by ids only; M2 never reads M0 or HR tables.
 
-**Depends on:** M0 (identity, permissions, audit) through `internal/shared/identityport`; PostgreSQL (schema `projects`); an
+**Depends on:** M0 (identity, audit and every permission decision, including the role a user holds on a project: DPJ-49) through `internal/shared/identityport`; PostgreSQL (schema `projects`); an
 S3-compatible object store through `internal/shared/storage`; RabbitMQ for events; HR organisation facts through an adapter
 (`internal/hr/people.go`) for group rules. **Publishes:** `jaas.projects.events` (project, task, sprint, attachment, time events,
 ids and versions only). **Consumes:** identity deactivation (in-process hook now, inbox-deduplicated handler ready for a broker).
@@ -17,7 +17,7 @@ ids and versions only). **Consumes:** identity deactivation (in-process hook now
 
 | Area | Operations | Package |
 |---|---|---|
-| Projects, members, roles, columns, labels, milestones | 35 | `backend/internal/projects/project` |
+| Projects, members, assignable roles, columns, labels, milestones | 31 | `backend/internal/projects/project` |
 | Tasks, relations, subtasks, bulk, activity | 23 | `.../task` |
 | Comments, mentions, watchers, time, attachments | 21 | `.../collab` |
 | Sprints, backlog, board, calendar, Gantt, My work, search, saved views, feed tokens | 25 | `.../planning` |
@@ -26,10 +26,10 @@ ids and versions only). **Consumes:** identity deactivation (in-process hook now
 | AI hooks (read-only seams for M9) | 5 | `.../aihooks` |
 | Webhooks, chat notifications, Git integrations | 14 | `.../webhooks` |
 | Automation rules, recurring tasks, public links | 15 | `.../automation` (+ `automation/bridge`), `.../recurrence`, `.../publiclink` |
-| **Total** | **148** (all in `backend/api/swagger.yaml`) | |
+| **Total** | **144** (all in `backend/api/swagger.yaml`) | |
 
 Shared inside M2: `kernel` (errors, ranks, cursors, outbox events, activity), `api` (authorizer, task resolver, hooks), `ports`
-(People), `testdb`. 28 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (nine pages). Product UI: `/workspace` (board, list with saved views and bulk actions, calendar, Gantt, backlog, settings, task drawer, My work, search) and the anonymous public page `/public/projects/{token}` (`docs/modules/m2-projects-tasks/notes-ui.md`). Command line: `backend/cmd/jaas-pm`, MCP server: `backend/cmd/jaas-pm-mcp`.
+(People), `testdb`. 29 migrations in `backend/migrations/projects`. Console: `/dev-test/projects` (nine pages). Product UI: `/workspace` (board, list with saved views and bulk actions, calendar, Gantt, backlog, settings, task drawer, My work, search) and the anonymous public page `/public/projects/{token}` (`docs/modules/m2-projects-tasks/notes-ui.md`). Command line: `backend/cmd/jaas-pm`, MCP server: `backend/cmd/jaas-pm-mcp`.
 
 ## Files in this folder
 

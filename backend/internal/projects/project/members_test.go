@@ -22,8 +22,8 @@ func TestMembersLifecycle(t *testing.T) {
 	if _, err = e.svc.AddMember(bg, owner, p.ID, MemberInput{UserID: ghost, Role: "member"}); err == nil {
 		t.Fatal("unknown users are refused")
 	}
-	for _, in := range []MemberInput{{UserID: alice.UserID}, {UserID: alice.UserID, Role: "boss"}, {UserID: alice.UserID, Role: "member", CustomRoleID: &p.ID},
-		{UserID: alice.UserID, CustomRoleID: &p.ID}} {
+	for _, in := range []MemberInput{{UserID: alice.UserID}, {UserID: alice.UserID, Role: "boss"}, {UserID: alice.UserID, Role: "member", RoleID: &p.ID},
+		{UserID: alice.UserID, RoleID: &p.ID}} {
 		if _, err = e.svc.ChangeMember(bg, owner, p.ID, alice.UserID, in); err == nil {
 			t.Fatalf("invalid role input accepted: %+v", in)
 		}
@@ -48,7 +48,9 @@ func TestLastOwnerGuard(t *testing.T) {
 	_, err := e.svc.ChangeMember(bg, owner, p.ID, owner.UserID, MemberInput{Role: "manager"})
 	wantCode(t, err, "LAST_OWNER")
 	wantCode(t, e.svc.RemoveMember(bg, owner, p.ID, owner.UserID), "LAST_OWNER")
-	_, _ = e.svc.AddMember(bg, owner, p.ID, MemberInput{UserID: second.UserID, Role: "owner"})
+	if _, err = e.svc.AddMember(bg, owner, p.ID, MemberInput{UserID: second.UserID, Role: "owner"}); err != nil {
+		t.Fatalf("add second owner: %v", err)
+	}
 	if _, err = e.svc.ChangeMember(bg, second, p.ID, owner.UserID, MemberInput{Role: "member"}); err != nil {
 		t.Fatalf("owners can demote another owner: %v", err)
 	}
@@ -71,55 +73,36 @@ func TestLastOwnerGuard(t *testing.T) {
 	}
 }
 
-func TestCustomRoles(t *testing.T) {
+// DPJ-49: roles live in M0. A member can hold a custom project role; its permissions and name come from M0 at once, and a role
+// M0 does not know is refused.
+func TestMemberWithCustomRoleFromIdentity(t *testing.T) {
 	e := newEnv(t)
-	admin, owner, user := e.user("roles"), e.user("create"), e.user()
-	if _, err := e.svc.CreateRole(bg, user, RoleInput{Name: "X", Permissions: []string{"project.read", "task.read"}}); err == nil {
-		t.Fatal("roles need project_roles:manage")
-	}
-	bad := []RoleInput{{Name: ""}, {Name: "Owner", Permissions: []string{"project.read", "task.read"}}, {Name: "Z", Permissions: []string{"nope"}},
-		{Name: "Z", Permissions: []string{"task.create"}}, {Name: "Z", Description: string(repeat('a', 301)), Permissions: []string{"project.read", "task.read"}}}
-	for _, in := range bad {
-		if _, err := e.svc.CreateRole(bg, admin, in); err == nil {
-			t.Errorf("accepted %+v", in)
-		}
-	}
-	r, err := e.svc.CreateRole(bg, admin, RoleInput{Name: "Reviewer", Permissions: []string{"project.read", "task.read", "task.comment", "task.comment"}})
-	if err != nil || len(r.Permissions) != 3 {
-		t.Fatalf("create: %+v %v", r, err)
-	}
-	_, err = e.svc.CreateRole(bg, admin, RoleInput{Name: "reviewer", Permissions: []string{"project.read", "task.read"}})
-	wantCode(t, err, "ROLE_NAME_TAKEN")
+	owner, user := e.user("create"), e.user()
 	p := e.project(owner, "ROLE")
-	if _, err = e.svc.AddMember(bg, owner, p.ID, MemberInput{UserID: user.UserID, CustomRoleID: &r.ID}); err != nil {
+	role := e.res.DefineRole("Reviewer", "project.read", "task.read", "task.comment")
+	if _, err := e.svc.AddMember(bg, owner, p.ID, MemberInput{UserID: user.UserID, RoleID: &role}); err != nil {
 		t.Fatal(err)
 	}
 	acc, _ := e.svc.Access(bg, nil, user, p.ID)
 	if !acc.Can(api.TaskComment) || acc.Can(api.TaskCreate) || acc.Role != "Reviewer" {
 		t.Fatalf("custom role access: %+v", acc)
 	}
-	r, err = e.svc.UpdateRole(bg, admin, r.ID, RoleInput{Name: "Reviewer", Permissions: []string{"project.read", "task.read", "task.create"}})
+	members, err := e.svc.Members(bg, owner, p.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if acc, _ = e.svc.Access(bg, nil, user, p.ID); !acc.Can(api.TaskCreate) || acc.Can(api.TaskComment) {
-		t.Fatal("role edits apply to members at once")
+	for _, m := range members {
+		if m.UserID == user.UserID && (m.RoleID != role || m.RoleName != "Reviewer" || m.RoleKey != "") {
+			t.Fatalf("member view: %+v", m)
+		}
 	}
-	wantCode(t, e.svc.DeleteRole(bg, admin, r.ID), "ROLE_IN_USE")
-	_ = e.svc.RemoveMember(bg, owner, p.ID, user.UserID)
-	if err = e.svc.DeleteRole(bg, admin, r.ID); err != nil {
+	unknown := uuid.New()
+	_, err = e.svc.ChangeMember(bg, owner, p.ID, user.UserID, MemberInput{RoleID: &unknown})
+	wantCode(t, err, "VALIDATION_ERROR")
+	if _, err = e.svc.ChangeMember(bg, owner, p.ID, user.UserID, MemberInput{Role: "viewer"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = e.svc.DeleteRole(bg, admin, r.ID); err == nil {
-		t.Fatal("deleting twice is 404")
-	}
-	if roles, _ := e.svc.Roles(bg, admin); len(roles) != 0 {
-		t.Fatal("roles list")
-	}
-	if _, err = e.svc.UpdateRole(bg, admin, uuid.New(), RoleInput{Name: "N", Permissions: []string{"project.read", "task.read"}}); err == nil {
-		t.Fatal("unknown role")
-	}
-	if c := PermissionCatalogue(); len(c.Permissions) != len(api.AllPerms) || len(c.Roles) != 4 {
-		t.Fatal("catalogue")
+	if acc, _ = e.svc.Access(bg, nil, user, p.ID); acc.Can(api.TaskComment) || acc.Role != "viewer" {
+		t.Fatalf("back to viewer: %+v", acc)
 	}
 }

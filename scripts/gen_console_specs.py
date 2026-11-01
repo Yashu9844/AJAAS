@@ -31,7 +31,7 @@ CONTEXTS = {
 # M2 Projects & Tasks: routes live at the /api/v1 root, written to their own generated file.
 # A path belongs to the context with the longest matching prefix, so nested prefixes can be split between contexts.
 PM_CONTEXTS = {
-    'projects': ('PM_PROJECTS', ['/projects', '/project-roles', '/project-permissions', '/project-labels']),
+    'projects': ('PM_PROJECTS', ['/projects', '/project-labels']),
     'tasks': ('PM_TASKS', ['/projects/{id}/tasks', '/projects/{id}/activity', '/tasks', '/tickets']),
     'collab': ('PM_COLLAB', ['/tasks/{id}/comments', '/tasks/{id}/watch', '/tasks/{id}/watchers', '/tasks/{id}/time', '/tasks/{id}/attachments',
                              '/projects/{id}/time', '/comments', '/time-entries', '/attachments']),

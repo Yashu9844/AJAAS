@@ -31,7 +31,7 @@ func TestMembersCarryDisplayNames(t *testing.T) {
 	_, _ = e.svc.AddMember(bg, owner, p.ID, MemberInput{UserID: member.UserID, Role: "member"})
 
 	names := fakeNames{names: map[uuid.UUID]string{owner.UserID: "Olivia Owner"}}
-	withNames := NewService(e.db, Ports{Users: e.users, Audit: e.audit, Names: names})
+	withNames := NewService(e.db, Ports{Users: e.users, Audit: e.audit, Names: names, Resources: e.res})
 	rows, err := withNames.Members(bg, owner, p.ID)
 	if err != nil || len(rows) != 2 {
 		t.Fatalf("members: %v %d", err, len(rows))
@@ -43,7 +43,7 @@ func TestMembersCarryDisplayNames(t *testing.T) {
 	if got[owner.UserID] != "Olivia Owner" || got[member.UserID] != "" {
 		t.Fatalf("known names are filled, unknown stay empty: %v", got)
 	}
-	failing := NewService(e.db, Ports{Users: e.users, Audit: e.audit, Names: fakeNames{err: errors.New("down")}})
+	failing := NewService(e.db, Ports{Users: e.users, Audit: e.audit, Names: fakeNames{err: errors.New("down")}, Resources: e.res})
 	if rows, err = failing.Members(bg, owner, p.ID); err != nil || len(rows) != 2 {
 		t.Fatalf("a failing names lookup must not fail the list: %v", err)
 	}

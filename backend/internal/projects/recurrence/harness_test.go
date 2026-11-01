@@ -122,7 +122,7 @@ func newEnv(t *testing.T) *env {
 	db := testdb.Open(t)
 	e := &env{t: t, db: db, audit: &fakeAudit{}, users: fakeUsers{active: map[uuid.UUID]bool{}}, tenant: uuid.New(),
 		clock: time.Date(2026, 3, 10, 9, 30, 0, 0, time.UTC)}
-	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit})
+	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit, Resources: testdb.NewResources()})
 	e.tasks = &fakeTasks{db: db}
 	e.svc = NewService(db, e.proj, e.tasks, Ports{Audit: e.audit})
 	e.svc.now = func() time.Time { return e.clock }

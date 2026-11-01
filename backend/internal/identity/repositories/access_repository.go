@@ -124,7 +124,7 @@ func (r *accessRepository) AutomaticAssignments(ctx context.Context, db *gorm.DB
 func (r *accessRepository) UpsertPermission(ctx context.Context, db *gorm.DB, p *models.Permission) error {
 	return db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "resource"}, {Name: "action"}},
-		DoUpdates: clause.AssignmentColumns([]string{"description", "module", "is_sensitive", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"description", "module", "is_sensitive", "applies_to", "updated_at"}),
 	}).Create(p).Error
 }
 

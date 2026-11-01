@@ -98,12 +98,9 @@ func TestBulkValidationAndPermissions(t *testing.T) {
 	if _, err := e.svc.Bulk(bg, e.user(), p.ID, BulkInput{TaskIDs: []uuid.UUID{v.ID}, Priority: str("low")}); code(err) != "NOT_FOUND" {
 		t.Fatalf("stranger: %v", err)
 	}
-	custom, err := e.proj.CreateRole(bg, e.user("admin"), roleIn("Updater", "project.read", "task.read", "task.update"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	custom := e.res.DefineRole("Updater", "project.read", "task.read", "task.update")
 	cu := e.user()
-	if _, err = e.proj.AddMember(bg, owner, p.ID, customMemberIn(cu.UserID, custom.ID)); err != nil {
+	if _, err := e.proj.AddMember(bg, owner, p.ID, customMemberIn(cu.UserID, custom)); err != nil {
 		t.Fatal(err)
 	}
 	out, err := e.svc.Bulk(bg, cu, p.ID, BulkInput{TaskIDs: []uuid.UUID{v.ID}, AssigneesAdd: []uuid.UUID{member.UserID}})

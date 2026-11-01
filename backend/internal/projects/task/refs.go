@@ -104,9 +104,8 @@ func checkAssignees(tx *gorm.DB, tenantID, projectID uuid.UUID, ids []uuid.UUID)
 	if len(ids) == 0 {
 		return nil
 	}
-	n, err := count(tx, `SELECT count(*) FROM project_members m LEFT JOIN project_roles r ON r.id = m.custom_role_id
-		WHERE m.tenant_id = ? AND m.project_id = ? AND m.active AND m.user_id IN ?
-		AND (m.role_key IS NOT NULL OR r.permissions @> '["task.read"]'::jsonb)`, tenantID, projectID, ids)
+	n, err := count(tx, `SELECT count(*) FROM project_members m
+		WHERE m.tenant_id = ? AND m.project_id = ? AND m.active AND m.user_id IN ?`, tenantID, projectID, ids)
 	if err != nil {
 		return err
 	}

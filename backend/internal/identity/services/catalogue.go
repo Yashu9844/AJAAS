@@ -61,7 +61,7 @@ func (c *catalogue) Register(ctx context.Context, defs []access.PermissionDef) e
 	}
 	for _, def := range defs {
 		desc := def.Description
-		row := &models.Permission{Resource: def.Resource, Action: def.Action, Description: &desc, Module: def.Module, IsSensitive: def.Sensitive}
+		row := &models.Permission{Resource: def.Resource, Action: def.Action, Description: &desc, Module: def.Module, IsSensitive: def.Sensitive, AppliesTo: appliesOf(def.AppliesTo)}
 		if err := c.d.Access.UpsertPermission(ctx, c.d.DB, row); err != nil {
 			return fmt.Errorf("register %s: %w", def.Key(), err)
 		}
@@ -138,7 +138,7 @@ func (c *catalogue) createTemplateRole(ctx context.Context, tx *gorm.DB, tenantI
 		name = tpl.Name + " (predefined)"
 	}
 	key, desc := tpl.Key, tpl.Description
-	role := &models.Role{TenantID: tenantID, Name: name, Description: &desc, TemplateKey: &key, IsAutomatic: tpl.Automatic, TemplateManaged: true}
+	role := &models.Role{TenantID: tenantID, Name: name, Description: &desc, TemplateKey: &key, IsAutomatic: tpl.Automatic, TemplateManaged: true, AppliesTo: appliesOf(tpl.AppliesTo)}
 	if parent := byKey[tpl.Parent]; parent != nil {
 		role.ParentRoleID = &parent.ID
 	}
@@ -188,4 +188,12 @@ func (c *catalogue) permissionIDs(ctx context.Context, db *gorm.DB) (map[string]
 		out[access.Key(p.Resource, p.Action)] = p.ID
 	}
 	return out, nil
+}
+
+// appliesOf maps an empty applies_to to the tenant default.
+func appliesOf(v string) string {
+	if v == "" {
+		return access.AppliesTenant
+	}
+	return v
 }

@@ -14,10 +14,9 @@ func roleOf(e *env, p *Project, u api.Actor) (string, string) {
 	if err := e.db.Where("project_id = ? AND user_id = ? AND active", p.ID, u.UserID).Take(&m).Error; err != nil {
 		return "", ""
 	}
-	if m.RoleKey == nil {
-		return "", m.Source
-	}
-	return *m.RoleKey, m.Source
+	role, _ := e.res.RolesFor(bg, e.db, e.tenant, u.UserID, "project", []uuid.UUID{p.ID})
+	key, _ := roleLabel(role[p.ID])
+	return key, m.Source
 }
 
 // PR-04: department, team and reports-of rules expand into members, the highest role wins, direct members stay.
@@ -117,7 +116,7 @@ func TestGroupRuleGuards(t *testing.T) {
 	if _, err := e.svc.GroupRules(bg, member, p.ID); err == nil {
 		t.Fatal("rules are visible to managers only")
 	}
-	noPeople := NewService(e.db, Ports{Users: e.users, Audit: e.audit})
+	noPeople := NewService(e.db, Ports{Users: e.users, Audit: e.audit, Resources: e.res})
 	_, err := noPeople.AddGroupRule(bg, owner, p.ID, ok)
 	wantCode(t, err, "PEOPLE_UNAVAILABLE")
 	wantCode(t, noPeople.RemoveGroupRule(bg, owner, p.ID, uuid.New()), "PEOPLE_UNAVAILABLE")

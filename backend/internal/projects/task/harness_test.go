@@ -68,13 +68,15 @@ type env struct {
 	audit  *fakeAudit
 	users  fakeUsers
 	tenant uuid.UUID
+	res    *testdb.Resources
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
 	db := testdb.Open(t)
 	e := &env{t: t, db: db, audit: &fakeAudit{}, users: fakeUsers{active: map[uuid.UUID]bool{}}, tenant: uuid.New()}
-	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit})
+	e.res = testdb.NewResources()
+	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit, Resources: e.res})
 	e.svc = NewService(db, e.proj, Ports{Audit: e.audit})
 	return e
 }
@@ -89,7 +91,7 @@ func (e *env) user(flags ...string) api.Actor {
 		case "readall":
 			a.ReadAll = true
 		case "admin":
-			a.ManageAll, a.ManageRoles = true, true
+			a.ManageAll = true
 		}
 	}
 	return a
@@ -227,12 +229,8 @@ func memberIn(user uuid.UUID, role string) project.MemberInput {
 	return project.MemberInput{UserID: user, Role: role}
 }
 
-func roleIn(name string, perms ...string) project.RoleInput {
-	return project.RoleInput{Name: name, Permissions: perms}
-}
-
 func customMemberIn(user, role uuid.UUID) project.MemberInput {
-	return project.MemberInput{UserID: user, CustomRoleID: &role}
+	return project.MemberInput{UserID: user, RoleID: &role}
 }
 
 var versionConflictForTest = kernel.VersionConflict{Current: 7}

@@ -44,6 +44,7 @@ type Module struct {
 	settingsRepo repositories.TenantSettingsRepository
 	auditRepo    repositories.AuditLogRepository
 	accessRepo   repositories.AccessRepository
+	resourceRepo repositories.ResourceRoleRepository
 
 	// Services
 	auditSvc   services.AuditService
@@ -55,6 +56,7 @@ type Module struct {
 	userSvc    services.UserService
 	authSvc    services.AuthService
 	resolver   services.AccessResolver
+	resources  services.ResourceAccess
 	catalogue  services.Catalogue
 	accessSvc  services.AccessService
 	eventSink  services.EventSink
@@ -108,6 +110,7 @@ func NewModule(
 	m.settingsRepo = repositories.NewTenantSettingsRepository()
 	m.auditRepo = repositories.NewAuditLogRepository()
 	m.accessRepo = repositories.NewAccessRepository()
+	m.resourceRepo = repositories.NewResourceRoleRepository()
 
 	// 2. Initialize Services
 	jwtConfig := &sharedConfig.JWTConfig{
@@ -133,11 +136,12 @@ func NewModule(
 		services.WithAdminProvisioning(m.userRepo, m.userRoleRepo), services.WithRoleProvisioner(m.catalogue.ProvisionTenant),
 		services.WithTenantEvents(m.eventSink))
 	m.roleSvc = services.NewRoleService(m.roleRepo, m.permRepo, m.userRoleRepo, m.rolePermRepo, m.userRepo, publisher, m.auditSvc,
-		services.WithAccessModel(m.accessRepo, m.resolver), services.WithRoleEvents(m.eventSink))
+		services.WithAccessModel(m.accessRepo, m.resolver), services.WithRoleEvents(m.eventSink), services.WithResourceRoles(m.resourceRepo))
 	m.permSvc = services.NewPermissionService(m.permRepo)
 	m.inviteRepo = repositories.NewInvitationRepository()
 	m.inviteSvc = services.NewInvitationService(services.InvitationDeps{Invitations: m.inviteRepo, Users: m.userRepo,
 		Tokens: m.tokenSvc, Secrets: secretRouter{m: m}, Sink: m.eventSink, Audit: m.auditSvc})
+	m.resources = services.NewResourceAccess(services.ResourceAccessDeps{Repo: m.resourceRepo, Roles: m.roleRepo, Access: m.accessRepo, Resolver: m.resolver, Audit: m.auditSvc})
 	m.accessSvc = services.NewAccessService(services.AccessServiceDeps{Users: m.userRepo, Perms: m.permRepo, UserRoles: m.userRoleRepo,
 		Access: m.accessRepo, Resolver: m.resolver, Audit: m.auditSvc})
 	m.automatic = services.NewAutomaticRoles(services.AutomaticRolesDeps{DB: db, Access: m.accessRepo, UserRoles: m.userRoleRepo,
@@ -305,6 +309,9 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 
 // UserService exposes the user domain service to dependent modules (Module 1+).
 func (m *Module) UserService() services.UserService { return m.userSvc }
+
+// ResourceAccess exposes role assignments on resources such as projects.
+func (m *Module) ResourceAccess() services.ResourceAccess { return m.resources }
 
 // AuditService exposes the audit transport to dependent modules.
 func (m *Module) AuditService() services.AuditService { return m.auditSvc }

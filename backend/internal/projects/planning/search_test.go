@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/projects/api"
-	"github.com/jaas/jaas/internal/projects/project"
 )
 
 func hitIDs(h []SearchHit) []uuid.UUID {
@@ -111,29 +110,6 @@ func TestPG9SearchIsTenantIsolatedAndPrivacyAware(t *testing.T) {
 	}
 	if h, err := e.svc.Search(bg, e.user(), SearchParams{Query: "nothing-readable-here", Limit: 5}); err != nil || h == nil {
 		t.Fatalf("a caller without projects gets an empty list: %v %v", h, err)
-	}
-}
-
-// A custom role with project.read but not task.read must not search the tasks.
-func TestSearchHonoursTaskReadOfCustomRoles(t *testing.T) {
-	e := newEnv(t)
-	owner, admin, guest := e.user("create"), e.user("admin"), e.user()
-	p := e.scrum(owner, "CUS")
-	e.task(p, tk{title: "Walrus roadmap", col: e.col(p, "todo")})
-	role, err := e.proj.CreateRole(bg, admin, project.RoleInput{Name: "Peek", Permissions: []string{"project.read", "task.read"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The API refuses such a role; the database could still hold one (older data, manual change), so the read models cope.
-	e.db.Exec(`UPDATE project_roles SET permissions = '["project.read"]' WHERE id = ?`, role.ID)
-	if _, err = e.proj.AddMember(bg, owner, p.ID, project.MemberInput{UserID: guest.UserID, CustomRoleID: &role.ID}); err != nil {
-		t.Fatal(err)
-	}
-	if h, _ := e.svc.Search(bg, guest, SearchParams{Query: "walrus", Limit: 10}); len(h) != 0 {
-		t.Fatalf("project.read alone must not expose tasks: %+v", h)
-	}
-	if h, _ := e.svc.Search(bg, owner, SearchParams{Query: "walrus", Limit: 10}); len(h) != 1 {
-		t.Fatal("the owner still finds it")
 	}
 }
 

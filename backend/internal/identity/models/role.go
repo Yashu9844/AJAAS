@@ -18,6 +18,7 @@ type Role struct {
 	TemplateKey     *string    `gorm:"type:varchar(50);uniqueIndex:uq_roles_tenant_template_key,priority:2,where:template_key IS NOT NULL AND deleted_at IS NULL" json:"template_key,omitempty"`
 	IsAutomatic     bool       `gorm:"not null;default:false" json:"is_automatic"`
 	TemplateManaged bool       `gorm:"not null;default:false" json:"template_managed"`
+	AppliesTo       string     `gorm:"type:varchar(20);not null;default:tenant" json:"applies_to"`
 
 	// Relationships
 	Permissions []RolePermission `gorm:"foreignKey:RoleID" json:"permissions,omitempty"`

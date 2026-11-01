@@ -53,6 +53,68 @@ func (p *port) AuditTrail(action, resource string) gin.HandlerFunc {
 func (p *port) Users() identityport.Users   { return users{svc: p.m.UserService()} }
 func (p *port) Audit() identityport.Auditor { return p.m.AuditService() }
 
+func (p *port) Resources() identityport.ResourceAccess { return resources{svc: p.m.ResourceAccess()} }
+
+type resources struct {
+	svc identityServices.ResourceAccess
+}
+
+func (r resources) PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, rt string, id uuid.UUID) (identityport.ResourceRole, []string, error) {
+	role, perms, err := r.svc.PermissionsOn(ctx, db, tenantID, userID, rt, id)
+	return identityport.ResourceRole(role), perms, err
+}
+
+func (r resources) RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, rt string, ids []uuid.UUID) (map[uuid.UUID]identityport.ResourceRole, error) {
+	rows, err := r.svc.RolesFor(ctx, db, tenantID, userID, rt, ids)
+	out := make(map[uuid.UUID]identityport.ResourceRole, len(rows))
+	for k, v := range rows {
+		out[k] = identityport.ResourceRole(v)
+	}
+	return out, err
+}
+
+func (r resources) AssignRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID, roleID uuid.UUID, rt string, id uuid.UUID, source string) error {
+	err := r.svc.AssignRole(ctx, tx, tenantID, actorID, userID, roleID, rt, id, source)
+	var app *sharedErrors.AppError
+	switch {
+	case errors.Is(err, identityServices.ErrRoleScope):
+		return identityport.ErrRoleNotApplicable
+	case errors.As(err, &app) && app.StatusCode == 404:
+		return identityport.ErrRoleNotFound
+	}
+	return err
+}
+
+func (r resources) RevokeRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID uuid.UUID, rt string, id uuid.UUID) error {
+	return r.svc.RevokeRole(ctx, tx, tenantID, actorID, userID, rt, id)
+}
+
+func (r resources) RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rt string, id uuid.UUID) ([]identityport.ResourceRole, error) {
+	rows, err := r.svc.RolesOn(ctx, db, tenantID, rt, id)
+	out := make([]identityport.ResourceRole, len(rows))
+	for i, x := range rows {
+		out[i] = identityport.ResourceRole(x)
+	}
+	return out, err
+}
+
+func (r resources) AvailableRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rt string) ([]identityport.ResourceRole, error) {
+	rows, err := r.svc.AvailableRoles(ctx, db, tenantID, rt)
+	out := make([]identityport.ResourceRole, len(rows))
+	for i, x := range rows {
+		out[i] = identityport.ResourceRole(x)
+	}
+	return out, err
+}
+
+func (r resources) RoleByTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, key string) (uuid.UUID, error) {
+	return r.svc.RoleByTemplate(ctx, db, tenantID, key)
+}
+
+func (r resources) CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rt string, id uuid.UUID, key string) (int64, error) {
+	return r.svc.CountWithTemplate(ctx, db, tenantID, rt, id, key)
+}
+
 func (p *port) RegisterPermissions(ctx context.Context, defs []access.PermissionDef) error {
 	return p.m.RegisterCatalogue(ctx, defs)
 }

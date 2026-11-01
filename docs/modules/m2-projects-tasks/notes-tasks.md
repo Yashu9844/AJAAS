@@ -55,7 +55,7 @@ integration tests green; not committed (the lead commits).
   and dates and only the field name for title/description; audit metadata is project id and version. Tested (PG12).
 - **Force = `task.delete` holder** (manager proxy) for blocked tasks and open subtasks, as the brief said; needed only when the
   rule would otherwise refuse.
-- **Assignees.** Must be active project members whose role can read tasks (built-in role or custom role holding `task.read`).
+- **Assignees.** Must be active project members; every M0 project role holds `task:read`, so membership is enough.
   View: `assignee_ids` lists active assignees, `assignees` lists every assignment with `active`; inactive ones (deactivated login,
   migration 000040) are history only: not counted in the 20-assignee cap, not matched by the assignee filter, not copied by
   duplicate. Assigning an inactive user again reactivates the row. Explicit unassign deletes the row.

@@ -26,11 +26,11 @@ func (s *Service) RefreshGroups(ctx context.Context, tenantID, projectID uuid.UU
 		if _, err := lockProject(tx, tenantID, projectID); err != nil {
 			return err
 		}
-		return s.reconcile(tx, tenantID, projectID, want)
+		return s.reconcile(ctx, tx, tenantID, projectID, want)
 	})
 }
 
-func (s *Service) reconcile(tx *gorm.DB, tenantID, projectID uuid.UUID, want map[uuid.UUID]string) error {
+func (s *Service) reconcile(ctx context.Context, tx *gorm.DB, tenantID, projectID uuid.UUID, want map[uuid.UUID]string) error {
 	var have []Member
 	if err := tx.Where("project_id = ? AND source = 'group'", projectID).Find(&have).Error; err != nil {
 		return err
@@ -39,14 +39,25 @@ func (s *Service) reconcile(tx *gorm.DB, tenantID, projectID uuid.UUID, want map
 	for _, m := range have {
 		current[m.UserID] = m
 	}
+	roles, err := s.p.Resources.RolesOn(ctx, tx, tenantID, projectResource, projectID)
+	if err != nil {
+		return err
+	}
+	held := map[uuid.UUID]string{}
+	for _, r := range roles {
+		held[r.UserID] = r.TemplateKey
+	}
 	for uid, role := range want {
-		if err := s.upsertGroupMember(tx, groupScope{tenantID, projectID, current}, uid, role); err != nil {
+		if err := s.upsertGroupMember(ctx, tx, groupScope{tenantID, projectID, current, held}, uid, role); err != nil {
 			return err
 		}
 	}
 	for uid := range current {
 		if _, keep := want[uid]; !keep {
 			if err := tx.Exec(`DELETE FROM project_members WHERE project_id = ? AND user_id = ? AND source = 'group'`, projectID, uid).Error; err != nil {
+				return err
+			}
+			if err := s.p.Resources.RevokeRole(ctx, tx, tenantID, uuid.Nil, uid, projectResource, projectID); err != nil {
 				return err
 			}
 			if err := dropWatches(tx, tenantID, projectID, uid); err != nil {
@@ -61,20 +72,7 @@ func (s *Service) reconcile(tx *gorm.DB, tenantID, projectID uuid.UUID, want map
 type groupScope struct {
 	tenantID, projectID uuid.UUID
 	current             map[uuid.UUID]Member
-}
-
-// upsertGroupMember inserts or updates a group member; a user who is already a direct member keeps the direct row.
-func (s *Service) upsertGroupMember(tx *gorm.DB, scope groupScope, uid uuid.UUID, role string) error {
-	tenantID, projectID, current := scope.tenantID, scope.projectID, scope.current
-	if cur, ok := current[uid]; ok {
-		if cur.RoleKey != nil && *cur.RoleKey == role && cur.Active {
-			return nil
-		}
-		return tx.Exec(`UPDATE project_members SET role_key = ?, active = TRUE WHERE project_id = ? AND user_id = ? AND source = 'group'`, role, projectID, uid).Error
-	}
-	return tx.Exec(`INSERT INTO project_members (project_id, user_id, tenant_id, role_key, active, added_by, added_at, source)
-		VALUES (?, ?, ?, ?, TRUE, ?, ?, 'group') ON CONFLICT (project_id, user_id) DO NOTHING`,
-		projectID, uid, tenantID, role, uid, s.now().UTC()).Error
+	held                map[uuid.UUID]string // M0 role template key per user
 }
 
 // RefreshAll refreshes every project of the tenant that has rules; a periodic sweep keeps group membership aligned with HR.
@@ -106,4 +104,27 @@ func (s *Service) RunGroupRefresh(ctx context.Context, interval time.Duration, o
 			}
 		}
 	}
+}
+
+// upsertGroupMember inserts or updates a group member; a user who is already a direct member keeps the direct row.
+func (s *Service) upsertGroupMember(ctx context.Context, tx *gorm.DB, scope groupScope, uid uuid.UUID, role string) error {
+	tenantID, projectID := scope.tenantID, scope.projectID
+	cur, exists := scope.current[uid]
+	if exists && cur.Active && scope.held[uid] == templatePrefix+role {
+		return nil
+	}
+	if !exists {
+		res := tx.Exec(`INSERT INTO project_members (project_id, user_id, tenant_id, active, added_by, added_at, source)
+			VALUES (?, ?, ?, TRUE, ?, ?, 'group') ON CONFLICT (project_id, user_id) DO NOTHING`, projectID, uid, tenantID, uid, s.now().UTC())
+		if res.Error != nil || res.RowsAffected == 0 { // a direct member keeps its own role
+			return res.Error
+		}
+	} else if err := tx.Exec(`UPDATE project_members SET active = TRUE WHERE project_id = ? AND user_id = ? AND source = 'group'`, projectID, uid).Error; err != nil {
+		return err
+	}
+	rid, err := s.p.Resources.RoleByTemplate(ctx, tx, tenantID, templatePrefix+role)
+	if err != nil {
+		return err
+	}
+	return s.p.Resources.AssignRole(ctx, tx, tenantID, uuid.Nil, uid, rid, projectResource, projectID, "group")
 }

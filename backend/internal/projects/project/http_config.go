@@ -9,29 +9,6 @@ import (
 	"github.com/jaas/jaas/internal/projects/kernel"
 )
 
-func (h handler) roleRoutes(g *gin.RouterGroup) {
-	g.GET("/project-permissions", act(func(c *gin.Context, _ api.Actor) { kernel.Respond(c, http.StatusOK, PermissionCatalogue(), nil) }))
-	g.GET("/project-roles", act(func(c *gin.Context, a api.Actor) {
-		rows, err := h.s.Roles(c.Request.Context(), a)
-		kernel.Respond(c, http.StatusOK, rows, err)
-	}))
-	g.POST("/project-roles", act(func(c *gin.Context, a api.Actor) {
-		body(c, func(in RoleInput) {
-			r, err := h.s.CreateRole(c.Request.Context(), a, in)
-			kernel.Respond(c, http.StatusCreated, r, err)
-		})
-	}))
-	g.PATCH("/project-roles/:id", withID(func(c *gin.Context, a api.Actor, id uuid.UUID) {
-		body(c, func(in RoleInput) {
-			r, err := h.s.UpdateRole(c.Request.Context(), a, id, in)
-			kernel.Respond(c, http.StatusOK, r, err)
-		})
-	}))
-	g.DELETE("/project-roles/:id", withID(func(c *gin.Context, a api.Actor, id uuid.UUID) {
-		kernel.Respond(c, http.StatusOK, gin.H{"deleted": true}, h.s.DeleteRole(c.Request.Context(), a, id))
-	}))
-}
-
 func (h handler) columnRoutes(g *gin.RouterGroup) {
 	g.GET("/projects/:id/columns", withID(func(c *gin.Context, a api.Actor, id uuid.UUID) {
 		rows, err := h.s.Columns(c.Request.Context(), a, id)

@@ -14,7 +14,7 @@ target architecture are listed in `plan.md` §3 and scheduled as restructure Pha
 | Tenants | platform-key-guarded create (with first `tenant_admin`), list, get, update, activate, suspend; subdomain resolution |
 | Authentication | login (failure-only rate limit), refresh-token rotation with reuse detection, logout revoking session + refresh, forgot/reset password (1 h single-use tokens), `GET /auth/me` |
 | Users | create, list, get, update, activate, deactivate, assign/unassign roles, invite (used by the HR hire saga) |
-| Roles & permissions | role CRUD, grant/revoke permissions with anti-escalation, permission catalogue (seeded idempotently), `tenant_admin` bypass |
+| Roles & permissions | role CRUD, grant/revoke permissions with anti-escalation, permission catalogue (seeded idempotently), `tenant_admin` bypass; **roles assigned on a resource** (today a project): `applies_to`, project role templates, `resource_role_assignments` - see `resource-roles.md` |
 | Audit | immutable audit log for mutations, `GET /audit-logs` |
 | Security | JWT access 15 min (HS256), refresh 7 days, bcrypt 12, uniform error envelope, security headers, body limit, CORS allowlist, trusted-proxy-aware client IPs |
 

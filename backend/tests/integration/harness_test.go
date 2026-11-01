@@ -85,10 +85,10 @@ func setup(m *testing.M) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := admin.Exec("DROP DATABASE IF EXISTS "+dbName+" WITH (FORCE)").Error; err != nil {
+	if err := admin.Exec("DROP DATABASE IF EXISTS " + dbName + " WITH (FORCE)").Error; err != nil {
 		return 0, err
 	}
-	if err := admin.Exec("CREATE DATABASE "+dbName).Error; err != nil {
+	if err := admin.Exec("CREATE DATABASE " + dbName).Error; err != nil {
 		return 0, err
 	}
 	if sqlDB, e := admin.DB(); e == nil {
@@ -340,11 +340,17 @@ func (tc *tenantCtx) roleID(t *testing.T, name string) string {
 // permID returns the id of resource:action from the seeded catalogue.
 func (tc *tenantCtx) permID(t *testing.T, resource, action string) string {
 	t.Helper()
-	r := tc.do(t, "GET", "/permissions", query("per_page", "100"))
-	for _, it := range r.list("data") {
-		m := it.(map[string]any)
-		if m["resource"] == resource && m["action"] == action {
-			return m["id"].(string)
+	for page := 1; page <= 10; page++ {
+		r := tc.do(t, "GET", "/permissions", query("per_page", "100", "page", fmt.Sprint(page)))
+		items := r.list("data")
+		for _, it := range items {
+			m := it.(map[string]any)
+			if m["resource"] == resource && m["action"] == action {
+				return m["id"].(string)
+			}
+		}
+		if len(items) < 100 {
+			break
 		}
 	}
 	t.Fatalf("permission %s:%s not seeded", resource, action)

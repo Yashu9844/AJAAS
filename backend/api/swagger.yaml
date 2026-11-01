@@ -454,6 +454,11 @@ paths:
                   type: string
                   format: uuid
                   description: The role inherits every grant of its parent (same tenant, acyclic, depth at most 10). The caller must hold everything the parent grants.
+                applies_to:
+                  type: string
+                  enum: [tenant, project]
+                  default: tenant
+                  description: A project role is assigned to a user on one project and may hold only permissions that apply to projects; it must include project:read and task:read. Its parent must apply to the same thing.
       responses:
         '201':
           description: Role created
@@ -5334,6 +5339,16 @@ paths:
       responses:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
         '404': {description: 'NOT_FOUND'}
+  /projects/{id}/roles:
+    get:
+      summary: 'List the M0 project roles that can be given to members (project.manage_members)'
+      tags: [Projects]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
   /projects/{id}/members:
     get:
       summary: 'List active members with role names'
@@ -5344,7 +5359,7 @@ paths:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
         '404': {description: 'NOT_FOUND'}
     post:
-      summary: 'Add a member with a built-in or custom role (project.manage_members)'
+      summary: 'Add a member with a predefined or custom M0 project role (project.manage_members)'
       tags: [Projects]
       security: [{BearerAuth: []}, {TenantSubdomain: []}]
       parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
@@ -5373,53 +5388,6 @@ paths:
       tags: [Projects]
       security: [{BearerAuth: []}, {TenantSubdomain: []}]
       parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}]
-      responses:
-        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
-        '403': {description: 'FORBIDDEN'}
-        '404': {description: 'NOT_FOUND'}
-        '409': {description: 'CONFLICT'}
-  /project-permissions:
-    get:
-      summary: 'Project permissions and the built-in roles'
-      tags: [Project roles]
-      security: [{BearerAuth: []}, {TenantSubdomain: []}]
-      responses:
-        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
-  /project-roles:
-    get:
-      summary: 'List the tenant custom project roles'
-      tags: [Project roles]
-      security: [{BearerAuth: []}, {TenantSubdomain: []}]
-      responses:
-        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsListEnvelope'}}}}
-    post:
-      summary: 'Create a custom role (project_roles:manage)'
-      tags: [Project roles]
-      security: [{BearerAuth: []}, {TenantSubdomain: []}]
-      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectRoleInput'}}}}
-      responses:
-        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
-        '400': {description: 'VALIDATION_ERROR'}
-        '403': {description: 'FORBIDDEN'}
-        '409': {description: 'CONFLICT'}
-  /project-roles/{id}:
-    patch:
-      summary: 'Edit a custom role (project_roles:manage)'
-      tags: [Project roles]
-      security: [{BearerAuth: []}, {TenantSubdomain: []}]
-      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
-      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectRoleInput'}}}}
-      responses:
-        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
-        '400': {description: 'VALIDATION_ERROR'}
-        '403': {description: 'FORBIDDEN'}
-        '404': {description: 'NOT_FOUND'}
-        '409': {description: 'CONFLICT'}
-    delete:
-      summary: 'Delete an unused custom role (project_roles:manage)'
-      tags: [Project roles]
-      security: [{BearerAuth: []}, {TenantSubdomain: []}]
-      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
       responses:
         '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProjectsObjectEnvelope'}}}}
         '403': {description: 'FORBIDDEN'}
@@ -8173,8 +8141,7 @@ components:
     ProjectsObjectEnvelope: {type: object, properties: {data: {type: object}}}
     ProjectsListEnvelope: {type: object, properties: {data: {type: array, items: {type: object}}, meta: {type: object, properties: {limit: {type: integer}, next_cursor: {type: string, nullable: true}}}}}
     ProjectInput: {type: object, properties: {key: {type: string}, name: {type: string}, description: {type: string}, visibility: {type: string, enum: [private, tenant]}, mode: {type: string, enum: [kanban, scrum]}, start_on: {type: string, format: date}, due_on: {type: string, format: date}, icon: {type: string}, color: {type: string, example: '#3B82F6'}, time_tracking_enabled: {type: boolean}, version: {type: integer}}, required: [key, name]}
-    MemberInput: {type: object, properties: {user_id: {type: string, format: uuid}, role: {type: string, enum: [owner, manager, member, viewer]}, custom_role_id: {type: string, format: uuid}}}
-    ProjectRoleInput: {type: object, properties: {name: {type: string}, description: {type: string}, permissions: {type: array, items: {type: string}}}, required: [name, permissions]}
+    MemberInput: {type: object, properties: {user_id: {type: string, format: uuid}, role: {type: string, enum: [owner, manager, member, viewer]}, role_id: {type: string, format: uuid}}}
     ColumnInput: {type: object, properties: {name: {type: string}, category: {type: string, enum: [backlog, todo, in_progress, done, canceled]}, color: {type: string, example: '#3B82F6'}, wip_limit: {type: integer}, clear_wip_limit: {type: boolean}, wip_hard: {type: boolean}, is_default: {type: boolean}}}
     ColumnOrderInput: {type: object, properties: {column_ids: {type: array, items: {type: string, format: uuid}}}, required: [column_ids]}
     LabelInput: {type: object, properties: {name: {type: string}, color: {type: string, example: '#3B82F6'}}, required: [name]}

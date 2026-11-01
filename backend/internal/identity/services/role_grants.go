@@ -16,6 +16,8 @@ type grantSpec struct {
 	id    uuid.UUID
 	key   string
 	scope access.Scope
+	// applies is the permission applies_to value.
+	applies string
 }
 
 func grantsOf(specs []grantSpec) []access.Grant {
@@ -76,13 +78,13 @@ func (s *roleService) lookupGrants(ctx context.Context, db *gorm.DB, order []uui
 	if len(found) != len(order) {
 		return nil, &sharedErrors.AppError{Code: "NOT_FOUND", Message: "One or more permission IDs were not found", StatusCode: 404}
 	}
-	keys := make(map[uuid.UUID]string, len(found))
+	keys, applies := make(map[uuid.UUID]string, len(found)), make(map[uuid.UUID]string, len(found))
 	for _, p := range found {
-		keys[p.ID] = access.Key(p.Resource, p.Action)
+		keys[p.ID], applies[p.ID] = access.Key(p.Resource, p.Action), p.AppliesTo
 	}
 	out := make([]grantSpec, len(order))
 	for i, id := range order {
-		out[i] = grantSpec{id: id, key: keys[id], scope: scopes[id]}
+		out[i] = grantSpec{id: id, key: keys[id], scope: scopes[id], applies: applies[id]}
 	}
 	return out, nil
 }
@@ -141,6 +143,9 @@ func (s *roleService) applyParent(ctx context.Context, tx *gorm.DB, role *models
 	}
 	if _, err := s.findRole(ctx, tx, role.TenantID, parentID); err != nil {
 		return err
+	}
+	if parent, _ := s.roleRepo.FindByID(ctx, tx, role.TenantID, parentID); parent != nil && parent.AppliesTo != role.AppliesTo {
+		return validationError("a role can only inherit from a role that applies to the same thing")
 	}
 	if err := s.checkParent(ctx, tx, role, parentID); err != nil {
 		return err
@@ -226,11 +231,31 @@ func mapRoleToResponse(r *models.Role) *dto.RoleResponse {
 	}
 	res := &dto.RoleResponse{
 		ID: r.ID.String(), Name: r.Name, Description: r.Description, IsSystem: r.IsSystem, TemplateKey: r.TemplateKey,
-		IsAutomatic: r.IsAutomatic, TemplateManaged: r.TemplateManaged, Permissions: perms, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		IsAutomatic: r.IsAutomatic, AppliesTo: r.AppliesTo, TemplateManaged: r.TemplateManaged, Permissions: perms, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 	if r.ParentRoleID != nil {
 		p := r.ParentRoleID.String()
 		res.ParentRoleID = &p
 	}
 	return res
+}
+
+// checkAppliesTo requires every permission of a role to apply to what the role applies to, and project roles to be able
+// to read the project and its tasks (a member who cannot read would be invisible to the rest of the platform).
+func checkAppliesTo(applies string, specs []grantSpec) error {
+	have := map[string]bool{}
+	for _, g := range specs {
+		if appliesOf(g.applies) != applies {
+			return validationError("permission " + g.key + " applies to " + g.applies + ", not " + applies)
+		}
+		have[g.key] = true
+	}
+	if applies == access.AppliesProject {
+		for _, k := range access.ProjectRoleRequired {
+			if !have[k] {
+				return validationError("a project role must include " + k)
+			}
+		}
+	}
+	return nil
 }

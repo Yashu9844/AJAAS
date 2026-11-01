@@ -63,11 +63,23 @@ func TestProjectsContext(t *testing.T) {
 	expect(t, tc.asTok(t, creator, "POST", "/projects/"+pid+"/columns", body(map[string]any{"name": "Review", "category": "in_progress"})), 201, "column")
 	expect(t, tc.asTok(t, creator, "POST", "/projects/"+pid+"/labels", body(map[string]any{"name": "bug", "color": "#FF0000"})), 201, "label")
 	expect(t, tc.asTok(t, creator, "POST", "/projects/"+pid+"/milestones", body(map[string]any{"name": "Beta", "due_on": "2026-12-01"})), 201, "milestone")
-	if c := tc.asTok(t, creator, "GET", "/project-permissions"); len(c.list("data.permissions")) != 20 {
-		t.Fatalf("catalogue: %s", c.Raw)
+	// DPJ-49: project roles live in M0. A project role holds only project permissions and must read the project and its
+	// tasks; defining roles needs M0 role management, and assigning one needs project:manage_members on that project.
+	read, taskRead, comment := tc.permID(t, "project", "read"), tc.permID(t, "task", "read"), tc.permID(t, "task", "comment")
+	roleBody := func(perms ...string) map[string]any {
+		return map[string]any{"name": "Reviewer " + uniq(), "applies_to": "project", "permission_ids": perms}
 	}
-	expectErr(t, tc.asTok(t, creator, "POST", "/project-roles", body(map[string]any{"name": "R", "permissions": []string{"project.read", "task.read"}})), 403, "FORBIDDEN", "roles need project_roles:manage")
-	expect(t, tc.do(t, "POST", "/project-roles", body(map[string]any{"name": "Reviewer", "permissions": []string{"project.read", "task.read", "task.comment"}})), 201, "tenant admin defines a role")
+	expectErr(t, tc.asTok(t, creator, "POST", "/roles", body(roleBody(read, taskRead, comment))), 403, "FORBIDDEN", "defining roles needs role management")
+	expectErr(t, tc.do(t, "POST", "/roles", body(roleBody(read, comment))), 400, "VALIDATION_ERROR", "a project role must include task:read")
+	expectErr(t, tc.do(t, "POST", "/roles", body(roleBody(read, taskRead, tc.permID(t, "projects", "create")))), 400, "VALIDATION_ERROR", "tenant permission in a project role")
+	reviewer := tc.do(t, "POST", "/roles", body(roleBody(read, taskRead, comment)))
+	expect(t, reviewer, 201, "tenant administrator defines a project role")
+	reviewerID := reviewer.str("data.id")
+	guest, _ := tc.newUser(t, "guest")
+	added := tc.asTok(t, creator, "POST", "/projects/"+pid+"/members", body(map[string]any{"user_id": guest, "role_id": reviewerID}))
+	expect(t, added, 201, "member with a custom project role")
+	expectErr(t, tc.asTok(t, creator, "POST", "/projects/"+pid+"/members", body(map[string]any{"user_id": guest, "role_id": tc.roleID(t, "Employee")})), 409, "ALREADY_MEMBER", "already a member")
+	expectErr(t, tc.do(t, "DELETE", "/roles/"+reviewerID), 409, "CONFLICT", "a role assigned on a project cannot be deleted")
 
 	// Lifecycle: archive freezes, delete needs archive and a tenant administrator.
 	expect(t, tc.asTok(t, creator, "POST", "/projects/"+pid+"/archive"), 200, "archive")

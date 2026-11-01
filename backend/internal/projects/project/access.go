@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/projects/api"
@@ -22,7 +23,7 @@ func (s *Service) Access(ctx context.Context, db *gorm.DB, a api.Actor, projectI
 	if err != nil {
 		return api.Access{}, err
 	}
-	held, role, member, err := s.heldPerms(db, a, p)
+	held, role, member, err := s.heldPerms(ctx, db, a, p)
 	if err != nil {
 		return api.Access{}, err
 	}
@@ -39,7 +40,7 @@ func (s *Service) Access(ctx context.Context, db *gorm.DB, a api.Actor, projectI
 }
 
 // heldPerms merges the permission sources before the archive filter.
-func (s *Service) heldPerms(db *gorm.DB, a api.Actor, p Project) (map[api.Perm]bool, string, bool, error) {
+func (s *Service) heldPerms(ctx context.Context, db *gorm.DB, a api.Actor, p Project) (map[api.Perm]bool, string, bool, error) {
 	held := map[api.Perm]bool{}
 	role, member := "", false
 	var m Member
@@ -47,13 +48,15 @@ func (s *Service) heldPerms(db *gorm.DB, a api.Actor, p Project) (map[api.Perm]b
 	switch {
 	case err == nil:
 		member = true
-		perms, name, rerr := s.memberPerms(db, m)
+		rr, keys, rerr := s.p.Resources.PermissionsOn(ctx, db, a.TenantID, m.UserID, projectResource, p.ID)
 		if rerr != nil {
 			return nil, "", false, rerr
 		}
-		role = name
-		for k := range perms {
-			held[k] = true
+		_, role = roleLabel(rr)
+		for _, k := range keys {
+			if perm := strings.Replace(k, ":", ".", 1); api.ValidPerm(perm) {
+				held[api.Perm(perm)] = true
+			}
 		}
 	case !errors.Is(err, gorm.ErrRecordNotFound):
 		return nil, "", false, err
@@ -70,25 +73,6 @@ func (s *Service) heldPerms(db *gorm.DB, a api.Actor, p Project) (map[api.Perm]b
 		held[api.ProjectRead], held[api.TaskRead] = true, true
 	}
 	return held, role, member, nil
-}
-
-// memberPerms returns the permission set and display name of a member role, built-in or custom.
-func (s *Service) memberPerms(db *gorm.DB, m Member) (map[api.Perm]bool, string, error) {
-	if m.RoleKey != nil {
-		return api.BuiltinPerms(*m.RoleKey), *m.RoleKey, nil
-	}
-	var r CustomRole
-	if m.CustomRoleID == nil {
-		return nil, "", nil
-	}
-	if err := db.Where("id = ?", *m.CustomRoleID).Take(&r).Error; err != nil {
-		return nil, "", err
-	}
-	perms := map[api.Perm]bool{}
-	for _, k := range r.Permissions {
-		perms[api.Perm(k)] = true
-	}
-	return perms, r.Name, nil
 }
 
 // ReadableProjectIDs lists the projects the caller can read (used by search and My work).

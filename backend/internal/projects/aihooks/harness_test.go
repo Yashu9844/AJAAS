@@ -75,7 +75,7 @@ func newEnv(t *testing.T) *env {
 	t.Helper()
 	db := testdb.Open(t)
 	e := &env{t: t, db: db, audit: &fakeAudit{}, users: fakeUsers{active: map[uuid.UUID]bool{}}, tenant: uuid.New()}
-	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit})
+	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit, Resources: testdb.NewResources()})
 	e.svc = NewService(db, e.proj, testResolver{e.proj})
 	return e
 }

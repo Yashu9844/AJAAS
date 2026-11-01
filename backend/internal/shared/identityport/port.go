@@ -7,6 +7,7 @@ package identityport
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -40,6 +41,31 @@ type Users interface {
 	// ActivateUser re-enables a deactivated login (HR/Core rehire and rescinded termination).
 	ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error
 	InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in Invite, correlationID uuid.UUID) (*User, error)
+}
+
+// ResourceRole is a role held on one resource.
+type ResourceRole struct {
+	UserID      uuid.UUID
+	RoleID      uuid.UUID
+	RoleName    string
+	TemplateKey string
+	Source      string
+}
+
+// ResourceAccess is M0's view of roles assigned on a resource (docs/modules/m0-identity-access/resource-roles.md).
+// Write methods run inside the caller's transaction so a membership change and its role commit together.
+type ResourceAccess interface {
+	// PermissionsOn returns the role and the permission keys the user holds on the resource through it (zero role: none).
+	PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (ResourceRole, []string, error)
+	// RolesFor maps each resource to the role the user holds on it.
+	RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, ids []uuid.UUID) (map[uuid.UUID]ResourceRole, error)
+	AssignRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID, roleID uuid.UUID, resourceType string, resourceID uuid.UUID, source string) error
+	RevokeRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) error
+	RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID) ([]ResourceRole, error)
+	// AvailableRoles lists the roles of the tenant that can be assigned on the resource type.
+	AvailableRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string) ([]ResourceRole, error)
+	RoleByTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, templateKey string) (uuid.UUID, error)
+	CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID, templateKey string) (int64, error)
 }
 
 // Auditor writes audit records (HR keeps using M0's audit trail until hr.audit_events exists).
@@ -78,6 +104,8 @@ type Port interface {
 	HTTP
 	Users() Users
 	Audit() Auditor
+	// Resources manages roles assigned on resources such as projects.
+	Resources() ResourceAccess
 	// RegisterPermissions registers HR permission definitions (with predefined-role defaults) in M0's catalogue.
 	RegisterPermissions(ctx context.Context, defs []access.PermissionDef) error
 	// OnUserDeactivated registers a hook run when M0 deactivates a user.
@@ -85,3 +113,9 @@ type Port interface {
 	// ProvideRoleFacts installs HR as the source of the automatic Employee and Manager roles.
 	ProvideRoleFacts(f RoleFacts)
 }
+
+// Errors returned when assigning a role on a resource.
+var (
+	ErrRoleNotFound      = errors.New("role not found")
+	ErrRoleNotApplicable = errors.New("role does not apply to this resource")
+)

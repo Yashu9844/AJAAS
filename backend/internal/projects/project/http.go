@@ -49,7 +49,6 @@ func (s *Service) Register(g *gin.RouterGroup) {
 	h := handler{s: s}
 	h.projectRoutes(g)
 	h.memberRoutes(g)
-	h.roleRoutes(g)
 	h.columnRoutes(g)
 	h.labelRoutes(g)
 	h.milestoneRoutes(g)
@@ -102,6 +101,10 @@ func (h handler) projectRoutes(g *gin.RouterGroup) {
 }
 
 func (h handler) memberRoutes(g *gin.RouterGroup) {
+	g.GET("/projects/:id/roles", withID(func(c *gin.Context, a api.Actor, id uuid.UUID) {
+		rows, err := h.s.AssignableRoles(c.Request.Context(), a, id)
+		kernel.Respond(c, http.StatusOK, rows, err)
+	}))
 	g.GET("/projects/:id/members", withID(func(c *gin.Context, a api.Actor, id uuid.UUID) {
 		rows, err := h.s.Members(c.Request.Context(), a, id)
 		kernel.Respond(c, http.StatusOK, rows, err)

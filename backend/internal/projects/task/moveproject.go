@@ -160,7 +160,6 @@ func (m *mut) remapLinks(target uuid.UUID) error {
 		return err
 	}
 	return m.tx.Exec(`DELETE FROM task_assignees ta WHERE ta.task_id = ? AND ta.tenant_id = ? AND NOT EXISTS (
-			SELECT 1 FROM project_members pm LEFT JOIN project_roles r ON r.id = pm.custom_role_id
-			WHERE pm.project_id = ? AND pm.user_id = ta.user_id AND pm.active
-			AND (pm.role_key IS NOT NULL OR r.permissions @> '["task.read"]'::jsonb))`, m.t.ID, tenant, target).Error
+			SELECT 1 FROM project_members pm
+			WHERE pm.project_id = ? AND pm.user_id = ta.user_id AND pm.active)`, m.t.ID, tenant, target).Error
 }

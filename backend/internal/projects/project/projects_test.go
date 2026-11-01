@@ -23,7 +23,7 @@ func TestCreateProjectDefaults(t *testing.T) {
 		e.count(`SELECT count(*) FROM board_columns WHERE project_id = ? AND is_default AND category = 'todo'`, p.ID) != 1 {
 		t.Fatal("default columns")
 	}
-	if e.count(`SELECT count(*) FROM project_members WHERE project_id = ? AND role_key = 'owner' AND user_id = ?`, p.ID, owner.UserID) != 1 {
+	if e.count(`SELECT count(*) FROM project_members WHERE project_id = ? AND user_id = ? AND active`, p.ID, owner.UserID) != 1 || e.mustRole(p, owner) != "owner" {
 		t.Fatal("creator must be the owner")
 	}
 	if e.count(`SELECT count(*) FROM projects_events_outbox WHERE routing_key = 'project.created'`) != 1 || len(e.audit.actions) != 1 {

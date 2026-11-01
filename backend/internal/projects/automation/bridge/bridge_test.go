@@ -60,7 +60,7 @@ func newWorld(t *testing.T) *world {
 	db := testdb.Open(t)
 	w := &world{t: t, db: db, tenant: uuid.New()}
 	users := fakeUsers{active: map[uuid.UUID]bool{}}
-	w.proj = project.NewService(db, project.Ports{Users: users, Audit: fakeAudit{}})
+	w.proj = project.NewService(db, project.Ports{Users: users, Audit: fakeAudit{}, Resources: testdb.NewResources()})
 	w.task = task.NewService(db, w.proj, task.Ports{Audit: fakeAudit{}})
 	cl := collab.NewService(db, collab.Ports{Authorizer: w.proj, Tasks: w.task, Users: users, Audit: fakeAudit{}})
 	w.task.SetHooks(cl.TaskHooks())

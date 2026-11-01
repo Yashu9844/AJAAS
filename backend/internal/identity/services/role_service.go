@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/identity/access"
 	"github.com/jaas/jaas/internal/identity/dto"
 	"github.com/jaas/jaas/internal/identity/events"
 	"github.com/jaas/jaas/internal/identity/models"
@@ -38,7 +39,8 @@ type roleService struct {
 	userRoleRepo repositories.UserRoleRepository
 	rolePermRepo repositories.RolePermissionRepository
 	userRepo     repositories.UserRepository
-	accessRepo   repositories.AccessRepository // nil: no inheritance or scope changes (legacy wiring)
+	resourceRepo repositories.ResourceRoleRepository // nil: roles in use on resources are not checked
+	accessRepo   repositories.AccessRepository       // nil: no inheritance or scope changes (legacy wiring)
 	resolver     AccessResolver
 	publisher    queue.EventPublisher
 	auditSvc     AuditService
@@ -49,6 +51,11 @@ type RoleOption func(*roleService)
 
 // WithRoleEvents records role events through sink (the transactional outbox in production).
 func WithRoleEvents(sink EventSink) RoleOption { return func(s *roleService) { s.sink = sink } }
+
+// WithResourceRoles lets role deletion see assignments on resources.
+func WithResourceRoles(repo repositories.ResourceRoleRepository) RoleOption {
+	return func(s *roleService) { s.resourceRepo = repo }
+}
 
 // WithAccessModel enables inheritance, scope changes and full access resolution for escalation checks.
 func WithAccessModel(repo repositories.AccessRepository, resolver AccessResolver) RoleOption {
@@ -97,13 +104,23 @@ func (s *roleService) CreateRole(ctx context.Context, tx *gorm.DB, tenantID uuid
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureCanGrant(ctx, tx, s.resolver, tenantID, grantsOf(specs)); err != nil {
+	applies := req.AppliesTo
+	if applies == "" {
+		applies = access.AppliesTenant
+	}
+	if err := checkAppliesTo(applies, specs); err != nil {
 		return nil, err
+	}
+	// Project permissions only act inside a project where the caller assigns the role, so they are not escalation.
+	if applies == access.AppliesTenant {
+		if err := ensureCanGrant(ctx, tx, s.resolver, tenantID, grantsOf(specs)); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.ensureNameFree(ctx, tx, tenantID, req.Name, nil); err != nil {
 		return nil, err
 	}
-	role := &models.Role{TenantID: tenantID, Name: req.Name}
+	role := &models.Role{TenantID: tenantID, Name: req.Name, AppliesTo: applies}
 	if req.Description != "" {
 		role.Description = &req.Description
 	}
@@ -219,6 +236,15 @@ func (s *roleService) DeleteRole(ctx context.Context, tx *gorm.DB, tenantID, id 
 	}
 	if holders > 0 {
 		return &sharedErrors.AppError{Code: "CONFLICT", Message: fmt.Sprintf("Role is assigned to %d user(s); unassign it first", holders), StatusCode: 409}
+	}
+	if s.resourceRepo != nil {
+		used, rerr := s.resourceRepo.RoleInUse(ctx, tx, tenantID, id)
+		if rerr != nil {
+			return rerr
+		}
+		if used > 0 {
+			return &sharedErrors.AppError{Code: "CONFLICT", Message: fmt.Sprintf("Role is assigned on %d resource(s); change those first", used), StatusCode: 409}
+		}
 	}
 	if err := s.ensureNoChildren(ctx, tx, tenantID, id); err != nil {
 		return err

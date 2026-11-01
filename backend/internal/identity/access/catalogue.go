@@ -29,22 +29,44 @@ type Template struct {
 	Description string
 	Parent      string // template key of the parent role; "" for none
 	Automatic   bool   // held automatically from HR facts; never assigned by hand
+	AppliesTo   string // "" or AppliesTenant: assigned tenant-wide; AppliesProject: assigned on one project
 }
+
+// What a role or permission applies to (resource-scoped roles, docs/modules/m0-identity-access/resource-roles.md).
+const (
+	AppliesTenant  = "tenant"
+	AppliesProject = "project"
+)
+
+// ProjectRoleRequired are the permissions every project role must hold.
+var ProjectRoleRequired = []string{"project:read", "task:read"}
+
+// Predefined project role template keys; each inherits the one before it (viewer <- member <- manager <- owner).
+const (
+	TemplateProjectViewer  = "project_viewer"
+	TemplateProjectMember  = "project_member"
+	TemplateProjectManager = "project_manager"
+	TemplateProjectOwner   = "project_owner"
+)
 
 // Templates lists the predefined roles, parents before children.
 var Templates = []Template{
-	{TemplateEmployee, "Employee", "Every employee: own records and self-service", "", true},
-	{TemplateManager, "Manager", "Anyone with direct reports: access to their team", TemplateEmployee, true},
-	{TemplateHRManager, "HR Manager", "HR operations across the company", TemplateManager, false},
-	{TemplateHRAdmin, "HR Admin", "All of HR, including sensitive data", TemplateHRManager, false},
-	{TemplateExecutive, "Executive", "Company-wide visibility and approvals (CEO and leadership)", TemplateHRAdmin, false},
-	{TemplatePayrollAdmin, "Payroll Admin", "Prepares and calculates payroll", TemplateEmployee, false},
-	{TemplatePayrollApprover, "Payroll Approver", "Approves and finalizes payroll", TemplateEmployee, false},
-	{TemplateFinance, "Finance", "Finance team: payroll and cost visibility", TemplateEmployee, false},
-	{TemplateRecruiter, "Recruiter", "Runs hiring: jobs, candidates, offers, hires", TemplateEmployee, false},
-	{TemplateInterviewer, "Interviewer", "Interviews candidates assigned to them", TemplateEmployee, false},
-	{TemplateITAdmin, "IT Admin", "Users, roles and access administration", TemplateEmployee, false},
-	{TemplateAuditor, "Auditor", "Read-only access to records and audit trails", TemplateEmployee, false},
+	{TemplateEmployee, "Employee", "Every employee: own records and self-service", "", true, ""},
+	{TemplateManager, "Manager", "Anyone with direct reports: access to their team", TemplateEmployee, true, ""},
+	{TemplateHRManager, "HR Manager", "HR operations across the company", TemplateManager, false, ""},
+	{TemplateHRAdmin, "HR Admin", "All of HR, including sensitive data", TemplateHRManager, false, ""},
+	{TemplateExecutive, "Executive", "Company-wide visibility and approvals (CEO and leadership)", TemplateHRAdmin, false, ""},
+	{TemplatePayrollAdmin, "Payroll Admin", "Prepares and calculates payroll", TemplateEmployee, false, ""},
+	{TemplatePayrollApprover, "Payroll Approver", "Approves and finalizes payroll", TemplateEmployee, false, ""},
+	{TemplateFinance, "Finance", "Finance team: payroll and cost visibility", TemplateEmployee, false, ""},
+	{TemplateRecruiter, "Recruiter", "Runs hiring: jobs, candidates, offers, hires", TemplateEmployee, false, ""},
+	{TemplateInterviewer, "Interviewer", "Interviews candidates assigned to them", TemplateEmployee, false, ""},
+	{TemplateITAdmin, "IT Admin", "Users, roles and access administration", TemplateEmployee, false, ""},
+	{TemplateAuditor, "Auditor", "Read-only access to records and audit trails", TemplateEmployee, false, ""},
+	{TemplateProjectViewer, "Project Viewer", "Reads a project and its tasks", "", false, AppliesProject},
+	{TemplateProjectMember, "Project Member", "Works on tasks: create, edit, assign, comment, log time, attach files", TemplateProjectViewer, false, AppliesProject},
+	{TemplateProjectManager, "Project Manager", "Manages a project: members, columns, labels, milestones, sprints, moderation", TemplateProjectMember, false, AppliesProject},
+	{TemplateProjectOwner, "Project Owner", "Everything a manager can do, plus archive and restore", TemplateProjectManager, false, AppliesProject},
 }
 
 // TemplateByKey finds a template.
@@ -65,6 +87,7 @@ type PermissionDef struct {
 	Action      string
 	Description string
 	Sensitive   bool
+	AppliesTo   string           // "" or AppliesTenant, or AppliesProject for permissions held through a project role
 	Defaults    map[string]Scope // template key → scope
 }
 

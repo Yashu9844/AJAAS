@@ -48,8 +48,8 @@ services are unit-tested without a database; the integration ring tests the real
 | Table | Columns (key ones) | Notes |
 |---|---|---|
 | `project` | id, tenant_id, key, name, description, status, visibility, owner_user_id, icon, color, start_on, due_on, mode (`kanban|scrum`), task_counter, version, archived_at, deleted_at, created_at, updated_at | unique (tenant_id, key) among non-deleted |
-| `project_role` | id, tenant_id, name, permissions text[], builtin bool | tenant-defined custom roles; built-ins seeded and immutable |
-| `project_member` | tenant_id, project_id, user_id, role_id, source (`direct|group`), source_ref, active bool, added_by, added_at | PK (project_id, user_id); `active=false` when the user is deactivated |
+| *(role)* | held in M0 (`resource_role_assignments`) | project roles are M0 roles with `applies_to = project`; see `docs/modules/m0-identity-access/resource-roles.md` (DPJ-49) |
+| `project_member` | tenant_id, project_id, user_id, source (`direct|group`), source_ref, active bool, added_by, added_at | PK (project_id, user_id); `active=false` when the user is deactivated |
 | `project_group_rule` | id, tenant_id, project_id, kind (`department|team|reports_of`), ref_id, role_id | phase 3; resolved through the People port, refreshed on org events |
 | `project_favorite` | tenant_id, user_id, project_id | |
 | `board_column` | id, tenant_id, project_id, name, key, position, color, category, wip_limit, wip_hard, is_default | unique (project_id, key) |
@@ -161,7 +161,7 @@ A `/dev-test/projects` page with generated operation forms from the OpenAPI and 
   TaskResolver, TaskHooks) and `kernel`; `TestImportBoundaries` keeps M2 free of HR and identity internals.
 - **Wiring order in `module.go`:** project -> task (needs the authorizer) -> collab (needs the task resolver) -> `task.SetHooks(collab.TaskHooks())`
   (late bound, because collab depends on task) -> planning.
-- **Tables (plural, unprefixed, schema `projects`):** `projects`, `project_roles`, `project_members`, `project_group_rules`, `board_columns`,
+- **Tables (plural, unprefixed, schema `projects`):** `projects`, `project_members`, `project_group_rules`, `board_columns`,
   `labels`, `milestones`, `project_favorites`, `tasks`, `task_assignees`, `task_labels`, `task_relations`, `task_ticket_alias`, `activity`,
   `comments`, `mentions`, `task_watchers`, `time_entries`, `attachments`, `sprints`, `saved_views`, `calendar_tokens`, `projects_events_outbox`,
   `projects_events_inbox` (22 migrations, 000001-000040 with reserved ranges per context; `idempotency_records` is the shared table in `identity`).

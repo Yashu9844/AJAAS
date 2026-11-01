@@ -13,36 +13,10 @@ import (
 )
 
 // taskProjects lists the projects whose tasks the caller can read, for cross-project queries (search, My work, my
-// calendar, the iCalendar feed). It starts from Authorizer.ReadableProjectIDs and drops projects where a custom role
-// grants project.read without task.read; built-in roles, tenant visibility and tenant-wide read always carry both.
+// calendar, the iCalendar feed). Every project role in M0 must hold project:read and task:read, so the readable projects
+// are the task-readable ones.
 func (s *Service) taskProjects(ctx context.Context, a api.Actor) ([]uuid.UUID, error) {
-	ids, err := s.authz.ReadableProjectIDs(ctx, s.db, a)
-	if err != nil || len(ids) == 0 {
-		return ids, err
-	}
-	var custom []uuid.UUID
-	err = s.db.WithContext(ctx).Raw(`SELECT project_id FROM project_members WHERE tenant_id = ? AND user_id = ? AND active
-		AND custom_role_id IS NOT NULL AND project_id = ANY(?::uuid[])`, a.TenantID, a.UserID, idArray(ids)).Scan(&custom).Error
-	if err != nil || len(custom) == 0 {
-		return ids, err
-	}
-	drop := map[uuid.UUID]bool{}
-	for _, pid := range custom {
-		acc, aerr := s.access(ctx, a, pid)
-		if aerr != nil && !isNotFound(aerr) {
-			return nil, aerr
-		}
-		if aerr != nil || !acc.Can(api.TaskRead) {
-			drop[pid] = true
-		}
-	}
-	kept := ids[:0:0]
-	for _, id := range ids {
-		if !drop[id] {
-			kept = append(kept, id)
-		}
-	}
-	return kept, nil
+	return s.authz.ReadableProjectIDs(ctx, s.db, a)
 }
 
 func isNotFound(err error) bool {

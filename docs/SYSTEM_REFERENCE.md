@@ -1140,7 +1140,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | GET | `/api/v1/hr/benefits/employees/:id/life-events` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] sensitive, (inline handler) |
 | GET | `/api/v1/hr/benefits/reports/enrolment` | [group: idp.TenantResolver(), idp.Authenticate(), idp.Flag("benefits", "read", flagRead), idp.Flag("benefits", "manage", flagManage), idp.Flag("benefits", "read_sensitive", flagSensitive)] read, (inline handler) |
 
-### M2 Projects / project — 39 routes
+### M2 Projects / project — 35 routes
 
 | Method | Path | Middleware / permission → handler |
 |---|---|---|
@@ -1157,15 +1157,11 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | DELETE | `/api/v1/projects/:id` | (from the contract; Soft-delete an archived project (projects:manage_all)) |
 | PUT | `/api/v1/projects/:id/favorite` | (from the contract; Star the project for the caller) |
 | DELETE | `/api/v1/projects/:id/favorite` | (from the contract; Unstar the project for the caller) |
+| GET | `/api/v1/projects/:id/roles` | (from the contract; List the M0 project roles that can be given to members (project.manage_members)) |
 | GET | `/api/v1/projects/:id/members` | (from the contract; List active members with role names) |
-| POST | `/api/v1/projects/:id/members` | (from the contract; Add a member with a built-in or custom role (project.manage_members)) |
+| POST | `/api/v1/projects/:id/members` | (from the contract; Add a member with a predefined or custom M0 project role (project.manage_members)) |
 | PATCH | `/api/v1/projects/:id/members/:user_id` | (from the contract; Change a member role; the last owner stays (project.manage_members)) |
 | DELETE | `/api/v1/projects/:id/members/:user_id` | (from the contract; Remove a member; anyone may remove themselves) |
-| GET | `/api/v1/project-permissions` | (from the contract; Project permissions and the built-in roles) |
-| GET | `/api/v1/project-roles` | (from the contract; List the tenant custom project roles) |
-| POST | `/api/v1/project-roles` | (from the contract; Create a custom role (project_roles:manage)) |
-| PATCH | `/api/v1/project-roles/:id` | (from the contract; Edit a custom role (project_roles:manage)) |
-| DELETE | `/api/v1/project-roles/:id` | (from the contract; Delete an unused custom role (project_roles:manage)) |
 | GET | `/api/v1/projects/:id/columns` | (from the contract; List board columns with open task counts) |
 | POST | `/api/v1/projects/:id/columns` | (from the contract; Add a column (column.manage)) |
 | PUT | `/api/v1/projects/:id/columns/order` | (from the contract; Reorder all columns (column.manage)) |
@@ -1328,7 +1324,7 @@ Every non-test Go file under `backend/internal`, with its exported and unexporte
 | DELETE | `/api/v1/projects/:id/public-links/:link_id` | (from the contract; Revoke a public link at once (project.update)) |
 | GET | `/api/v1/public/projects/:token` | (from the contract; Read-only page of a project (name, columns, tasks without people), authenticated by the secret token in the path only (no bearer token, rate limited per IP, never cached); unknown, revoked and archived answer the same 404) |
 
-Total routes registered by module route files: **589** (plus `GET /health`).
+Total routes registered by module route files: **585** (plus `GET /health`).
 
 
 ## B. Database schema (migrations, in order)
@@ -1610,6 +1606,25 @@ Total routes registered by module route files: **589** (plus `GET /health`).
   - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
 - UNIQUE index `uq_invitations_token_hash` on `invitations` (token_hash)
 - index `idx_invitations_tenant_user` on `invitations` (tenant_id, user_id)
+
+#### `identity/000019_create_resource_roles.up.sql`
+- **table `resource_role_assignments`**
+  - `id` UUID — PRIMARY KEY
+  - `tenant_id` UUID — NOT NULL REFERENCES tenants(id) ON DELETE CASCADE
+  - `user_id` UUID — NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  - `role_id` UUID — NOT NULL REFERENCES roles(id) ON DELETE RESTRICT
+  - `resource_type` VARCHAR(20) — NOT NULL CHECK (resource_type IN ('project'))
+  - `resource_id` UUID — NOT NULL
+  - `source` VARCHAR(20) — NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'group', 'automatic'))
+  - `assigned_by` UUID
+  - `created_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMPTZ — NOT NULL DEFAULT CURRENT_TIMESTAMP
+- index `idx_roles_applies_to` on `roles` (tenant_id, applies_to)
+- UNIQUE index `uq_resource_role_user` on `resource_role_assignments` (tenant_id, user_id, resource_type, resource_id)
+- index `idx_resource_role_resource` on `resource_role_assignments` (tenant_id, resource_type, resource_id)
+- index `idx_resource_role_role` on `resource_role_assignments` (role_id)
+- ALTER `permissions` ADD COLUMN applies_to VARCHAR(20) NOT NULL DEFAULT 'tenant' CONSTRAINT chk_permissions_applies_to CHECK (applies_to IN ('tenant', 'project'))
+- ALTER `roles` ADD COLUMN applies_to VARCHAR(20) NOT NULL DEFAULT 'tenant' CONSTRAINT chk_roles_applies_to CHECK (applies_to IN ('tenant', 'project'))
 
 #### `hr/000001_create_departments.up.sql`
 - **table `departments`**
@@ -3960,6 +3975,12 @@ Total routes registered by module route files: **589** (plus `GET /health`).
 - UNIQUE index `uq_public_links_hash` on `public_links` (token_hash)
 - index `idx_public_links_project` on `public_links` (tenant_id, project_id) WHERE revoked_at IS NULL
 
+#### `projects/000073_roles_move_to_identity.up.sql`
+- ALTER `project_members` DROP CONSTRAINT IF EXISTS project_members_group_not_owner
+- ALTER `project_members` DROP CONSTRAINT IF EXISTS project_members_one_role
+- ALTER `project_members` DROP COLUMN role_key
+- ALTER `project_members` DROP COLUMN custom_role_id
+
 ## C. Code inventory — every file, type and function
 
 
@@ -4051,7 +4072,7 @@ _Package:_ Package idempotency makes retried commands safe (docs/ARCHITECTURE.md
 - **func** `(s gormStore) Release(ctx context.Context, id uuid.UUID) error`
 - **func** `(s gormStore) PurgeExpired(ctx context.Context, now time.Time) (int64, error)`
 
-#### `internal/shared/identityport/port.go` (87 lines)
+#### `internal/shared/identityport/port.go` (121 lines)
 _Package:_ Package identityport is M1 HR Management's only view of M0 Identity & Access (docs/modules/m1-hr-management/ design.md §4). HR packages depend on these interfaces, never on internal/identity/... packages (enforced by the import-boundary test). The in-process adapter lives in identityport/inprocess; a JWT-claims + HTTP adapter replaces it when HR is deployed separately. The permission catalogue types come from the published contract package internal/identity/access.
 - **type** `User struct` — User is HR's view of a login identity.
 - **func** `(u *User) Active() bool { return u != nil && u.Status == "active" }` — Active reports whether the user can sign in.
@@ -4061,6 +4082,16 @@ _Package:_ Package identityport is M1 HR Management's only view of M0 Identity &
 - **method** `Users.DeactivateUser(ctx context.Context, tx *gorm.DB, tenantID, id, correlationID uuid.UUID) error`
 - **method** `Users.ActivateUser(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) error` — ActivateUser re-enables a deactivated login (HR/Core rehire and rescinded termination).
 - **method** `Users.InviteUser(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, in Invite, correlationID uuid.UUID) (*User, error)`
+- **type** `ResourceRole struct` — ResourceRole is a role held on one resource.
+- **type** `ResourceAccess interface` — ResourceAccess is M0's view of roles assigned on a resource (docs/modules/m0-identity-access/resource-roles.md). Write methods run inside the caller's transaction so a membership change and its role commit together.
+- **method** `ResourceAccess.PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (ResourceRole, []string, error)` — PermissionsOn returns the role and the permission keys the user holds on the resource through it (zero role: none).
+- **method** `ResourceAccess.RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, ids []uuid.UUID) (map[uuid.UUID]ResourceRole, error)` — RolesFor maps each resource to the role the user holds on it.
+- **method** `ResourceAccess.AssignRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID, roleID uuid.UUID, resourceType string, resourceID uuid.UUID, source string) error`
+- **method** `ResourceAccess.RevokeRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) error`
+- **method** `ResourceAccess.RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID) ([]ResourceRole, error)`
+- **method** `ResourceAccess.AvailableRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string) ([]ResourceRole, error)` — AvailableRoles lists the roles of the tenant that can be assigned on the resource type.
+- **method** `ResourceAccess.RoleByTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, templateKey string) (uuid.UUID, error)`
+- **method** `ResourceAccess.CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID, templateKey string) (int64, error)`
 - **type** `Auditor interface` — Auditor writes audit records (HR keeps using M0's audit trail until hr.audit_events exists).
 - **method** `Auditor.Log(ctx context.Context, tx *gorm.DB, tenantID, userID string, action, resource, resourceID string, metadata interface{}, ipAddress, userAgent string) error`
 - **type** `HTTP interface` — HTTP provides the request guards HR routes use.
@@ -4078,11 +4109,12 @@ _Package:_ Package identityport is M1 HR Management's only view of M0 Identity &
 - **type** `Port interface` — Port is everything HR needs from M0.
 - **method** `Port.Users() Users`
 - **method** `Port.Audit() Auditor`
+- **method** `Port.Resources() ResourceAccess` — Resources manages roles assigned on resources such as projects.
 - **method** `Port.RegisterPermissions(ctx context.Context, defs []access.PermissionDef) error` — RegisterPermissions registers HR permission definitions (with predefined-role defaults) in M0's catalogue.
 - **method** `Port.OnUserDeactivated(h DeactivationHook)` — OnUserDeactivated registers a hook run when M0 deactivates a user.
 - **method** `Port.ProvideRoleFacts(f RoleFacts)` — ProvideRoleFacts installs HR as the source of the automatic Employee and Manager roles.
 
-#### `internal/shared/identityport/inprocess/adapter.go` (125 lines)
+#### `internal/shared/identityport/inprocess/adapter.go` (187 lines)
 _Package:_ Package inprocess adapts the in-process M0 identity module to identityport.Port. It is the only HR package that imports internal/identity/... packages.
 - **type** `port struct`
 - **func** `New(m *identity.Module, db *gorm.DB) identityport.Port` — New returns the in-process Port over the identity module; db is used for route-level audit writes.
@@ -4094,6 +4126,16 @@ _Package:_ Package inprocess adapts the in-process M0 identity module to identit
 - **func** `(p *port) AuditTrail(action, resource string) gin.HandlerFunc`
 - **func** `(p *port) Users() identityport.Users   { return users{svc: p.m.UserService()} }`
 - **func** `(p *port) Audit() identityport.Auditor { return p.m.AuditService() }`
+- **func** `(p *port) Resources() identityport.ResourceAccess { return resources{svc: p.m.ResourceAccess()} }`
+- **type** `resources struct`
+- **func** `(r resources) PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, rt string, id uuid.UUID) (identityport.ResourceRole, []string, error)`
+- **func** `(r resources) RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, rt string, ids []uuid.UUID) (map[uuid.UUID]identityport.ResourceRole, error)`
+- **func** `(r resources) AssignRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID, roleID uuid.UUID, rt string, id uuid.UUID, source string) error`
+- **func** `(r resources) RevokeRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID uuid.UUID, rt string, id uuid.UUID) error`
+- **func** `(r resources) RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rt string, id uuid.UUID) ([]identityport.ResourceRole, error)`
+- **func** `(r resources) AvailableRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rt string) ([]identityport.ResourceRole, error)`
+- **func** `(r resources) RoleByTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, key string) (uuid.UUID, error)`
+- **func** `(r resources) CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, rt string, id uuid.UUID, key string) (int64, error)`
 - **func** `(p *port) RegisterPermissions(ctx context.Context, defs []access.PermissionDef) error`
 - **func** `(p *port) OnUserDeactivated(h identityport.DeactivationHook)`
 - **func** `(p *port) ProvideRoleFacts(f identityport.RoleFacts) { p.m.SetAutomaticRoleSource(f) }`
@@ -4251,7 +4293,7 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 ### M0 Identity & Access
 
 
-#### `internal/identity/module.go` (328 lines)
+#### `internal/identity/module.go` (335 lines)
 - **type** `Module struct` — Module encapsulates the Module 0 Identity and Access Management domain.
 - **func** `NewModule(` — NewModule constructs a Module container injecting database and message queue handles.
 - **func** `(m *Module) SetPlatformAdminKey(key string) { m.platformAdminKey = key }` — SetPlatformAdminKey configures the platform operator key guarding /tenants routes (empty = routes disabled).
@@ -4271,13 +4313,14 @@ _Package:_ Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go 
 - **func** `(m *Module) RegisterModels() []interface{}` — RegisterModels lists all domain entity models for migrations.
 - **func** `(m *Module) RegisterRoutes(router *gin.RouterGroup)` — RegisterRoutes hooks endpoint paths to controller handlers.
 - **func** `(m *Module) UserService() services.UserService { return m.userSvc }` — UserService exposes the user domain service to dependent modules (Module 1+).
+- **func** `(m *Module) ResourceAccess() services.ResourceAccess { return m.resources }` — ResourceAccess exposes role assignments on resources such as projects.
 - **func** `(m *Module) AuditService() services.AuditService { return m.auditSvc }` — AuditService exposes the audit transport to dependent modules.
 - **func** `(m *Module) UserRoleRepository() repositories.UserRoleRepository { return m.userRoleRepo }` — UserRoleRepository exposes user-role reads for RBAC middleware in dependent modules.
 - **func** `(m *Module) RolePermissionRepository() repositories.RolePermissionRepository` — RolePermissionRepository exposes role-permission reads for RBAC middleware in dependent modules.
 - **func** `(m *Module) TenantResolver() gin.HandlerFunc` — TenantResolver builds the subdomain tenant-resolution middleware for dependent modules.
 - **func** `(m *Module) AuthMiddleware() gin.HandlerFunc` — AuthMiddleware builds the JWT authentication middleware for dependent modules.
 
-#### `internal/identity/access/catalogue.go` (106 lines)
+#### `internal/identity/access/catalogue.go` (129 lines)
 - **type** `Template struct` — Template describes a predefined role seeded into every tenant.
 - **func** `TemplateByKey(key string) (Template, bool)` — TemplateByKey finds a template.
 - **type** `PermissionDef struct` — PermissionDef is one catalogue entry a service registers with M0, including the scope each predefined role receives by default.
@@ -4449,7 +4492,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `PermissionResponse struct` — PermissionResponse represents authorization permission records.
 - **type** `PermissionListResponse struct` — PermissionListResponse holds paginated PermissionResponses.
 
-#### `internal/identity/dto/role_dto.go` (88 lines)
+#### `internal/identity/dto/role_dto.go` (91 lines)
 - **type** `GrantInput struct` — GrantInput is a permission granted at a scope (docs/ARCHITECTURE.md §17); an empty scope means tenant.
 - **type** `CreateRoleRequest struct` — CreateRoleRequest contains payload to create a new role. permission_ids are granted at tenant scope; grants carry explicit scopes. parent_role_id makes the role inherit every grant of the parent.
 - **type** `UpdateRoleRequest struct` — UpdateRoleRequest is a partial payload to update role metadata. parent_role_id "" removes the parent.
@@ -4539,7 +4582,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `PasswordResetToken struct` — PasswordResetToken represents a verification token generated for password reset requests.
 - **func** `(pr *PasswordResetToken) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
-#### `internal/identity/models/permission.go` (28 lines)
+#### `internal/identity/models/permission.go` (29 lines)
 - **type** `Permission struct` — Permission represents a global capability definition.
 - **func** `(p *Permission) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
@@ -4550,7 +4593,11 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `RefreshToken struct` — RefreshToken represents a refresh token used for JWT renewal.
 - **func** `(rt *RefreshToken) BeforeCreate(tx *gorm.DB) error` — BeforeCreate is a GORM hook that auto-generates a UUID v4 key if not already set.
 
-#### `internal/identity/models/role.go` (25 lines)
+#### `internal/identity/models/resource_role.go` (26 lines)
+- **type** `ResourceRoleAssignment struct` — ResourceRoleAssignment gives a user a role on one resource of another service (today a project). The resource has no foreign key: it belongs to another service schema. A user holds at most one role per resource.
+- **func** `(ResourceRoleAssignment) TableName() string { return "resource_role_assignments" }` — TableName maps to resource_role_assignments.
+
+#### `internal/identity/models/role.go` (26 lines)
 - **type** `Role struct` — Role represents a Role-Based Access Control role scoped to a tenant.
 
 #### `internal/identity/models/role_permission.go` (31 lines)
@@ -4731,6 +4778,25 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(r *permissionRepository) FindAll(ctx context.Context, db *gorm.DB, page, perPage int) ([]models.Permission, int64, error)`
 - **func** `(r *permissionRepository) FindByIDs(ctx context.Context, db *gorm.DB, ids []uuid.UUID) ([]models.Permission, error)`
 
+#### `internal/identity/repositories/resource_role_repository.go` (99 lines)
+- **type** `ResourceRoleRepository interface` — ResourceRoleRepository stores role assignments on resources (docs/modules/m0-identity-access/resource-roles.md).
+- **method** `ResourceRoleRepository.Assign(ctx context.Context, tx *gorm.DB, a *models.ResourceRoleAssignment) error` — Assign sets the user role on the resource, replacing any earlier one, and invalidates cached access.
+- **method** `ResourceRoleRepository.Revoke(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (bool, error)` — Revoke removes the user role on the resource and reports whether one existed.
+- **method** `ResourceRoleRepository.Find(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (*models.ResourceRoleAssignment, error)` — Find returns the user assignment on the resource (nil when none), with its role.
+- **method** `ResourceRoleRepository.ListByResource(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID) ([]models.ResourceRoleAssignment, error)` — ListByResource returns every assignment on the resource, with roles.
+- **method** `ResourceRoleRepository.ListForUser(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, ids []uuid.UUID) ([]models.ResourceRoleAssignment, error)` — ListForUser returns the user assignments on the given resources, with roles.
+- **method** `ResourceRoleRepository.CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID, templateKey string) (int64, error)` — CountWithTemplate counts assignments on the resource whose role came from the template.
+- **method** `ResourceRoleRepository.RoleInUse(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) (int64, error)` — RoleInUse counts assignments of a role anywhere (a role in use cannot be deleted).
+- **type** `resourceRoleRepository struct{}`
+- **func** `NewResourceRoleRepository() ResourceRoleRepository { return &resourceRoleRepository{} }` — NewResourceRoleRepository returns a ResourceRoleRepository.
+- **func** `(r *resourceRoleRepository) Assign(ctx context.Context, tx *gorm.DB, a *models.ResourceRoleAssignment) error`
+- **func** `(r *resourceRoleRepository) Revoke(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (bool, error)`
+- **func** `(r *resourceRoleRepository) Find(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (*models.ResourceRoleAssignment, error)`
+- **func** `(r *resourceRoleRepository) ListByResource(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID) ([]models.ResourceRoleAssignment, error)`
+- **func** `(r *resourceRoleRepository) ListForUser(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, ids []uuid.UUID) ([]models.ResourceRoleAssignment, error)`
+- **func** `(r *resourceRoleRepository) CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID, templateKey string) (int64, error)`
+- **func** `(r *resourceRoleRepository) RoleInUse(ctx context.Context, db *gorm.DB, tenantID, roleID uuid.UUID) (int64, error)`
+
 #### `internal/identity/repositories/role_assignment_repository.go` (138 lines)
 - **type** `userRoleRepository struct{}`
 - **func** `NewUserRoleRepository() UserRoleRepository` — NewUserRoleRepository returns a UserRoleRepository.
@@ -4904,7 +4970,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(a *automaticRoles) sweep(ctx context.Context)`
 - **func** `(a *automaticRoles) warn(err error, tenantID uuid.UUID)`
 
-#### `internal/identity/services/catalogue.go` (191 lines)
+#### `internal/identity/services/catalogue.go` (199 lines)
 - **type** `Transactor func(ctx context.Context, fn func(tx *gorm.DB) error) error` — Transactor runs fn in one database transaction.
 - **func** `dbTransactor(db *gorm.DB) Transactor`
 - **type** `Catalogue interface` — Catalogue registers the permission catalogue and keeps every tenant's predefined roles in sync (docs/ARCHITECTURE.md §17).
@@ -4921,6 +4987,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(c *catalogue) createTemplateRole(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, tpl access.Template, byKey map[string]*models.Role, names map[string]bool) (*models.Role, error)`
 - **func** `(c *catalogue) syncDefaults(ctx context.Context, tx *gorm.DB, role *models.Role, want []access.Grant, permIDs map[string]uuid.UUID) error` — syncDefaults adds missing default grants and resets drifted scopes on a template-managed role.
 - **func** `(c *catalogue) permissionIDs(ctx context.Context, db *gorm.DB) (map[string]uuid.UUID, error)`
+- **func** `appliesOf(v string) string` — appliesOf maps an empty applies_to to the tenant default.
 
 #### `internal/identity/services/event_sink.go` (36 lines)
 - **type** `EventSink interface` — EventSink records an identity event. The production sink writes it to the outbox inside the caller's transaction, so the event exists if and only if the change committed (docs/ARCHITECTURE.md §3.7).
@@ -4971,6 +5038,32 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `NewPermissionService(permRepo repositories.PermissionRepository) PermissionService` — NewPermissionService creates a new PermissionService.
 - **func** `(s *permissionService) ListPermissions(ctx context.Context, db *gorm.DB, page, perPage int) (*dto.PermissionListResponse, error)`
 
+#### `internal/identity/services/resource_access.go` (211 lines)
+- **type** `ResourceRole struct` — ResourceRole is a role held on one resource.
+- **type** `ResourceAccess interface` — ResourceAccess answers and changes role assignments on resources (docs/modules/m0-identity-access/resource-roles.md).
+- **method** `ResourceAccess.PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (ResourceRole, []string, error)` — PermissionsOn returns the role and the permission keys the user holds on the resource through it (inheritance included).
+- **method** `ResourceAccess.RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, ids []uuid.UUID) (map[uuid.UUID]ResourceRole, error)` — RolesFor maps each resource to the role the user holds on it (resources without a role are absent).
+- **method** `ResourceAccess.AssignRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID, roleID uuid.UUID, resourceType string, resourceID uuid.UUID, source string) error` — AssignRole gives the user the role on the resource, replacing any earlier one.
+- **method** `ResourceAccess.RevokeRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) error` — RevokeRole removes the user role on the resource; it is not an error when none exists.
+- **method** `ResourceAccess.RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID) ([]ResourceRole, error)` — RolesOn lists every role assignment on the resource.
+- **method** `ResourceAccess.AvailableRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string) ([]ResourceRole, error)` — AvailableRoles lists the roles of the tenant that can be assigned on the resource type.
+- **method** `ResourceAccess.RoleByTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, templateKey string) (uuid.UUID, error)` — RoleByTemplate returns the id of a predefined role of the tenant.
+- **method** `ResourceAccess.CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID, templateKey string) (int64, error)` — CountWithTemplate counts assignments on the resource whose role came from the template.
+- **type** `ResourceAccessDeps struct` — ResourceAccessDeps are the service collaborators.
+- **type** `resourceAccess struct{ d ResourceAccessDeps }`
+- **func** `NewResourceAccess(d ResourceAccessDeps) ResourceAccess { return &resourceAccess{d: d} }` — NewResourceAccess builds a ResourceAccess.
+- **func** `checkResourceType(t string) error`
+- **func** `(s *resourceAccess) PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) (ResourceRole, []string, error)`
+- **func** `(s *resourceAccess) RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, resourceType string, ids []uuid.UUID) (map[uuid.UUID]ResourceRole, error)`
+- **func** `roleOf(a models.ResourceRoleAssignment) ResourceRole`
+- **func** `(s *resourceAccess) AssignRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID, roleID uuid.UUID, resourceType string, resourceID uuid.UUID, source string) error`
+- **func** `(s *resourceAccess) RevokeRole(ctx context.Context, tx *gorm.DB, tenantID, actorID, userID uuid.UUID, resourceType string, resourceID uuid.UUID) error`
+- **func** `(s *resourceAccess) RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID) ([]ResourceRole, error)`
+- **func** `(s *resourceAccess) AvailableRoles(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string) ([]ResourceRole, error)`
+- **func** `(s *resourceAccess) RoleByTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, templateKey string) (uuid.UUID, error)`
+- **func** `(s *resourceAccess) CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, resourceType string, resourceID uuid.UUID, templateKey string) (int64, error)`
+- **func** `(s *resourceAccess) audit(ctx context.Context, tx *gorm.DB, tenantID, actorID uuid.UUID, action string, resourceID uuid.UUID, meta any) error`
+
 #### `internal/identity/services/role_assign.go` (165 lines)
 - **func** `(s *roleService) rolesForAssignment(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, raw []string) ([]*models.Role, error)`
 - **func** `(s *roleService) AssignRolesToUser(ctx context.Context, tx *gorm.DB, tenantID, userID uuid.UUID, req dto.AssignRoleRequest, correlationID uuid.UUID) error`
@@ -4978,7 +5071,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(s *roleService) assignment(ctx context.Context, tx *gorm.DB, tenantID, userID, roleID uuid.UUID) (*models.UserRole, error)`
 - **func** `(s *roleService) GetMyAccess(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID) (*dto.AccessResponse, error)`
 
-#### `internal/identity/services/role_grants.go` (236 lines)
+#### `internal/identity/services/role_grants.go` (261 lines)
 - **type** `grantSpec struct` — grantSpec is a validated permission + scope to store on a role.
 - **func** `grantsOf(specs []grantSpec) []access.Grant`
 - **func** `validationError(msg string) error`
@@ -4990,8 +5083,9 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **func** `(s *roleService) CloneRole(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID, req dto.CloneRoleRequest) (*dto.RoleResponse, error)`
 - **func** `(s *roleService) loadPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roles ...*models.Role) error` — loadPermissions attaches each role's permissions (one batched query).
 - **func** `mapRoleToResponse(r *models.Role) *dto.RoleResponse`
+- **func** `checkAppliesTo(applies string, specs []grantSpec) error` — checkAppliesTo requires every permission of a role to apply to what the role applies to, and project roles to be able to read the project and its tasks (a member who cannot read would be invisible to the rest of the platform).
 
-#### `internal/identity/services/role_service.go` (316 lines)
+#### `internal/identity/services/role_service.go` (342 lines)
 - **type** `RoleService interface` — RoleService manages RBAC roles: grants with scopes, inheritance, predefined and automatic roles (docs/ARCHITECTURE.md §17).
 - **method** `RoleService.CreateRole(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, req dto.CreateRoleRequest) (*dto.RoleResponse, error)`
 - **method** `RoleService.GetRoleByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*dto.RoleResponse, error)`
@@ -5007,6 +5101,7 @@ _Package:_ Package access is the pure access model of M0 (docs/ARCHITECTURE.md �
 - **type** `roleService struct`
 - **type** `RoleOption func(*roleService)` — RoleOption customises a RoleService.
 - **func** `WithRoleEvents(sink EventSink) RoleOption { return func(s *roleService) { s.sink = sink } }` — WithRoleEvents records role events through sink (the transactional outbox in production).
+- **func** `WithResourceRoles(repo repositories.ResourceRoleRepository) RoleOption` — WithResourceRoles lets role deletion see assignments on resources.
 - **func** `WithAccessModel(repo repositories.AccessRepository, resolver AccessResolver) RoleOption` — WithAccessModel enables inheritance, scope changes and full access resolution for escalation checks.
 - **func** `NewRoleService(` — NewRoleService creates a new RoleService.
 - **func** `(s *roleService) findRole(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*models.Role, error)`
@@ -10079,7 +10174,7 @@ _Package:_ Package kernel holds what every M2 context shares: error constructors
 ### M2 Projects / api
 
 
-#### `internal/projects/api/access.go` (193 lines)
+#### `internal/projects/api/access.go` (191 lines)
 _Package:_ Package api is the contract between M2 contexts: the project context implements Authorizer, and the task and planning contexts depend on this package only (never on project/). Specification section 8.
 - **type** `Perm string` — Perm is a project-level permission (specification section 8).
 - **func** `buildBuiltins() map[string]map[Perm]bool`
@@ -10113,10 +10208,9 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 ### M2 Projects / project
 
 
-#### `internal/projects/project/access.go` (101 lines)
+#### `internal/projects/project/access.go` (85 lines)
 - **func** `(s *Service) Access(ctx context.Context, db *gorm.DB, a api.Actor, projectID uuid.UUID) (api.Access, error)` — Access resolves what the caller may do in the project (specification section 8): tenant-level permissions, then the effective member role, then tenant visibility for reads. A caller who cannot read the project gets 404 (PG4).
-- **func** `(s *Service) heldPerms(db *gorm.DB, a api.Actor, p Project) (map[api.Perm]bool, string, bool, error)` — heldPerms merges the permission sources before the archive filter.
-- **func** `(s *Service) memberPerms(db *gorm.DB, m Member) (map[api.Perm]bool, string, error)` — memberPerms returns the permission set and display name of a member role, built-in or custom.
+- **func** `(s *Service) heldPerms(ctx context.Context, db *gorm.DB, a api.Actor, p Project) (map[api.Perm]bool, string, bool, error)` — heldPerms merges the permission sources before the archive filter.
 - **func** `(s *Service) ReadableProjectIDs(ctx context.Context, db *gorm.DB, a api.Actor) ([]uuid.UUID, error)` — ReadableProjectIDs lists the projects the caller can read (used by search and My work).
 
 #### `internal/projects/project/columns.go` (252 lines)
@@ -10143,13 +10237,13 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **type** `identityEnvelope struct`
 - **func** `(s *Service) HandleIdentityEvent(ctx context.Context, raw []byte) error` — HandleIdentityEvent applies an identity or HR lifecycle event delivered by a broker consumer. Redeliveries are recognised through the inbox ledger and ignored (PG10). Unknown event types are ignored.
 
-#### `internal/projects/project/group_refresh.go` (109 lines)
+#### `internal/projects/project/group_refresh.go` (130 lines)
 - **func** `(s *Service) RefreshGroups(ctx context.Context, tenantID, projectID uuid.UUID) error` — RefreshGroups reconciles the group-sourced members of one project with its rules. Direct members are never touched or overridden. The people lookups happen before the transaction so no external call is made while rows are locked.
-- **func** `(s *Service) reconcile(tx *gorm.DB, tenantID, projectID uuid.UUID, want map[uuid.UUID]string) error`
+- **func** `(s *Service) reconcile(ctx context.Context, tx *gorm.DB, tenantID, projectID uuid.UUID, want map[uuid.UUID]string) error`
 - **type** `groupScope struct` — groupScope is the tenant, project and current group rows a reconcile works on.
-- **func** `(s *Service) upsertGroupMember(tx *gorm.DB, scope groupScope, uid uuid.UUID, role string) error` — upsertGroupMember inserts or updates a group member; a user who is already a direct member keeps the direct row.
 - **func** `(s *Service) RefreshAll(ctx context.Context) error` — RefreshAll refreshes every project of the tenant that has rules; a periodic sweep keeps group membership aligned with HR.
 - **func** `(s *Service) RunGroupRefresh(ctx context.Context, interval time.Duration, onErr func(error))` — RunGroupRefresh refreshes all group rules every interval until ctx ends; failures go to onErr and are retried.
+- **func** `(s *Service) upsertGroupMember(ctx context.Context, tx *gorm.DB, scope groupScope, uid uuid.UUID, role string) error` — upsertGroupMember inserts or updates a group member; a user who is already a direct member keeps the direct row.
 
 #### `internal/projects/project/group_rules.go` (170 lines)
 - **type** `GroupRule struct` — GroupRule gives every member of a department or team, or a manager direct reports, a role in the project.
@@ -10164,7 +10258,7 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(s *Service) desiredMembers(ctx context.Context, rules []GroupRule, tenantID uuid.UUID) (map[uuid.UUID]string, error)` — desiredMembers resolves every rule to users, keeping the highest role per user. Network-free of the DB transaction.
 - **func** `(s *Service) resolve(ctx context.Context, p ports.People, tenantID uuid.UUID, r GroupRule) ([]uuid.UUID, error)`
 
-#### `internal/projects/project/http.go` (124 lines)
+#### `internal/projects/project/http.go` (127 lines)
 - **type** `handler struct{ s *Service }` — handler adapts a use case to gin: it resolves the actor and the :id path parameter.
 - **func** `act(fn func(c *gin.Context, a api.Actor)) gin.HandlerFunc`
 - **func** `withID(fn func(c *gin.Context, a api.Actor, id uuid.UUID)) gin.HandlerFunc`
@@ -10174,8 +10268,7 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(h handler) projectRoutes(g *gin.RouterGroup)`
 - **func** `(h handler) memberRoutes(g *gin.RouterGroup)`
 
-#### `internal/projects/project/http_config.go` (129 lines)
-- **func** `(h handler) roleRoutes(g *gin.RouterGroup)`
+#### `internal/projects/project/http_config.go` (106 lines)
 - **func** `(h handler) columnRoutes(g *gin.RouterGroup)`
 - **func** `(h handler) labelRoutes(g *gin.RouterGroup)`
 - **func** `(h handler) milestoneRoutes(g *gin.RouterGroup)`
@@ -10194,7 +10287,7 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(s *Service) UpdateLabel(ctx context.Context, a api.Actor, projectID *uuid.UUID, id uuid.UUID, in LabelInput) (*Label, error)` — UpdateLabel renames or recolors a label.
 - **func** `(s *Service) DeleteLabel(ctx context.Context, a api.Actor, projectID *uuid.UUID, id uuid.UUID) error` — DeleteLabel removes a label from every task and deletes it.
 
-#### `internal/projects/project/lifecycle.go` (164 lines)
+#### `internal/projects/project/lifecycle.go` (182 lines)
 - **func** `(s *Service) List(ctx context.Context, a api.Actor, f ListFilter) ([]Project, string, error)` — List returns the projects the caller can read, most recently active first (PR-09).
 - **func** `(s *Service) listWhere(a api.Actor, f ListFilter, cur listCursor) (string, []any)`
 - **func** `escapeLike(s string) string`
@@ -10204,21 +10297,26 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(s *Service) Delete(ctx context.Context, a api.Actor, id uuid.UUID) error` — Delete soft-deletes an archived project; only tenant administrators may (PR-03).
 - **func** `(s *Service) SetFavorite(ctx context.Context, a api.Actor, id uuid.UUID, on bool) error` — SetFavorite stars or unstars the project for the caller.
 - **func** `lockProject(tx *gorm.DB, tenantID, id uuid.UUID) (*Project, error)` — lockProject takes a row lock on the project inside tx and returns it; used by operations that must serialise.
+- **func** `(s *Service) fillMyRoles(ctx context.Context, a api.Actor, rows []Project) error` — fillMyRoles sets my_role on each listed project from the caller's M0 role assignments.
 
-#### `internal/projects/project/members.go` (233 lines)
-- **type** `MemberInput struct` — MemberInput adds or changes a member. Exactly one of Role (built-in key) and CustomRoleID is set.
-- **type** `MemberView struct` — MemberView is a member with the role name resolved.
+#### `internal/projects/project/members.go` (321 lines)
+- **type** `MemberInput struct` — MemberInput adds or changes a member. Exactly one of Role (built-in key) and RoleID (an M0 project role) is set.
+- **type** `MemberView struct` — MemberView is a member with the M0 role resolved.
+- **func** `roleLabel(r identityport.ResourceRole) (key, label string)` — roleLabel is the short role name shown to users: the built-in key, or the custom role name.
 - **func** `(s *Service) Members(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]MemberView, error)` — Members lists the active members of a project.
-- **func** `(in MemberInput) validate(db *gorm.DB, tenantID uuid.UUID) error`
-- **func** `(in MemberInput) roleCols() (*string, *uuid.UUID)`
-- **func** `grantsOwner(in MemberInput, current *Member) bool` — grantsOwner reports whether the change needs the caller to be an owner (or a tenant administrator).
-- **func** `(s *Service) AddMember(ctx context.Context, a api.Actor, projectID uuid.UUID, in MemberInput) (*Member, error)` — AddMember adds a user to a project (PR-04).
+- **func** `(in MemberInput) validate() error`
+- **func** `(s *Service) roleID(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, in MemberInput) (uuid.UUID, error)` — roleID resolves the M0 role the input names.
+- **func** `(s *Service) assign(ctx context.Context, tx *gorm.DB, a api.Actor, userID, roleID, projectID uuid.UUID, source string) error` — assign gives the user the role on the project in M0, inside tx, translating M0 refusals into request errors.
+- **func** `(s *Service) isOwnerRole(ctx context.Context, db *gorm.DB, tenantID, userID, projectID uuid.UUID) (bool, error)` — isOwnerRole reports whether the user currently holds the owner role on the project.
+- **func** `(s *Service) AddMember(ctx context.Context, a api.Actor, projectID uuid.UUID, in MemberInput) (*MemberView, error)` — AddMember adds a user to a project (PR-04).
 - **func** `ownerLevel(acc api.Access, a api.Actor) bool { return a.ManageAll || acc.Role == api.RoleOwner }`
-- **func** `(s *Service) upsertMember(ctx context.Context, a api.Actor, projectID uuid.UUID, in MemberInput) (*Member, error)`
-- **func** `(s *Service) ChangeMember(ctx context.Context, a api.Actor, projectID, userID uuid.UUID, in MemberInput) (*Member, error)` — ChangeMember changes a member role; the last owner cannot be demoted (PR-04).
+- **func** `(s *Service) upsertMember(ctx context.Context, a api.Actor, projectID uuid.UUID, in MemberInput) (*MemberView, error)`
+- **func** `(s *Service) ChangeMember(ctx context.Context, a api.Actor, projectID, userID uuid.UUID, in MemberInput) (*MemberView, error)` — ChangeMember changes a member role; the last owner cannot be demoted (PR-04).
 - **func** `(s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, userID uuid.UUID) error` — RemoveMember removes a member; anyone may remove themselves. The last owner stays (PR-04).
-- **func** `ensureOwner(tx *gorm.DB, projectID uuid.UUID) error` — ensureOwner refuses a change that would leave the project without an owner.
+- **func** `(s *Service) ensureOwner(ctx context.Context, tx *gorm.DB, tenantID, projectID uuid.UUID) error` — ensureOwner refuses a change that would leave the project without an active owner.
 - **func** `(s *Service) addNames(ctx context.Context, tenantID uuid.UUID, rows []MemberView) error` — addNames fills display names for the members; a failing lookup degrades to ids only rather than failing the list.
+- **type** `RoleOption struct` — RoleOption is a project role that can be given to a member.
+- **func** `(s *Service) AssignableRoles(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]RoleOption, error)` — AssignableRoles lists the M0 roles that can be given to members of the project (manage_members).
 
 #### `internal/projects/project/milestones.go` (121 lines)
 - **type** `MilestoneInput struct` — MilestoneInput creates or edits a milestone; nil fields are unchanged on edit.
@@ -10228,14 +10326,12 @@ _Package:_ Package api is the contract between M2 contexts: the project context 
 - **func** `(s *Service) UpdateMilestone(ctx context.Context, a api.Actor, projectID, id uuid.UUID, in MilestoneInput) (*Milestone, error)` — UpdateMilestone edits a milestone.
 - **func** `(s *Service) DeleteMilestone(ctx context.Context, a api.Actor, projectID, id uuid.UUID) error` — DeleteMilestone removes a milestone; its tasks keep existing without one.
 
-#### `internal/projects/project/models.go` (123 lines)
+#### `internal/projects/project/models.go` (106 lines)
 _Package:_ Package project is the project context of M2: projects, members, roles, columns, labels, milestones and favourites, and the Authorizer every other M2 context uses (specification sections 1 and 8).
 - **type** `Project struct` — Project is a unit of work with its own members, columns and tasks (PR-01).
 - **func** `(Project) TableName() string { return "projects" }` — TableName maps to projects.projects.
-- **type** `Member struct` — Member links a user to a project with a built-in or custom role (PR-04, PR-05).
+- **type** `Member struct` — Member records that a user belongs to a project (PR-04); the role is an M0 assignment on the project (DPJ-49).
 - **func** `(Member) TableName() string { return "project_members" }` — TableName maps to project_members.
-- **type** `CustomRole struct` — CustomRole is a tenant-defined named set of project permissions (PR-05).
-- **func** `(CustomRole) TableName() string { return "project_roles" }` — TableName maps to project_roles.
 - **type** `Column struct` — Column is a board status of a project (PR-06).
 - **func** `(Column) TableName() string { return "board_columns" }` — TableName maps to board_columns.
 - **type** `Label struct` — Label tags tasks; ProjectID is nil for a tenant-wide label (PR-07).
@@ -10243,7 +10339,7 @@ _Package:_ Package project is the project context of M2: projects, members, role
 - **type** `Milestone struct` — Milestone groups tasks toward a date (PR-08).
 - **func** `(Milestone) TableName() string { return "milestones" }` — TableName maps to milestones.
 
-#### `internal/projects/project/projects.go` (221 lines)
+#### `internal/projects/project/projects.go` (227 lines)
 - **type** `CreateInput struct` — CreateInput creates a project (PR-01).
 - **type** `UpdateInput struct` — UpdateInput edits a project; nil fields are unchanged. Version, when set, must match (optimistic concurrency).
 - **type** `ListFilter struct` — ListFilter narrows the project list (PR-09).
@@ -10257,19 +10353,7 @@ _Package:_ Package project is the project context of M2: projects, members, role
 - **func** `(in UpdateInput) apply(p *Project) error`
 - **func** `setStr(dst *string, src *string)`
 
-#### `internal/projects/project/roles.go` (159 lines)
-- **type** `RoleInput struct` — RoleInput creates or edits a custom project role (PR-05).
-- **type** `BuiltinRole struct` — BuiltinRole describes one fixed role in the catalogue.
-- **type** `Catalogue struct` — Catalogue lists the project permissions and the built-in roles.
-- **func** `PermissionCatalogue() Catalogue` — PermissionCatalogue returns what a custom role can be built from.
-- **func** `(in RoleInput) validate() (kernel.StringList, string, error)`
-- **func** `(s *Service) requireRoles(a api.Actor) error`
-- **func** `(s *Service) Roles(ctx context.Context, a api.Actor) ([]CustomRole, error)` — Roles lists the tenant custom roles.
-- **func** `(s *Service) CreateRole(ctx context.Context, a api.Actor, in RoleInput) (*CustomRole, error)` — CreateRole defines a custom role.
-- **func** `(s *Service) UpdateRole(ctx context.Context, a api.Actor, id uuid.UUID, in RoleInput) (*CustomRole, error)` — UpdateRole edits a custom role; members pick up the new permissions at once.
-- **func** `(s *Service) DeleteRole(ctx context.Context, a api.Actor, id uuid.UUID) error` — DeleteRole removes a custom role that no member uses.
-
-#### `internal/projects/project/service.go` (114 lines)
+#### `internal/projects/project/service.go` (116 lines)
 - **type** `Ports struct` — Ports are the services the project context needs from the rest of the platform.
 - **type** `Service struct` — Service holds the project use cases. It also implements api.Authorizer.
 - **func** `NewService(db *gorm.DB, p Ports) *Service { return &Service{db: db, p: p, now: time.Now} }` — NewService builds the service.
@@ -10422,7 +10506,7 @@ _Package:_ Package task is the task core context of M2: tasks, assignees, labels
 - **func** `(m *mut) changeColumn(to *colRow, rank string, force bool) error` — changeColumn applies a column change: rules for done, WIP, completion time and the completed/reopened events.
 - **func** `(m *mut) doneRules(force bool) error` — doneRules refuses completion while blockers or subtasks are open unless a manager forces it (TK-06, TK-07).
 
-#### `internal/projects/task/moveproject.go` (166 lines)
+#### `internal/projects/task/moveproject.go` (165 lines)
 - **type** `projectKey struct{ tenantID, projectID uuid.UUID }` — projectKey names a project inside its tenant.
 - **func** `pickColumn(db *gorm.DB, target projectKey, want *uuid.UUID, from *colRow) (*colRow, error)` — pickColumn chooses the column a moved task lands in: the requested one, the one with the same key, the first one of the same category, or the default column of the target project.
 - **func** `(s *Service) MoveProject(ctx context.Context, a api.Actor, id uuid.UUID, in MoveProjectInput) (*View, error)` — MoveProject moves a task to another project (TK-08): a new number there, columns, labels and milestone mapped or cleared, the sprint cleared, and an alias so the old ticket id keeps resolving.
@@ -10462,7 +10546,7 @@ _Package:_ Package task is the task core context of M2: tasks, assignees, labels
 - **func** `spreadRanks(n int) []string` — spreadRanks returns n strictly increasing ranks of one fixed width (trailing zeros trimmed), leaving room between neighbours for many inserts. kernel.Spread would grow a character every few items on long columns.
 - **func** `encodeRank(v uint64, width int) string`
 
-#### `internal/projects/task/refs.go` (136 lines)
+#### `internal/projects/task/refs.go` (135 lines)
 - **type** `colRow struct` — colRow is the part of a board column the task context needs.
 - **func** `(colRow) TableName() string { return "board_columns" }`
 - **func** `(c colRow) closed() bool { return c.Category == "done" || c.Category == "canceled" }`
@@ -10824,8 +10908,8 @@ _Package:_ Package collab is the collaboration context of M2: comments with ment
 - **type** `planBatch struct` — planBatch is the set of tasks that really change sprint in one planning move.
 - **func** `(s *Service) applyPlan(ctx context.Context, tx *gorm.DB, a api.Actor, b planBatch) error` — applyPlan writes the sprint change for the locked tasks with one UPDATE of tasks.sprint_id, then records one activity entry and one event per task. Data and payloads carry ids and versions only (PG12).
 
-#### `internal/projects/planning/scope.go` (81 lines)
-- **func** `(s *Service) taskProjects(ctx context.Context, a api.Actor) ([]uuid.UUID, error)` — taskProjects lists the projects whose tasks the caller can read, for cross-project queries (search, My work, my calendar, the iCalendar feed). It starts from Authorizer.ReadableProjectIDs and drops projects where a custom role grants project.read without task.read; built-in roles, tenant visibility and tenant-wide read always carry both.
+#### `internal/projects/planning/scope.go` (55 lines)
+- **func** `(s *Service) taskProjects(ctx context.Context, a api.Actor) ([]uuid.UUID, error)` — taskProjects lists the projects whose tasks the caller can read, for cross-project queries (search, My work, my calendar, the iCalendar feed). Every project role in M0 must hold project:read and task:read, so the readable projects are the task-readable ones.
 - **func** `isNotFound(err error) bool`
 - **type** `Window struct` — Window is an inclusive range of calendar days (UTC).
 - **func** `ParseWindow(from, to string, maxDays int) (Window, error)` — ParseWindow reads from/to as YYYY-MM-DD and bounds the span (VW-03: at most 62 days; the Gantt allows more).
@@ -11763,7 +11847,7 @@ _Package:_ Package publiclink is the public project links context of M2 (specifi
 - `internal/projects/project/faults_test.go`: TestEveryStatementFailureIsReportedAndRolledBack, TestRunGroupRefreshStopsWithContext
 - `internal/projects/project/group_test.go`: TestGroupRulesExpandAndReconcile, TestGroupRuleGuards, TestRefreshAllSweepsActiveProjectsWithRules, TestDeactivationAndInbox
 - `internal/projects/project/harness_test.go`: (helpers only)
-- `internal/projects/project/members_test.go`: TestMembersLifecycle, TestLastOwnerGuard, TestCustomRoles
+- `internal/projects/project/members_test.go`: TestMembersLifecycle, TestLastOwnerGuard, TestMemberWithCustomRoleFromIdentity
 - `internal/projects/project/names_test.go`: TestMembersCarryDisplayNames
 - `internal/projects/project/projects_test.go`: TestCreateProjectDefaults, TestCreateProjectValidation, TestAccessRules, TestTenantVisibilityAndArchivedFreeze, TestUpdateProjectVersioned, TestArchiveRestoreDeleteAndFavorite, TestListProjects
 - `internal/projects/project/watch_cleanup_test.go`: TestWatchesEndWhenAccessIsLost
@@ -11792,7 +11876,7 @@ _Package:_ Package publiclink is the public project links context of M2 (specifi
 - `internal/projects/collab/time_test.go`: TestLogTimeValidationTable, TestTimePermissionsAndEvents, TestTimeTrackingDisabled, TestEditDeleteAndLockWindow, TestListTimeMineAndPaging, TestTimerStartStopAndOneRunning, TestOneRunningTimerUnderRace, TestStopStaleTimers, TestTimeReport
 - `internal/projects/collab/watchers_test.go`: TestParseMentions, TestWatchUnwatchAndList, TestAddWatcherKeepsFirstReason
 
-### M2 Projects / planning — 45 test functions in 12 files
+### M2 Projects / planning — 44 test functions in 12 files
 - `internal/projects/planning/board_test.go`: TestBoardPagesEachColumn, TestBoardPagingIsStableUnderInserts, TestBoardSprintScopeAndErrors, TestBoardCardsCarryAssigneesAndLabels
 - `internal/projects/planning/calendar_test.go`: TestParseWindow, TestProjectCalendarWindow, TestCalendarTruncatesAt500, TestMyCalendar, TestGantt, TestGanttDependenciesHideUnreadableProjects
 - `internal/projects/planning/feed_test.go`: TestIcsEscapeAndFold, TestCalendarTokenLifecycle, TestFeedListsOnlyMyReadableAssignedTasks, TestFeedRefusesBadTokensAndInactiveOwners, TestFeedRouteIsPublicAndRateLimited, TestFeedLimiterWindowsExpire
@@ -11801,7 +11885,7 @@ _Package:_ Package publiclink is the public project links context of M2 (specifi
 - `internal/projects/planning/mywork_test.go`: TestDayBounds, TestMyWorkGroupsAndCounts, TestMyWorkPagesOneGroup, TestMyWorkWatchingAndMentions
 - `internal/projects/planning/perf_test.go`: TestPG7LargeBoardPaginationWithinBudget
 - `internal/projects/planning/plan_test.go`: TestPlanMoveWritesOnlySprintColumn, TestPlanMovePerTaskOutcomes, TestPlanMoveConcurrentSameVersion, TestPlanMoveRefusals, TestBacklogByMode
-- `internal/projects/planning/search_test.go`: TestSearchTextRankingAndTicket, TestPG9SearchIsTenantIsolatedAndPrivacyAware, TestSearchHonoursTaskReadOfCustomRoles
+- `internal/projects/planning/search_test.go`: TestSearchTextRankingAndTicket, TestPG9SearchIsTenantIsolatedAndPrivacyAware
 - `internal/projects/planning/sprint_flow_test.go`: TestSprintStateMachine, TestPG6OneActiveSprintUnderRace, TestCompleteSprintMovesUnfinishedAndReports, TestPG12PlanningEventsHoldIdsOnly
 - `internal/projects/planning/sprints_test.go`: TestSprintCrudAndAccess, TestSprintListPagingAndFilters, TestKanbanProjectsHaveNoSprints, TestDeleteSprintReleasesTasks, TestArchivedProjectFreezesPlanning
 - `internal/projects/planning/views_test.go`: TestSavedViewValidation, TestSavedViewVisibility, TestSavedViewUpdateAndDelete
@@ -11880,6 +11964,7 @@ _Package:_ Package publiclink is the public project links context of M2 (specifi
 - `projects_groups_test.go`: TestProjectGroupRulesFollowHR
 - `projects_hooks_test.go`: TestTaskDescriptionMentionsAndAutoWatchers
 - `projects_planning_test.go`: TestPlanningSprintsAndPlan, TestPlanningViewsSearchAndFeed
+- `projects_roles_test.go`: TestProjectRolesAreDecidedByIdentity
 - `projects_tasks_test.go`: TestProjectTasksCore, TestTasksListingAndSubtasks, TestTaskRelationsAssigneesBulkAndMove
 - `projects_test.go`: TestProjectsContext, TestMembersListCarriesDisplayNamesNotEmails
 - `projects_webhooks_test.go`: TestWebhooksThroughTheRouter, TestGitIntegrationThroughTheRouter
@@ -12364,7 +12449,7 @@ route widens; scoped routes opt in through `RequireScopedPermission`.
 | PR-02 | `private`: only members and tenant-level admins see it. `tenant`: any user of the tenant can read it and its tasks (read-only unless a member). |
 | PR-03 | Archiving a project is reversible, hides it from default lists, blocks task creation and edits, and keeps all data. Deleting is a soft delete by tenant admins only, after archive. |
 | PR-04 | Membership: `project_member` (user, role). A user can be added directly, or through a **group rule** (phase 3): all members of a department or team, or a manager's direct reports, resolved through the people port and refreshed on org changes. Removing the last owner is refused. |
-| PR-05 | Roles: built-in `owner`, `manager`, `member`, `viewer` (fixed permission sets) plus tenant-defined **custom project roles** (a named set of project permissions). The project permissions are listed in section 8. |
+| PR-05 | Roles: built-in `owner`, `manager`, `member`, `viewer` (fixed permission sets) plus **custom project roles** defined in the M0 role editor (a role that applies to projects and holds project permissions; it must include `project:read` and `task:read`). A member holds one M0 role on the project. The project permissions are listed in section 8. |
 | PR-06 | **Columns** (statuses) per project: name, key, position, color, `category` `backlog | todo | in_progress | done | canceled`, optional WIP limit, default flag. Customisable (add, rename, reorder, recolor, delete when empty or with a target column). At least one `done` and one `todo` column always exist. The category drives reports, "completed" and overdue logic. |
 | PR-07 | **Labels**: project labels and tenant-wide labels (name unique per scope, color). |
 | PR-08 | **Milestones**: name, `due_on`, status `open | reached`; tasks may belong to one milestone; progress = done tasks / tasks. |
@@ -12442,7 +12527,7 @@ Format: decision - reason - alternatives - trade-off.
 - **DPJ-16 Table names are plural and unprefixed inside schema `projects`.** The in-process search path (`identity,hr,projects,public`) resolves unqualified names, so a name used by two services would be ambiguous; `TestSchemasAreOwnedAndIsolated` now fails on any table name that exists in two schemas. Alternative: `pm_` prefix everywhere (rejected: noise, and a separate deployment already isolates by schema).
 - **DPJ-17 Storage provider: S3-compatible dev service is `adobe/s3mock`, not MinIO.** MinIO's official images are no longer published (Docker Hub repository removed, Quay answers 401). The adapter speaks plain S3 (AWS SDK v2) and is configured by endpoint/region/bucket/keys, so MinIO, AWS S3 or another server is a configuration change. HR and other modules can adopt the same `shared/storage` port later; HR is unchanged now.
 - **DPJ-18 Shared packages promoted for M2.** `identityport` (with its in-process adapter) moved to `internal/shared` so M2 and HR use one port; the HR table relay became `shared/outbox.TableRelay` (HR keeps a thin alias); `shared/inbox.Claim` is the first consumer ledger. Alternative: duplicate in M2 (rejected: two relays to keep in step). The HR import-boundary test now forbids any HR import of identity internals other than `identity/access`.
-- **DPJ-19 Role permissions are stored as JSONB, project member roles as `role_key` or `custom_role_id` (exactly one).** Keeps built-in roles in code (fixed sets, no per-tenant seeding) and custom roles editable with immediate effect on members. Alternative: seed built-in roles per tenant (rejected: seeding drift and a migration per permission added).
+- **DPJ-19 (superseded by DPJ-49) Role permissions were stored as JSONB, project member roles as `role_key` or `custom_role_id`.** Replaced when project roles moved to M0; the columns and the `project_roles` table were dropped by migration 000073.
 - **DPJ-20 Ranks use `COLLATE "C"`.** Fractional string ranks (`kernel.RankBetween`) compare bytewise; the default collation would reorder them.
 - **DPJ-21 Activity is append-only by trigger.** `UPDATE` raises an exception; rows disappear only with their project (hard purge). The application role keeps `DELETE` for cascades.
 - **DPJ-22 Group rules are materialised.** A rule expands into `project_members` rows with `source = 'group'`; direct members are never overridden; an explicit role change pins a group member as a direct one; the highest role among rules wins; refresh runs on rule change, on request, and every 10 minutes. Alternative: resolve at read time on every access check (rejected: an HR call per request breaks the latency budget and the failure mode - HR down means nobody can open a project). Trade-off: up to ten minutes of lag after an HR change unless refreshed explicitly.
@@ -12455,7 +12540,7 @@ Format: decision - reason - alternatives - trade-off.
 - **DPJ-29 The iCalendar feed is the one public M2 route.** It carries a per-user random token (32 bytes, SHA-256 stored, shown once, revocable), derives the tenant from the token row, lists only tasks assigned to the token owner in projects that owner can read, checks the owner is still active, and is rate limited at 30/min/IP (the shared Redis limiter when configured, a per-process one otherwise). Tenant-level flags are not available without a JWT, so tenant admins see only the private projects they belong to.
 - **DPJ-30 Attachments never pass through the API.** Clients upload with a presigned PUT and the server verifies the object (existence, size, type, checksum) before `ready`; the object key is `t/<tenant>/p/<project>/a/<attachment>`; the bucket is private; storage calls happen outside DB transactions; with no storage configured every attachment route answers 503 `STORAGE_UNAVAILABLE` and the rest of M2 works.
 - **DPJ-31 Time tracking.** One running timer per user (partial unique index), entries editable by their author within a 30-day lock window and by `time.manage`, projects can switch tracking off, timers running more than 24 h are stopped by a sweep and marked `auto_stopped`.
-- **DPJ-32 Permission model.** Four tenant-level catalogue entries were added to M0 (`projects:create` defaults to the Employee template; `projects:read_all` to Executive, Auditor, IT Admin; `projects:manage_all` and `project_roles:manage` to IT Admin). Project-level permissions are owned by M2 and are not M0 permissions. No M0 role or permission behaviour was changed.
+- **DPJ-32 (superseded by DPJ-49) Permission model.** Four tenant-level catalogue entries were added to M0 (`projects:create` to the Employee template; `projects:read_all` to Executive, Auditor, IT Admin; `projects:manage_all` to IT Admin); `project_roles:manage` has since been removed. Project-level permissions were first owned by M2; they now live in the M0 catalogue (DPJ-49).
 - **DPJ-33 `If-Match` joins the CORS allow-list (shared change).** The first browser run of the console showed that versioned edits (`PATCH` with `If-Match`) failed with "Failed to fetch": the preflight did not allow the header, so no browser client could use header-based concurrency (curl and the Go tests could). `internal/shared/middleware/cors.go` now allows `If-Match`; `TestCORSAllowsVersionAndIdempotencyHeaders` guards it; the full backend suite was re-run (shared change rule).
 - **DPJ-34 Watches end with access.** Removing a member, a group rule that drops a member, and deactivating a login delete the user's `task_watchers` rows (in the same transaction) for the affected project, or for all projects on deactivation. Alternative: filter at delivery time in M10 only (rejected: stale rows would leak who followed what, and M10 does not exist yet). The project context deletes from the collaboration table directly; both live in schema `projects` and the statement is a single scoped `DELETE`.
 - **DPJ-35 Phases 4-5 stay unbuilt by owner scope.** The owner confirmed phases 1-3 as the scope. Custom fields, automation, webhooks, integrations, MCP/CLI, recurrence, public links and a product UI use the reserved extension points (specification section 9) and need a new scope GO; nothing in phases 1-3 has to change to add them.
@@ -12472,6 +12557,7 @@ Format: decision - reason - alternatives - trade-off.
 - **DPJ-46 Recurrence.** Claim-then-copy at most once per occurrence, catch-up collapses to one task after an outage, creator re-check, archived projects flagged, copy goes into the template column (keep templates in a backlog column), `run-now` runs as the caller and does not move the schedule.
 - **DPJ-47 Public project links.** Anonymous read-only page `GET /public/projects/{token}`: 256-bit token shown once (hash only stored, constant-time compare, revocable, max 3 per project), strict allow-list (project key and name, columns, task key/title/column/priority/due/label names/progress, optional descriptions), never user ids or names, comments, attachments, time, activity or members; mentions are scrubbed from descriptions; unknown, revoked, archived and deleted all answer one identical 404; `no-store`, `noindex`, `no-referrer`.
 - **DPJ-48 People names come from a read-only names port, never from the user directory.** `ports.Names.DisplayNames` (implemented by the in-process identity adapter with one query) fills `display_name` on the project members list; the UI shows names for members and falls back to a short id for former members and "System" for system actions. E-mail addresses are never returned to project members. Alternative: let members read `GET /users/{id}` (rejected: it exposes e-mail and HR-adjacent data to every project member).
+- **DPJ-49 All permission decisions are made by M0; project roles are M0 roles assigned on a project (owner decision, 2026-10-30).** M0 gained `permissions.applies_to` and `roles.applies_to` (`tenant|project`), four predefined project role templates (`project_viewer <- project_member <- project_manager <- project_owner`, using the normal role inheritance) and a table `resource_role_assignments` (tenant, user, role, resource type `project`, resource id, source `manual|group|automatic`; one role per user per project; no foreign key to the project because it belongs to another service). The 20 project permissions are registered in the M0 catalogue as `resource:action` (`project.read` is `project:read`, `task.create` is `task:create`) with the old built-in sets as template defaults. M2 asks M0 through `identityport.ResourceAccess` (`PermissionsOn`, `RolesFor`, `RolesOn`, `AssignRole`, `RevokeRole`, `RoleByTemplate`, `AvailableRoles`); M2 keeps the membership record (who is in a project, active flag, `direct|group` source) for visibility, the owner-count guard, the archive freeze and group rules, but holds no role data. Custom project roles are created in the M0 role editor (`POST /roles` with `applies_to: project`); M0 refuses permissions that do not apply to projects and roles without `project:read` and `task:read` (so a member is always able to read the project and its tasks; M2 readers therefore only check membership). The M0 escalation check does not apply to project permissions because they act only inside a project where the caller assigns the role. M0 refuses to delete a role that is assigned on a project. `project_roles:manage` and the routes `/project-roles*` and `/project-permissions` were removed; `GET /projects/{id}/roles` lists the roles a project manager can assign. Migration 000073 drops `project_members.role_key|custom_role_id` and `project_roles` without a data backfill because module 2 was never released (existing development data loses its member roles). Alternatives: keep a hybrid with roles in M2 (rejected by the owner: one catalogue, one editor, one cache and one audit trail for every permission); store the role id in `project_members` as well (rejected: two copies to keep in step). Details: `docs/modules/m0-identity-access/resource-roles.md`.
 
 ### m1-hr-management/contexts/organization  _(from specification.md)_
 

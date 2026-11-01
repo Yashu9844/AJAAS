@@ -18,10 +18,12 @@ import (
 
 // Ports are the services the project context needs from the rest of the platform.
 type Ports struct {
-	Users  identityport.Users
-	Audit  identityport.Auditor
-	People ports.People // nil: group rules answer 503 PEOPLE_UNAVAILABLE
-	Names  ports.Names  // nil: members carry no display names
+	Users identityport.Users
+	Audit identityport.Auditor
+	// Resources decides project permissions and stores project roles (M0).
+	Resources identityport.ResourceAccess
+	People    ports.People // nil: group rules answer 503 PEOPLE_UNAVAILABLE
+	Names     ports.Names  // nil: members carry no display names
 }
 
 // Service holds the project use cases. It also implements api.Authorizer.

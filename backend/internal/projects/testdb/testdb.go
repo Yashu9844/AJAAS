@@ -4,7 +4,10 @@ package testdb
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
@@ -38,17 +41,17 @@ func Open(t testing.TB) *gorm.DB {
 	if err != nil {
 		return unavailable(t, err)
 	}
+	tpl, err := ensureTemplate(admin, quiet)
+	if err != nil {
+		return unavailable(t, err)
+	}
 	name := "m2_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:16]
-	if err := admin.Exec("CREATE DATABASE " + name).Error; err != nil {
+	if err := admin.Exec("CREATE DATABASE " + name + " TEMPLATE " + tpl).Error; err != nil {
 		return unavailable(t, err)
 	}
 	db, err := gorm.Open(postgres.Open(dsn(name)), quiet)
 	if err != nil {
 		return unavailable(t, err)
-	}
-	sets := []database.MigrationSet{{Schema: "projects", FS: migrations.Projects}}
-	if _, err := database.RunMigrationSets(context.Background(), db, sets); err != nil {
-		t.Fatalf("migrate: %v", err)
 	}
 	t.Cleanup(func() {
 		if sql, e := db.DB(); e == nil {
@@ -60,6 +63,65 @@ func Open(t testing.TB) *gorm.DB {
 		}
 	})
 	return db
+}
+
+// ensureTemplate returns the name of a database with the projects schema and the stand-in identity table already migrated.
+// Tests copy it with CREATE DATABASE ... TEMPLATE, which is far faster than migrating every test database. The name carries a
+// hash of the migration files so a changed migration builds a new template; a lock serialises packages that start together.
+func ensureTemplate(admin *gorm.DB, cfg *gorm.Config) (string, error) {
+	h := sha256.New()
+	entries, err := fs.ReadDir(migrations.Projects, ".")
+	if err != nil {
+		return "", err
+	}
+	_ = fs.WalkDir(migrations.Projects, ".", func(p string, d fs.DirEntry, e error) error {
+		if e == nil && !d.IsDir() {
+			b, _ := fs.ReadFile(migrations.Projects, p)
+			h.Write([]byte(p))
+			h.Write(b)
+		}
+		return nil
+	})
+	_ = entries
+	name := "m2_tpl_" + hex.EncodeToString(h.Sum(nil))[:12]
+	sqlDB, err := admin.DB()
+	if err != nil {
+		return "", err
+	}
+	conn, err := sqlDB.Conn(context.Background())
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(context.Background(), "SELECT pg_advisory_lock(727201)"); err != nil {
+		return "", err
+	}
+	defer conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock(727201)")
+	var exists bool
+	if err := conn.QueryRowContext(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil || exists {
+		return name, err
+	}
+	building := name + "_b"
+	_, _ = conn.ExecContext(context.Background(), "DROP DATABASE IF EXISTS "+building+" WITH (FORCE)")
+	if _, err := conn.ExecContext(context.Background(), "CREATE DATABASE "+building); err != nil {
+		return "", err
+	}
+	db, err := gorm.Open(postgres.Open(dsn(building)), cfg)
+	if err != nil {
+		return "", err
+	}
+	sets := []database.MigrationSet{{Schema: "projects", FS: migrations.Projects}}
+	if _, err := database.RunMigrationSets(context.Background(), db, sets); err != nil {
+		return "", err
+	}
+	if err := db.Exec(FakeRoleTable).Error; err != nil {
+		return "", err
+	}
+	if inner, e := db.DB(); e == nil {
+		_ = inner.Close()
+	}
+	_, err = conn.ExecContext(context.Background(), "ALTER DATABASE "+building+" RENAME TO "+name)
+	return name, err
 }
 
 func unavailable(t testing.TB, err error) *gorm.DB {

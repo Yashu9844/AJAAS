@@ -115,7 +115,6 @@ type Actor struct {
 	CreateProject    bool // projects:create
 	ReadAll          bool // projects:read_all
 	ManageAll        bool // projects:manage_all
-	ManageRoles      bool // project_roles:manage
 }
 
 // ProjectInfo is the part of a project every context needs.
@@ -175,7 +174,6 @@ const (
 	FlagCreate    = "projects_create"
 	FlagReadAll   = "projects_read_all"
 	FlagManageAll = "projects_manage_all"
-	FlagRoles     = "project_roles_manage"
 )
 
 // ActorFrom builds the Actor from the request context set by the identity guards.
@@ -189,5 +187,5 @@ func ActorFrom(c *gin.Context) (Actor, bool) {
 		return Actor{}, false
 	}
 	return Actor{TenantID: tid, UserID: uid, IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), CreateProject: c.GetBool(FlagCreate),
-		ReadAll: c.GetBool(FlagReadAll), ManageAll: c.GetBool(FlagManageAll), ManageRoles: c.GetBool(FlagRoles)}, true
+		ReadAll: c.GetBool(FlagReadAll), ManageAll: c.GetBool(FlagManageAll)}, true
 }

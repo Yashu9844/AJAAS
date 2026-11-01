@@ -66,7 +66,7 @@ func newEnv(t *testing.T) *env {
 	t.Helper()
 	db := testdb.Open(t)
 	e := &env{t: t, db: db, audit: &fakeAudit{}, users: fakeUsers{mu: &sync.Mutex{}, active: map[uuid.UUID]bool{}}, tenant: uuid.New()}
-	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit})
+	e.proj = project.NewService(db, project.Ports{Users: e.users, Audit: e.audit, Resources: testdb.NewResources()})
 	e.svc = NewService(db, e.proj, Ports{Users: e.users, Audit: e.audit})
 	return e
 }
@@ -85,7 +85,7 @@ func (e *env) user(flags ...string) api.Actor {
 		case "readall":
 			a.ReadAll = true
 		case "admin":
-			a.ManageAll, a.CreateProject, a.ManageRoles = true, true, true
+			a.ManageAll, a.CreateProject = true, true
 		}
 	}
 	return a

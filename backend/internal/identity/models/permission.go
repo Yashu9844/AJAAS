@@ -15,6 +15,7 @@ type Permission struct {
 	Description *string   `gorm:"type:varchar(500)" json:"description,omitempty"`
 	Module      string    `gorm:"type:varchar(50);not null;default:''" json:"module"`
 	IsSensitive bool      `gorm:"not null;default:false" json:"is_sensitive"`
+	AppliesTo   string    `gorm:"type:varchar(20);not null;default:tenant" json:"applies_to"`
 	CreatedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 }

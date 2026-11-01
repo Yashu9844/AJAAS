@@ -25,17 +25,19 @@ func (s *Service) List(ctx context.Context, a api.Actor, f ListFilter) ([]Projec
 	}
 	where, args := s.listWhere(a, f, cur)
 	var rows []Project
-	err := s.db.WithContext(ctx).Raw(`SELECT p.*, (fv.user_id IS NOT NULL) AS favorite, COALESCE(m.role_key, cr.name, '') AS my_role
+	err := s.db.WithContext(ctx).Raw(`SELECT p.*, (fv.user_id IS NOT NULL) AS favorite, '' AS my_role
 		FROM projects p
 		LEFT JOIN project_favorites fv ON fv.project_id = p.id AND fv.user_id = ?
 		LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = ? AND m.active
-		LEFT JOIN project_roles cr ON cr.id = m.custom_role_id
 		WHERE `+where+` ORDER BY p.last_activity_at DESC, p.id DESC LIMIT ?`,
 		append([]any{a.UserID, a.UserID}, append(args, f.Limit+1)...)...).Scan(&rows).Error
 	if err != nil {
 		return nil, "", err
 	}
 	rows, more := kernel.Trim(rows, f.Limit)
+	if err := s.fillMyRoles(ctx, a, rows); err != nil {
+		return nil, "", err
+	}
 	next := ""
 	if more {
 		last := rows[len(rows)-1]
@@ -161,4 +163,20 @@ func lockProject(tx *gorm.DB, tenantID, id uuid.UUID) (*Project, error) {
 	var p Project
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).Take(&p).Error
 	return &p, err
+}
+
+// fillMyRoles sets my_role on each listed project from the caller's M0 role assignments.
+func (s *Service) fillMyRoles(ctx context.Context, a api.Actor, rows []Project) error {
+	ids := make([]uuid.UUID, len(rows))
+	for i, p := range rows {
+		ids[i] = p.ID
+	}
+	roles, err := s.p.Resources.RolesFor(ctx, s.db, a.TenantID, a.UserID, projectResource, ids)
+	if err != nil {
+		return err
+	}
+	for i := range rows {
+		_, rows[i].MyRole = roleLabel(roles[rows[i].ID])
+	}
+	return nil
 }
