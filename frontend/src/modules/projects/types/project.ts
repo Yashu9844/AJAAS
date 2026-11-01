@@ -59,11 +59,13 @@ export interface ColumnInput {
 export interface Member {
   project_id: string;
   user_id: string;
-  role_key: ProjectRoleKey | null;
+  /** The role assigned in M0 on this project (a predefined or custom project role). */
+  role_id: string;
+  /** Only for the four predefined roles. */
+  role_key?: ProjectRoleKey;
   role_name: string;
   /** First and last name; absent when the API predates it. Never the e-mail. */
   display_name?: string;
-  custom_role_id: string | null;
   active: boolean;
   source: string;
 }
@@ -100,5 +102,7 @@ export interface PublicProject {
   tasks: PublicTask[];
 }
 
-/** A role choice is either a built-in role key or a custom role id (see lib/role-picker.ts). */
-export type RoleChoice = { role: ProjectRoleKey } | { custom_role_id: string };
+/** A member role is always chosen by role id (the ids come from GET /projects/{id}/roles; see lib/role-picker.ts). */
+export interface RoleChoice {
+  role_id: string;
+}

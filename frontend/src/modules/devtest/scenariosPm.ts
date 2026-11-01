@@ -24,7 +24,7 @@ export const S_PROJECTS: Scenario[] = [
     module: "projects",
     title: "Project, members, visibility, versions, setup data, archive (PG1, PG4)",
     description:
-      "Creates a project as a user holding projects:create and shows its default columns; a private project is invisible to strangers and to other tenants (PG4); a viewer reads but cannot edit; an edit with a stale version is refused with the current version; columns, labels, milestones and a custom role are managed; archiving freezes the project and only a tenant administrator may delete it.",
+      "Creates a project as a user holding projects:create and shows its default columns; a private project is invisible to strangers and to other tenants (PG4); a viewer reads but cannot edit; an edit with a stale version is refused with the current version; columns, labels, milestones and a custom project role (created in M0, assigned by role id, changed, then its permission removed) are managed; archiving freezes the project and only a tenant administrator may delete it.",
     needs: "A",
     run: async (r, { A, uid }) => {
       const key = `P${uid}`.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
@@ -52,8 +52,35 @@ export const S_PROJECTS: Scenario[] = [
       await r.call("Add a column", tn(owner.S, "POST", `/projects/${pid}/columns`, { name: "In review", category: "in_progress", wip_limit: 3 }), 201);
       await r.call("A project label", tn(owner.S, "POST", `/projects/${pid}/labels`, { name: "bug", color: "#FF0000" }), 201);
       await r.call("A milestone", tn(owner.S, "POST", `/projects/${pid}/milestones`, { name: "Beta", due_on: "2030-01-31" }), 201);
-      await r.call("A custom role needs project_roles:manage → 403", tn(owner.S, "POST", "/project-roles", { name: `R${uid}`, permissions: ["project.read", "task.read"] }), 403);
-      await r.call("Tenant admin defines a custom role", tn(A, "POST", "/project-roles", { name: `Reviewer ${uid}`, permissions: ["project.read", "task.read", "task.comment"] }), 201);
+      // Custom project role in M0 (docs/modules/m0-identity-access/resource-roles.md): created through /roles, assigned by role id.
+      const pRead = await permId(r, A, "project", "read");
+      const tRead = await permId(r, A, "task", "read");
+      const tCreate = await permId(r, A, "task", "create");
+      await r.call("A project role needs M0 role permissions → 403", tn(owner.S, "POST", "/roles", { name: `R${uid}`, applies_to: "project", permission_ids: [pRead, tRead] }), 403);
+      await r.call("A project role must include project:read → 400", tn(A, "POST", "/roles", { name: `Bad ${uid}`, applies_to: "project", permission_ids: [tCreate] }), 400);
+      const role = await r.call("Tenant admin defines a project role (applies_to project)", tn(A, "POST", "/roles", { name: `Reviewer ${uid}`, applies_to: "project", permission_ids: [pRead, tRead, tCreate] }), 201);
+      const roleId = str(role, "data.id");
+      const roles = await r.call("The project offers predefined and custom roles", tn(owner.S, "GET", `/projects/${pid}/roles`), 200, (e) =>
+        list(e).length >= 5 && list(e).some((x) => x.role_id === roleId && !x.key) && list(e).some((x) => x.key === "viewer") ? null : "expected the four predefined roles and the custom role",
+      );
+      const viewerRole = String(list(roles).find((x) => x.key === "viewer")?.role_id ?? "");
+      const worker = await limited(r, A, uid, "pmw", []);
+      await r.call("Add a member with the custom role (role_id)", tn(owner.S, "POST", `/projects/${pid}/members`, { user_id: worker.userId, role_id: roleId }), 201, (e) =>
+        str(e, "data.role_id") === roleId ? null : "the member must hold the custom role",
+      );
+      await r.call("The custom role reads the project", tn(worker.S, "GET", `/projects/${pid}`), 200);
+      await r.call("The custom role creates a task (task:create)", tn(worker.S, "POST", `/projects/${pid}/tasks`, { title: "From the reviewer" }), 201);
+      await r.call("The custom role cannot edit the project → 403", tn(worker.S, "PATCH", `/projects/${pid}`, { name: "Hacked" }), 403);
+      await r.call("Change the member to viewer (role_id)", tn(owner.S, "PATCH", `/projects/${pid}/members/${worker.userId}`, { role_id: viewerRole }), 200);
+      await r.call("As viewer the task is refused → 403", tn(worker.S, "POST", `/projects/${pid}/tasks`, { title: "Nope" }), 403);
+      await r.call("Back to the custom role", tn(owner.S, "PATCH", `/projects/${pid}/members/${worker.userId}`, { role_id: roleId }), 200);
+      await r.call("Task creation works again", tn(worker.S, "POST", `/projects/${pid}/tasks`, { title: "Second" }), 201);
+      await r.call("Remove task:create from the role (M0)", tn(A, "DELETE", `/roles/${roleId}/permissions/${tCreate}`), 200);
+      await r.call("The member loses the action → 403", tn(worker.S, "POST", `/projects/${pid}/tasks`, { title: "Third" }), 403);
+      await r.call("The member still reads", tn(worker.S, "GET", `/projects/${pid}`), 200);
+      await r.call("A role assigned on a project cannot be deleted → 409", tn(A, "DELETE", `/roles/${roleId}`), 409);
+      await r.call("Remove the member", tn(owner.S, "DELETE", `/projects/${pid}/members/${worker.userId}`), 200);
+      await r.call("The unused role can be deleted", tn(A, "DELETE", `/roles/${roleId}`), 200);
       await r.call("Archive", tn(owner.S, "POST", `/projects/${pid}/archive`), 200);
       await r.call("An archived project is frozen → 409", tn(owner.S, "POST", `/projects/${pid}/columns`, { name: "Late" }), 409);
       await r.call("The owner cannot delete → 403", tn(owner.S, "DELETE", `/projects/${pid}`), 403);

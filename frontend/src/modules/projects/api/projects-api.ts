@@ -1,5 +1,5 @@
 import type { Page } from "../types/common";
-import type { ProjectPermissions, ProjectRole } from "../types/settings";
+import type { ProjectRoleOption } from "../types/settings";
 import type { Column, ColumnInput, RoleChoice, CreateProjectInput, Label, Member, Person, Project } from "../types/project";
 import { del, getData, getPage, idempotencyHeader, patch, post, put } from "./client";
 import { seg } from "./query";
@@ -73,11 +73,11 @@ export function listMembers(projectId: string): Promise<Member[]> {
 }
 
 export function addMember(projectId: string, userId: string, choice: RoleChoice): Promise<Member> {
-  return post<Member>(`/projects/${seg(projectId)}/members`, { user_id: userId, ...choice });
+  return post<Member>(`/projects/${seg(projectId)}/members`, { user_id: userId, role_id: choice.role_id });
 }
 
 export function changeMemberRole(projectId: string, userId: string, choice: RoleChoice): Promise<Member> {
-  return patch<Member>(`/projects/${seg(projectId)}/members/${seg(userId)}`, choice);
+  return patch<Member>(`/projects/${seg(projectId)}/members/${seg(userId)}`, { role_id: choice.role_id });
 }
 
 export function removeMember(projectId: string, userId: string): Promise<unknown> {
@@ -90,22 +90,7 @@ export async function listPeople(): Promise<Person[]> {
   return res ?? [];
 }
 
-export async function listProjectRoles(): Promise<ProjectRole[]> {
-  return (await getData<ProjectRole[] | null>("/project-roles")) ?? [];
-}
-
-export async function listProjectPermissions(): Promise<string[]> {
-  return (await getData<ProjectPermissions>("/project-permissions")).permissions ?? [];
-}
-
-export function createProjectRole(name: string, description: string, permissions: string[]): Promise<ProjectRole> {
-  return post<ProjectRole>("/project-roles", { name, description, permissions });
-}
-
-export function updateProjectRole(id: string, name: string, description: string, permissions: string[]): Promise<ProjectRole> {
-  return patch<ProjectRole>(`/project-roles/${seg(id)}`, { name, description, permissions });
-}
-
-export function deleteProjectRole(id: string): Promise<unknown> {
-  return del(`/project-roles/${seg(id)}`);
+/** Roles that can be assigned on a project (predefined and custom project roles of the tenant). Needs project.manage_members. */
+export async function listProjectRoleOptions(projectId: string): Promise<ProjectRoleOption[]> {
+  return (await getData<ProjectRoleOption[] | null>(`/projects/${seg(projectId)}/roles`)) ?? [];
 }

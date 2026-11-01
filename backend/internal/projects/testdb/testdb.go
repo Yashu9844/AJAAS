@@ -54,6 +54,10 @@ func Open(t testing.TB) *gorm.DB {
 	if err != nil {
 		return unavailable(t, err)
 	}
+	// Migrations seed worker cursors with the migration time; a copy of the template must start at the time of the test.
+	if err := db.Exec(`UPDATE projects_dispatch_cursor SET last_created_at = now(); UPDATE automation_cursor SET last_created_at = now()`).Error; err != nil {
+		t.Fatalf("reset cursors: %v", err)
+	}
 	t.Cleanup(func() {
 		if sql, e := db.DB(); e == nil {
 			_ = sql.Close()

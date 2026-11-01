@@ -69,7 +69,7 @@ export function SettingsPage() {
         <>
           <MembersSettings projectId={project.id} members={members} canManage={canManage} onChanged={reload} />
           <GroupRulesSettings projectId={project.id} canManage={manage} />
-          <RolesSettings />
+          <RolesSettings projectId={project.id} />
         </>
       )}
       {section === "automation" && (

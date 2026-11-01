@@ -1,41 +1,34 @@
-import type { ProjectRoleKey } from "../types/common";
 import type { Member, RoleChoice } from "../types/project";
-import type { ProjectRole } from "../types/settings";
+import type { ProjectRoleOption } from "../types/settings";
 
-export const BUILTIN_ROLES: ProjectRoleKey[] = ["owner", "manager", "member", "viewer"];
-
-const CUSTOM_PREFIX = "custom:";
-const ID_RE = /^[0-9a-fA-F-]{36}$/;
+const ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const NIL_ID = "00000000-0000-0000-0000-000000000000";
+const ORDER = ["owner", "manager", "member", "viewer"];
 
 export interface RoleOption {
   value: string;
   label: string;
 }
 
-/** Options of a role picker: the four built-in roles, then the tenant's custom roles. */
-export function roleOptions(custom: readonly Pick<ProjectRole, "id" | "name">[]): RoleOption[] {
-  return [...BUILTIN_ROLES.map((r) => ({ value: r, label: r })), ...custom.map((c) => ({ value: `${CUSTOM_PREFIX}${c.id}`, label: `${c.name} (custom)` }))];
+/** Options of a role picker from GET /projects/{id}/roles: the four predefined roles first (in rank order), then custom roles by name. */
+export function roleOptions(roles: readonly ProjectRoleOption[]): RoleOption[] {
+  const rank = (r: ProjectRoleOption) => (r.key ? ORDER.indexOf(r.key) : ORDER.length);
+  return [...roles]
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+    .map((r) => ({ value: r.role_id, label: r.key ? r.key : `${r.name} (custom)` }));
 }
 
-/** The select value of a member's current role. */
-export function currentRoleValue(m: Pick<Member, "role_key" | "custom_role_id">): string {
-  if (m.custom_role_id) return `${CUSTOM_PREFIX}${m.custom_role_id}`;
-  return m.role_key ?? "";
+/** The select value of a member's current role ("" when the member has none, for example after a migration). */
+export function currentRoleValue(m: Pick<Member, "role_id">): string {
+  return m.role_id && m.role_id !== NIL_ID ? m.role_id : "";
 }
 
-/** Turns a select value into the API fields; null for an unknown value. */
+/** Turns a select value into the API field; null for anything that is not a role id. */
 export function decodeRole(value: string): RoleChoice | null {
-  if (value.startsWith(CUSTOM_PREFIX)) {
-    const id = value.slice(CUSTOM_PREFIX.length);
-    return ID_RE.test(id) ? { custom_role_id: id } : null;
-  }
-  return (BUILTIN_ROLES as string[]).includes(value) ? { role: value as ProjectRoleKey } : null;
+  return ID_RE.test(value) && value !== NIL_ID ? { role_id: value } : null;
 }
 
-/** Permissions toggled in a role editor (returns a new sorted list). */
-export function togglePermission(current: readonly string[], permission: string, on: boolean): string[] {
-  const next = new Set(current);
-  if (on) next.add(permission);
-  else next.delete(permission);
-  return [...next].sort();
+/** The role id of a predefined role key (for flows that know "member" but not its id); undefined when the list has none. */
+export function roleIdForKey(roles: readonly ProjectRoleOption[], key: string): string | undefined {
+  return roles.find((r) => r.key === key)?.role_id;
 }

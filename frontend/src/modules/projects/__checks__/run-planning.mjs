@@ -103,19 +103,26 @@ const roles = await load("lib/role-picker.mjs");
 const links = await load("lib/links.mjs");
 const paths2 = await load("lib/paths.mjs");
 
-await check("role picker: built-in and custom roles encode and decode", () => {
-  const id = "22af515b-fa4a-49f6-8987-ca8c73acf349";
-  const opts = roles.roleOptions([{ id, name: "Reviewer" }]);
-  assert.deepEqual(opts.map((o) => o.value), ["owner", "manager", "member", "viewer", `custom:${id}`]);
-  assert.equal(opts[4].label, "Reviewer (custom)");
-  assert.deepEqual(roles.decodeRole("manager"), { role: "manager" });
-  assert.deepEqual(roles.decodeRole(`custom:${id}`), { custom_role_id: id });
-  assert.equal(roles.decodeRole("custom:../x"), null);
-  assert.equal(roles.decodeRole("root"), null);
-  assert.equal(roles.currentRoleValue({ role_key: "viewer", custom_role_id: null }), "viewer");
-  assert.equal(roles.currentRoleValue({ role_key: null, custom_role_id: id }), `custom:${id}`);
-  assert.deepEqual(roles.togglePermission(["b"], "a", true), ["a", "b"]);
-  assert.deepEqual(roles.togglePermission(["a", "b"], "a", false), ["b"]);
+await check("role picker: roles come from GET /projects/{id}/roles and are chosen by role id", () => {
+  const ids = { owner: "75d6929d-f467-477e-abdb-798b606d120b", manager: "d3c2aca1-c5c4-48d4-86be-d7aa523e6dfb", member: "c938449e-2615-49ed-a0ea-d5870307216f", viewer: "8f5a5c69-5e11-42b6-858b-c86ae26aa3a4", reviewer: "22af515b-fa4a-49f6-8987-ca8c73acf349" };
+  const list = [
+    { role_id: ids.viewer, name: "viewer", key: "viewer" },
+    { role_id: ids.reviewer, name: "Reviewer", key: "" },
+    { role_id: ids.owner, name: "owner", key: "owner" },
+    { role_id: ids.member, name: "member", key: "member" },
+    { role_id: ids.manager, name: "manager", key: "manager" },
+  ];
+  const opts = roles.roleOptions(list);
+  assert.deepEqual(opts.map((o) => o.label), ["owner", "manager", "member", "viewer", "Reviewer (custom)"]);
+  assert.deepEqual(opts.map((o) => o.value), [ids.owner, ids.manager, ids.member, ids.viewer, ids.reviewer]);
+  assert.deepEqual(roles.decodeRole(ids.reviewer), { role_id: ids.reviewer });
+  assert.equal(roles.decodeRole("manager"), null);
+  assert.equal(roles.decodeRole("custom:" + ids.reviewer), null);
+  assert.equal(roles.decodeRole("00000000-0000-0000-0000-000000000000"), null);
+  assert.equal(roles.currentRoleValue({ role_id: ids.member }), ids.member);
+  assert.equal(roles.currentRoleValue({ role_id: "00000000-0000-0000-0000-000000000000" }), "");
+  assert.equal(roles.roleIdForKey(list, "member"), ids.member);
+  assert.equal(roles.roleIdForKey(list, "root"), undefined);
 });
 await check("links: only plain https URLs become links", () => {
   assert.equal(links.safeHttpsUrl("https://github.com/o/r/pull/1"), "https://github.com/o/r/pull/1");

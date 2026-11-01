@@ -175,13 +175,10 @@ export interface RuleTestResult {
   actions: RuleTestAction[];
 }
 
-export interface ProjectRole {
-  id: string;
+/** One role a person can hold on a project: the four predefined roles (key set) and custom project roles (key empty). */
+export interface ProjectRoleOption {
+  role_id: string;
   name: string;
-  description: string;
-  permissions: string[];
-}
-
-export interface ProjectPermissions {
-  permissions: string[];
+  /** Set only for the four predefined roles (the field is absent for custom roles). */
+  key?: string;
 }

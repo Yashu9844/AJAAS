@@ -95,120 +95,6 @@ export const PM_PROJECTS: OpSpec[] = [
     "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
   },
   {
-    "key": "pm.projects.get.project.permissions",
-    "label": "Project permissions and the built-in roles",
-    "method": "GET",
-    "path": "/project-permissions",
-    "scope": "tenant",
-    "auth": true,
-    "fields": [],
-    "expect": [
-      200
-    ]
-  },
-  {
-    "key": "pm.projects.post.project.roles",
-    "label": "Create a custom role (project_roles:manage)",
-    "method": "POST",
-    "path": "/project-roles",
-    "scope": "tenant",
-    "auth": true,
-    "fields": [
-      {
-        "name": "name",
-        "where": "body",
-        "required": true
-      },
-      {
-        "name": "description",
-        "where": "body"
-      },
-      {
-        "name": "permissions",
-        "where": "body",
-        "type": "list",
-        "required": true
-      }
-    ],
-    "expect": [
-      201
-    ],
-    "capture": [
-      {
-        "idKey": "projectRolesXId",
-        "from": "data.id"
-      }
-    ],
-    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 409 CONFLICT"
-  },
-  {
-    "key": "pm.projects.get.project.roles",
-    "label": "List the tenant custom project roles",
-    "method": "GET",
-    "path": "/project-roles",
-    "scope": "tenant",
-    "auth": true,
-    "fields": [],
-    "expect": [
-      200
-    ]
-  },
-  {
-    "key": "pm.projects.patch.project.roles.id",
-    "label": "Edit a custom role (project_roles:manage)",
-    "method": "PATCH",
-    "path": "/project-roles/:id",
-    "scope": "tenant",
-    "auth": true,
-    "fields": [
-      {
-        "name": "id",
-        "where": "path",
-        "required": true,
-        "ref": "projectRolesXId"
-      },
-      {
-        "name": "name",
-        "where": "body",
-        "required": true
-      },
-      {
-        "name": "description",
-        "where": "body"
-      },
-      {
-        "name": "permissions",
-        "where": "body",
-        "type": "list",
-        "required": true
-      }
-    ],
-    "expect": [
-      200
-    ],
-    "note": "Errors: 400 VALIDATION_ERROR; 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
-  },
-  {
-    "key": "pm.projects.delete.project.roles.id",
-    "label": "Delete an unused custom role (project_roles:manage)",
-    "method": "DELETE",
-    "path": "/project-roles/:id",
-    "scope": "tenant",
-    "auth": true,
-    "fields": [
-      {
-        "name": "id",
-        "where": "path",
-        "required": true,
-        "ref": "projectRolesXId"
-      }
-    ],
-    "expect": [
-      200
-    ],
-    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
-  },
-  {
     "key": "pm.projects.post.projects",
     "label": "Create a project; the caller becomes its owner (projects:create)",
     "method": "POST",
@@ -853,7 +739,7 @@ export const PM_PROJECTS: OpSpec[] = [
   },
   {
     "key": "pm.projects.post.projects.id.members",
-    "label": "Add a member with a built-in or custom role (project.manage_members)",
+    "label": "Add a member with a predefined or custom M0 project role (project.manage_members)",
     "method": "POST",
     "path": "/projects/:id/members",
     "scope": "tenant",
@@ -883,7 +769,7 @@ export const PM_PROJECTS: OpSpec[] = [
         ]
       },
       {
-        "name": "custom_role_id",
+        "name": "role_id",
         "where": "body",
         "placeholder": "uuid"
       }
@@ -957,7 +843,7 @@ export const PM_PROJECTS: OpSpec[] = [
         ]
       },
       {
-        "name": "custom_role_id",
+        "name": "role_id",
         "where": "body",
         "placeholder": "uuid"
       }
@@ -1148,6 +1034,26 @@ export const PM_PROJECTS: OpSpec[] = [
       200
     ],
     "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND; 409 CONFLICT"
+  },
+  {
+    "key": "pm.projects.get.projects.id.roles",
+    "label": "List the M0 project roles that can be given to members (project.manage_members)",
+    "method": "GET",
+    "path": "/projects/:id/roles",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "id",
+        "where": "path",
+        "required": true,
+        "ref": "projectsXId"
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 403 FORBIDDEN; 404 NOT_FOUND"
   }
 ];
 

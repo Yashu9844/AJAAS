@@ -147,7 +147,7 @@ export async function restoreSession(): Promise<void> {
       const o = parsed as Record<string, unknown>;
       if (typeof o.slug === "string" && typeof o.refresh === "string" && isValidSlug(o.slug)) {
         refreshToken = o.refresh;
-        publish({ ...SIGNED_OUT, slug: o.slug });
+        publish({ ...BOOTING, slug: o.slug }); // stays "booting" while the refresh runs, so the guard does not bounce to sign-in
         if (await refreshTokens()) return;
       }
     }
