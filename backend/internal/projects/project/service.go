@@ -34,7 +34,12 @@ type Service struct {
 }
 
 // NewService builds the service.
-func NewService(db *gorm.DB, p Ports) *Service { return &Service{db: db, p: p, now: time.Now} }
+func NewService(db *gorm.DB, p Ports) *Service {
+	if p.Resources == nil {
+		panic("projects: Ports.Resources is required (project roles are decided by M0)")
+	}
+	return &Service{db: db, p: p, now: time.Now}
+}
 
 var (
 	keyPattern   = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)

@@ -2,19 +2,32 @@ package integration
 
 import (
 	"context"
+	"github.com/rs/zerolog"
 	"strings"
 	"testing"
 
+	identityRepos "github.com/jaas/jaas/internal/identity/repositories"
+	identityServices "github.com/jaas/jaas/internal/identity/services"
 	"github.com/jaas/jaas/internal/projects/automation/bridge"
 	"github.com/jaas/jaas/internal/projects/collab"
 	"github.com/jaas/jaas/internal/projects/project"
 	"github.com/jaas/jaas/internal/projects/task"
 )
 
+// realResourceAccess is the M0 resource-role service over the integration database, for services the test builds itself.
+func realResourceAccess() identityServices.ResourceAccess {
+	access, userRoles, rolePerms := identityRepos.NewAccessRepository(), identityRepos.NewUserRoleRepository(), identityRepos.NewRolePermissionRepository()
+	resolver := identityServices.NewAccessResolver(identityServices.AccessResolverDeps{DB: testDB, Access: access, UserRoles: userRoles, RolePerms: rolePerms})
+	nop := zerolog.Nop()
+	return identityServices.NewResourceAccess(identityServices.ResourceAccessDeps{Repo: identityRepos.NewResourceRoleRepository(),
+		Roles: identityRepos.NewRoleRepository(), Access: access, Resolver: resolver,
+		Audit: identityServices.NewAuditService(identityRepos.NewAuditLogRepository(), &nop)})
+}
+
 // automationSuite builds a second automation engine on the integration database with the real task and collaboration
 // services; the test application runs without background workers, so the test ticks it by hand.
 func automationSuite() *bridge.Suite {
-	proj := project.NewService(testDB, project.Ports{})
+	proj := project.NewService(testDB, project.Ports{Resources: realResourceAccess()})
 	tasks := task.NewService(testDB, proj, task.Ports{})
 	cl := collab.NewService(testDB, collab.Ports{Authorizer: proj, Tasks: tasks})
 	s := bridge.NewSuite(bridge.Deps{DB: testDB, Authz: proj, Tasks: tasks, Collab: cl})
