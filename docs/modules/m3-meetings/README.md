@@ -1,6 +1,6 @@
 # M3 Meetings
 
-**Status:** NOT STARTED — design pending. Proposed contract in `specification.md`; logical data model, ER diagram and
+**Status:** NOT STARTED — design pending. Research phase done (2026-11-02): `research/README.md` (features, market, open source, internals, architecture options, recommendation and open questions for the owner); no design or code yet. Proposed contract in `specification.md`; logical data model, ER diagram and
 service diagram in `model/`.
 
 **Purpose:** Scheduling, meeting records and decisions; tasks remain owned by Projects & Tasks.
