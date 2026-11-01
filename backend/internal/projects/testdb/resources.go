@@ -82,8 +82,8 @@ func (r *Resources) rows(ctx context.Context, db *gorm.DB, where string, args ..
 }
 
 // PermissionsOn returns the role and permissions the user holds on the project.
-func (r *Resources) PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, _ string, resourceID uuid.UUID) (identityport.ResourceRole, []string, error) {
-	rows, err := r.rows(ctx, db, `tenant_id = ? AND user_id = ? AND resource_id = ?`, tenantID, userID, resourceID)
+func (r *Resources) PermissionsOn(ctx context.Context, db *gorm.DB, ref identityport.ResourceRef, userID uuid.UUID) (identityport.ResourceRole, []string, error) {
+	rows, err := r.rows(ctx, db, `tenant_id = ? AND user_id = ? AND resource_id = ?`, ref.TenantID, userID, ref.ID)
 	if err != nil || len(rows) == 0 {
 		return identityport.ResourceRole{}, nil, err
 	}
@@ -94,12 +94,12 @@ func (r *Resources) PermissionsOn(ctx context.Context, db *gorm.DB, tenantID, us
 }
 
 // RolesFor maps the projects to the role the user holds on each.
-func (r *Resources) RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID uuid.UUID, _ string, ids []uuid.UUID) (map[uuid.UUID]identityport.ResourceRole, error) {
+func (r *Resources) RolesFor(ctx context.Context, db *gorm.DB, ref identityport.ResourceRef, userID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]identityport.ResourceRole, error) {
 	out := map[uuid.UUID]identityport.ResourceRole{}
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, err := r.rows(ctx, db, `tenant_id = ? AND user_id = ? AND resource_id IN ?`, tenantID, userID, ids)
+	rows, err := r.rows(ctx, db, `tenant_id = ? AND user_id = ? AND resource_id IN ?`, ref.TenantID, userID, ids)
 	for _, row := range rows {
 		out[row.ResourceID] = r.role(row.RoleID, userID, row.Source)
 	}
@@ -107,26 +107,26 @@ func (r *Resources) RolesFor(ctx context.Context, db *gorm.DB, tenantID, userID 
 }
 
 // AssignRole records the assignment; an unknown role is refused like M0 does.
-func (r *Resources) AssignRole(ctx context.Context, db *gorm.DB, tenantID, _, userID, roleID uuid.UUID, _ string, resourceID uuid.UUID, source string) error {
+func (r *Resources) AssignRole(ctx context.Context, db *gorm.DB, ref identityport.ResourceRef, a identityport.RoleAssignment) error {
 	r.mu.Lock()
-	_, ok := r.roles[roleID]
+	_, ok := r.roles[a.RoleID]
 	r.mu.Unlock()
 	if !ok {
 		return identityport.ErrRoleNotFound
 	}
 	return db.WithContext(ctx).Exec(`INSERT INTO fake_resource_roles (tenant_id, user_id, resource_id, role_id, source) VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (tenant_id, user_id, resource_id) DO UPDATE SET role_id = EXCLUDED.role_id, source = EXCLUDED.source`,
-		tenantID, userID, resourceID, roleID, source).Error
+		ref.TenantID, a.UserID, ref.ID, a.RoleID, a.Source).Error
 }
 
 // RevokeRole removes the assignment.
-func (r *Resources) RevokeRole(ctx context.Context, db *gorm.DB, tenantID, _, userID uuid.UUID, _ string, resourceID uuid.UUID) error {
-	return db.WithContext(ctx).Exec(`DELETE FROM fake_resource_roles WHERE tenant_id = ? AND user_id = ? AND resource_id = ?`, tenantID, userID, resourceID).Error
+func (r *Resources) RevokeRole(ctx context.Context, db *gorm.DB, ref identityport.ResourceRef, _, userID uuid.UUID) error {
+	return db.WithContext(ctx).Exec(`DELETE FROM fake_resource_roles WHERE tenant_id = ? AND user_id = ? AND resource_id = ?`, ref.TenantID, userID, ref.ID).Error
 }
 
 // RolesOn lists the assignments on the project.
-func (r *Resources) RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, _ string, resourceID uuid.UUID) ([]identityport.ResourceRole, error) {
-	rows, err := r.rows(ctx, db, `tenant_id = ? AND resource_id = ?`, tenantID, resourceID)
+func (r *Resources) RolesOn(ctx context.Context, db *gorm.DB, ref identityport.ResourceRef) ([]identityport.ResourceRole, error) {
+	rows, err := r.rows(ctx, db, `tenant_id = ? AND resource_id = ?`, ref.TenantID, ref.ID)
 	out := make([]identityport.ResourceRole, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, r.role(row.RoleID, row.UserID, row.Source))
@@ -135,7 +135,7 @@ func (r *Resources) RolesOn(ctx context.Context, db *gorm.DB, tenantID uuid.UUID
 }
 
 // AvailableRoles lists the predefined and custom roles.
-func (r *Resources) AvailableRoles(context.Context, *gorm.DB, uuid.UUID, string) ([]identityport.ResourceRole, error) {
+func (r *Resources) AvailableRoles(context.Context, *gorm.DB, identityport.ResourceRef) ([]identityport.ResourceRole, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var out []identityport.ResourceRole
@@ -157,8 +157,8 @@ func (r *Resources) RoleByTemplate(_ context.Context, _ *gorm.DB, _ uuid.UUID, k
 }
 
 // CountWithTemplate counts assignments on the project whose role is the template.
-func (r *Resources) CountWithTemplate(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, _ string, resourceID uuid.UUID, key string) (int64, error) {
-	rows, err := r.rows(ctx, db, `tenant_id = ? AND resource_id = ?`, tenantID, resourceID)
+func (r *Resources) CountWithTemplate(ctx context.Context, db *gorm.DB, ref identityport.ResourceRef, key string) (int64, error) {
+	rows, err := r.rows(ctx, db, `tenant_id = ? AND resource_id = ?`, ref.TenantID, ref.ID)
 	var n int64
 	for _, row := range rows {
 		if r.role(row.RoleID, row.UserID, row.Source).TemplateKey == key {

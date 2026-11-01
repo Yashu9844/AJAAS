@@ -120,7 +120,7 @@ func (s *Service) Create(ctx context.Context, a api.Actor, in CreateInput) (*Pro
 		if rerr != nil {
 			return rerr
 		}
-		if err := s.assign(ctx, tx, a, a.UserID, ownerRole, p.ID, "manual"); err != nil {
+		if err := s.assign(ctx, tx, a, p.ID, memberRole{a.UserID, ownerRole, "manual"}); err != nil {
 			return err
 		}
 		if err := createDefaultColumns(tx, p); err != nil {

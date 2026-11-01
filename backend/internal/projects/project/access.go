@@ -48,7 +48,7 @@ func (s *Service) heldPerms(ctx context.Context, db *gorm.DB, a api.Actor, p Pro
 	switch {
 	case err == nil:
 		member = true
-		rr, keys, rerr := s.p.Resources.PermissionsOn(ctx, db, a.TenantID, m.UserID, projectResource, p.ID)
+		rr, keys, rerr := s.p.Resources.PermissionsOn(ctx, db, projectRef(a.TenantID, p.ID), m.UserID)
 		if rerr != nil {
 			return nil, "", false, rerr
 		}

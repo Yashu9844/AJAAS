@@ -36,6 +36,7 @@ func Conflict(code, msg string) *sharedErrors.AppError { return Err(http.StatusC
 // VersionConflict is returned when an edit carries a stale version; Current is what the caller should re-read (TK-03).
 type VersionConflict struct{ Current int }
 
+// Error implements error.
 func (e *VersionConflict) Error() string {
 	return fmt.Sprintf("[VERSION_CONFLICT] the object is at version %d (status: 409)", e.Current)
 }

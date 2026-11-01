@@ -130,7 +130,7 @@ func contains(s, sub string) bool {
 
 // mustRole returns the built-in role key the user holds on the project in the M0 stand-in.
 func (e *env) mustRole(p *Project, u api.Actor) string {
-	roles, _ := e.res.RolesFor(bg, e.db, e.tenant, u.UserID, "project", []uuid.UUID{p.ID})
+	roles, _ := e.res.RolesFor(bg, e.db, projectRef(e.tenant, uuid.Nil), u.UserID, []uuid.UUID{p.ID})
 	key, _ := roleLabel(roles[p.ID])
 	return key
 }

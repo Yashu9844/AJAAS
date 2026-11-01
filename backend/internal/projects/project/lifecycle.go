@@ -171,7 +171,7 @@ func (s *Service) fillMyRoles(ctx context.Context, a api.Actor, rows []Project) 
 	for i, p := range rows {
 		ids[i] = p.ID
 	}
-	roles, err := s.p.Resources.RolesFor(ctx, s.db, a.TenantID, a.UserID, projectResource, ids)
+	roles, err := s.p.Resources.RolesFor(ctx, s.db, projectRef(a.TenantID, uuid.Nil), a.UserID, ids)
 	if err != nil {
 		return err
 	}

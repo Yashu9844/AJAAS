@@ -14,7 +14,7 @@ func roleOf(e *env, p *Project, u api.Actor) (string, string) {
 	if err := e.db.Where("project_id = ? AND user_id = ? AND active", p.ID, u.UserID).Take(&m).Error; err != nil {
 		return "", ""
 	}
-	role, _ := e.res.RolesFor(bg, e.db, e.tenant, u.UserID, "project", []uuid.UUID{p.ID})
+	role, _ := e.res.RolesFor(bg, e.db, projectRef(e.tenant, uuid.Nil), u.UserID, []uuid.UUID{p.ID})
 	key, _ := roleLabel(role[p.ID])
 	return key, m.Source
 }

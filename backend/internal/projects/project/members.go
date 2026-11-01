@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"errors"
-	"sort"
 
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/projects/api"
@@ -34,15 +33,6 @@ type MemberView struct {
 	DisplayName string    `gorm:"-" json:"display_name,omitempty"`
 }
 
-// roleLabel is the short role name shown to users: the built-in key, or the custom role name.
-func roleLabel(r identityport.ResourceRole) (key, label string) {
-	if len(r.TemplateKey) > len(templatePrefix) && r.TemplateKey[:len(templatePrefix)] == templatePrefix {
-		k := r.TemplateKey[len(templatePrefix):]
-		return k, k
-	}
-	return "", r.RoleName
-}
-
 // Members lists the active members of a project.
 func (s *Service) Members(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]MemberView, error) {
 	if _, err := s.Access(ctx, nil, a, projectID); err != nil {
@@ -54,7 +44,7 @@ func (s *Service) Members(ctx context.Context, a api.Actor, projectID uuid.UUID)
 	if err != nil {
 		return nil, err
 	}
-	roles, err := s.p.Resources.RolesOn(ctx, s.db, a.TenantID, projectResource, projectID)
+	roles, err := s.p.Resources.RolesOn(ctx, s.db, projectRef(a.TenantID, projectID))
 	if err != nil {
 		return nil, err
 	}
@@ -89,9 +79,20 @@ func (s *Service) roleID(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, i
 	return s.p.Resources.RoleByTemplate(ctx, db, tenantID, templatePrefix+in.Role)
 }
 
+// memberRole is the M0 role a member holds on a project and how they came to hold it.
+type memberRole struct {
+	userID, roleID uuid.UUID
+	source         string
+}
+
+func projectRef(tenantID, projectID uuid.UUID) identityport.ResourceRef {
+	return identityport.ResourceRef{TenantID: tenantID, Type: projectResource, ID: projectID}
+}
+
 // assign gives the user the role on the project in M0, inside tx, translating M0 refusals into request errors.
-func (s *Service) assign(ctx context.Context, tx *gorm.DB, a api.Actor, userID, roleID, projectID uuid.UUID, source string) error {
-	err := s.p.Resources.AssignRole(ctx, tx, a.TenantID, a.UserID, userID, roleID, projectResource, projectID, source)
+func (s *Service) assign(ctx context.Context, tx *gorm.DB, a api.Actor, projectID uuid.UUID, mr memberRole) error {
+	in := identityport.RoleAssignment{ActorID: a.UserID, UserID: mr.userID, RoleID: mr.roleID, Source: mr.source}
+	err := s.p.Resources.AssignRole(ctx, tx, projectRef(a.TenantID, projectID), in)
 	if errors.Is(err, identityport.ErrRoleNotFound) || errors.Is(err, identityport.ErrRoleNotApplicable) {
 		return kernel.Invalid("role_id", "must be a project role of this tenant")
 	}
@@ -100,7 +101,7 @@ func (s *Service) assign(ctx context.Context, tx *gorm.DB, a api.Actor, userID, 
 
 // isOwnerRole reports whether the user currently holds the owner role on the project.
 func (s *Service) isOwnerRole(ctx context.Context, db *gorm.DB, tenantID, userID, projectID uuid.UUID) (bool, error) {
-	roles, err := s.p.Resources.RolesFor(ctx, db, tenantID, userID, projectResource, []uuid.UUID{projectID})
+	roles, err := s.p.Resources.RolesFor(ctx, db, projectRef(tenantID, uuid.Nil), userID, []uuid.UUID{projectID})
 	return roles[projectID].TemplateKey == templatePrefix+api.RoleOwner, err
 }
 
@@ -151,7 +152,7 @@ func (s *Service) upsertMember(ctx context.Context, a api.Actor, projectID uuid.
 		if err := tx.Create(&m).Error; err != nil {
 			return err
 		}
-		if err := s.assign(ctx, tx, a, in.UserID, rid, projectID, "manual"); err != nil {
+		if err := s.assign(ctx, tx, a, projectID, memberRole{in.UserID, rid, "manual"}); err != nil {
 			return err
 		}
 		out = MemberView{Member: m, RoleID: rid, RoleKey: in.Role}
@@ -197,7 +198,7 @@ func (s *Service) ChangeMember(ctx context.Context, a api.Actor, projectID, user
 		if err := tx.Model(&Member{}).Where("project_id = ? AND user_id = ?", projectID, userID).Update("source", "direct").Error; err != nil {
 			return err
 		}
-		if err := s.assign(ctx, tx, a, userID, rid, projectID, "manual"); err != nil {
+		if err := s.assign(ctx, tx, a, projectID, memberRole{userID, rid, "manual"}); err != nil {
 			return err
 		}
 		if err := s.ensureOwner(ctx, tx, a.TenantID, projectID); err != nil {
@@ -238,7 +239,7 @@ func (s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, user
 		if res.RowsAffected == 0 {
 			return kernel.NotFound("member")
 		}
-		if err := s.p.Resources.RevokeRole(ctx, tx, a.TenantID, a.UserID, userID, projectResource, projectID); err != nil {
+		if err := s.p.Resources.RevokeRole(ctx, tx, projectRef(a.TenantID, projectID), a.UserID, userID); err != nil {
 			return err
 		}
 		if err := s.ensureOwner(ctx, tx, a.TenantID, projectID); err != nil {
@@ -254,7 +255,7 @@ func (s *Service) RemoveMember(ctx context.Context, a api.Actor, projectID, user
 
 // ensureOwner refuses a change that would leave the project without an active owner.
 func (s *Service) ensureOwner(ctx context.Context, tx *gorm.DB, tenantID, projectID uuid.UUID) error {
-	roles, err := s.p.Resources.RolesOn(ctx, tx, tenantID, projectResource, projectID)
+	roles, err := s.p.Resources.RolesOn(ctx, tx, projectRef(tenantID, projectID))
 	if err != nil {
 		return err
 	}
@@ -293,29 +294,4 @@ func (s *Service) addNames(ctx context.Context, tenantID uuid.UUID, rows []Membe
 		rows[i].DisplayName = names[rows[i].UserID]
 	}
 	return nil
-}
-
-// RoleOption is a project role that can be given to a member.
-type RoleOption struct {
-	RoleID uuid.UUID `json:"role_id"`
-	Name   string    `json:"name"`
-	Key    string    `json:"key,omitempty"` // owner, manager, member or viewer for the built-in roles
-}
-
-// AssignableRoles lists the M0 roles that can be given to members of the project (manage_members).
-func (s *Service) AssignableRoles(ctx context.Context, a api.Actor, projectID uuid.UUID) ([]RoleOption, error) {
-	if err := s.require(ctx, a, projectID, api.ManageMembers); err != nil {
-		return nil, err
-	}
-	roles, err := s.p.Resources.AvailableRoles(ctx, s.db, a.TenantID, projectResource)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]RoleOption, 0, len(roles))
-	for _, r := range roles {
-		key, label := roleLabel(r)
-		out = append(out, RoleOption{RoleID: r.RoleID, Name: label, Key: key})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out, nil
 }

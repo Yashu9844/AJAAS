@@ -5,6 +5,7 @@ package testdb
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"io/fs"
@@ -102,26 +103,34 @@ func ensureTemplate(admin *gorm.DB, cfg *gorm.Config) (string, error) {
 		return name, err
 	}
 	building := name + "_b"
-	_, _ = conn.ExecContext(context.Background(), "DROP DATABASE IF EXISTS "+building+" WITH (FORCE)")
-	if _, err := conn.ExecContext(context.Background(), "CREATE DATABASE "+building); err != nil {
+	if err := buildTemplate(conn, building, cfg); err != nil {
 		return "", err
-	}
-	db, err := gorm.Open(postgres.Open(dsn(building)), cfg)
-	if err != nil {
-		return "", err
-	}
-	sets := []database.MigrationSet{{Schema: "projects", FS: migrations.Projects}}
-	if _, err := database.RunMigrationSets(context.Background(), db, sets); err != nil {
-		return "", err
-	}
-	if err := db.Exec(FakeRoleTable).Error; err != nil {
-		return "", err
-	}
-	if inner, e := db.DB(); e == nil {
-		_ = inner.Close()
 	}
 	_, err = conn.ExecContext(context.Background(), "ALTER DATABASE "+building+" RENAME TO "+name)
 	return name, err
+}
+
+// buildTemplate creates the named database and migrates it.
+func buildTemplate(conn *sql.Conn, name string, cfg *gorm.Config) error {
+	ctx := context.Background()
+	_, _ = conn.ExecContext(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
+	if _, err := conn.ExecContext(ctx, "CREATE DATABASE "+name); err != nil {
+		return err
+	}
+	db, err := gorm.Open(postgres.Open(dsn(name)), cfg)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if inner, e := db.DB(); e == nil {
+			_ = inner.Close()
+		}
+	}()
+	sets := []database.MigrationSet{{Schema: "projects", FS: migrations.Projects}}
+	if _, err := database.RunMigrationSets(ctx, db, sets); err != nil {
+		return err
+	}
+	return db.Exec(FakeRoleTable).Error
 }
 
 func unavailable(t testing.TB, err error) *gorm.DB {

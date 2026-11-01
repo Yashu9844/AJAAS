@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jaas/jaas/internal/shared/identityport"
 	"gorm.io/gorm"
 )
 
@@ -39,7 +40,7 @@ func (s *Service) reconcile(ctx context.Context, tx *gorm.DB, tenantID, projectI
 	for _, m := range have {
 		current[m.UserID] = m
 	}
-	roles, err := s.p.Resources.RolesOn(ctx, tx, tenantID, projectResource, projectID)
+	roles, err := s.p.Resources.RolesOn(ctx, tx, projectRef(tenantID, projectID))
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func (s *Service) reconcile(ctx context.Context, tx *gorm.DB, tenantID, projectI
 			if err := tx.Exec(`DELETE FROM project_members WHERE project_id = ? AND user_id = ? AND source = 'group'`, projectID, uid).Error; err != nil {
 				return err
 			}
-			if err := s.p.Resources.RevokeRole(ctx, tx, tenantID, uuid.Nil, uid, projectResource, projectID); err != nil {
+			if err := s.p.Resources.RevokeRole(ctx, tx, projectRef(tenantID, projectID), uuid.Nil, uid); err != nil {
 				return err
 			}
 			if err := dropWatches(tx, tenantID, projectID, uid); err != nil {
@@ -126,5 +127,5 @@ func (s *Service) upsertGroupMember(ctx context.Context, tx *gorm.DB, scope grou
 	if err != nil {
 		return err
 	}
-	return s.p.Resources.AssignRole(ctx, tx, tenantID, uuid.Nil, uid, rid, projectResource, projectID, "group")
+	return s.p.Resources.AssignRole(ctx, tx, projectRef(tenantID, projectID), identityport.RoleAssignment{UserID: uid, RoleID: rid, Source: "group"})
 }

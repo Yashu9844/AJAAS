@@ -20,6 +20,7 @@ type colRow struct {
 	IsDefault bool
 }
 
+// TableName maps to board_columns.
 func (colRow) TableName() string { return "board_columns" }
 
 func (c colRow) closed() bool { return c.Category == "done" || c.Category == "canceled" }
