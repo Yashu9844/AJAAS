@@ -11,6 +11,8 @@ Research input for the M3 design gate. No code, migrations or specification chan
 | `market-research.md` | 18 products: features, pricing model, what to copy, what to avoid |
 | `open-source.md` | OSS alternatives and building blocks: licence, maturity, how it works, fit (embed/integrate/learn) |
 | `internals.md` | data model, recurrence, conflict detection and sync in sabre/dav, go-webdav, rrule-go, golang-ical, Cal.diy |
+| `user-journeys.md` | 14 detailed journeys (steps, failure paths, checks) for the proposed phase 1-2 |
+| `decisions-validation.md` | the 12 open questions answered with evidence, alternatives and confidence |
 | `architecture-options.md` | 3 options, decision matrix, recommendation, draft data model, API, events, threats, performance targets and benchmark plan |
 
 ## Recommendation (Option A, "rule + bounded occurrences, relational notes")
@@ -28,6 +30,8 @@ Research input for the M3 design gate. No code, migrations or specification chan
 10. AI = seams only (context packs, document feed, draft-minutes endpoint); transcription engines (whisper.cpp, faster-whisper, Vexa) belong to M9, with consent flags in M3.
 
 ## Open questions for the owner
+
+Recommended answers with evidence: `decisions-validation.md`.
 
 1. **M0 change:** extend `applies_to` / `resource_role_assignments.resource_type` with `meeting` (resource roles on a series)? Alternative: derive roles from participant kind inside M3 (conflicts with DPJ-49 "M0 decides everything").
 2. Phase-1 scope: is MUST in `features.md` the right cut? Are rooms (RR-1/2) phase 1 or 2?
