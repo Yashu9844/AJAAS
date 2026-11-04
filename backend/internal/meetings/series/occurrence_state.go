@@ -22,11 +22,8 @@ func (s *Service) CancelOccurrence(ctx context.Context, a api.Actor, id uuid.UUI
 		return nil, err
 	}
 	err = s.inTx(ctx, func(tx *gorm.DB) error {
-		o, row, acc, err := s.editableOccurrence(ctx, tx, a, id, in.Version)
+		o, row, _, err := s.editableOccurrence(ctx, tx, a, editable{id, in.Version, requirer(api.Cancel)})
 		if err != nil {
-			return err
-		}
-		if err := acc.Require(api.Cancel); err != nil {
 			return err
 		}
 		o.Status, o.CancelReason, o.IsException = StatusCancelled, reason, true
@@ -53,12 +50,14 @@ func (s *Service) SetStatus(ctx context.Context, a api.Actor, id uuid.UUID, in S
 		return nil, err
 	}
 	err := s.inTx(ctx, func(tx *gorm.DB) error {
-		o, row, acc, err := s.editableOccurrence(ctx, tx, a, id, in.Version)
+		o, row, _, err := s.editableOccurrence(ctx, tx, a, editable{id, in.Version, func(acc api.Access) error {
+			if !acc.Can(api.EditMinutes) && !acc.Can(api.Update) {
+				return kernel.Forbidden(string(api.EditMinutes))
+			}
+			return acc.Require(api.Read)
+		}})
 		if err != nil {
 			return err
-		}
-		if !acc.Can(api.EditMinutes) && !acc.Can(api.Update) {
-			return kernel.Forbidden(string(api.EditMinutes))
 		}
 		o.Status, o.StatusManual = in.Status, in.Status != StatusScheduled
 		if err := s.saveOccurrence(ctx, tx, o); err != nil {

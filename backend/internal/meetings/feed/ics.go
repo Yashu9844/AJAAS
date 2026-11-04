@@ -118,7 +118,11 @@ func (s *Service) renderWhere(ctx context.Context, acc api.Access, where string,
 	for i := range rows {
 		rows[i].Busy = busy
 	}
-	return render(rows, s.now().UTC(), acc.Series.Title), nil
+	name := acc.Series.Title
+	if busy {
+		name = "JAAS meeting" // the calendar name must not reveal what the events hide
+	}
+	return render(rows, s.now().UTC(), name), nil
 }
 
 func render(rows []event, now time.Time, name string) string {

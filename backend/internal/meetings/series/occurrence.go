@@ -103,11 +103,8 @@ func (s *Service) UpdateOccurrence(ctx context.Context, a api.Actor, id uuid.UUI
 		return nil, err
 	}
 	err = s.inTx(ctx, func(tx *gorm.DB) error {
-		o, row, acc, err := s.editableOccurrence(ctx, tx, a, id, in.Version)
+		o, row, _, err := s.editableOccurrence(ctx, tx, a, editable{id, in.Version, requirer(api.Update)})
 		if err != nil {
-			return err
-		}
-		if err := acc.Require(api.Update); err != nil {
 			return err
 		}
 		moved, err := applyOccurrence(o, in)
@@ -163,8 +160,16 @@ func applyOccurrence(o *Occurrence, in OccurrenceInput) (bool, error) {
 	return moved, nil
 }
 
-// editableOccurrence loads an occurrence for a write: version checked, published and cancelled occurrences refused.
-func (s *Service) editableOccurrence(ctx context.Context, tx *gorm.DB, a api.Actor, id uuid.UUID, version int) (*Occurrence, *Series, api.Access, error) {
+// editable is a write on an occurrence: its version and the permission check run before any change.
+type editable struct {
+	id      uuid.UUID
+	version int
+	allow   func(api.Access) error
+}
+
+// editableOccurrence loads an occurrence for a write: permission, then published and cancelled refusals, then version.
+func (s *Service) editableOccurrence(ctx context.Context, tx *gorm.DB, a api.Actor, e editable) (*Occurrence, *Series, api.Access, error) {
+	id, version := e.id, e.version
 	o, row, acc, err := s.loadOccurrence(ctx, tx, a, id)
 	if err != nil {
 		return nil, nil, api.Access{}, err
@@ -172,7 +177,7 @@ func (s *Service) editableOccurrence(ctx context.Context, tx *gorm.DB, a api.Act
 	if !acc.ReadsContent() {
 		return nil, nil, api.Access{}, kernel.NotFound("occurrence")
 	}
-	if err := kernel.CheckVersion(version, o.Version); err != nil {
+	if err := e.allow(acc); err != nil {
 		return nil, nil, api.Access{}, err
 	}
 	switch o.Status {
@@ -181,6 +186,9 @@ func (s *Service) editableOccurrence(ctx context.Context, tx *gorm.DB, a api.Act
 	case StatusCancelled:
 		return nil, nil, api.Access{}, kernel.Conflict("OCCURRENCE_CANCELLED", "the occurrence is cancelled")
 	}
+	if err := kernel.CheckVersion(version, o.Version); err != nil {
+		return nil, nil, api.Access{}, err
+	}
 	return o, row, acc, nil
 }
 
@@ -188,4 +196,8 @@ func (s *Service) saveOccurrence(ctx context.Context, tx *gorm.DB, o *Occurrence
 	o.Version++
 	o.UpdatedAt = s.now().UTC()
 	return tx.WithContext(ctx).Save(o).Error
+}
+
+func requirer(p api.Perm) func(api.Access) error {
+	return func(acc api.Access) error { return acc.Require(p) }
 }
