@@ -192,5 +192,5 @@ func (s *resourceAccess) audit(ctx context.Context, tx *gorm.DB, ref access.Reso
 	if actorID != uuid.Nil { // a system change (group rule refresh) has no actor
 		actor = actorID.String()
 	}
-	return s.d.Audit.Log(ctx, tx, ref.TenantID.String(), actor, action, "project", ref.ID.String(), meta, "", "")
+	return s.d.Audit.Log(ctx, tx, ref.TenantID.String(), actor, action, ref.Type, ref.ID.String(), meta, "", "")
 }
