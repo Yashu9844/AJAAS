@@ -2662,6 +2662,25 @@ export const PM_PLANNING: OpSpec[] = [
     "note": "Errors: 404 NOT_FOUND; 429 RATE_LIMITED"
   },
   {
+    "key": "pm.planning.get.calendar.meetings.ics",
+    "label": "Personal meeting feed authenticated by its token only (30 per minute per IP)",
+    "method": "GET",
+    "path": "/calendar/meetings.ics",
+    "scope": "tenant",
+    "auth": true,
+    "fields": [
+      {
+        "name": "token",
+        "where": "query",
+        "required": true
+      }
+    ],
+    "expect": [
+      200
+    ],
+    "note": "Errors: 404 NOT_FOUND; 429 RATE_LIMITED"
+  },
+  {
     "key": "pm.planning.get.my.work",
     "label": "Tasks assigned to me, grouped overdue / today / this_week / later / no_date, with counts",
     "method": "GET",

@@ -44,10 +44,19 @@ PM_CONTEXTS = {
     'automation': ('PM_AUTOMATION', ['/projects/{id}/rules', '/projects/{id}/recurrences', '/projects/{id}/public-links', '/public/projects']),
 }
 
+# M3 Meetings: routes at the /api/v1 root, written to generated/meetingsSpecs.ts (longest matching prefix wins, as for M2).
+MT_CONTEXTS = {
+    'meetings': ('MT_MEETINGS', ['/meetings', '/me/meetings', '/occurrences']),
+    'content': ('MT_CONTENT', ['/occurrences/{id}/agenda-items', '/agenda-items', '/occurrences/{id}/attendance', '/occurrences/{id}/private-points',
+                               '/private-points', '/occurrences/{id}/notes', '/occurrences/{id}/minutes', '/occurrences/{id}/decisions', '/decisions']),
+    'links': ('MT_LINKS', ['/occurrences/{id}/action-items', '/action-items', '/meeting-feed-tokens', '/calendar/meetings.ics',
+                           '/occurrences/{id}/ics', '/meetings/{id}/ics']),
+}
 
-def pm_owner(path):
+
+def pm_owner(path, contexts=None):
     best, owner = -1, None
-    for ctx, (_, prefixes) in PM_CONTEXTS.items():
+    for ctx, (_, prefixes) in (contexts or PM_CONTEXTS).items():
         for p in prefixes:
             if (path == p or path.startswith(p + '/')) and len(p) > best:
                 best, owner = len(p), ctx
@@ -171,8 +180,8 @@ def op_fields(doc, path, op, shared=()):
 def ops_for(doc, prefixes, ctx, ns='hr'):
     out = []
     for path in sorted(doc['paths']):
-        if ns == 'pm':
-            if pm_owner(path) != ctx:
+        if ns in ('pm', 'mt'):
+            if pm_owner(path, MT_CONTEXTS if ns == 'mt' else None) != ctx:
                 continue
         elif not any(path == p or path.startswith(p + '/') for p in prefixes):
             continue
@@ -218,6 +227,14 @@ def main(repo):
         print('pm', ctx, len(ops), 'operations')
     with open(out.replace('hrSpecs.ts', 'projectsSpecs.ts'), 'w', encoding='utf-8', newline='\n') as fh:
         fh.write('\n'.join(pm) + '\n')
+    mt = lines[:2] + ['']
+    for ctx, (name, prefixes) in MT_CONTEXTS.items():
+        ops = ops_for(doc, prefixes, ctx, 'mt')
+        mt.append('export const %s: OpSpec[] = %s;' % (name, json.dumps(ops, indent=2, ensure_ascii=False)))
+        mt.append('')
+        print('mt', ctx, len(ops), 'operations')
+    with open(out.replace('hrSpecs.ts', 'meetingsSpecs.ts'), 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write('\n'.join(mt) + '\n')
 
 
 main(sys.argv[1])
