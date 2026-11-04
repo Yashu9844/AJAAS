@@ -49,7 +49,15 @@ type timing struct {
 	rule     *rrule.Rule
 }
 
-func parseTiming(start, tz string, duration int, allDay bool, rule string) (timing, error) {
+// timingInput is the raw schedule of a series.
+type timingInput struct {
+	start, tz, rule string
+	duration        int
+	allDay          bool
+}
+
+func parseTiming(in timingInput) (timing, error) {
+	start, tz, duration, allDay, rule := in.start, in.tz, in.duration, in.allDay, in.rule
 	loc, err := time.LoadLocation(strings.TrimSpace(tz))
 	if err != nil || tz == "" || strings.EqualFold(tz, "local") {
 		return timing{}, kernel.Invalid("tz", "must be an IANA time zone such as Europe/Berlin")
@@ -88,7 +96,8 @@ type fields struct {
 	title, description, visibility, location, video string
 }
 
-func checkFields(title, description, visibility, location, video string) (fields, error) {
+func checkFields(raw fields) (fields, error) {
+	title, description, visibility, location, video := raw.title, raw.description, raw.visibility, raw.location, raw.video
 	var f fields
 	var err error
 	if f.title, err = kernel.Text("title", title, 1, 200); err != nil {

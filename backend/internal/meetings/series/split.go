@@ -40,7 +40,7 @@ func (s *Service) Split(ctx context.Context, a api.Actor, id uuid.UUID, in Split
 			return err
 		}
 		newID = next.ID
-		return s.applySplit(ctx, tx, a, old, next, at)
+		return s.applySplit(ctx, tx, a, splitPlan{old, next, at})
 	})
 	if err != nil {
 		return nil, err
@@ -106,7 +106,13 @@ func localFields(t time.Time) time.Time {
 
 // applySplit saves both series, moves the later occurrences that hold data to the new series, copies participants and
 // their roles, and regenerates the new schedule.
-func (s *Service) applySplit(ctx context.Context, tx *gorm.DB, a api.Actor, old, next *Series, at time.Time) error {
+type splitPlan struct {
+	old, next *Series
+	at        time.Time
+}
+
+func (s *Service) applySplit(ctx context.Context, tx *gorm.DB, a api.Actor, p splitPlan) error {
+	old, next, at := p.old, p.next, p.at
 	old.Version, old.Sequence, old.UpdatedAt = old.Version+1, old.Sequence+1, s.now().UTC()
 	if err := tx.WithContext(ctx).Save(old).Error; err != nil {
 		return err

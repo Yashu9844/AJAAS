@@ -16,11 +16,11 @@ func (s *Service) Create(ctx context.Context, a api.Actor, in CreateInput) (*Vie
 	if !a.Create && !a.ManageAll {
 		return nil, kernel.Forbidden("meetings:create")
 	}
-	t, err := parseTiming(in.Start, in.TZ, in.DurationMin, in.AllDay, in.RRule)
+	t, err := parseTiming(timingInput{start: in.Start, tz: in.TZ, duration: in.DurationMin, allDay: in.AllDay, rule: in.RRule})
 	if err != nil {
 		return nil, err
 	}
-	f, err := checkFields(in.Title, in.Description, in.Visibility, in.Location, in.VideoURL)
+	f, err := checkFields(fields{in.Title, in.Description, in.Visibility, in.Location, in.VideoURL})
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (s *Service) Create(ctx context.Context, a api.Actor, in CreateInput) (*Vie
 		if e := s.logChange(ctx, tx, a, change{series: row.ID, action: "series.created"}); e != nil {
 			return e
 		}
-		if e := s.audit(ctx, tx, a, "meeting.created", row.ID, nil); e != nil {
+		if e := s.audit(ctx, tx, a, auditEntry{"meeting.created", row.ID, nil}); e != nil {
 			return e
 		}
 		return kernel.Emit(ctx, tx, a.TenantID, "meeting.scheduled", map[string]any{"series_id": row.ID, "version": row.Version})

@@ -97,5 +97,5 @@ func (s *Service) auditRead(ctx context.Context, a api.Actor, acc api.Access) {
 	if acc.Participant || (acc.Level != api.LevelAudit && acc.Level != api.LevelFull) {
 		return
 	}
-	_ = s.audit(ctx, s.db, a, "meeting.read_privileged", acc.Series.ID, map[string]string{"level": acc.Level})
+	_ = s.audit(ctx, s.db, a, auditEntry{"meeting.read_privileged", acc.Series.ID, map[string]string{"level": acc.Level}})
 }

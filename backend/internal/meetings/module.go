@@ -83,9 +83,6 @@ func (m *Module) startBackground() {
 	}
 }
 
-// Series exposes the series service (tests, the authorizer for other modules).
-func (m *Module) Series() *series.Service { return m.series }
-
 // Actions exposes the action-item service (the M2 task-event subscription).
 func (m *Module) Actions() *actions.Service { return m.actions }
 

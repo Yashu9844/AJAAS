@@ -64,7 +64,7 @@ func (s *Service) AddParticipant(ctx context.Context, a api.Actor, seriesID uuid
 		if err := s.addParticipant(ctx, tx, a, row, in); err != nil {
 			return err
 		}
-		return s.participantChanged(ctx, tx, a, row, in.UserID, "participant.added")
+		return s.participantChanged(ctx, tx, a, partChange{row.ID, in.UserID, "participant.added"})
 	})
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (s *Service) UpdateParticipant(ctx context.Context, a api.Actor, seriesID u
 		if err := s.addParticipant(ctx, tx, a, row, in); err != nil {
 			return err
 		}
-		return s.participantChanged(ctx, tx, a, row, in.UserID, "participant.changed")
+		return s.participantChanged(ctx, tx, a, partChange{row.ID, in.UserID, "participant.changed"})
 	})
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (s *Service) RemoveParticipant(ctx context.Context, a api.Actor, seriesID, 
 		if err := s.deactivateMember(ctx, tx, a, seriesID, userID); err != nil {
 			return err
 		}
-		return s.participantChanged(ctx, tx, a, row, userID, "participant.removed")
+		return s.participantChanged(ctx, tx, a, partChange{row.ID, userID, "participant.removed"})
 	})
 }
 
@@ -162,12 +162,18 @@ func (s *Service) guardLastOrganizer(ctx context.Context, tx *gorm.DB, a api.Act
 	return nil
 }
 
-func (s *Service) participantChanged(ctx context.Context, tx *gorm.DB, a api.Actor, row *Series, userID uuid.UUID, key string) error {
-	if err := s.logChange(ctx, tx, a, change{series: row.ID, action: key, fields: map[string]any{"user_id": userID}}); err != nil {
+// partChange is a membership change to log, audit and publish.
+type partChange struct {
+	series, user uuid.UUID
+	key          string
+}
+
+func (s *Service) participantChanged(ctx context.Context, tx *gorm.DB, a api.Actor, c partChange) error {
+	if err := s.logChange(ctx, tx, a, change{series: c.series, action: c.key, fields: map[string]any{"user_id": c.user}}); err != nil {
 		return err
 	}
-	if err := s.audit(ctx, tx, a, "meeting."+key, row.ID, map[string]string{"user_id": userID.String()}); err != nil {
+	if err := s.audit(ctx, tx, a, auditEntry{"meeting." + c.key, c.series, map[string]string{"user_id": c.user.String()}}); err != nil {
 		return err
 	}
-	return kernel.Emit(ctx, tx, a.TenantID, key, map[string]any{"series_id": row.ID, "user_id": userID})
+	return kernel.Emit(ctx, tx, a.TenantID, c.key, map[string]any{"series_id": c.series, "user_id": c.user})
 }

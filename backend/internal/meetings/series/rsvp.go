@@ -36,6 +36,7 @@ type response struct {
 	RespondedAt  time.Time
 }
 
+// TableName maps to meeting_responses.
 func (response) TableName() string { return "meeting_responses" }
 
 func seriesResponses(ctx context.Context, db *gorm.DB, seriesID uuid.UUID) (map[uuid.UUID]string, error) {

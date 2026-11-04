@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: JAAS Modules 0-2 API (Identity, Organization, Employee)
+  title: JAAS Modules 0-3 API (Identity, Organization, Employee)
   description: API specifications for Module 0 — Tenant, Identity, and RBAC authorization core.
   version: 1.1.0
   x-conventions: |
@@ -6774,6 +6774,597 @@ paths:
         '404': {description: 'NOT_FOUND'}
         '429': {description: 'RATE_LIMITED'}
 # END M2 projects
+  /meetings:
+    get:
+      summary: 'Occurrences the caller may see in a window (default the next 14 days); level full, audit, internal or busy per row'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: from, in: query, schema: {type: string, format: date-time}}, {name: to, in: query, schema: {type: string, format: date-time}, description: 'at most 62 days after from'}, {name: mine, in: query, schema: {type: boolean}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+    post:
+      summary: 'Schedule a meeting or a recurring series (meetings:create); the caller becomes organizer and occurrences are materialised'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '422': {description: 'UNPROCESSABLE'}
+  /meetings/search:
+    get:
+      summary: 'Find series the caller reads in full, by title and/or participant'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: q, in: query, schema: {type: string}}, {name: participant_id, in: query, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /meetings/needs-organizer:
+    get:
+      summary: 'Active series whose organizer no longer takes part (meetings:manage_all)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+  /meetings/{id}:
+    get:
+      summary: 'One series with the caller level, role and permissions and the next occurrence'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'Edit every occurrence (meeting:update); a schedule change regenerates future occurrences without data; send version or If-Match'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingUpdateInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+        '422': {description: 'UNPROCESSABLE'}
+    delete:
+      summary: 'Soft-delete the series (meeting:cancel); If-Match required; purged after 30 days'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: No Content}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+        '428': {description: 'VERSION_REQUIRED'}
+  /meetings/{id}/cancel:
+    post:
+      summary: 'Cancel the series: future occurrences are cancelled, history stays (meeting:cancel)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingCancelInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /meetings/{id}/split:
+    post:
+      summary: 'This and following: end the series before an occurrence and start a new one with changes (meeting:update)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingSplitInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /meetings/{id}/occurrences:
+    get:
+      summary: 'Occurrences of one series in a window'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: from, in: query, schema: {type: string, format: date-time}}, {name: to, in: query, schema: {type: string, format: date-time}, description: 'at most 62 days after from'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /meetings/{id}/response:
+    put:
+      summary: 'Answer for the whole series (participants)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingResponseInput'}}}}
+      responses:
+        '204': {description: No Content}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /meetings/{id}/consent:
+    get:
+      summary: 'Recording consent of every participant and whether recording may start'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    put:
+      summary: 'Record the caller recording and transcription consent (participants)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingConsentInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /meetings/{id}/participants:
+    get:
+      summary: 'Participants with the role M0 holds for each and their series answer'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Invite a user with a role (meeting:manage_participants; only organizers grant organizer)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingParticipantInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '422': {description: 'UNPROCESSABLE'}
+  /meetings/{id}/participants/{user_id}:
+    patch:
+      summary: 'Change a participant kind or role; the last organizer cannot lose the role'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingParticipantInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Remove a participant and revoke the M0 role; history stays'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: No Content}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /meetings/{id}/roles:
+    get:
+      summary: 'Roles of the tenant that can be assigned on a meeting (M0)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /meetings/{id}/ics:
+    get:
+      summary: 'The series occurrences as an iCalendar download (busy blocks below content level)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {text/calendar: {schema: {type: string}}}}
+        '404': {description: 'NOT_FOUND'}
+  /me/meetings:
+    get:
+      summary: 'My meetings: occurrences of series the caller takes part in, with my answer'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: from, in: query, schema: {type: string, format: date-time}}, {name: to, in: query, schema: {type: string, format: date-time}, description: 'at most 62 days after from'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+  /occurrences/{id}:
+    get:
+      summary: 'One occurrence with its series and the answers of the participants'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    patch:
+      summary: 'This occurrence only: reschedule, retitle or relocate (meeting:update); send version or If-Match'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OccurrenceInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+        '428': {description: 'VERSION_REQUIRED'}
+  /occurrences/{id}/cancel:
+    post:
+      summary: 'Cancel one occurrence (meeting:cancel)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingCancelInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /occurrences/{id}/status:
+    post:
+      summary: 'Start or end early; scheduled returns to the clock (meeting:edit_minutes or meeting:update)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OccurrenceStatusInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /occurrences/{id}/response:
+    put:
+      summary: 'Answer for one occurrence; overrides the series answer'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingResponseInput'}}}}
+      responses:
+        '204': {description: No Content}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /occurrences/{id}/ics:
+    get:
+      summary: 'One occurrence as an iCalendar download'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {text/calendar: {schema: {type: string}}}}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/agenda-items:
+    get:
+      summary: 'Agenda items in order'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Propose an agenda item (meeting:propose_agenda)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AgendaItemInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+        '422': {description: 'UNPROCESSABLE'}
+  /agenda-items/{id}:
+    patch:
+      summary: 'Edit an item: organizers any, attendees their own; send version or If-Match'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AgendaItemInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+    delete:
+      summary: 'Remove an item (organizers any, attendees their own)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: No Content}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /agenda-items/{id}/move:
+    post:
+      summary: 'Reorder an item between neighbours (meeting:manage_agenda)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AgendaMoveInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/attendance:
+    get:
+      summary: 'Attendance marks'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    put:
+      summary: 'Mark attendance of participants once the occurrence started (meeting:mark_attendance)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttendanceInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /occurrences/{id}/private-points:
+    get:
+      summary: 'The caller own private talking points (participants only; nobody else ever reads them)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Add a private talking point'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PrivatePointInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+        '422': {description: 'UNPROCESSABLE'}
+  /private-points/{id}:
+    patch:
+      summary: 'Edit the caller own point'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PrivatePointInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+    delete:
+      summary: 'Delete the caller own point'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: No Content}
+        '404': {description: 'NOT_FOUND'}
+  /private-points/{id}/promote:
+    post:
+      summary: 'Turn the caller point into a shared agenda item'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/notes:
+    get:
+      summary: 'Latest version of every note section (drafts: note-takers and organizers only)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/notes/{section}:
+    put:
+      summary: 'Save a note section; version is the base version (0 first); stale is 409 with current_body (meeting:edit_minutes)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: section, in: path, required: true, schema: {type: string}, description: 'general, or an agenda item id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/NotesInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /occurrences/{id}/notes/{section}/versions:
+    get:
+      summary: 'Every version of a section, newest first'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: section, in: path, required: true, schema: {type: string}, description: 'general, or an agenda item id'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/minutes/publish:
+    post:
+      summary: 'Freeze the notes as published minutes version 1 (meeting:publish_minutes)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+        '422': {description: 'UNPROCESSABLE'}
+  /occurrences/{id}/minutes/corrections:
+    post:
+      summary: 'Publish a corrected version with a reason (meeting:publish_minutes)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MinutesCorrectionInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /occurrences/{id}/minutes:
+    get:
+      summary: 'Latest published minutes'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/minutes/versions:
+    get:
+      summary: 'Published versions without bodies, newest first'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/minutes/versions/{version}:
+    get:
+      summary: 'One published version'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}, {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '404': {description: 'NOT_FOUND'}
+  /occurrences/{id}/decisions:
+    get:
+      summary: 'Decisions of an occurrence'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Record a decision (meeting:record_decision)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DecisionInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /decisions/{id}:
+    patch:
+      summary: 'Edit or supersede a decision; send version or If-Match'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DecisionInput'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+  /occurrences/{id}/action-items:
+    get:
+      summary: 'Action items with live task data; tasks the viewer cannot read are restricted'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+        '404': {description: 'NOT_FOUND'}
+    post:
+      summary: 'Create an M2 task as the caller (project_id or the series default project) or link task_id (meeting:create_action)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ActionItemInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+        '409': {description: 'CONFLICT'}
+        '422': {description: 'UNPROCESSABLE'}
+        '503': {description: 'TASKS_UNAVAILABLE'}
+  /action-items/{id}:
+    delete:
+      summary: 'Unlink an action item; the M2 task stays'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: No Content}
+        '403': {description: 'FORBIDDEN'}
+        '404': {description: 'NOT_FOUND'}
+  /meeting-feed-tokens:
+    post:
+      summary: 'Issue a personal iCalendar feed token; the token is shown once'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/FeedTokenInput'}}}}
+      responses:
+        '201': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsObjectEnvelope'}}}}
+        '400': {description: 'VALIDATION_ERROR'}
+        '409': {description: 'CONFLICT'}
+    get:
+      summary: 'The caller active feed tokens (never the secrets)'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeetingsListEnvelope'}}}}
+  /meeting-feed-tokens/{id}:
+    delete:
+      summary: 'Revoke a feed token at once'
+      tags: [Meetings]
+      security: [{BearerAuth: []}, {TenantSubdomain: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: No Content}
+        '404': {description: 'NOT_FOUND'}
+  /calendar/meetings.ics:
+    get:
+      summary: 'Personal meeting feed authenticated by its token only (30 per minute per IP)'
+      tags: [Meetings]
+      security: []
+      parameters: [{name: token, in: query, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: OK, content: {text/calendar: {schema: {type: string}}}}
+        '404': {description: 'NOT_FOUND'}
+        '429': {description: 'RATE_LIMITED'}
 components:
   securitySchemes:
     BearerAuth:
@@ -8180,3 +8771,24 @@ components:
     IntegrationInput: {type: object, properties: {provider: {type: string, enum: [github, gitea]}, name: {type: string}}, required: [provider, name]}
     ProviderEvent: {type: object, properties: {action: {type: string}, ref: {type: string}, pull_request: {type: object}, commits: {type: array, items: {type: object}}, repository: {type: object}}}
 # END schemas M2 projects
+    MeetingsObjectEnvelope: {type: object, properties: {data: {type: object}}}
+    MeetingsListEnvelope: {type: object, properties: {data: {type: array, items: {type: object}}, meta: {type: object}}}
+    MeetingParticipantRef: {type: object, properties: {user_id: {type: string, format: uuid}, kind: {type: string, enum: [required, optional]}, role: {type: string, enum: [meeting_viewer, meeting_attendee, meeting_note_taker, meeting_organizer]}, role_id: {type: string, format: uuid}}, required: [user_id]}
+    MeetingInput: {type: object, properties: {title: {type: string}, description: {type: string}, start: {type: string, example: '2027-03-16T09:00', description: 'local wall-clock time in tz (YYYY-MM-DD when all_day)'}, tz: {type: string, example: Europe/Berlin}, duration_min: {type: integer, minimum: 1, maximum: 1440}, all_day: {type: boolean}, rrule: {type: string, example: 'FREQ=WEEKLY;BYDAY=TU', description: 'RFC 5545 subset: DAILY..YEARLY, INTERVAL<=99, COUNT<=500 or UNTIL<=5 years, BYDAY, BYMONTHDAY, BYMONTH, WKST; empty for a single meeting'}, visibility: {type: string, enum: [private, internal, busy_only]}, confidential: {type: boolean}, location: {type: string}, video_url: {type: string, example: 'https://meet.example.com/room'}, default_project_id: {type: string, format: uuid}, recording_allowed: {type: boolean}, participants: {type: array, items: {$ref: '#/components/schemas/MeetingParticipantRef'}}}, required: [title, start, tz, duration_min]}
+    MeetingUpdateInput: {type: object, properties: {title: {type: string}, description: {type: string}, start: {type: string}, tz: {type: string}, duration_min: {type: integer}, all_day: {type: boolean}, rrule: {type: string}, visibility: {type: string, enum: [private, internal, busy_only]}, confidential: {type: boolean}, location: {type: string}, video_url: {type: string}, default_project_id: {type: string, format: uuid}, clear_default_project: {type: boolean}, recording_allowed: {type: boolean}, version: {type: integer}}}
+    MeetingCancelInput: {type: object, properties: {reason: {type: string}, version: {type: integer}}}
+    MeetingSplitInput: {type: object, properties: {occurrence_id: {type: string, format: uuid}, changes: {$ref: '#/components/schemas/MeetingUpdateInput'}, version: {type: integer}}, required: [occurrence_id]}
+    MeetingResponseInput: {type: object, properties: {rsvp: {type: string, enum: [accepted, tentative, declined, needs_action]}, comment: {type: string}}, required: [rsvp]}
+    MeetingConsentInput: {type: object, properties: {state: {type: string, enum: [granted, declined]}}, required: [state]}
+    MeetingParticipantInput: {type: object, properties: {user_id: {type: string, format: uuid}, kind: {type: string, enum: [required, optional]}, role: {type: string, enum: [meeting_viewer, meeting_attendee, meeting_note_taker, meeting_organizer]}, role_id: {type: string, format: uuid}}}
+    OccurrenceInput: {type: object, properties: {start_at: {type: string, format: date-time}, end_at: {type: string, format: date-time}, title: {type: string}, location: {type: string}, reason: {type: string}, version: {type: integer}}}
+    OccurrenceStatusInput: {type: object, properties: {status: {type: string, enum: [scheduled, in_progress, ended]}, version: {type: integer}}, required: [status]}
+    AgendaItemInput: {type: object, properties: {title: {type: string}, body: {type: string}, owner_id: {type: string, format: uuid}, timebox_min: {type: integer, minimum: 1, maximum: 480}, kind: {type: string, enum: [info, discussion, decision]}, state: {type: string, enum: [open, discussed, deferred]}, version: {type: integer}}}
+    AgendaMoveInput: {type: object, properties: {after_id: {type: string, format: uuid}, before_id: {type: string, format: uuid}}}
+    AttendanceInput: {type: object, properties: {entries: {type: array, items: {type: object, properties: {user_id: {type: string, format: uuid}, state: {type: string, enum: [present, late, absent, excused]}}}}}, required: [entries]}
+    PrivatePointInput: {type: object, properties: {body: {type: string}}, required: [body]}
+    NotesInput: {type: object, properties: {body: {type: string}, version: {type: integer, description: 'the version the edit is based on; 0 for the first save'}}, required: [body, version]}
+    MinutesCorrectionInput: {type: object, properties: {reason: {type: string}}, required: [reason]}
+    DecisionInput: {type: object, properties: {text: {type: string}, agenda_item_id: {type: string, format: uuid}, status: {type: string, enum: [proposed, approved, superseded]}, decided_by: {type: string, format: uuid}, version: {type: integer}}}
+    ActionItemInput: {type: object, properties: {task_id: {type: string, format: uuid}, project_id: {type: string, format: uuid}, title: {type: string}, description: {type: string}, assignee_ids: {type: array, items: {type: string, format: uuid}}, due_at: {type: string, format: date-time}, agenda_item_id: {type: string, format: uuid}}}
+    FeedTokenInput: {type: object, properties: {label: {type: string}}}

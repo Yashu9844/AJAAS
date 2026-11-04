@@ -98,7 +98,9 @@ func (r Rule) Expand(start, windowEnd time.Time, limit int) []time.Time {
 func (r Rule) period(start time.Time, p int) []time.Time {
 	loc, step := start.Location(), p*r.Interval
 	h, m, s := start.Clock()
-	at := func(y int, mo time.Month, d int) time.Time { return wallClock(y, mo, d, [3]int{h, m, s}, loc) }
+	at := func(y int, mo time.Month, d int) time.Time {
+		return wallClock(time.Date(y, mo, d, 0, 0, 0, 0, time.UTC), [3]int{h, m, s}, loc)
+	}
 	var days []time.Time
 	switch r.Freq {
 	case Daily:
@@ -121,7 +123,8 @@ func (r Rule) period(start time.Time, p int) []time.Time {
 
 // wallClock is the instant of a local wall-clock time. A time inside a DST gap does not exist; RFC 5545 section 3.3.5
 // interprets it with the UTC offset in force before the gap (02:30 on a spring-forward night becomes 03:30).
-func wallClock(y int, mo time.Month, d int, hms [3]int, loc *time.Location) time.Time {
+func wallClock(day time.Time, hms [3]int, loc *time.Location) time.Time {
+	y, mo, d := day.Date()
 	t := time.Date(y, mo, d, hms[0], hms[1], hms[2], 0, loc)
 	if t.Hour() == hms[0] && t.Minute() == hms[1] {
 		return t
@@ -158,5 +161,5 @@ func (r Rule) months(start time.Time) []time.Month {
 
 // WallClock returns the instant in loc of the wall-clock fields of local (DST gaps resolved as RFC 5545 does).
 func WallClock(local time.Time, loc *time.Location) time.Time {
-	return wallClock(local.Year(), local.Month(), local.Day(), [3]int{local.Hour(), local.Minute(), local.Second()}, loc)
+	return wallClock(local, [3]int{local.Hour(), local.Minute(), local.Second()}, loc)
 }

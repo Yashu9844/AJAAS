@@ -4,12 +4,10 @@ package kernel
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -116,45 +114,6 @@ func Emit(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, key string, payl
 	}
 	return tx.WithContext(ctx).Exec(`INSERT INTO `+OutboxTable+` (id, tenant_id, event_id, routing_key, payload) VALUES (?, ?, ?, ?, ?)`,
 		uuid.New(), tenantID, id, key, string(raw)).Error
-}
-
-// Default and maximum page sizes.
-const (
-	DefaultLimit = 50
-	MaxLimit     = 200
-)
-
-// ClampLimit applies the default and the maximum.
-func ClampLimit(raw string) int {
-	n, err := strconv.Atoi(strings.TrimSpace(raw))
-	if err != nil || n < 1 {
-		return DefaultLimit
-	}
-	if n > MaxLimit {
-		return MaxLimit
-	}
-	return n
-}
-
-// EncodeCursor turns a position into an opaque token.
-func EncodeCursor(v any) string {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return ""
-	}
-	return base64.RawURLEncoding.EncodeToString(raw)
-}
-
-// DecodeCursor parses a token into dst; an empty token leaves dst untouched.
-func DecodeCursor(token string, dst any) error {
-	if token == "" {
-		return nil
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(token)
-	if err != nil || json.Unmarshal(raw, dst) != nil {
-		return Invalid("cursor", "is not a valid cursor")
-	}
-	return nil
 }
 
 // InTx runs fn in a transaction on db.

@@ -65,7 +65,7 @@ func (s *Service) Update(ctx context.Context, a api.Actor, id uuid.UUID, in Upda
 		if err := s.logChange(ctx, tx, a, change{series: row.ID, action: "series.updated", fields: map[string]any{"version": row.Version}}); err != nil {
 			return err
 		}
-		if err := s.audit(ctx, tx, a, "meeting.updated", row.ID, nil); err != nil {
+		if err := s.audit(ctx, tx, a, auditEntry{"meeting.updated", row.ID, nil}); err != nil {
 			return err
 		}
 		return kernel.Emit(ctx, tx, a.TenantID, "meeting.updated", map[string]any{"series_id": row.ID, "version": row.Version})
@@ -77,8 +77,8 @@ func (s *Service) Update(ctx context.Context, a api.Actor, id uuid.UUID, in Upda
 }
 
 func applyUpdate(row *Series, in UpdateInput) error {
-	f, err := checkFields(pick(in.Title, row.Title), pick(in.Description, row.DescriptionMD), pick(in.Visibility, row.Visibility),
-		pick(in.Location, row.Location), pick(in.VideoURL, row.VideoURL))
+	f, err := checkFields(fields{pick(in.Title, row.Title), pick(in.Description, row.DescriptionMD), pick(in.Visibility, row.Visibility),
+		pick(in.Location, row.Location), pick(in.VideoURL, row.VideoURL)})
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,8 @@ func applyUpdate(row *Series, in UpdateInput) error {
 	if row.RRule != nil {
 		rule = *row.RRule
 	}
-	t, err := parseTiming(pick(in.Start, row.DTStartLocal.Format(startLayout)), pick(in.TZ, row.TZ), pick(in.DurationMin, row.DurationMin), allDay, pick(in.RRule, rule))
+	t, err := parseTiming(timingInput{start: pick(in.Start, row.DTStartLocal.Format(startLayout)), tz: pick(in.TZ, row.TZ),
+		duration: pick(in.DurationMin, row.DurationMin), allDay: allDay, rule: pick(in.RRule, rule)})
 	if err != nil {
 		return err
 	}

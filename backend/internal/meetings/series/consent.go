@@ -26,6 +26,7 @@ type consent struct {
 	DecidedAt time.Time
 }
 
+// TableName maps to meeting_consents.
 func (consent) TableName() string { return "meeting_consents" }
 
 // ConsentInput is a participant decision on recording and transcription.
@@ -67,7 +68,7 @@ func (s *Service) SetConsent(ctx context.Context, a api.Actor, seriesID uuid.UUI
 		}).Create(&c).Error; err != nil {
 			return err
 		}
-		return s.audit(ctx, tx, a, "meeting.consent."+in.State, row.ID, nil)
+		return s.audit(ctx, tx, a, auditEntry{"meeting.consent." + in.State, row.ID, nil})
 	})
 	if err != nil {
 		return nil, err

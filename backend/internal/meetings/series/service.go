@@ -55,12 +55,6 @@ func NewService(db *gorm.DB, p Ports) *Service {
 // SetClock replaces the clock (tests).
 func (s *Service) SetClock(now func() time.Time) { s.now = now }
 
-// Now returns the service clock.
-func (s *Service) Now() time.Time { return s.now() }
-
-// DB returns the database handle the service uses.
-func (s *Service) DB() *gorm.DB { return s.db }
-
 func ref(tenantID, seriesID uuid.UUID) identityport.ResourceRef {
 	return identityport.ResourceRef{TenantID: tenantID, Type: access.AppliesMeetingSeries, ID: seriesID}
 }
@@ -69,9 +63,16 @@ func (s *Service) inTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	return kernel.InTx(ctx, s.db, fn)
 }
 
+// auditEntry is one M0 audit record about a series.
+type auditEntry struct {
+	action string
+	series uuid.UUID
+	meta   any
+}
+
 // audit records an M0 audit entry; failures surface so a write and its audit commit together.
-func (s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, action string, id uuid.UUID, meta any) error {
-	return s.p.Audit.Log(ctx, tx, a.TenantID.String(), a.UserID.String(), action, "meeting_series", id.String(), meta, a.IP, a.UserAgent)
+func (s *Service) audit(ctx context.Context, tx *gorm.DB, a api.Actor, e auditEntry) error {
+	return s.p.Audit.Log(ctx, tx, a.TenantID.String(), a.UserID.String(), e.action, "meeting_series", e.series.String(), e.meta, a.IP, a.UserAgent)
 }
 
 // change appends a change-log row (SC-6).

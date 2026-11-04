@@ -29,7 +29,7 @@ func (s *Service) Cancel(ctx context.Context, a api.Actor, id uuid.UUID, in Canc
 		if err := s.logChange(ctx, tx, a, change{series: row.ID, action: "series.cancelled", reason: reason}); err != nil {
 			return err
 		}
-		if err := s.audit(ctx, tx, a, "meeting.cancelled", row.ID, nil); err != nil {
+		if err := s.audit(ctx, tx, a, auditEntry{"meeting.cancelled", row.ID, nil}); err != nil {
 			return err
 		}
 		return kernel.Emit(ctx, tx, a.TenantID, "meeting.cancelled", map[string]any{"series_id": row.ID, "version": row.Version})
@@ -66,7 +66,7 @@ func (s *Service) Delete(ctx context.Context, a api.Actor, id uuid.UUID, version
 			Updates(map[string]any{"deleted_at": now, "window_until": nil, "version": row.Version + 1}).Error; err != nil {
 			return err
 		}
-		if err := s.audit(ctx, tx, a, "meeting.deleted", row.ID, nil); err != nil {
+		if err := s.audit(ctx, tx, a, auditEntry{"meeting.deleted", row.ID, nil}); err != nil {
 			return err
 		}
 		return kernel.Emit(ctx, tx, a.TenantID, "meeting.cancelled", map[string]any{"series_id": row.ID, "deleted": true})

@@ -98,7 +98,7 @@ func (s *Service) occurrenceChanged(ctx context.Context, tx *gorm.DB, a api.Acto
 	if err := s.logChange(ctx, tx, a, change{series: c.row.ID, occurrence: &c.o.ID, action: action, fields: fields, reason: c.reason}); err != nil {
 		return err
 	}
-	if err := s.audit(ctx, tx, a, "meeting."+action, c.row.ID, map[string]string{"occurrence_id": c.o.ID.String()}); err != nil {
+	if err := s.audit(ctx, tx, a, auditEntry{"meeting." + action, c.row.ID, map[string]string{"occurrence_id": c.o.ID.String()}}); err != nil {
 		return err
 	}
 	if c.key == "" {

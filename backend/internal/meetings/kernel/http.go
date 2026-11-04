@@ -48,28 +48,6 @@ func NoContent(c *gin.Context, err error) {
 	c.Status(http.StatusNoContent)
 }
 
-// Page is a cursor-paged list.
-type Page[T any] struct {
-	Rows []T
-	Next string
-}
-
-// RespondPage writes {data, meta: {next_cursor}}.
-func RespondPage[T any](c *gin.Context, p Page[T], err error) {
-	if err != nil {
-		Fail(c, err)
-		return
-	}
-	if p.Rows == nil {
-		p.Rows = []T{}
-	}
-	var cur any
-	if p.Next != "" {
-		cur = p.Next
-	}
-	c.JSON(http.StatusOK, gin.H{"data": p.Rows, "meta": gin.H{"next_cursor": cur}})
-}
-
 // Bind decodes the JSON body into dst or answers 400.
 func Bind(c *gin.Context, dst any) bool {
 	if err := c.ShouldBindJSON(dst); err != nil {
