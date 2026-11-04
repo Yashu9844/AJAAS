@@ -34,12 +34,40 @@ type Template struct {
 
 // What a role or permission applies to (resource-scoped roles, docs/modules/m0-identity-access/resource-roles.md).
 const (
-	AppliesTenant  = "tenant"
-	AppliesProject = "project"
+	AppliesTenant        = "tenant"
+	AppliesProject       = "project"
+	AppliesMeetingSeries = "meeting_series"
 )
+
+// ResourceTypes are the resource types roles can be assigned on.
+var ResourceTypes = []string{AppliesProject, AppliesMeetingSeries}
+
+// IsResourceType reports whether t is a resource type roles can be assigned on.
+func IsResourceType(t string) bool {
+	for _, r := range ResourceTypes {
+		if r == t {
+			return true
+		}
+	}
+	return false
+}
 
 // ProjectRoleRequired are the permissions every project role must hold.
 var ProjectRoleRequired = []string{"project:read", "task:read"}
+
+// MeetingRoleRequired are the permissions every meeting-series role must hold (M3 DMT-09).
+var MeetingRoleRequired = []string{"meeting:read"}
+
+// RoleRequired returns the permissions every role applying to the resource type must hold.
+func RoleRequired(applies string) []string {
+	switch applies {
+	case AppliesProject:
+		return ProjectRoleRequired
+	case AppliesMeetingSeries:
+		return MeetingRoleRequired
+	}
+	return nil
+}
 
 // Predefined project role template keys; each inherits the one before it (viewer <- member <- manager <- owner).
 const (
@@ -47,6 +75,15 @@ const (
 	TemplateProjectMember  = "project_member"
 	TemplateProjectManager = "project_manager"
 	TemplateProjectOwner   = "project_owner"
+)
+
+// Predefined meeting-series role template keys; each inherits the one before it (viewer <- attendee <- note-taker <-
+// organizer), M3 DMT-09.
+const (
+	TemplateMeetingViewer    = "meeting_viewer"
+	TemplateMeetingAttendee  = "meeting_attendee"
+	TemplateMeetingNoteTaker = "meeting_note_taker"
+	TemplateMeetingOrganizer = "meeting_organizer"
 )
 
 // Templates lists the predefined roles, parents before children.
@@ -67,6 +104,10 @@ var Templates = []Template{
 	{TemplateProjectMember, "Project Member", "Works on tasks: create, edit, assign, comment, log time, attach files", TemplateProjectViewer, false, AppliesProject},
 	{TemplateProjectManager, "Project Manager", "Manages a project: members, columns, labels, milestones, sprints, moderation", TemplateProjectMember, false, AppliesProject},
 	{TemplateProjectOwner, "Project Owner", "Everything a manager can do, plus archive and restore", TemplateProjectManager, false, AppliesProject},
+	{TemplateMeetingViewer, "Meeting Viewer", "Reads a meeting series, its agenda and published minutes", "", false, AppliesMeetingSeries},
+	{TemplateMeetingAttendee, "Meeting Attendee", "Takes part: responds, proposes agenda topics", TemplateMeetingViewer, false, AppliesMeetingSeries},
+	{TemplateMeetingNoteTaker, "Meeting Note-taker", "Writes notes, records decisions, attendance and action items, publishes minutes", TemplateMeetingAttendee, false, AppliesMeetingSeries},
+	{TemplateMeetingOrganizer, "Meeting Organizer", "Everything a note-taker can do, plus scheduling, participants and cancelling", TemplateMeetingNoteTaker, false, AppliesMeetingSeries},
 }
 
 // TemplateByKey finds a template.

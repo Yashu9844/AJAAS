@@ -16,7 +16,7 @@ var (
 // ResourceRef names one resource of a tenant, or (with a zero ID) every resource of a type.
 type ResourceRef struct {
 	TenantID uuid.UUID
-	Type     string // AppliesProject
+	Type     string // one of ResourceTypes (AppliesProject, AppliesMeetingSeries)
 	ID       uuid.UUID
 }
 

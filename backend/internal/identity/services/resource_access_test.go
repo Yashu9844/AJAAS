@@ -270,3 +270,46 @@ func TestResourceAccessCatalogueAndErrors(t *testing.T) {
 		t.Fatal("tenant roles error surfaces in template lookup")
 	}
 }
+
+func TestResourceAccessMeetingSeries(t *testing.T) {
+	e := newResourceEnv()
+	key := access.TemplateMeetingAttendee
+	attendee := e.f.role("Attendee", nil, map[string]string{"meeting:read": "tenant", "agenda:propose": "tenant"})
+	attendee.AppliesTo, attendee.TemplateKey = access.AppliesMeetingSeries, &key
+	ref := access.ResourceRef{TenantID: e.f.tenant, Type: access.AppliesMeetingSeries, ID: uuid.New()}
+	user, ctx := uuid.New(), context.Background()
+	if err := e.svc.AssignRole(ctx, nil, ref, access.RoleAssignment{UserID: user, RoleID: e.member.ID}); !errors.Is(err, access.ErrRoleNotApplicable) {
+		t.Fatalf("a project role cannot be assigned on a meeting series: %v", err)
+	}
+	if err := e.svc.AssignRole(ctx, nil, ref, access.RoleAssignment{ActorID: user, UserID: user, RoleID: attendee.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, perms, err := e.svc.PermissionsOn(ctx, nil, ref, user); err != nil || len(perms) != 2 {
+		t.Fatalf("meeting permissions: %v %v", perms, err)
+	}
+	if r, _, _ := e.svc.PermissionsOn(ctx, nil, e.ref, user); r.RoleID != uuid.Nil {
+		t.Fatal("a meeting role grants nothing on a project with the same tenant")
+	}
+	if got := (*e.audits)[0]; got.resource != access.AppliesMeetingSeries {
+		t.Fatalf("audited under the meeting series type: %+v", got)
+	}
+	avail, _ := e.svc.AvailableRoles(ctx, nil, ref)
+	if len(avail) != 1 || avail[0].RoleID != attendee.ID {
+		t.Fatalf("only meeting roles are assignable on a series: %+v", avail)
+	}
+}
+
+func TestRoleRequiredPerResourceType(t *testing.T) {
+	if err := checkAppliesTo(access.AppliesMeetingSeries, []grantSpec{{key: "agenda:propose", applies: access.AppliesMeetingSeries}}); err == nil {
+		t.Fatal("a meeting role without meeting:read is refused")
+	}
+	if err := checkAppliesTo(access.AppliesMeetingSeries, []grantSpec{{key: "meeting:read", applies: access.AppliesMeetingSeries}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkAppliesTo(access.AppliesMeetingSeries, []grantSpec{{key: "meeting:read", applies: access.AppliesMeetingSeries}, {key: "project:read", applies: access.AppliesProject}}); err == nil {
+		t.Fatal("a project permission cannot be part of a meeting role")
+	}
+	if !access.IsResourceType(access.AppliesMeetingSeries) || access.IsResourceType(access.AppliesTenant) || access.RoleRequired(access.AppliesTenant) != nil {
+		t.Fatal("resource type helpers")
+	}
+}

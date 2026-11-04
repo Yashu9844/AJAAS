@@ -38,7 +38,8 @@ func TestSchemasAreOwnedAndIsolated(t *testing.T) {
 	for table, schema := range map[string]string{"tenants": "identity", "users": "identity", "roles": "identity",
 		"identity_events_outbox": "identity", "departments": "hr", "employee_profiles": "hr", "leave_ledger": "hr",
 		"payroll_runs": "hr", "recruitment_jobs": "hr", "performance_cycles": "hr",
-		"projects_events_outbox": "projects", "projects_events_inbox": "projects"} {
+		"projects_events_outbox": "projects", "projects_events_inbox": "projects",
+		"meeting_series": "meetings", "meeting_occurrences": "meetings", "meetings_events_outbox": "meetings"} {
 		if got := sqlStr(t, "SELECT table_schema FROM information_schema.tables WHERE table_name = ?", table); got != schema {
 			t.Errorf("%s lives in %q, want %q", table, got, schema)
 		}
@@ -48,7 +49,7 @@ func TestSchemasAreOwnedAndIsolated(t *testing.T) {
 	}
 	// The monolith resolves unqualified names through one search path, so a name used by two services would be ambiguous.
 	if dup := sqlStr(t, `SELECT coalesce(string_agg(table_name, ','), '') FROM (SELECT table_name FROM information_schema.tables
-		WHERE table_schema IN ('identity','hr','projects') AND table_type = 'BASE TABLE'
+		WHERE table_schema IN ('identity','hr','projects','meetings') AND table_type = 'BASE TABLE'
 		GROUP BY table_name HAVING count(*) > 1 AND table_name <> 'schema_migrations') d`); dup != "" {
 		t.Fatalf("table names used by more than one schema: %s", dup)
 	}

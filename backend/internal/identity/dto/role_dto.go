@@ -17,7 +17,7 @@ type CreateRoleRequest struct {
 	Grants        []GrantInput `json:"grants" binding:"omitempty,dive"`
 	ParentRoleID  *string      `json:"parent_role_id" binding:"omitempty,uuid"`
 	// AppliesTo is "tenant" (default) or "project" (a role assigned to a user on one project).
-	AppliesTo string `json:"applies_to" binding:"omitempty,oneof=tenant project"`
+	AppliesTo string `json:"applies_to" binding:"omitempty,oneof=tenant project meeting_series"`
 }
 
 // UpdateRoleRequest is a partial payload to update role metadata. parent_role_id "" removes the parent.

@@ -1,4 +1,4 @@
-// Package app wires Modules 0-2 into a single HTTP engine. cmd/main.go and the integration tests share it so the
+// Package app wires Modules 0-3 into a single HTTP engine. cmd/main.go and the integration tests share it so the
 // tested router is exactly the production router.
 package app
 
@@ -101,6 +101,10 @@ func Build(o Options) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	meetingsModule, err := buildMeetings(o, idp, projectsModule)
+	if err != nil {
+		return nil, err
+	}
 	// Predefined roles need every service's catalogue, so they are synced once HR has registered its permissions.
 	if err := identityModule.SyncRoleTemplates(context.Background()); err != nil {
 		return nil, err
@@ -132,6 +136,8 @@ func Build(o Options) (*gin.Engine, error) {
 	hrModule.RegisterRoutes(v1.Group("/hr"))
 	// M2 Projects & Tasks: its own routes at the /api/v1 root (docs/modules/m2-projects-tasks/design.md).
 	projectsModule.RegisterRoutes(v1)
+	// M3 Meetings: its own routes at the /api/v1 root (docs/modules/m3-meetings/design.md).
+	meetingsModule.RegisterRoutes(v1)
 
 	registerHealth(router, o.DB, o.Redis)
 	identityModule.RegisterWellKnown(router)

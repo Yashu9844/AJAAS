@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jaas/jaas/internal/identity/access"
@@ -250,11 +251,9 @@ func checkAppliesTo(applies string, specs []grantSpec) error {
 		}
 		have[g.key] = true
 	}
-	if applies == access.AppliesProject {
-		for _, k := range access.ProjectRoleRequired {
-			if !have[k] {
-				return validationError("a project role must include " + k)
-			}
+	for _, k := range access.RoleRequired(applies) {
+		if !have[k] {
+			return validationError("a " + strings.ReplaceAll(applies, "_", " ") + " role must include " + k)
 		}
 	}
 	return nil

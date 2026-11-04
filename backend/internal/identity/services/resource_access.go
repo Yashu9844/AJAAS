@@ -47,7 +47,7 @@ type resourceAccess struct{ d ResourceAccessDeps }
 func NewResourceAccess(d ResourceAccessDeps) ResourceAccess { return &resourceAccess{d: d} }
 
 func checkResourceType(t string) error {
-	if t != access.AppliesProject {
+	if !access.IsResourceType(t) {
 		return access.ErrResourceType
 	}
 	return nil

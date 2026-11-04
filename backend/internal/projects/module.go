@@ -144,6 +144,9 @@ func (m *Module) startBackground() {
 	go m.project.RunGroupRefresh(m.o.Background, groupRefreshEvery, func(err error) { m.o.Logger.Error().Err(err).Msg("group rule refresh failed") })
 }
 
+// Tasks exposes the task service for the in-process tasks port M3 uses (internal/shared/tasksport).
+func (m *Module) Tasks() *task.Service { return m.task }
+
 // Authorizer exposes project access resolution for tests and other contexts.
 func (m *Module) Authorizer() api.Authorizer { return m.project }
 
