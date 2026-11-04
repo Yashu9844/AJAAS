@@ -9,7 +9,7 @@ M8 Documents → M2–M6 and M10, M12 → M6 Reports, M11 Knowledge Base, M9 AI 
 | M0 Identity & Access | `m0-identity-access/` | built and hardened; Phase B alignment next |
 | M1 HR Management | `m1-hr-management/` | 6 contexts built, `performance` in progress, 5 contexts planned |
 | M2 Projects & Tasks | `m2-projects-tasks/` | not started |
-| M3 Meetings | `m3-meetings/` | not started |
+| M3 Meetings | `m3-meetings/` | design approved 2026-11-04, build not started |
 | M4 Assets & Inventory | `m4-assets-inventory/` | not started |
 | M5 Finance | `m5-finance/` | not started |
 | M6 Reports & Analytics | `m6-reports-analytics/` | not started |

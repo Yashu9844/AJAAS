@@ -1,7 +1,6 @@
 # M3 Meetings
 
-**Status:** NOT STARTED — design pending. Research phase done (2026-11-02): `research/README.md` (features, market, open source, internals, architecture options, recommendation and open questions for the owner); no design or code yet. Proposed contract in `specification.md`; logical data model, ER diagram and
-service diagram in `model/`.
+**Status:** DESIGN APPROVED (2026-11-04), build not started - see `plan.md`. Research in `research/` (features, journeys, market, open source, internals, architecture options, validated answers to the 12 owner questions); decisions DMT-01..20 in `decisions.md`.
 
 **Purpose:** Scheduling, meeting records and decisions; tasks remain owned by Projects & Tasks.
 
@@ -15,10 +14,11 @@ service diagram in `model/`.
 
 | File | Holds |
 |---|---|
-| `specification.md` | proposed purpose, data model, API shapes, rules, events and acceptance tests (from `docs/ARCHITECTURE.md` section 5) plus the proposed entities |
-| `model/db-model.md` | proposed tables, relationships, dependencies, reliability tables, indexes (owner bundle, verbatim) |
-| `model/erd.mmd` | Mermaid ER diagram |
-| `model/architecture.mmd` | Mermaid service interaction diagram |
-
-When the module enters design, `design.md`, `testing.md`, `plan.md` and `decisions.md` are added and the
-specification is frozen (see `docs/ENGINEERING.md`, documentation standard).
+| `specification.md` | phase-1 contract: phase plan by feature id, rules MR-01..13, API, events, acceptance tests, extension points |
+| `design.md` | packages, ports, data model, materialiser, authorizer, notes, action items, feed, performance, risks |
+| `decisions.md` | DMT-01..20 (owner-approved 2026-11-04) |
+| `security.md` | threats T1-T16 with mitigations and planned evidence |
+| `testing.md` | test layers, golden tests, gates |
+| `plan.md` | build steps P0-P7 and status |
+| `research/` | research input (see `research/README.md`) |
+| `model/` | original proposed tables and diagrams (pre-design; superseded by `design.md` section 2 where they differ) |
